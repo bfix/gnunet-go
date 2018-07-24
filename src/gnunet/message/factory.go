@@ -1,0 +1,33 @@
+package message
+
+import (
+	"errors"
+	"fmt"
+)
+
+// NewEmptyMessage creates a new empty message object of given type.
+func NewEmptyMessage(msgType uint16) (interface{}, error) {
+	switch msgType {
+	case TRANSPORT_TCP_WELCOME:
+		return NewTransportTcpWelcomeMsg(nil), nil
+	case HELLO:
+		return NewHelloMsg(nil), nil
+	case TRANSPORT_SESSION_QUOTA:
+		return NewSessionQuotaMsg(0), nil
+	case TRANSPORT_SESSION_SYN:
+		return NewSessionSynMsg(0), nil
+	case TRANSPORT_SESSION_SYN_ACK:
+		return NewSessionSynAckMsg(0), nil
+	case TRANSPORT_SESSION_ACK:
+		return new(SessionAckMsg), nil
+	case TRANSPORT_PING:
+		return NewTransportPingMsg(nil, nil), nil
+	case TRANSPORT_PONG:
+		return NewTransportPongMsg(0, nil), nil
+	case TRANSPORT_SESSION_KEEPALIVE:
+		return NewSessionKeepAliveMsg(), nil
+	case CORE_EPHEMERAL_KEY:
+		return NewEphemeralKeyMsg(), nil
+	}
+	return nil, errors.New(fmt.Sprintf("Unknown message type %d", msgType))
+}

@@ -1,0 +1,31 @@
+@node Services
+@chapter Services
+
+A GNUnet instance running on one node is an assembly of services that exchange
+messages (see Chapter "Messages" for details) -- among themselves and with
+services running on other nodes.
+
+GNUnet services on a node usually utilize other, more basic GNUnet services
+to provide their functionality. The following graph shows the dependencies
+and message channels between the most basic GNUnet services:
+
+@float GNUnet services
+@image{chapters/services/services-01,,7cm,,.png}
+@caption{dependencies}
+@end float
+
+@node Mandatory services for a GNUnet node
+@section Mandatory services for a GNUnet node
+
+The services marked with a background color in the above figure comprise the
+smallest set of services a node must provide to be useful for the network -- 
+even if it is only providing a simple DHT storage service. These mandatory
+services are:
+
+@c *********************************************************************
+@include chapters/services/core.texi
+@c *********************************************************************
+
+@c *********************************************************************
+@include chapters/services/transport.texi
+@c *********************************************************************

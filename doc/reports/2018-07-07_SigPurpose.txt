@@ -1,0 +1,33 @@
+
+In ./src/include/gnunet_signature.h (lines 146-169) the following
+constants are defined:
+
+> /**
+>  * Signature of a conversation ring.
+>  */
+> #define GNUNET_SIGNATURE_PURPOSE_CONVERSATION_RING 20
+>
+> /**
+>  * Signature for the first round of distributed key generation.
+>  */
+> #define GNUNET_SIGNATURE_PURPOSE_SECRETSHARING_DKG1 22
+>
+> /**
+>  * Signature for the second round of distributed key generation.
+>  */
+> #define GNUNET_SIGNATURE_PURPOSE_SECRETSHARING_DKG2 23
+>
+> /**
+>  * Signature for cooperatice decryption.
+>  */
+> #define GNUNET_SIGNATURE_PURPOSE_SECRETSHARING_DECRYPTION 23
+>
+> /**
+>  * Signature of a multicast request sent by a member.
+>  */
+> #define GNUNET_SIGNATURE_PURPOSE_MULTICAST_REQUEST 24
+
+The value "21" is missing and "23" is defined twice. Is that on purpose
+(due to some history I don't know) or a bug?
+
+Thanks, Bernd.

@@ -1,0 +1,47 @@
+@node Transport
+@section Transport
+
+@emph{Transport} in this chapter refers to the transport of GNUnet messages
+as sent and received by the various subsystems of GNUnet (like DHT, NSE, FS,
+GNS, ...) between peers in the P2P network.  For the purpose of this chapter
+such a message `M` is treated as a binary object of size `m` (in bytes).
+
+Every node (peer) in GNUnet is identified by the hash codes of its public key.
+
+
+@table @samp
+
+@item StartMessage
+
+Message from the transport service to the library asking to check if both
+processes agree about this peers identity.
+
+@example
++--------+--------+--------+--------+--------+--------+--------+--------+
+|    msg_size     |    msg_type     |             options               |
++--------+--------+--------+--------+--------+--------+--------+--------+
+|                                                                       |
++                                                                       +
+|                                                                       |
++                             peer_identity                             +
+|                                                                       |
++                                                                       +
+|                                                                       |
++--------+--------+--------+--------+--------+--------+--------+--------+
+@end example
+
+@itemize
+	@item @samp{msg_size}
+	uint16: size of the message = 40 bytes
+	
+	@item @samp{msg_type}
+	uint16: message type = GNUNET_MESSAGE_TYPE_TRANSPORT_START
+	
+	@item
+	
+	@item @samp{peer_identity}
+	Identity we think we have.  If it does not match, the receiver should
+	print out an error message and disconnect.
+@end itemize
+
+@end table

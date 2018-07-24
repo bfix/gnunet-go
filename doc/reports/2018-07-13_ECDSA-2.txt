@@ -1,0 +1,103 @@
+
+On 07/13/2018 12:31 PM, Christian Grothoff wrote:
+> On 07/13/2018 12:33 AM, Bernd Fix wrote:
+>> ECDHE: ------ Good, but it is used with curve Ed25519. The problem 
+>> is that ECDHE requires scalar multiplication of a point on the 
+>> curve (that is not the base point!) - and that functionality is
+>> not available in many Ed25519 implementations - they often only
+>> provide sign/verify operations.
+>>
+>> A more natural choice for me would be ECDHE with Curve25519.
+>
+> EdDSA here does not refer to the actual EdDSA signature algorithm, 
+> but to the point compression algorithm which should be used by 
+> libgcrypt (see page 37, 
+> https://www.gnupg.org/documentation/manuals/gcrypt.pdf).
+
+My point was that EdDSA (and the flag "eddsa" used with gcrypt) refers
+to and enforces the Ed25519 curve. For implementations not using gcrypt
+that can be a problem as ECDHE requires operations on the curve (scalar
+multiplication of a arbitrary point) that a lot of libraries do not
+support. But I understand why that is not an issue for GNUnet itself.
+
+> Now, I can see why you might argue that the resulting point should
+> be in X25519 format for Curve25519, that would seem to require the
+> 0x40 byte to explicitly request the algorithm's native compression
+> method to be used.  I don't mind changing the point format for the
+> ECDHE case to X25519 (at a point where we break compatibility).
+
+As you said: X25519 is based on Curve25519, not Ed25519 (although there
+is a bijective mapping between them). And yes, I would "add/strip" the
+compression indicator for points when retrieving/storing keys (so public
+keys remain 256 bits in size and cause no alignment issues). But this
+approach seems void given your next statement:
+
+> Well, there is one tricky bit with that I forgot to point out in my 
+> previous message: we do use (rarely) the same point/key for both 
+> ECDHE and EdDSA (specifically, in Taler).  Hence, here it is
+> relevant to have the same public key representation across both
+> schemes.
+
+This constraint of course make things trickier, because that means we
+are stuck in using Ed25519 for ECDHE. A possible solution (again: not
+for GNUnet itself, but for implementators in general) for using Ed25519
+points with ECDHE is to use the bijective mapping between Ed25519 and
+Curve25519 and to do the ECDHE on Curve25519. Not nice probably, but
+that could work.
+
+>> ECDSA: ------ I also have some problems with this one - and it is 
+>> used everywhere in GNUnet for (user) identities (although not by 
+>> the crypto used for secure message exchange in sessions).
+>>
+>> AFAIK is the choice of curve for ECDSA limited (NIST curves 
+>> basically). I think that is one of the reason we have EdDSA in the 
+>> first place. But maybe I am wrong here...
+>
+> You are. You can use Curve25519 with ECDSA, and that is what we do in
+> GNUnet. No NIST curves to be found.
+
+Well, ECDSA in GNUnet is used with Ed25519 (and not Curve25519). Even
+the gcrypt manual
+(https://www.gnupg.org/documentation/manuals/gcrypt/General-public_002dkey-related-Functions.html)
+states:
+
+"Here is an example on how to create a key using curve Ed25519 with the
+ECDSA signature algorithm. Note that the use of ECDSA with that curve is
+in general not recommended."
+
+Yes, you *can* use ECDSA with Ed25519 (gcrypt implements it) or
+Curve25519, but to my knowledge both curve types (Montgomery/twisted
+Edwards) are not *recommended* for ECDSA, which was designed with
+Weierstrass curves in mind (but I am not so deep into ECC that I can
+recall the exact security considerations leading to that statement - or
+do you consider that statement incorrect?)
+
+>> Changing the code to really use Curve25519 would ease the pain 
+>> significantly. But if someone asks me, I would replace ECDSA with 
+>> EdDSA completely...
+>
+> Please note that this is not so easy: we use ECDSA specifically 
+> because the following holds (needed for GNS):
+>
+> Suppose A := aG.  Let b := xa for some random x.  Then B := xaG.
+> Now, suppose I give you my public key A and x. Now I can sign
+> something with xa as the private key, and you can verify the
+> signature using xA.
+>
+> EdDSA applies h(ax) to the private key, and this hashing destroys the
+> (otherwise) linear relationship as with
+>
+> A := h(a)G, b := xa and B := h(xa)G
+>
+> no longer allows for xA = B (and also not h(x)A = B).
+>
+> Doing GNS-crypto (which is what we do with identities) thus would 
+> require you to re-implement parts of EdDSA to get past the 'h' 
+> application. Doable, but messy. So please make sure that if you do
+> try to change this, that the GNS crypto is still 'happy'.
+
+Let's assume ECDSA is used with Curve25519 (ignoring my previous
+arguments against this). For me it then looks like all requirements for
+GNS-crypto are also satisfied. So are there any other arguments to at
+least switch ECDSA from Ed25519 to Curve25519?
+

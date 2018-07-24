@@ -1,0 +1,25 @@
+
+@subsection TRANSPORT
+
+The TRANSPORT service handles all message exchanges between a local peer and
+other peers on the network. It can -- depending on the computer hardware it
+is running on -- support multiple transport methods between peers: TCP/IP,
+UDP/IP, ICMP, HTTP, Bluetooth, WiFi and others.
+
+Each transport method has its unique way of specifying a peer address; TCP/IP
+expects an IP address and a port number, while HTTP expects an URL. So a
+single peer can have multiple addresses (one for each available transport
+method). CORE links all these addresses to one peer identity. While a peer
+address can (and often do) change over time, the peer identity is fixed.
+
+The TRANSPORT service establishes, maintains, processes and drops connections
+with other peers on request of the CORE service. If a new connection to a peer
+identity is requested, the ATS (Automatic Transport Selection) decides which
+available transport method should be used. To improve performance and
+reliability, multiple channels on different transport methods can be created
+between two peers at the same time; the sender sends the next message on the
+channel with the best throughput.
+
+Connection requests from other peers can be filtered by the TRANSPORT service
+(e.g. by implementing a black-list of banned peers), all other requests are
+forwarded to the CORE service for validation and approval.

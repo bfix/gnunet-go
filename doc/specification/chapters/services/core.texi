@@ -1,0 +1,63 @@
+
+@subsection CORE
+
+One of the most important services in GNUnet is the CORE service managing
+connections and handling encryption between peers.
+
+Every peer has a private (secret) key and an associated public key for the
+Ed25519 signature scheme (see @url{https://gnunet.org/ed25519}); this keypair
+is usually created if a GNUnet instance is started for the first time. The
+keypair is unique, so the Ed25519 public key (32 octets in standard compact
+format) serves as a GNUnet @dfn{peer identity}. 
+
+A @dfn{connection} is a bi-directional channel suitable for message exchange
+between two peers. The connection uses a specific transport method (e.g.
+TCP/IP) available on both end-points. The TRANSPORT service is creating,
+processing and dropping connections to other peers on behalf of CORE.
+
+The CORE service will try to maintain a certain number of open connections to
+other peers; this number depends on the estimated size (number of participants)
+of the network as determined by the NSE service (Network Size Estimation). If
+@math{s} is the size of the network, than the number of concurrent connections
+is @math{ n = \lceil log_2\;s \rceil}.
+
+To connect to the network, a peer needs to learn about the identities of other
+peers on the network. This is done by providing a single (active) peer identity
+(and its addresses) at start-up; in the course of exchanging messages with this
+peer CORE will discover the identities of other nodes it can try connect to.
+CORE will maintain a persistent database of node identities it has discovered
+(and probably has been connected to).
+
+A node publishes its identity and addresses (initially and in case of address
+changes) in the DHT, so other nodes can look it up and connect to it if
+desired. In the same way CORE uses the DHT to lookup addresses of peers (based
+on their identity) it want to establish a connection with.
+
+After a connection is established, the peers will start exchanging messages
+over it. 
+
+Out-bound GNUnet messages (originating from local GNUnet services including
+CORE itself) are queued for further processing. CORE decides if and when a message is to be sent to
+another peer. Based on the maximum size of the out-bound transport packet (MTU, depends
+on the transport method used), it can either bundle smaller GNUnet messages
+into a single transport packet, or create a sequence of fragments from a single
+GNUnet message, in case the GNUnet message is larger than a transport
+packet. If the GNUnet message(s) do not fill a transport packet completely,
+the transport packet is padded with random data to its maximum size. A
+transport packet is than encrypted with a session key negotiated between the
+two peers during the creation of a connection (see section on "Packet
+encryption") before leaving the peer.
+
+In-bound transport packets are first decrypted and than either split into
+multiple GNUnet messages or defragmented (reassembled) in case of a large
+GNUnet message. The received messages are either processed by CORE itself, are
+forwarded to local GNUnet services or relayed to other peers. Messages that
+cannot be handled (e.g. because a local service is temporarily unavailable)
+are simply dropped.
+
+@subsubsection Cryptographic operations
+
+@subsubsection GNUnet Anonymization Protocol
+
+The protocol governing this process is the GNUnet Anonymization Protocol (GAP)
+(see @url{https://gnunet.org/sites/default/files/aff.pdf,,paper}).
