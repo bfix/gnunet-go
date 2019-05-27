@@ -236,8 +236,14 @@ func Unmarshal(obj interface{}, data []byte) error {
 							}
 							size += int(off)
 						}
-					} else if len(sizeTag) > 0 {
-						size = int(x.FieldByName(sizeTag).Uint())
+					} else {
+						n, err := strconv.ParseInt(sizeTag, 10, 16)
+						if err == nil {
+							size = int(n)
+						}
+						if size == 0 {
+							size = int(x.FieldByName(sizeTag).Uint())
+						}
 					}
 				}
 				a := make([]byte, size)
