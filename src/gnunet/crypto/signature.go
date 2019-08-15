@@ -1,6 +1,8 @@
 package crypto
 
-import ()
+import (
+	"gnunet/util"
+)
 
 // Signature purpose constants
 const (
@@ -34,3 +36,22 @@ const (
 	SIG_GNUID_TICKET                    // GNUid Ticket.
 	SIG_CREDENTIAL                      // GNUnet credential.
 )
+
+//----------------------------------------------------------------------
+// Signature
+//----------------------------------------------------------------------
+
+type Signature struct {
+	// internal
+	data []byte
+}
+
+func NewSignatureFromBytes(data []byte) *Signature {
+	return &Signature{
+		data: util.Clone(data),
+	}
+}
+
+func (s *Signature) Bytes() []byte {
+	return s.data[:]
+}

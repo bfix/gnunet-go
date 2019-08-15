@@ -10,6 +10,12 @@ func RndArray(b []byte) {
 	rand.Read(b)
 }
 
+func NewRndArray(size int) []byte {
+	b := make([]byte, size)
+	rand.Read(b)
+	return b
+}
+
 func RndUInt64() uint64 {
 	b := make([]byte, 8)
 	RndArray(b)

@@ -73,13 +73,13 @@ var (
 			},
 		*/
 	}
-	prv *EdDSAPrivateKey
-	pub *EdDSAPublicKey
+	prv *PrivateKey
+	pub *PublicKey
 )
 
-func TestEdDSAPrvKey(t *testing.T) {
+func TestPrvKey(t *testing.T) {
 
-	prv = EdDSAPrivateKeyFromSeed(seed)
+	prv = PrivateKeyFromSeed(seed)
 	if testing.Verbose() {
 		prvB := prv.key[:32]
 		fmt.Printf("PRIVATE = %s\n", hex.EncodeToString(prvB))
@@ -100,16 +100,18 @@ func TestEdDSAPrvKey(t *testing.T) {
 	}
 }
 
-func TestEdDSASign(t *testing.T) {
+func TestSign(t *testing.T) {
 	for i := range data {
 		sigT, err := prv.Sign(data[i])
 		if err != nil {
 			t.Fatal(err)
 		}
+		sigX := sigT.Bytes()
 		if testing.Verbose() {
-			fmt.Printf("SIG(%d)=%s\n", i, hex.EncodeToString(sigT))
+			fmt.Printf("SIG(%d)=%s\n", i, hex.EncodeToString(sigX))
 		}
-		if bytes.Compare(sigT, sig[i]) != 0 {
+		if bytes.Compare(sigX, sig[i]) != 0 {
+			t.Logf("SIG! = %s\n", hex.EncodeToString(sig[i]))
 			t.Fatal(fmt.Sprintf("Signature mismatch (%d)", i))
 		}
 

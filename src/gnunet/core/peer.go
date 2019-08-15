@@ -19,18 +19,18 @@ type Peer interface {
 */
 
 type Peer struct {
-	pub      *crypto.EdDSAPublicKey
+	pub      *crypto.PublicKey
 	idString string
 	addrList []*util.Address
-	prv      *crypto.EdDSAPrivateKey  // long-term signing key
-	ephPrv   *crypto.EdDSAPrivateKey  // ephemeral signing key
+	prv      *crypto.PrivateKey       // long-term signing key
+	ephPrv   *crypto.PrivateKey       // ephemeral signing key
 	ephMsg   *message.EphemeralKeyMsg // ephemeral signing key message
 }
 
 func NewPeer(data []byte, local bool) (p *Peer, err error) {
 	p = new(Peer)
 	if local {
-		p.prv = crypto.EdDSAPrivateKeyFromSeed(data)
+		p.prv = crypto.PrivateKeyFromSeed(data)
 		p.pub = p.prv.Public()
 		p.ephPrv, p.ephMsg, err = message.NewEphemeralKey(p.pub.Bytes(), p.prv)
 		if err != nil {
@@ -38,7 +38,7 @@ func NewPeer(data []byte, local bool) (p *Peer, err error) {
 		}
 	} else {
 		p.prv = nil
-		p.pub = crypto.NewEdDSAPublicKey(data)
+		p.pub = crypto.NewPublicKey(data)
 	}
 	p.idString = util.EncodeBinaryToString(p.pub.Bytes())
 	p.addrList = make([]*util.Address, 0)
@@ -53,15 +53,15 @@ func (p *Peer) SetEphKeyMsg(msg *message.EphemeralKeyMsg) {
 	p.ephMsg = msg
 }
 
-func (p *Peer) EphPrvKey() *crypto.EdDSAPrivateKey {
+func (p *Peer) EphPrvKey() *crypto.PrivateKey {
 	return p.ephPrv
 }
 
-func (p *Peer) PrvKey() *crypto.EdDSAPrivateKey {
+func (p *Peer) PrvKey() *crypto.PrivateKey {
 	return p.prv
 }
 
-func (p *Peer) PubKey() *crypto.EdDSAPublicKey {
+func (p *Peer) PubKey() *crypto.PublicKey {
 	return p.pub
 }
 
@@ -81,13 +81,13 @@ func (p *Peer) AddAddress(a *util.Address) {
 	p.addrList = append(p.addrList, a)
 }
 
-func (p *Peer) Sign(msg []byte) ([]byte, error) {
+func (p *Peer) Sign(msg []byte) (*crypto.Signature, error) {
 	if p.prv == nil {
 		return nil, fmt.Errorf("No private key")
 	}
 	return p.prv.Sign(msg)
 }
 
-func (p *Peer) Verify(msg, sig []byte) bool {
+func (p *Peer) Verify(msg []byte, sig *crypto.Signature) bool {
 	return p.pub.Verify(msg, sig)
 }

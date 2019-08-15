@@ -105,7 +105,7 @@ func (m *TransportPongMsg) String() string {
 	return fmt.Sprintf("TransportPongMsg{<unkown>,%d}", m.Challenge)
 }
 
-func (m *TransportPongMsg) Sign(prv *crypto.EdDSAPrivateKey) error {
+func (m *TransportPongMsg) Sign(prv *crypto.PrivateKey) error {
 	data, err := Marshal(m.SignedBlock)
 	if err != nil {
 		fmt.Printf("Sign: %s\n", err)
@@ -116,17 +116,18 @@ func (m *TransportPongMsg) Sign(prv *crypto.EdDSAPrivateKey) error {
 		fmt.Printf("Sign: %s\n", err)
 		return err
 	}
-	m.Signature = sig
+	copy(m.Signature, sig.Bytes())
 	return nil
 }
 
-func (m *TransportPongMsg) Verify(pub *crypto.EdDSAPublicKey) bool {
+func (m *TransportPongMsg) Verify(pub *crypto.PublicKey) bool {
 	data, err := Marshal(m.SignedBlock)
 	if err != nil {
 		fmt.Printf("Verify: %s\n", err)
 		return false
 	}
-	return pub.Verify(data, m.Signature)
+	sig := crypto.NewSignatureFromBytes(m.Signature)
+	return pub.Verify(data, sig)
 }
 
 //----------------------------------------------------------------------

@@ -25,7 +25,7 @@ func main() {
 		if err != nil || n != 32 {
 			panic(err)
 		}
-		prv := crypto.EdDSAPrivateKeyFromSeed(seed)
+		prv := crypto.PrivateKeyFromSeed(seed)
 		pub := prv.Public().Bytes()
 		id := util.EncodeBinaryToString(pub)
 		for _, p := range prefixes {

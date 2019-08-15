@@ -1,0 +1,3 @@
+
+https://wiki.gnupg.org/ECC
+https://gnupg.org/documentation/manuals/gcrypt.pdf (p.46)

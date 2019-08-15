@@ -27,20 +27,19 @@ type EphemeralKeyMsg struct {
 }
 
 func NewEphemeralKeyMsg() *EphemeralKeyMsg {
-	b := &EphKeyBlock{
-		SignSize:     88,
-		SigPurpose:   crypto.SIG_ECC_KEY,
-		CreateTime:   util.GetAbsoluteTimeNow(),
-		ExpireTime:   util.GetAbsoluteTimeOffset(12 * time.Hour),
-		EphemeralKey: make([]byte, 32),
-		PeerID:       make([]byte, 32),
-	}
 	return &EphemeralKeyMsg{
 		MsgSize:      160,
 		MsgType:      CORE_EPHEMERAL_KEY,
 		SenderStatus: 1,
 		Signature:    make([]byte, 64),
-		SignedBlock:  b,
+		SignedBlock: &EphKeyBlock{
+			SignSize:     88,
+			SigPurpose:   crypto.SIG_ECC_KEY,
+			CreateTime:   util.GetAbsoluteTimeNow(),
+			ExpireTime:   util.GetAbsoluteTimeOffset(12 * time.Hour),
+			EphemeralKey: make([]byte, 32),
+			PeerID:       make([]byte, 32),
+		},
 	}
 }
 
@@ -52,25 +51,25 @@ func (m *EphemeralKeyMsg) String() string {
 		m.SenderStatus)
 }
 
-func (m *EphemeralKeyMsg) Public() *crypto.EdDSAPublicKey {
-	return crypto.NewEdDSAPublicKey(m.SignedBlock.PeerID)
+func (m *EphemeralKeyMsg) Public() *crypto.PublicKey {
+	return crypto.NewPublicKey(m.SignedBlock.PeerID)
 }
 
-func (m *EphemeralKeyMsg) Verify(pub *crypto.EdDSAPublicKey) bool {
+func (m *EphemeralKeyMsg) Verify(pub *crypto.PublicKey) bool {
 	data, err := Marshal(m.SignedBlock)
 	if err != nil {
 		fmt.Printf("Verify: %s\n", err)
 		return false
 	}
-	return pub.Verify(data, m.Signature)
+	sig := crypto.NewSignatureFromBytes(m.Signature)
+	return pub.Verify(data, sig)
 }
 
-func NewEphemeralKey(peerId []byte, ltPrv *crypto.EdDSAPrivateKey) (*crypto.EdDSAPrivateKey, *EphemeralKeyMsg, error) {
+func NewEphemeralKey(peerId []byte, ltPrv *crypto.PrivateKey) (*crypto.PrivateKey, *EphemeralKeyMsg, error) {
 	msg := NewEphemeralKeyMsg()
 	copy(msg.SignedBlock.PeerID, peerId)
-	seed := make([]byte, 32)
-	util.RndArray(seed)
-	prv := crypto.EdDSAPrivateKeyFromSeed(seed)
+	seed := util.NewRndArray(32)
+	prv := crypto.PrivateKeyFromSeed(seed)
 	copy(msg.SignedBlock.EphemeralKey, prv.Public().Bytes())
 
 	data, err := Marshal(msg.SignedBlock)
@@ -81,7 +80,7 @@ func NewEphemeralKey(peerId []byte, ltPrv *crypto.EdDSAPrivateKey) (*crypto.EdDS
 	if err != nil {
 		return nil, nil, err
 	}
-	msg.Signature = sig
+	copy(msg.Signature, sig.Bytes())
 
 	return prv, msg, nil
 }
