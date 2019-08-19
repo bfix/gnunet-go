@@ -4,9 +4,10 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"net"
+	"log"
 
 	"gnunet/core"
+	"gnunet/transport"
 )
 
 var (
@@ -19,8 +20,7 @@ func main() {
 	var (
 		asServer bool
 		err      error
-		srv      net.Listener
-		conn     net.Conn
+		ch       transport.Channel
 	)
 	flag.BoolVar(&asServer, "s", false, "accept incoming connections")
 	flag.Parse()
@@ -32,26 +32,35 @@ func main() {
 	}
 
 	fmt.Println("======================================================================")
-	fmt.Println("GNUnet peer mock-up (EXPERIMENTAL)          (c) 2018 by Bernd Fix, >Y<")
+	fmt.Println("GNUnet peer mock-up (EXPERIMENTAL)     (c) 2018,2019 by Bernd Fix, >Y<")
 	fmt.Printf("    Identity '%s'\n", p.GetIDString())
 	fmt.Printf("    [%s]\n", hex.EncodeToString(p.GetID()))
 	fmt.Println("======================================================================")
 
 	if asServer {
-		// run as server (accepting ONE incoming connection)
+		// run as server
 		fmt.Println("Waiting for connections...")
-		if srv, err = net.Listen("tcp", "0.0.0.0:2086"); err == nil {
-			defer srv.Close()
-			if conn, err = srv.Accept(); err == nil {
-				err = process(conn, t, p)
+		hdlr := make(chan transport.Channel)
+		go func() {
+			for {
+				select {
+				case ch = <-hdlr:
+					mc := transport.NewMsgChannel(ch)
+					if err = process(mc, t, p); err != nil {
+						log.Println(err)
+					}
+				}
 			}
-		}
+		}()
+		_, err = transport.NewChannelServer("tcp+0.0.0.0:2086", hdlr)
 	} else {
 		// connect to peer
 		fmt.Println("Connecting to target peer")
-		if conn, err = net.Dial("tcp", "172.17.0.5:2086"); err == nil {
-			err = process(conn, p, t)
+		if ch, err = transport.NewChannel("tcp+172.17.0.5:2086"); err != nil {
+			log.Println(err)
 		}
+		mc := transport.NewMsgChannel(ch)
+		err = process(mc, p, t)
 	}
 	if err != nil {
 		fmt.Println(err)

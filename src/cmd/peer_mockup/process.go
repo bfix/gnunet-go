@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"net"
 	//"time"
 
 	"gnunet/core"
@@ -13,9 +12,9 @@ import (
 	//"gnunet/util"
 )
 
-func process(conn net.Conn, from, to *core.Peer) (err error) {
-	// create a new TCP connection instance
-	c := transport.NewTCPConnection(conn, from, to)
+func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
+	// create a new connection instance
+	c := transport.NewConnection(ch, from, to)
 	defer c.Close()
 
 	// read and push next message
