@@ -19,14 +19,16 @@ type Service interface {
 
 // ServiceImpl is an implementation of generic service functionality.
 type ServiceImpl struct {
+	impl    Service
 	hdlr    chan transport.Channel
 	srvc    transport.ChannelServer
 	running bool
 }
 
 // NewServiceImpl instantiates a new ServiceImpl object.
-func NewServiceImpl() *ServiceImpl {
+func NewServiceImpl(srv Service) *ServiceImpl {
 	return &ServiceImpl{
+		impl:    srv,
 		hdlr:    make(chan transport.Channel),
 		srvc:    nil,
 		running: false,
@@ -63,16 +65,18 @@ func (si *ServiceImpl) Start(spec string) (err error) {
 		si.srvc.Close()
 		si.running = false
 	}()
-	return nil
+
+	return si.impl.Start(spec)
 }
 
 // Stop a service
-func (si *ServiceImpl) Stop() (err error) {
+func (si *ServiceImpl) Stop() error {
 	if !si.running {
-		err = fmt.Errorf("service not running")
+		return fmt.Errorf("service not running")
 	}
 	si.running = false
-	return
+
+	return si.impl.Stop()
 }
 
 // Serve a client channel.
@@ -83,11 +87,7 @@ func (si *ServiceImpl) Serve(ch transport.Channel) {
 		if err != nil {
 			break
 		}
-		si.HandleMsg(msg)
+		si.impl.HandleMsg(msg)
 	}
 	ch.Close()
-}
-
-// HandleMsg is implemented by specific GNUnet services.
-func (si *ServiceImpl) HandleMsg(msg message.Message) {
 }
