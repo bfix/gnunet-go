@@ -1,66 +1,93 @@
-package transport
+package service
 
 import (
 	"fmt"
-	"net"
-	"os"
+
+	"gnunet/message"
+	"gnunet/transport"
 )
 
-// Service is an interface for GNUnet services.
-//
+// Service is an interface for GNUnet services. Every service has one channel
+// end-point it listens to for incoming channel requests (network-based
+// channels established by service clients). The end-point is specified in
+// Channel semantics in the specification string.
 type Service interface {
-	Start(network, addr string) error
+	Start(spec string) error
+	HandleMsg(msg message.Message)
 	Stop() error
 }
 
+// ServiceImpl is an implementation of generic service functionality.
 type ServiceImpl struct {
+	hdlr    chan transport.Channel
+	srvc    transport.ChannelServer
+	running bool
 }
 
-// NewSocketServer runs a new socket listener for a GNUnet service.
-// The channels are used to pass control and status/error messages
-// between the socket server (A) and the enclosing service (B):
-//    out: A->B: error -- any error occurring in the socker server process
-//               net.Conn -- a new client connection established
-//               bool -- socket server terminated
-//	  in:  B->A: bool -- terminate socket server (any value)
-func NewSocketServer(addr string, in <-chan interface{}, out chan<- interface{}) error {
+// NewServiceImpl instantiates a new ServiceImpl object.
+func NewServiceImpl() *ServiceImpl {
+	return &ServiceImpl{
+		hdlr:    make(chan transport.Channel),
+		srvc:    nil,
+		running: false,
+	}
+}
 
-	// create socket for client connections.
-	listener, err := net.Listen("unix", addr)
-	if err != nil {
-		return err
+// Start a service
+func (si *ServiceImpl) Start(spec string) (err error) {
+	// check if we are already running
+	if si.running {
+		return fmt.Errorf("service already running")
 	}
 
-	// run the message handler in separate routine
+	// start channel server
+	if si.srvc, err = transport.NewChannelServer(spec, si.hdlr); err != nil {
+		return
+	}
+	si.running = true
+
+	// handle clients
 	go func() {
-		for {
+		for si.running {
 			select {
-			case cmd := <-in:
-				switch cmd.(type) {
-				case bool:
-					fmt.Println("TERMINATING")
-					listener.Close()
-					if err := os.RemoveAll(addr); err != nil {
-						out <- err
-					}
-					out <- true
+			case in := <-si.hdlr:
+				if in == nil {
 					break
+				}
+				switch ch := in.(type) {
+				case transport.Channel:
+					go si.Serve(ch)
 				}
 			}
 		}
+		si.srvc.Close()
+		si.running = false
 	}()
-
-	// run the listener in a separate routine
-	go func() {
-		for {
-			conn, err := listener.Accept()
-			if err != nil {
-				out <- err
-			} else {
-				out <- conn
-			}
-		}
-	}()
-
 	return nil
+}
+
+// Stop a service
+func (si *ServiceImpl) Stop() (err error) {
+	if !si.running {
+		err = fmt.Errorf("service not running")
+	}
+	si.running = false
+	return
+}
+
+// Serve a client channel.
+func (si *ServiceImpl) Serve(ch transport.Channel) {
+	mc := transport.NewMsgChannel(ch)
+	for {
+		msg, _, err := mc.Receive()
+		if err != nil {
+			break
+		}
+		si.HandleMsg(msg)
+	}
+	ch.Close()
+}
+
+// HandleMsg is implemented by specific GNUnet services.
+func (si *ServiceImpl) HandleMsg(msg message.Message) {
 }

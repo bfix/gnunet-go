@@ -6,7 +6,7 @@ import (
 )
 
 // NewEmptyMessage creates a new empty message object of given type.
-func NewEmptyMessage(msgType uint16) (interface{}, error) {
+func NewEmptyMessage(msgType uint16) (Message, error) {
 	switch msgType {
 	case TRANSPORT_TCP_WELCOME:
 		return NewTransportTcpWelcomeMsg(nil), nil

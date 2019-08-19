@@ -3,13 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
-	//"time"
 
 	"gnunet/core"
 	"gnunet/crypto"
 	"gnunet/message"
 	"gnunet/transport"
-	//"gnunet/util"
 )
 
 func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
@@ -18,7 +16,7 @@ func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
 	defer c.Close()
 
 	// read and push next message
-	in := make(chan interface{})
+	in := make(chan message.Message)
 	go func() {
 		for {
 			msg, _, err := c.Receive()
@@ -42,7 +40,7 @@ func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
 
 	send := make(map[uint16]bool)
 	//received := make(map[uint16]bool)
-	pending := make(map[uint16]interface{})
+	pending := make(map[uint16]message.Message)
 
 	// process loop
 	for {

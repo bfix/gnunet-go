@@ -110,7 +110,7 @@ func (c *MsgChannel) Close() error {
 }
 
 // Send a GNUnet message over a channel.
-func (c *MsgChannel) Send(msg interface{}) error {
+func (c *MsgChannel) Send(msg message.Message) error {
 
 	// convert message to binary data
 	data, err := message.Marshal(msg)
@@ -141,7 +141,7 @@ func (c *MsgChannel) Send(msg interface{}) error {
 }
 
 // Receive GNUnet messages over a plain Channel.
-func (c *MsgChannel) Receive() (interface{}, uint16, error) {
+func (c *MsgChannel) Receive() (message.Message, uint16, error) {
 	get := func(pos, count int) error {
 		n, err := c.ch.Read(c.buf[pos : pos+count])
 		if err != nil {

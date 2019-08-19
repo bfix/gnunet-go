@@ -2,6 +2,7 @@ package transport
 
 import (
 	"gnunet/core"
+	"gnunet/message"
 )
 
 ////////////////////////////////////////////////////////////////////////
@@ -42,10 +43,10 @@ func (c *Connection) Close() error {
 	return c.ch.Close()
 }
 
-func (c *Connection) Send(msg interface{}) error {
+func (c *Connection) Send(msg message.Message) error {
 	return c.ch.Send(msg)
 }
 
-func (c *Connection) Receive() (interface{}, uint16, error) {
+func (c *Connection) Receive() (message.Message, uint16, error) {
 	return c.ch.Receive()
 }

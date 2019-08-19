@@ -33,8 +33,18 @@ func NewTransportTcpWelcomeMsg(peerid []byte) *TransportTcpWelcomeMsg {
 	return msg
 }
 
-func (msg *TransportTcpWelcomeMsg) String() string {
-	return fmt.Sprintf("TransportTcpWelcomeMsg{'%s'}", util.EncodeBinaryToString(msg.PeerID))
+func (m *TransportTcpWelcomeMsg) String() string {
+	return fmt.Sprintf("TransportTcpWelcomeMsg{'%s'}", util.EncodeBinaryToString(m.PeerID))
+}
+
+// Size returns the total number of bytes in a message.
+func (m *TransportTcpWelcomeMsg) Size() uint16 {
+	return m.MsgSize
+}
+
+// Type returns the message type
+func (m *TransportTcpWelcomeMsg) Type() uint16 {
+	return m.MsgType
 }
 
 //----------------------------------------------------------------------
@@ -130,6 +140,16 @@ func (m *TransportPongMsg) Verify(pub *crypto.PublicKey) bool {
 	return pub.Verify(data, sig)
 }
 
+// Size returns the total number of bytes in a message.
+func (m *TransportPongMsg) Size() uint16 {
+	return m.MsgSize
+}
+
+// Type returns the message type
+func (m *TransportPongMsg) Type() uint16 {
+	return m.MsgType
+}
+
 //----------------------------------------------------------------------
 // TRANSPORT_PING
 //
@@ -172,6 +192,16 @@ func (m *TransportPingMsg) String() string {
 	Unmarshal(a, m.Address)
 	return fmt.Sprintf("TransportPingMsg{%s,%s,%d}",
 		util.EncodeBinaryToString(m.Target), a, m.Challenge)
+}
+
+// Size returns the total number of bytes in a message.
+func (m *TransportPingMsg) Size() uint16 {
+	return m.MsgSize
+}
+
+// Type returns the message type
+func (m *TransportPingMsg) Type() uint16 {
+	return m.MsgType
 }
 
 //----------------------------------------------------------------------
@@ -241,6 +271,16 @@ func (m *HelloMsg) AddAddress(a *HelloAddress) {
 	m.MsgSize += uint16(len(a.Transport)) + a.AddrSize + 11
 }
 
+// Size returns the total number of bytes in a message.
+func (msg *HelloMsg) Size() uint16 {
+	return msg.MsgSize
+}
+
+// Type returns the message type
+func (msg *HelloMsg) Type() uint16 {
+	return msg.MsgType
+}
+
 //----------------------------------------------------------------------
 // TRANSPORT_SESSION_ACK
 //----------------------------------------------------------------------
@@ -250,15 +290,25 @@ type SessionAckMsg struct {
 	MsgType uint16 `order:"big"` // TRANSPORT_SESSION_ACK (377)
 }
 
-func (m *SessionAckMsg) String() string {
-	return "SessionAck{}"
-}
-
 func NewSessionAckMsg() *SessionAckMsg {
 	return &SessionAckMsg{
 		MsgSize: 16,
 		MsgType: TRANSPORT_SESSION_ACK,
 	}
+}
+
+func (m *SessionAckMsg) String() string {
+	return "SessionAck{}"
+}
+
+// Size returns the total number of bytes in a message.
+func (msg *SessionAckMsg) Size() uint16 {
+	return msg.MsgSize
+}
+
+// Type returns the message type
+func (msg *SessionAckMsg) Type() uint16 {
+	return msg.MsgType
 }
 
 //----------------------------------------------------------------------
@@ -272,10 +322,6 @@ type SessionSynMsg struct {
 	Timestamp uint64 `order:"big"` // usec epoch
 }
 
-func (m *SessionSynMsg) String() string {
-	return fmt.Sprintf("SessionSyn{%s}", util.Timestamp(m.Timestamp))
-}
-
 func NewSessionSynMsg(t uint64) *SessionSynMsg {
 	if t == 0 {
 		t = util.GetAbsoluteTimeNow()
@@ -286,6 +332,20 @@ func NewSessionSynMsg(t uint64) *SessionSynMsg {
 		Reserved:  0,
 		Timestamp: t,
 	}
+}
+
+func (m *SessionSynMsg) String() string {
+	return fmt.Sprintf("SessionSyn{%s}", util.Timestamp(m.Timestamp))
+}
+
+// Size returns the total number of bytes in a message.
+func (msg *SessionSynMsg) Size() uint16 {
+	return msg.MsgSize
+}
+
+// Type returns the message type
+func (msg *SessionSynMsg) Type() uint16 {
+	return msg.MsgType
 }
 
 //----------------------------------------------------------------------
@@ -315,6 +375,16 @@ func (m *SessionSynAckMsg) String() string {
 	return fmt.Sprintf("SessionSynAck{%s}", util.Timestamp(m.Timestamp))
 }
 
+// Size returns the total number of bytes in a message.
+func (msg *SessionSynAckMsg) Size() uint16 {
+	return msg.MsgSize
+}
+
+// Type returns the message type
+func (msg *SessionSynAckMsg) Type() uint16 {
+	return msg.MsgType
+}
+
 //----------------------------------------------------------------------
 // TRANSPORT_SESSION_QUOTA
 //----------------------------------------------------------------------
@@ -325,10 +395,6 @@ type SessionQuotaMsg struct {
 	Quota   uint32 `order:"big"` // Quota in bytes per second
 }
 
-func (m *SessionQuotaMsg) String() string {
-	return fmt.Sprintf("SessionQuotaMsg{%sB/s}", util.Scale1024(uint64(m.Quota)))
-}
-
 func NewSessionQuotaMsg(quota uint32) *SessionQuotaMsg {
 	m := new(SessionQuotaMsg)
 	if quota > 0 {
@@ -337,6 +403,20 @@ func NewSessionQuotaMsg(quota uint32) *SessionQuotaMsg {
 		m.Quota = quota
 	}
 	return m
+}
+
+func (m *SessionQuotaMsg) String() string {
+	return fmt.Sprintf("SessionQuotaMsg{%sB/s}", util.Scale1024(uint64(m.Quota)))
+}
+
+// Size returns the total number of bytes in a message.
+func (msg *SessionQuotaMsg) Size() uint16 {
+	return msg.MsgSize
+}
+
+// Type returns the message type
+func (msg *SessionQuotaMsg) Type() uint16 {
+	return msg.MsgType
 }
 
 //----------------------------------------------------------------------
@@ -362,6 +442,16 @@ func (m *SessionKeepAliveRespMsg) String() string {
 	return fmt.Sprintf("SessionKeepAliveRespMsg{%d}", m.Nonce)
 }
 
+// Size returns the total number of bytes in a message.
+func (msg *SessionKeepAliveRespMsg) Size() uint16 {
+	return msg.MsgSize
+}
+
+// Type returns the message type
+func (msg *SessionKeepAliveRespMsg) Type() uint16 {
+	return msg.MsgType
+}
+
 //----------------------------------------------------------------------
 // TRANSPORT_SESSION_KEEPALIVE
 //----------------------------------------------------------------------
@@ -383,4 +473,14 @@ func NewSessionKeepAliveMsg() *SessionKeepAliveMsg {
 
 func (m *SessionKeepAliveMsg) String() string {
 	return fmt.Sprintf("SessionKeepAliveMsg{%d}", m.Nonce)
+}
+
+// Size returns the total number of bytes in a message.
+func (msg *SessionKeepAliveMsg) Size() uint16 {
+	return msg.MsgSize
+}
+
+// Type returns the message type
+func (msg *SessionKeepAliveMsg) Type() uint16 {
+	return msg.MsgType
 }
