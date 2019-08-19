@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"gnunet/message"
@@ -30,24 +29,22 @@ type Channel interface {
 	Close() error
 	Read([]byte) (int, error)
 	Write([]byte) (int, error)
+	Clone() Channel
 }
 
 // Known channel implementations.
-var channelImpl = map[string]reflect.Type{
-	"unix": UDSChannelType(),
-	"tcp":  TCPChannelType(),
-	"udp":  UDPChannelType(),
+var channelImpl = map[string]Channel{
+	"unix": NewNetworkChannel("unix"),
+	"tcp":  NewNetworkChannel("tcp"),
+	"udp":  NewNetworkChannel("udp"),
 }
 
 // NewChannel creates a new channel to the specified endpoint.
 // Called by a client to connect to a service.
 func NewChannel(spec string) (Channel, error) {
-	prefix := spec
-	if idx := strings.Index(spec, "+"); idx != -1 {
-		prefix = spec[:idx]
-	}
-	if tpl, ok := channelImpl[prefix]; ok {
-		inst := reflect.New(tpl).Interface().(Channel)
+	parts := strings.Split(spec, "+")
+	if tpl, ok := channelImpl[parts[0]]; ok {
+		inst := tpl.Clone()
 		err := inst.Open(spec)
 		return inst, err
 	}
@@ -64,23 +61,21 @@ func NewChannel(spec string) (Channel, error) {
 type ChannelServer interface {
 	Open(spec string, hdlr chan<- Channel) error
 	Close() error
+	Clone() ChannelServer
 }
 
 // Known channel server implementations.
-var channelServerImpl = map[string]reflect.Type{
-	"unix": UDSChannelServerType(),
-	"tcp":  TCPChannelServerType(),
-	"udp":  UDPChannelServerType(),
+var channelServerImpl = map[string]ChannelServer{
+	"unix": NewNetworkChannelServer("unix"),
+	"tcp":  NewNetworkChannelServer("tcp"),
+	"udp":  NewNetworkChannelServer("udp"),
 }
 
 // NewChannelServer
 func NewChannelServer(spec string, hdlr chan<- Channel) (ChannelServer, error) {
-	prefix := spec
-	if idx := strings.Index(spec, "+"); idx != -1 {
-		prefix = spec[:idx]
-	}
-	if tpl, ok := channelServerImpl[prefix]; ok {
-		inst := reflect.New(tpl).Interface().(ChannelServer)
+	parts := strings.Split(spec, "+")
+	if tpl, ok := channelServerImpl[parts[0]]; ok {
+		inst := tpl.Clone()
 		err := inst.Open(spec, hdlr)
 		return inst, err
 	}

@@ -2,7 +2,6 @@ package transport
 
 import (
 	"net"
-	"reflect"
 	"strings"
 )
 
@@ -15,14 +14,28 @@ type NetworkChannel struct {
 	conn    net.Conn
 }
 
+// NewNetworkChannel
+func NewNetworkChannel(netw string) Channel {
+	return &NetworkChannel{
+		network: netw,
+		conn:    nil,
+	}
+}
+
+// Clone
+func (c *NetworkChannel) Clone() Channel {
+	return NewNetworkChannel(c.network)
+}
+
 // Open
 func (c *NetworkChannel) Open(spec string) (err error) {
+	parts := strings.Split(spec, "+")
 	// check for correct protocol
-	if !strings.HasPrefix(spec, c.network+"+") {
+	if parts[0] != c.network {
 		return ErrChannelNotImplemented
 	}
 	// open connection
-	c.conn, err = net.Dial(c.network, spec[len(c.network)+1:])
+	c.conn, err = net.Dial(c.network, parts[1])
 	return
 }
 
@@ -57,6 +70,19 @@ func (c *NetworkChannel) Write(buf []byte) (int, error) {
 type NetworkChannelServer struct {
 	network  string
 	listener net.Listener
+}
+
+// NewNetworkChannelServer
+func NewNetworkChannelServer(netw string) ChannelServer {
+	return &NetworkChannelServer{
+		network:  netw,
+		listener: nil,
+	}
+}
+
+// Clone
+func (c *NetworkChannelServer) Clone() ChannelServer {
+	return NewNetworkChannelServer(c.network)
 }
 
 // Open
@@ -100,79 +126,4 @@ func (s *NetworkChannelServer) Close() error {
 		return err
 	}
 	return nil
-}
-
-////////////////////////////////////////////////////////////////////////
-// Protocol-specific network-based Channel
-
-//----------------------------------------------------------------------
-// TCP
-//----------------------------------------------------------------------
-
-type TCPChannel struct {
-	NetworkChannel
-}
-
-func TCPChannelType() reflect.Type {
-	ch := new(TCPChannel)
-	ch.network = "tcp"
-	return reflect.TypeOf(ch)
-}
-
-type TCPChannelServer struct {
-	NetworkChannelServer
-}
-
-func TCPChannelServerType() reflect.Type {
-	ch := new(TCPChannelServer)
-	ch.network = "tcp"
-	return reflect.TypeOf(ch)
-}
-
-//----------------------------------------------------------------------
-// UDP
-//----------------------------------------------------------------------
-
-type UDPChannel struct {
-	NetworkChannel
-}
-
-func UDPChannelType() reflect.Type {
-	ch := new(UDPChannel)
-	ch.network = "udp"
-	return reflect.TypeOf(ch)
-}
-
-type UDPChannelServer struct {
-	NetworkChannelServer
-}
-
-func UDPChannelServerType() reflect.Type {
-	ch := new(UDPChannelServer)
-	ch.network = "udp"
-	return reflect.TypeOf(ch)
-}
-
-//----------------------------------------------------------------------
-// Unix Domain Socket
-//----------------------------------------------------------------------
-
-type UDSChannel struct {
-	NetworkChannel
-}
-
-func UDSChannelType() reflect.Type {
-	ch := new(UDSChannel)
-	ch.network = "unix"
-	return reflect.TypeOf(ch)
-}
-
-type UDSChannelServer struct {
-	NetworkChannelServer
-}
-
-func UDSChannelServerType() reflect.Type {
-	ch := new(UDSChannelServer)
-	ch.network = "unix"
-	return reflect.TypeOf(ch)
 }
