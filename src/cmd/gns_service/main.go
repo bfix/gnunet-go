@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"os"
 	"os/signal"
@@ -12,9 +13,17 @@ import (
 )
 
 func main() {
+	var (
+		srvEndp string
+	)
+	// handle command line arguments
+	flag.StringVar(&srvEndp, "s", "unix+/tmp/gnunet-go-gns-service.sock", "GNS service end-point")
+	flag.Parse()
 
-	srv := service.NewServiceImpl(gns.NewGNSService())
-	if err := srv.Start("unix+/tmp/gnunet-go-gns-service.sock"); err != nil {
+	// start a new GNS service
+	gns := gns.NewGNSService()
+	srv := service.NewServiceImpl(gns)
+	if err := srv.Start(srvEndp); err != nil {
 		log.Fatal(err)
 	}
 	defer srv.Stop()
