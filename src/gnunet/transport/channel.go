@@ -29,22 +29,24 @@ type Channel interface {
 	Close() error
 	Read([]byte) (int, error)
 	Write([]byte) (int, error)
-	Clone() Channel
 }
 
+// ChannelFactory instantiates specific Channel imülementations.
+type ChannelFactory func() Channel
+
 // Known channel implementations.
-var channelImpl = map[string]Channel{
-	"unix": NewNetworkChannel("unix"),
-	"tcp":  NewNetworkChannel("tcp"),
-	"udp":  NewNetworkChannel("udp"),
+var channelImpl = map[string]ChannelFactory{
+	"unix": NewSocketChannel,
+	"tcp":  NewTCPChannel,
+	"udp":  NewUDPChannel,
 }
 
 // NewChannel creates a new channel to the specified endpoint.
 // Called by a client to connect to a service.
 func NewChannel(spec string) (Channel, error) {
 	parts := strings.Split(spec, "+")
-	if tpl, ok := channelImpl[parts[0]]; ok {
-		inst := tpl.Clone()
+	if fac, ok := channelImpl[parts[0]]; ok {
+		inst := fac()
 		err := inst.Open(spec)
 		return inst, err
 	}
@@ -61,21 +63,23 @@ func NewChannel(spec string) (Channel, error) {
 type ChannelServer interface {
 	Open(spec string, hdlr chan<- Channel) error
 	Close() error
-	Clone() ChannelServer
 }
 
+// ChannelServerFactory instantiates specific ChannelServer imülementations.
+type ChannelServerFactory func() ChannelServer
+
 // Known channel server implementations.
-var channelServerImpl = map[string]ChannelServer{
-	"unix": NewNetworkChannelServer("unix"),
-	"tcp":  NewNetworkChannelServer("tcp"),
-	"udp":  NewNetworkChannelServer("udp"),
+var channelServerImpl = map[string]ChannelServerFactory{
+	"unix": NewSocketChannelServer,
+	"tcp":  NewTCPChannelServer,
+	"udp":  NewUDPChannelServer,
 }
 
 // NewChannelServer
 func NewChannelServer(spec string, hdlr chan<- Channel) (ChannelServer, error) {
 	parts := strings.Split(spec, "+")
-	if tpl, ok := channelServerImpl[parts[0]]; ok {
-		inst := tpl.Clone()
+	if fac, ok := channelServerImpl[parts[0]]; ok {
+		inst := fac()
 		err := inst.Open(spec, hdlr)
 		return inst, err
 	}

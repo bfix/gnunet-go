@@ -22,11 +22,6 @@ func NewNetworkChannel(netw string) Channel {
 	}
 }
 
-// Clone
-func (c *NetworkChannel) Clone() Channel {
-	return NewNetworkChannel(c.network)
-}
-
 // Open
 func (c *NetworkChannel) Open(spec string) (err error) {
 	parts := strings.Split(spec, "+")
@@ -80,11 +75,6 @@ func NewNetworkChannelServer(netw string) ChannelServer {
 	}
 }
 
-// Clone
-func (c *NetworkChannelServer) Clone() ChannelServer {
-	return NewNetworkChannelServer(c.network)
-}
-
 // Open
 func (s *NetworkChannelServer) Open(spec string, hdlr chan<- Channel) (err error) {
 	// check for correct protocol
@@ -126,4 +116,30 @@ func (s *NetworkChannelServer) Close() error {
 		return err
 	}
 	return nil
+}
+
+////////////////////////////////////////////////////////////////////////
+
+func NewSocketChannel() Channel {
+	return NewNetworkChannel("unix")
+}
+
+func NewTCPChannel() Channel {
+	return NewNetworkChannel("tcp")
+}
+
+func NewUDPChannel() Channel {
+	return NewNetworkChannel("udp")
+}
+
+func NewSocketChannelServer() ChannelServer {
+	return NewNetworkChannelServer("unix")
+}
+
+func NewTCPChannelServer() ChannelServer {
+	return NewNetworkChannelServer("tcp")
+}
+
+func NewUDPChannelServer() ChannelServer {
+	return NewNetworkChannelServer("udp")
 }
