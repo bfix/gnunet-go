@@ -154,21 +154,24 @@ func (c *MsgChannel) Receive() (message.Message, uint16, error) {
 	if err := get(0, 4); err != nil {
 		return nil, 0, err
 	}
-	msgSize, msgType := message.GetMessageHeader(c.buf[:4])
-	if err := get(4, int(msgSize)-4); err != nil {
+	mh, err := message.GetMsgHeader(c.buf[:4])
+	if err != nil {
 		return nil, 0, err
 	}
-	msg, err := message.NewEmptyMessage(msgType)
+	if err := get(4, int(mh.MsgSize)-4); err != nil {
+		return nil, 0, err
+	}
+	msg, err := message.NewEmptyMessage(mh.MsgType)
 	if err != nil {
 		return nil, 0, err
 	}
 	if msg == nil {
-		return nil, 0, fmt.Errorf("Message{%d} is nil!\n", msgType)
+		return nil, 0, fmt.Errorf("Message{%d} is nil!\n", mh.MsgType)
 	}
-	if err = message.Unmarshal(msg, c.buf[:msgSize]); err != nil {
+	if err = message.Unmarshal(msg, c.buf[:mh.MsgSize]); err != nil {
 		return nil, 0, err
 	}
 	fmt.Printf("<== %v\n", msg)
-	fmt.Printf("    [%s]\n", hex.EncodeToString(c.buf[:msgSize]))
-	return msg, msgType, nil
+	fmt.Printf("    [%s]\n", hex.EncodeToString(c.buf[:mh.MsgSize]))
+	return msg, mh.MsgType, nil
 }
