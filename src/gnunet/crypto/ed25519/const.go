@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package edwards25519
+package ed25519
 
 // These values are from the public domain, “ref10” implementation of ed25519
 // from SUPERCOP.

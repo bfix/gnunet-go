@@ -23,8 +23,6 @@ import (
 	"errors"
 	"io"
 	"strconv"
-
-	"gnunet/crypto/ed25519/internal/edwards25519"
 )
 
 const (
@@ -106,10 +104,10 @@ func NewKeyFromSeed(seed []byte) PrivateKey {
 	digest[31] &= 127
 	digest[31] |= 64
 
-	var A edwards25519.ExtendedGroupElement
+	var A ExtendedGroupElement
 	var hBytes [32]byte
 	copy(hBytes[:], digest[:])
-	edwards25519.GeScalarMultBase(&A, &hBytes)
+	GeScalarMultBase(&A, &hBytes)
 	var publicKeyBytes [32]byte
 	A.ToBytes(&publicKeyBytes)
 
@@ -144,9 +142,9 @@ func Sign(privateKey PrivateKey, message []byte) []byte {
 	h.Sum(messageDigest[:0])
 
 	var messageDigestReduced [32]byte
-	edwards25519.ScReduce(&messageDigestReduced, &messageDigest)
-	var R edwards25519.ExtendedGroupElement
-	edwards25519.GeScalarMultBase(&R, &messageDigestReduced)
+	ScReduce(&messageDigestReduced, &messageDigest)
+	var R ExtendedGroupElement
+	GeScalarMultBase(&R, &messageDigestReduced)
 
 	var encodedR [32]byte
 	R.ToBytes(&encodedR)
@@ -157,10 +155,10 @@ func Sign(privateKey PrivateKey, message []byte) []byte {
 	h.Write(message)
 	h.Sum(hramDigest[:0])
 	var hramDigestReduced [32]byte
-	edwards25519.ScReduce(&hramDigestReduced, &hramDigest)
+	ScReduce(&hramDigestReduced, &hramDigest)
 
 	var s [32]byte
-	edwards25519.ScMulAdd(&s, &hramDigestReduced, &expandedSecretKey, &messageDigestReduced)
+	ScMulAdd(&s, &hramDigestReduced, &expandedSecretKey, &messageDigestReduced)
 
 	signature := make([]byte, SignatureSize)
 	copy(signature[:], encodedR[:])
@@ -180,14 +178,14 @@ func Verify(publicKey PublicKey, message, sig []byte) bool {
 		return false
 	}
 
-	var A edwards25519.ExtendedGroupElement
+	var A ExtendedGroupElement
 	var publicKeyBytes [32]byte
 	copy(publicKeyBytes[:], publicKey)
 	if !A.FromBytes(&publicKeyBytes) {
 		return false
 	}
-	edwards25519.FeNeg(&A.X, &A.X)
-	edwards25519.FeNeg(&A.T, &A.T)
+	FeNeg(&A.X, &A.X)
+	FeNeg(&A.T, &A.T)
 
 	h := sha512.New()
 	h.Write(sig[:32])
@@ -197,19 +195,19 @@ func Verify(publicKey PublicKey, message, sig []byte) bool {
 	h.Sum(digest[:0])
 
 	var hReduced [32]byte
-	edwards25519.ScReduce(&hReduced, &digest)
+	ScReduce(&hReduced, &digest)
 
-	var R edwards25519.ProjectiveGroupElement
+	var R ProjectiveGroupElement
 	var s [32]byte
 	copy(s[:], sig[32:])
 
 	// https://tools.ietf.org/html/rfc8032#section-5.1.7 requires that s be in
 	// the range [0, order) in order to prevent signature malleability.
-	if !edwards25519.ScMinimal(&s) {
+	if !ScMinimal(&s) {
 		return false
 	}
 
-	edwards25519.GeDoubleScalarMultVartime(&R, &hReduced, &A, &s)
+	GeDoubleScalarMultVartime(&R, &hReduced, &A, &s)
 
 	var checkR [32]byte
 	R.ToBytes(&checkR)
