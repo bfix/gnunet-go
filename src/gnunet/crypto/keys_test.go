@@ -120,3 +120,15 @@ func TestSign(t *testing.T) {
 		}
 	}
 }
+
+func TestMult(t *testing.T) {
+	pubA, prvA := NewKeypair()
+	pubB, prvB := NewKeypair()
+
+	s1 := pubA.Mult(prvB.D()).Bytes()
+	s2 := pubB.Mult(prvA.D()).Bytes()
+
+	if bytes.Compare(s1, s2) != 0 {
+		t.Fatal("Shared secret mismatch")
+	}
+}
