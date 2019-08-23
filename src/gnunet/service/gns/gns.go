@@ -7,6 +7,10 @@ import (
 	"gnunet/service"
 )
 
+var (
+	DHT_GNS_REPLICATION_LEVEL = 10
+)
+
 // "GNUnet Name System" service
 type GNSService struct {
 }

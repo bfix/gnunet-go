@@ -37,14 +37,9 @@ func (m *TransportTcpWelcomeMsg) String() string {
 	return fmt.Sprintf("TransportTcpWelcomeMsg{'%s'}", util.EncodeBinaryToString(m.PeerID))
 }
 
-// Size returns the total number of bytes in a message.
-func (m *TransportTcpWelcomeMsg) Size() uint16 {
-	return m.MsgSize
-}
-
-// Type returns the message type
-func (m *TransportTcpWelcomeMsg) Type() uint16 {
-	return m.MsgType
+// Header returns the message header in a separate instance.
+func (msg *TransportTcpWelcomeMsg) Header() *MessageHeader {
+	return &MessageHeader{msg.MsgSize, msg.MsgType}
 }
 
 //----------------------------------------------------------------------
@@ -115,6 +110,11 @@ func (m *TransportPongMsg) String() string {
 	return fmt.Sprintf("TransportPongMsg{<unkown>,%d}", m.Challenge)
 }
 
+// Header returns the message header in a separate instance.
+func (msg *TransportPongMsg) Header() *MessageHeader {
+	return &MessageHeader{msg.MsgSize, msg.MsgType}
+}
+
 func (m *TransportPongMsg) Sign(prv *crypto.PrivateKey) error {
 	data, err := Marshal(m.SignedBlock)
 	if err != nil {
@@ -138,16 +138,6 @@ func (m *TransportPongMsg) Verify(pub *crypto.PublicKey) bool {
 	}
 	sig := crypto.NewSignatureFromBytes(m.Signature)
 	return pub.Verify(data, sig)
-}
-
-// Size returns the total number of bytes in a message.
-func (m *TransportPongMsg) Size() uint16 {
-	return m.MsgSize
-}
-
-// Type returns the message type
-func (m *TransportPongMsg) Type() uint16 {
-	return m.MsgType
 }
 
 //----------------------------------------------------------------------
@@ -194,14 +184,9 @@ func (m *TransportPingMsg) String() string {
 		util.EncodeBinaryToString(m.Target), a, m.Challenge)
 }
 
-// Size returns the total number of bytes in a message.
-func (m *TransportPingMsg) Size() uint16 {
-	return m.MsgSize
-}
-
-// Type returns the message type
-func (m *TransportPingMsg) Type() uint16 {
-	return m.MsgType
+// Header returns the message header in a separate instance.
+func (msg *TransportPingMsg) Header() *MessageHeader {
+	return &MessageHeader{msg.MsgSize, msg.MsgType}
 }
 
 //----------------------------------------------------------------------
@@ -271,14 +256,9 @@ func (m *HelloMsg) AddAddress(a *HelloAddress) {
 	m.MsgSize += uint16(len(a.Transport)) + a.AddrSize + 11
 }
 
-// Size returns the total number of bytes in a message.
-func (msg *HelloMsg) Size() uint16 {
-	return msg.MsgSize
-}
-
-// Type returns the message type
-func (msg *HelloMsg) Type() uint16 {
-	return msg.MsgType
+// Header returns the message header in a separate instance.
+func (msg *HelloMsg) Header() *MessageHeader {
+	return &MessageHeader{msg.MsgSize, msg.MsgType}
 }
 
 //----------------------------------------------------------------------
@@ -301,14 +281,9 @@ func (m *SessionAckMsg) String() string {
 	return "SessionAck{}"
 }
 
-// Size returns the total number of bytes in a message.
-func (msg *SessionAckMsg) Size() uint16 {
-	return msg.MsgSize
-}
-
-// Type returns the message type
-func (msg *SessionAckMsg) Type() uint16 {
-	return msg.MsgType
+// Header returns the message header in a separate instance.
+func (msg *SessionAckMsg) Header() *MessageHeader {
+	return &MessageHeader{msg.MsgSize, msg.MsgType}
 }
 
 //----------------------------------------------------------------------
@@ -338,14 +313,9 @@ func (m *SessionSynMsg) String() string {
 	return fmt.Sprintf("SessionSyn{%s}", util.Timestamp(m.Timestamp))
 }
 
-// Size returns the total number of bytes in a message.
-func (msg *SessionSynMsg) Size() uint16 {
-	return msg.MsgSize
-}
-
-// Type returns the message type
-func (msg *SessionSynMsg) Type() uint16 {
-	return msg.MsgType
+// Header returns the message header in a separate instance.
+func (msg *SessionSynMsg) Header() *MessageHeader {
+	return &MessageHeader{msg.MsgSize, msg.MsgType}
 }
 
 //----------------------------------------------------------------------
@@ -375,14 +345,9 @@ func (m *SessionSynAckMsg) String() string {
 	return fmt.Sprintf("SessionSynAck{%s}", util.Timestamp(m.Timestamp))
 }
 
-// Size returns the total number of bytes in a message.
-func (msg *SessionSynAckMsg) Size() uint16 {
-	return msg.MsgSize
-}
-
-// Type returns the message type
-func (msg *SessionSynAckMsg) Type() uint16 {
-	return msg.MsgType
+// Header returns the message header in a separate instance.
+func (msg *SessionSynAckMsg) Header() *MessageHeader {
+	return &MessageHeader{msg.MsgSize, msg.MsgType}
 }
 
 //----------------------------------------------------------------------
@@ -409,14 +374,9 @@ func (m *SessionQuotaMsg) String() string {
 	return fmt.Sprintf("SessionQuotaMsg{%sB/s}", util.Scale1024(uint64(m.Quota)))
 }
 
-// Size returns the total number of bytes in a message.
-func (msg *SessionQuotaMsg) Size() uint16 {
-	return msg.MsgSize
-}
-
-// Type returns the message type
-func (msg *SessionQuotaMsg) Type() uint16 {
-	return msg.MsgType
+// Header returns the message header in a separate instance.
+func (msg *SessionQuotaMsg) Header() *MessageHeader {
+	return &MessageHeader{msg.MsgSize, msg.MsgType}
 }
 
 //----------------------------------------------------------------------
@@ -442,14 +402,9 @@ func (m *SessionKeepAliveRespMsg) String() string {
 	return fmt.Sprintf("SessionKeepAliveRespMsg{%d}", m.Nonce)
 }
 
-// Size returns the total number of bytes in a message.
-func (msg *SessionKeepAliveRespMsg) Size() uint16 {
-	return msg.MsgSize
-}
-
-// Type returns the message type
-func (msg *SessionKeepAliveRespMsg) Type() uint16 {
-	return msg.MsgType
+// Header returns the message header in a separate instance.
+func (msg *SessionKeepAliveRespMsg) Header() *MessageHeader {
+	return &MessageHeader{msg.MsgSize, msg.MsgType}
 }
 
 //----------------------------------------------------------------------
@@ -475,12 +430,7 @@ func (m *SessionKeepAliveMsg) String() string {
 	return fmt.Sprintf("SessionKeepAliveMsg{%d}", m.Nonce)
 }
 
-// Size returns the total number of bytes in a message.
-func (msg *SessionKeepAliveMsg) Size() uint16 {
-	return msg.MsgSize
-}
-
-// Type returns the message type
-func (msg *SessionKeepAliveMsg) Type() uint16 {
-	return msg.MsgType
+// Header returns the message header in a separate instance.
+func (msg *SessionKeepAliveMsg) Header() *MessageHeader {
+	return &MessageHeader{msg.MsgSize, msg.MsgType}
 }

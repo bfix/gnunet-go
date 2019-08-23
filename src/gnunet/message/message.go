@@ -9,8 +9,7 @@ var (
 )
 
 type Message interface {
-	Size() uint16
-	Type() uint16
+	Header() *MessageHeader
 }
 
 type MessageHeader struct {

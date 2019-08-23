@@ -5,9 +5,12 @@ import (
 	"fmt"
 )
 
-// NewEmptyMessage creates a new empty message object of given type.
+// NewEmptyMessage creates a new empty message object for the given type.
 func NewEmptyMessage(msgType uint16) (Message, error) {
 	switch msgType {
+	//------------------------------------------------------------------
+	// Transport
+	//------------------------------------------------------------------
 	case TRANSPORT_TCP_WELCOME:
 		return NewTransportTcpWelcomeMsg(nil), nil
 	case HELLO:
@@ -26,8 +29,18 @@ func NewEmptyMessage(msgType uint16) (Message, error) {
 		return NewTransportPongMsg(0, nil), nil
 	case TRANSPORT_SESSION_KEEPALIVE:
 		return NewSessionKeepAliveMsg(), nil
+
+	//------------------------------------------------------------------
+	// Core
+	//------------------------------------------------------------------
 	case CORE_EPHEMERAL_KEY:
 		return NewEphemeralKeyMsg(), nil
+
+	//------------------------------------------------------------------
+	// DHT
+	//------------------------------------------------------------------
+	case DHT_CLIENT_GET:
+		return NewDHTClientGetMsg(), nil
 	}
 	return nil, errors.New(fmt.Sprintf("Unknown message type %d", msgType))
 }

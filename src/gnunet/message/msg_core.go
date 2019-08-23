@@ -51,14 +51,9 @@ func (m *EphemeralKeyMsg) String() string {
 		m.SenderStatus)
 }
 
-// Size returns the total number of bytes in a message.
-func (msg *EphemeralKeyMsg) Size() uint16 {
-	return msg.MsgSize
-}
-
-// Type returns the message type
-func (msg *EphemeralKeyMsg) Type() uint16 {
-	return msg.MsgType
+// Header returns the message header in a separate instance.
+func (msg *EphemeralKeyMsg) Header() *MessageHeader {
+	return &MessageHeader{msg.MsgSize, msg.MsgType}
 }
 
 func (m *EphemeralKeyMsg) Public() *crypto.PublicKey {
