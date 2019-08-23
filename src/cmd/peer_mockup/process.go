@@ -8,6 +8,7 @@ import (
 	"gnunet/crypto"
 	"gnunet/message"
 	"gnunet/transport"
+	"gnunet/util"
 )
 
 func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
@@ -96,11 +97,8 @@ func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
 				}
 				t.SetEphKeyMsg(msg)
 				c.Send(p.EphKeyMsg())
-				secret, err := crypto.SharedSecret(p.EphPrvKey(), t.EphKeyMsg().Public())
-				if err != nil {
-					return err
-				}
-				c.SharedSecret(secret)
+				secret := crypto.SharedSecret(p.EphPrvKey(), t.EphKeyMsg().Public())
+				c.SharedSecret(util.Clone(secret.Bits[:]))
 
 			default:
 				fmt.Printf("!!! %v\n", msg)
