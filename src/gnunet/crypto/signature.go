@@ -1,6 +1,12 @@
 package crypto
 
 import (
+	"crypto"
+	"crypto/rand"
+	"crypto/sha512"
+	"fmt"
+
+	"gnunet/crypto/ed25519"
 	"gnunet/util"
 )
 
@@ -38,20 +44,40 @@ const (
 )
 
 //----------------------------------------------------------------------
-// Signature
+// Signature (EdDSA, EcDSA)
 //----------------------------------------------------------------------
 
+// Signature
 type Signature struct {
 	// internal
-	data []byte
+	data    []byte
+	isEdDSA bool
 }
 
+// NewSignatureFromBytes
 func NewSignatureFromBytes(data []byte) *Signature {
 	return &Signature{
 		data: util.Clone(data),
 	}
 }
 
+// Bytes
 func (s *Signature) Bytes() []byte {
-	return s.data[:]
+	return util.Clone(s.data)
+}
+
+// Verify checks a signature of a message.
+func (pub *PublicKey) Verify(msg []byte, sig *Signature) bool {
+	hv := sha512.Sum512(msg)
+	return ed25519.Verify(pub.key, hv[:], sig.Bytes())
+}
+
+// Sign creates a signature for a message.
+func (prv *PrivateKey) Sign(msg []byte) (*Signature, error) {
+	if !prv.fromSeed {
+		return nil, fmt.Errorf("Key not suitable for EdDSA")
+	}
+	hv := sha512.Sum512(msg)
+	sig, err := prv.key.Sign(rand.Reader, hv[:], crypto.Hash(0))
+	return NewSignatureFromBytes(sig), err
 }

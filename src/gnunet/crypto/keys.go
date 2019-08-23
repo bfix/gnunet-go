@@ -1,8 +1,6 @@
 package crypto
 
 import (
-	"crypto"
-	"crypto/rand"
 	"crypto/sha512"
 	"fmt"
 	"math/big"
@@ -39,12 +37,6 @@ func NewPublicKey(data []byte) *PublicKey {
 // Bytes returns the binary representation of a public key.
 func (pub *PublicKey) Bytes() []byte {
 	return []byte(pub.key)
-}
-
-// Verify checks a signature of a message.
-func (pub *PublicKey) Verify(msg []byte, sig *Signature) bool {
-	hv := sha512.Sum512(msg)
-	return ed25519.Verify(pub.key, hv[:], sig.Bytes())
 }
 
 //----------------------------------------------------------------------
@@ -106,16 +98,6 @@ func (prv *PrivateKey) Public() *PublicKey {
 	return &PublicKey{
 		key: util.Clone(prv.key[ed25519.SeedSize:]),
 	}
-}
-
-// Sign creates a signature for a message.
-func (prv *PrivateKey) Sign(msg []byte) (*Signature, error) {
-	if !prv.fromSeed {
-		return nil, fmt.Errorf("Key not suitable for EdDSA")
-	}
-	hv := sha512.Sum512(msg)
-	sig, err := prv.key.Sign(rand.Reader, hv[:], crypto.Hash(0))
-	return NewSignatureFromBytes(sig), err
 }
 
 // NewKeypair creates a new Ed25519 key pair.
