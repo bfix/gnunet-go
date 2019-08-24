@@ -107,13 +107,19 @@ var (
 	zero = big.NewInt(0)
 )
 
+// dsa_getZ constructs the value of 'z' from binary data.
+func dsa_getZ(data []byte) *big.Int {
+	bits := len(data)*8 - n.BitLen()
+	z := new(big.Int).SetBytes(data)
+	return z.Rsh(z, uint(bits))
+}
+
 // SignLin creates an EcDSA signature for a message.
 func (prv *PrivateKey) SignLin(msg []byte) (*Signature, error) {
 	// Hash message
 	hv := sha512.Sum512(msg)
 	// compute z
-	hv[0] &= 0x3f
-	z := new(big.Int).SetBytes(hv[:32])
+	z := dsa_getZ(hv[:])
 	// find appropriate k
 	for {
 		// generate random k
@@ -177,8 +183,7 @@ func (pub *PublicKey) VerifyLin(msg []byte, sig *Signature) (bool, error) {
 	// Hash message
 	hv := sha512.Sum512(msg)
 	// compute z
-	hv[0] &= 0x3f
-	z := new(big.Int).SetBytes(hv[:32])
+	z := dsa_getZ(hv[:])
 	// compute u1, u2
 	si := new(big.Int).ModInverse(s, n)
 	b := new(big.Int).Mul(z, si)
