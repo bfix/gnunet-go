@@ -109,9 +109,12 @@ var (
 
 // dsa_getZ constructs the value of 'z' from binary data.
 func dsa_getZ(data []byte) *big.Int {
-	bits := len(data)*8 - n.BitLen()
 	z := new(big.Int).SetBytes(data)
-	return z.Rsh(z, uint(bits))
+	bits := len(data)*8 - n.BitLen()
+	if bits > 0 {
+		z.Rsh(z, uint(bits))
+	}
+	return z
 }
 
 // SignLin creates an EcDSA signature for a message.
