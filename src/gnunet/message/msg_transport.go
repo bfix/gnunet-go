@@ -130,11 +130,10 @@ func (m *TransportPongMsg) Sign(prv *crypto.PrivateKey) error {
 	return nil
 }
 
-func (m *TransportPongMsg) Verify(pub *crypto.PublicKey) bool {
+func (m *TransportPongMsg) Verify(pub *crypto.PublicKey) (bool, error) {
 	data, err := Marshal(m.SignedBlock)
 	if err != nil {
-		fmt.Printf("Verify: %s\n", err)
-		return false
+		return false, err
 	}
 	sig := crypto.NewSignatureFromBytes(m.Signature)
 	return pub.Verify(data, sig)

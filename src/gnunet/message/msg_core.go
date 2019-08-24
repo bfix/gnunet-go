@@ -60,11 +60,10 @@ func (m *EphemeralKeyMsg) Public() *crypto.PublicKey {
 	return crypto.NewPublicKey(m.SignedBlock.PeerID)
 }
 
-func (m *EphemeralKeyMsg) Verify(pub *crypto.PublicKey) bool {
+func (m *EphemeralKeyMsg) Verify(pub *crypto.PublicKey) (bool, error) {
 	data, err := Marshal(m.SignedBlock)
 	if err != nil {
-		fmt.Printf("Verify: %s\n", err)
-		return false
+		return false, err
 	}
 	sig := crypto.NewSignatureFromBytes(m.Signature)
 	return pub.Verify(data, sig)

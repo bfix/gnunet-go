@@ -67,7 +67,11 @@ func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
 				c.Send(mOut)
 
 			case *message.TransportPongMsg:
-				if !msg.Verify(t.PubKey()) {
+				rc, err := msg.Verify(t.PubKey())
+				if err != nil {
+					return err
+				}
+				if !rc {
 					return errors.New("PONG verification failed")
 				}
 				send[message.TRANSPORT_PONG] = true
@@ -92,7 +96,11 @@ func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
 				c.Send(message.NewSessionKeepAliveRespMsg(msg.Nonce))
 
 			case *message.EphemeralKeyMsg:
-				if !msg.Verify(t.PubKey()) {
+				rc, err := msg.Verify(t.PubKey())
+				if err != nil {
+					return err
+				}
+				if !rc {
 					return errors.New("EPHKEY verification failed")
 				}
 				t.SetEphKeyMsg(msg)

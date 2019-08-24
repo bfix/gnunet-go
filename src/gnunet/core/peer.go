@@ -88,6 +88,6 @@ func (p *Peer) Sign(msg []byte) (*crypto.Signature, error) {
 	return p.prv.Sign(msg)
 }
 
-func (p *Peer) Verify(msg []byte, sig *crypto.Signature) bool {
+func (p *Peer) Verify(msg []byte, sig *crypto.Signature) (bool, error) {
 	return p.pub.Verify(msg, sig)
 }
