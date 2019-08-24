@@ -141,7 +141,6 @@ func (prv *PrivateKey) SignLin(msg []byte) (*Signature, error) {
 		if r.Cmp(zero) == 0 {
 			continue
 		}
-		r_buf := r.Bytes()
 
 		// compute non-zero s
 		ki := new(big.Int).ModInverse(k, n)
@@ -153,12 +152,10 @@ func (prv *PrivateKey) SignLin(msg []byte) (*Signature, error) {
 		if s.Cmp(zero) == 0 {
 			continue
 		}
-		s_buf := s.Bytes()
 		// assemble signature
-		size := len(r_buf) + len(s_buf)
-		data := make([]byte, size)
-		copy(data, r_buf)
-		copy(data[len(r_buf):], s_buf)
+		data := make([]byte, 64)
+		util.ToBuffer(r, data[0:32], 32)
+		util.ToBuffer(s, data[32:64], 32)
 		sig := NewSignatureFromBytes(data)
 		sig.isEdDSA = false
 		return sig, nil
