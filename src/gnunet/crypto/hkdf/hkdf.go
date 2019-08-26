@@ -8,6 +8,10 @@
 // HKDF is a cryptographic key derivation function (KDF) with the goal of
 // expanding limited input keying material into one or more cryptographically
 // strong secret keys.
+
+// The package was imported from "gnunet.org/x/crypto/hkdf" and not changed
+// except for not enforcing the original package path.
+
 package hkdf
 
 import (
