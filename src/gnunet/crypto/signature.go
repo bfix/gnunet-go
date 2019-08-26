@@ -1,10 +1,13 @@
 package crypto
 
 import (
+	"bytes"
 	"crypto"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha512"
 	"fmt"
+	"hash"
 	"math/big"
 
 	"gnunet/crypto/ed25519"
@@ -50,6 +53,7 @@ var (
 	ErrSigNotEdDSA      = fmt.Errorf("Not a EdDSA signature")
 	ErrSigNotEcDSA      = fmt.Errorf("Not a EcDSA signature")
 	ErrSigInvalidEcDSA  = fmt.Errorf("Invalid EcDSA signature")
+	ErrSigHashTooSmall  = fmt.Errorf("Hash value to small")
 )
 
 //----------------------------------------------------------------------
@@ -99,7 +103,7 @@ func (pub *PublicKey) Verify(msg []byte, sig *Signature) (bool, error) {
 }
 
 //----------------------------------------------------------------------
-// EcDSA
+// EcDSA (classic or deterministic; see RFC 6979)
 //----------------------------------------------------------------------
 
 var (
@@ -107,8 +111,8 @@ var (
 	zero = big.NewInt(0)
 )
 
-// dsa_getZ constructs the value of 'z' from binary data.
-func dsa_getZ(data []byte) *big.Int {
+// dsa_get_bounded constructs an integer of order 'n' from binary data (message hash).
+func dsa_get_bounded(data []byte) *big.Int {
 	z := new(big.Int).SetBytes(data)
 	bits := len(data)*8 - n.BitLen()
 	if bits > 0 {
@@ -117,58 +121,188 @@ func dsa_getZ(data []byte) *big.Int {
 	return z
 }
 
+//----------------------------------------------------------------------
+// kGenerator is an interface for standard or deterministic computation of the
+// blinding factor 'k' in an EcDSA signature. It always uses SHA512 as a
+// hashing algorithm.
+type kGenerator interface {
+	init(x *big.Int, h1 []byte) error
+	next() (*big.Int, error)
+}
+
+// newKGenerator creates a new suitable generator for the binding factor 'k'.
+func newKGenerator(det bool, x *big.Int, h1 []byte) (gen kGenerator, err error) {
+	if det {
+		gen = &kGenDet{}
+	} else {
+		gen = &kGenStd{}
+	}
+	err = gen.init(x, h1)
+	return
+}
+
+//----------------------------------------------------------------------
+// kGenDet is a RFC6979-compliant generator.
+type kGenDet struct {
+	x    *big.Int
+	V, K []byte
+	hmac hash.Hash
+}
+
+// init prepares a generator
+func (k *kGenDet) init(x *big.Int, h1 []byte) error {
+	// enforce 512 bit hash value (SHA512)
+	if len(h1) != 64 {
+		return ErrSigHashTooSmall
+	}
+
+	// initialize generator specs
+	k.x = x
+	k.hmac = hmac.New(sha512.New, x.Bytes())
+
+	// initialize hmac'd data
+	data := make([]byte, 128)
+	util.CopyBlock(data[0:64], x.Bytes())
+	util.CopyBlock(data[64:128], h1)
+
+	k.V = bytes.Repeat([]byte{0x01}, 64)
+	k.K = bytes.Repeat([]byte{0x00}, 64)
+
+	// start sequence for 'V' and 'K':
+	// (1) K = HMAC_K(V || 0x00 || int2octets(key) || bits2octets(hash))
+	k.hmac.Reset()
+	k.hmac.Write(k.V)
+	k.hmac.Write([]byte{0x00})
+	k.hmac.Write(data)
+	k.K = k.hmac.Sum(nil)
+	// (2) V = HMAC_K(V)
+	k.hmac.Reset()
+	k.hmac.Write(k.V)
+	k.V = k.hmac.Sum(nil)
+	// (3) K = HMAC_K(V || 0x01 || int2octets(key) || bits2octets(hash))
+	k.hmac.Reset()
+	k.hmac.Write(k.V)
+	k.hmac.Write([]byte{0x01})
+	k.hmac.Write(data)
+	k.K = k.hmac.Sum(nil)
+	// (4) V = HMAC_K(V)
+	k.hmac.Reset()
+	k.hmac.Write(k.V)
+	k.V = k.hmac.Sum(nil)
+
+	return nil
+}
+
+// next returns the next 'k'
+func (k *kGenDet) next() (*big.Int, error) {
+	k.hmac.Reset()
+	k.hmac.Write(k.V)
+	k.V = k.hmac.Sum(nil)
+
+	// extract 'k' from data
+	kRes := dsa_get_bounded(k.V)
+
+	// prepare for possible next round
+	// (1) K = HMAC_K(V || 0x00
+	k.hmac.Reset()
+	k.hmac.Write(k.V)
+	k.hmac.Write([]byte{0x00})
+	k.K = k.hmac.Sum(nil)
+	// (2) V = HMAC_K(V)
+	k.hmac.Reset()
+	k.hmac.Write(k.V)
+	k.V = k.hmac.Sum(nil)
+
+	return kRes, nil
+}
+
+//----------------------------------------------------------------------
+// kGenStd is a random generator.
+type kGenStd struct {
+}
+
+// init prepares a generator
+func (k *kGenStd) init(x *big.Int, h1 []byte) error {
+	return nil
+}
+
+// next returns the next 'k'
+func (*kGenStd) next() (*big.Int, error) {
+	// generate random k
+	k, err := rand.Int(rand.Reader, n)
+	if err != nil {
+		return nil, err
+	}
+	k.Mod(k, n)
+	return k, nil
+}
+
+//----------------------------------------------------------------------
 // SignLin creates an EcDSA signature for a message.
 func (prv *PrivateKey) SignLin(msg []byte) (*Signature, error) {
 	// Hash message
 	hv := sha512.Sum512(msg)
+
 	// compute z
-	z := dsa_getZ(hv[:])
-	// find appropriate k
-	for {
-		// generate random k
-		k, err := rand.Int(rand.Reader, n)
+	z := dsa_get_bounded(hv[:])
+
+	// dsa_sign creates a signature. A deterministic signature implements RFC6979.
+	dsa_sign := func(det bool) (r, s *big.Int, err error) {
+		gen, err := newKGenerator(det, prv.D(), hv[:])
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		k.Mod(k, n)
+		for {
+			// generate next possible 'k'
+			k, err := gen.next()
+			if err != nil {
+				return nil, nil, err
+			}
 
-		// compute x-coordinate of point k*G (stored in buf)
-		var (
-			q     ed25519.ExtendedGroupElement
-			buf   [32]byte
-			x, zi ed25519.FieldElement
-		)
-		copy(buf[:], util.Reverse(k.Bytes()))
-		ed25519.GeScalarMultBase(&q, &buf)
-		ed25519.FeInvert(&zi, &q.Z)
-		ed25519.FeMul(&x, &q.X, &zi)
-		ed25519.FeToBytes(&buf, &x)
+			// compute x-coordinate of point k*G (stored in buf)
+			var (
+				q     ed25519.ExtendedGroupElement
+				buf   [32]byte
+				x, zi ed25519.FieldElement
+			)
+			copy(buf[:], util.Reverse(k.Bytes()))
+			ed25519.GeScalarMultBase(&q, &buf)
+			ed25519.FeInvert(&zi, &q.Z)
+			ed25519.FeMul(&x, &q.X, &zi)
+			ed25519.FeToBytes(&buf, &x)
 
-		// compute non-zero r
-		a := new(big.Int).SetBytes(util.Reverse(buf[:]))
-		r := new(big.Int).Mod(a, n)
-		if r.Cmp(zero) == 0 {
-			continue
+			// compute non-zero r
+			a := new(big.Int).SetBytes(util.Reverse(buf[:]))
+			r := new(big.Int).Mod(a, n)
+			if r.Cmp(zero) == 0 {
+				continue
+			}
+
+			// compute non-zero s
+			ki := new(big.Int).ModInverse(k, n)
+			d := prv.D()
+			a = new(big.Int).Mul(r, d)
+			b := new(big.Int).Add(z, a)
+			c := new(big.Int).Mul(ki, b)
+			s := new(big.Int).Mod(c, n)
+			if s.Cmp(zero) == 0 {
+				continue
+			}
+			return r, s, nil
 		}
-
-		// compute non-zero s
-		ki := new(big.Int).ModInverse(k, n)
-		d := prv.D()
-		a = new(big.Int).Mul(r, d)
-		b := new(big.Int).Add(z, a)
-		c := new(big.Int).Mul(ki, b)
-		s := new(big.Int).Mod(c, n)
-		if s.Cmp(zero) == 0 {
-			continue
-		}
-		// assemble signature
-		data := make([]byte, 64)
-		util.ToBuffer(r, data[0:32], 32)
-		util.ToBuffer(s, data[32:64], 32)
-		sig := NewSignatureFromBytes(data)
-		sig.isEdDSA = false
-		return sig, nil
 	}
+
+	// assemble signature
+	r, s, err := dsa_sign(true)
+	if err != nil {
+		return nil, err
+	}
+	data := make([]byte, 64)
+	util.CopyBlock(data[0:32], r.Bytes())
+	util.CopyBlock(data[32:64], s.Bytes())
+	sig := NewSignatureFromBytes(data)
+	sig.isEdDSA = false
+	return sig, nil
 }
 
 // Verify checks a EcDSA signature of a message.
@@ -186,7 +320,7 @@ func (pub *PublicKey) VerifyLin(msg []byte, sig *Signature) (bool, error) {
 	// Hash message
 	hv := sha512.Sum512(msg)
 	// compute z
-	z := dsa_getZ(hv[:])
+	z := dsa_get_bounded(hv[:])
 	// compute u1, u2
 	si := new(big.Int).ModInverse(s, n)
 	b := new(big.Int).Mul(z, si)
