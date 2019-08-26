@@ -161,6 +161,7 @@ func (k *kGenDet) init(x *big.Int, h1 []byte) error {
 	k.hmac = hmac.New(sha512.New, x.Bytes())
 
 	// initialize hmac'd data
+	// data = int2octets(key) || bits2octets(hash)
 	data := make([]byte, 128)
 	util.CopyBlock(data[0:64], x.Bytes())
 	util.CopyBlock(data[64:128], h1)
@@ -169,7 +170,7 @@ func (k *kGenDet) init(x *big.Int, h1 []byte) error {
 	k.K = bytes.Repeat([]byte{0x00}, 64)
 
 	// start sequence for 'V' and 'K':
-	// (1) K = HMAC_K(V || 0x00 || int2octets(key) || bits2octets(hash))
+	// (1) K = HMAC_K(V || 0x00 || data)
 	k.hmac.Reset()
 	k.hmac.Write(k.V)
 	k.hmac.Write([]byte{0x00})
@@ -179,7 +180,7 @@ func (k *kGenDet) init(x *big.Int, h1 []byte) error {
 	k.hmac.Reset()
 	k.hmac.Write(k.V)
 	k.V = k.hmac.Sum(nil)
-	// (3) K = HMAC_K(V || 0x01 || int2octets(key) || bits2octets(hash))
+	// (3) K = HMAC_K(V || 0x01 || data)
 	k.hmac.Reset()
 	k.hmac.Write(k.V)
 	k.hmac.Write([]byte{0x01})

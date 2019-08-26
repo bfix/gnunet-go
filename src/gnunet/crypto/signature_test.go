@@ -74,26 +74,33 @@ func TestEdDSA(t *testing.T) {
 }
 
 func TestEcDSA(t *testing.T) {
-	for n := 0; n < 1000; n++ {
-		sigT, err := prv.SignLin(msg_2)
-		if err != nil {
-			t.Fatal(fmt.Sprintf("[%d] %s", n, err.Error()))
-		}
-		rc, err := pub.VerifyLin(msg_2, sigT)
-		if err != nil {
-			t.Fatal(fmt.Sprintf("[%d] %s", n, err.Error()))
-		}
-		if !rc {
-			t.Fatal(fmt.Sprintf("[%d] Verify failed", n))
-		}
+	sigT, err := prv.SignLin(msg_2)
+	if err != nil {
+		t.Fatal(err)
 	}
-	sigT := NewSignatureFromBytes(sig_2)
-	sigT.isEdDSA = false
 	rc, err := pub.VerifyLin(msg_2, sigT)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !rc {
-		t.Fatal("Verify failed")
+		t.Fatal("Verify failed (1)")
+	}
+
+	sigU, err := prv.SignLin(msg_2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Compare(sigT.Bytes(), sigU.Bytes()) != 0 {
+		t.Fatal("Signatures not deterministic")
+	}
+
+	sigT = NewSignatureFromBytes(sig_2)
+	sigT.isEdDSA = false
+	rc, err = pub.VerifyLin(msg_2, sigT)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !rc {
+		t.Fatal("Verify failed (2)")
 	}
 }
