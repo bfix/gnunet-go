@@ -106,15 +106,10 @@ func (pub *PublicKey) Verify(msg []byte, sig *Signature) (bool, error) {
 // EcDSA (classic or deterministic; see RFC 6979)
 //----------------------------------------------------------------------
 
-var (
-	n, _ = new(big.Int).SetString("1000000000000000000000000000000014def9dea2f79cd65812631a5cf5d3ed", 16)
-	zero = big.NewInt(0)
-)
-
 // dsa_get_bounded constructs an integer of order 'n' from binary data (message hash).
 func dsa_get_bounded(data []byte) *big.Int {
 	z := new(big.Int).SetBytes(data)
-	bits := len(data)*8 - n.BitLen()
+	bits := len(data)*8 - ED25519_BITS
 	if bits > 0 {
 		z.Rsh(z, uint(bits))
 	}
@@ -230,12 +225,7 @@ func (k *kGenStd) init(x *big.Int, h1 []byte) error {
 // next returns the next 'k'
 func (*kGenStd) next() (*big.Int, error) {
 	// generate random k
-	k, err := rand.Int(rand.Reader, n)
-	if err != nil {
-		return nil, err
-	}
-	k.Mod(k, n)
-	return k, nil
+	return rand.Int(rand.Reader, ED25519_N)
 }
 
 //----------------------------------------------------------------------
@@ -249,6 +239,7 @@ func (prv *PrivateKey) SignLin(msg []byte) (*Signature, error) {
 
 	// dsa_sign creates a signature. A deterministic signature implements RFC6979.
 	dsa_sign := func(det bool) (r, s *big.Int, err error) {
+		zero := big.NewInt(0)
 		gen, err := newKGenerator(det, prv.D(), hv[:])
 		if err != nil {
 			return nil, nil, err
@@ -274,18 +265,18 @@ func (prv *PrivateKey) SignLin(msg []byte) (*Signature, error) {
 
 			// compute non-zero r
 			a := new(big.Int).SetBytes(util.Reverse(buf[:]))
-			r := new(big.Int).Mod(a, n)
+			r := new(big.Int).Mod(a, ED25519_N)
 			if r.Cmp(zero) == 0 {
 				continue
 			}
 
 			// compute non-zero s
-			ki := new(big.Int).ModInverse(k, n)
+			ki := new(big.Int).ModInverse(k, ED25519_N)
 			d := prv.D()
 			a = new(big.Int).Mul(r, d)
 			b := new(big.Int).Add(z, a)
 			c := new(big.Int).Mul(ki, b)
-			s := new(big.Int).Mod(c, n)
+			s := new(big.Int).Mod(c, ED25519_N)
 			if s.Cmp(zero) == 0 {
 				continue
 			}
@@ -315,7 +306,7 @@ func (pub *PublicKey) VerifyLin(msg []byte, sig *Signature) (bool, error) {
 	r := new(big.Int).SetBytes(sig.data[:32])
 	s := new(big.Int).SetBytes(sig.data[32:])
 	// check r,s values
-	if r.Cmp(n) != -1 || s.Cmp(n) != -1 {
+	if r.Cmp(ED25519_N) != -1 || s.Cmp(ED25519_N) != -1 {
 		return false, ErrSigInvalidEcDSA
 	}
 	// Hash message
@@ -323,11 +314,11 @@ func (pub *PublicKey) VerifyLin(msg []byte, sig *Signature) (bool, error) {
 	// compute z
 	z := dsa_get_bounded(hv[:])
 	// compute u1, u2
-	si := new(big.Int).ModInverse(s, n)
+	si := new(big.Int).ModInverse(s, ED25519_N)
 	b := new(big.Int).Mul(z, si)
-	u1 := new(big.Int).Mod(b, n)
+	u1 := new(big.Int).Mod(b, ED25519_N)
 	c := new(big.Int).Mul(r, si)
-	u2 := new(big.Int).Mod(c, n)
+	u2 := new(big.Int).Mod(c, ED25519_N)
 	// compute u2 * Q + u1 * G
 	var (
 		Q           ed25519.ExtendedGroupElement
@@ -342,6 +333,6 @@ func (pub *PublicKey) VerifyLin(msg []byte, sig *Signature) (bool, error) {
 	copy(u2B[:], util.Reverse(u2.Bytes()))
 	ed25519.GeDoubleScalarMultVartime(&pge, &u2B, &Q, &u1B)
 	pge.ToBytes(&a)
-	x1 := new(big.Int).Mod(NewPublicKey(a[:]).AffineX(), n)
+	x1 := new(big.Int).Mod(NewPublicKey(a[:]).AffineX(), ED25519_N)
 	return r.Cmp(x1) == 0, nil
 }

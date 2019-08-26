@@ -9,9 +9,13 @@ import (
 	"gnunet/util"
 )
 
-// Error codes
 var (
+	// Error codes
 	ErrInvalidPrivateKeyData = fmt.Errorf("Invalid private key data")
+
+	// Ed25519 curve order
+	ED25519_N, _ = new(big.Int).SetString("1000000000000000000000000000000014def9dea2f79cd65812631a5cf5d3ed", 16)
+	ED25519_BITS = ED25519_N.BitLen()
 )
 
 //----------------------------------------------------------------------

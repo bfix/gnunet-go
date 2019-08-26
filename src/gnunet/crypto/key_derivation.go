@@ -18,7 +18,7 @@ func (pub *PublicKey) DeriveH(label, context string) *big.Int {
 	b := make([]byte, 32)
 	rdr.Read(b)
 	h := new(big.Int).SetBytes(b)
-	return new(big.Int).Mod(h, n)
+	return new(big.Int).Mod(h, ED25519_N)
 }
 
 // PublicKeyDerive "shifts" a public key 'Q' to a new point 'P' where
