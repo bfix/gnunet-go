@@ -1,13 +1,43 @@
-# GNUnet protocol specification
+# GNUnet in Go
 
-Implementation-agnostic specification of GNUnet P2P protocols
+This repository has two parts:
 
-Author: Bernd Fix
+* `src` contains a Go implementation of GNUnet: It is WIP and only provides a
+very limited coverage of GNUnet. The goal is to have a complete, functionally
+equivalent implementation of the GNUnet protocol in Go.
 
-All files are licensed under GNU AGPL-3.0.
+* `doc/` contains documents for an implementation-agnostic specification of the
+GNUnet P2P protocols. It focuses on the peer messages, but also provides
+information on the internal messages.
+
+## Author(s)
+ * Bernd Fix <brf@hoi-polloi.org>
+
+All files are licensed under GNU AGPL-3.0. Copyright by the authors.
+
+## Caveat
 
 THIS IS WORK-IN-PROGRESS AT A VERY EARLY STATE. DON'T EXPECT ANY COMPLETE
 DOCUMENTATION OR COMPILABLE, RUNNABLE OR EVEN OPERATIONAL SOURCE CODE.
+
+## Source code
+
+All source code is written in Golang (version 1.10+). 3rd party libraries
+are used to provide helper functionality (logging, MPI, Ed25519 support and
+other crypto-related packages).
+
+### ./src/cmd folder
+
+* `vanityid`: Compute GNUnet vanity peer id for a given start pattern.
+
+* `gnunet-service-gns-go`: Implementation of the GNS service.
+
+* `peer_mockup`: test message exchange on the lowest level (transport).
+
+### ./src/gnunet folder
+
+Packages used to implement GNUnet protocols (currently only TRANSPORT
+and GNS).
 
 ## Documentation
 
@@ -15,19 +45,4 @@ DOCUMENTATION OR COMPILABLE, RUNNABLE OR EVEN OPERATIONAL SOURCE CODE.
 * raw: raw ASCII protocol definition
 * reports: findings in the GNUnet source code
 * specification: texinfo protocol definition
-
-## Source code
-
-All source code is written in Golang (version 1.10+) without additional
-3rd party libraries (although some source code files from
-[https://github.com/bfix/gospel] are re-used).
-
-### ./src/cmd folder
-
-* vanityid: Compute GNUnet vanity peer id
-* peer_mockup: Golang-based peer to test message exchange
-
-### ./src/gnunet folder
-
-Packages used to implement GNUnet protocols (currently only TRANSPORT)
 

@@ -17,7 +17,7 @@ func main() {
 		srvEndp string
 	)
 	// handle command line arguments
-	flag.StringVar(&srvEndp, "s", "unix+/tmp/gnunet-go-gns-service.sock", "GNS service end-point")
+	flag.StringVar(&srvEndp, "s", "unix+/tmp/gnunet-service-gns-go.sock", "GNS service end-point")
 	flag.Parse()
 
 	// start a new GNS service
