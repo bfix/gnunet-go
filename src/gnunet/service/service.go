@@ -94,7 +94,7 @@ func (si *ServiceImpl) Serve(ch transport.Channel) {
 			logger.Printf(logger.ERROR, "[%s] Message-receive failed: %s\n", si.name, err.Error())
 			break
 		}
-		logger.Printf(logger.DBG, "[%s] Received msg: %v\n", msg)
+		logger.Printf(logger.DBG, "[%s] Received msg: %v\n", si.name, msg)
 		si.impl.HandleMsg(msg)
 	}
 	ch.Close()
