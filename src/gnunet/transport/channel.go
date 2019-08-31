@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/bfix/gospel/data"
+	"github.com/bfix/gospel/logger"
 	"gnunet/message"
 )
 
@@ -159,6 +160,8 @@ func (c *MsgChannel) Receive() (message.Message, uint16, error) {
 	if err != nil {
 		return nil, 0, err
 	}
+	logger.Printf(logger.DBG, ">> Msg{%d,%d}\n", mh.MsgType, mh.MsgSize)
+
 	if err := get(4, int(mh.MsgSize)-4); err != nil {
 		return nil, 0, err
 	}
@@ -172,7 +175,7 @@ func (c *MsgChannel) Receive() (message.Message, uint16, error) {
 	if err = data.Unmarshal(msg, c.buf[:mh.MsgSize]); err != nil {
 		return nil, 0, err
 	}
-	fmt.Printf("<== %v\n", msg)
-	fmt.Printf("    [%s]\n", hex.EncodeToString(c.buf[:mh.MsgSize]))
+	logger.Printf(logger.DBG, "<== %v\n", msg)
+	logger.Printf(logger.DBG, "    [%s]\n", hex.EncodeToString(c.buf[:mh.MsgSize]))
 	return msg, mh.MsgType, nil
 }

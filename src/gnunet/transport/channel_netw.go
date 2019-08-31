@@ -2,7 +2,9 @@ package transport
 
 import (
 	"net"
+	"os"
 	"strings"
+	"syscall"
 )
 
 ////////////////////////////////////////////////////////////////////////
@@ -30,7 +32,15 @@ func (c *NetworkChannel) Open(spec string) (err error) {
 		return ErrChannelNotImplemented
 	}
 	// open connection
+	if err = os.Remove(parts[1]); err != nil {
+		return
+	}
+	oldUMask := syscall.Umask(0777)
 	c.conn, err = net.Dial(c.network, parts[1])
+	if err == nil {
+		err = os.Chmod(parts[1], 01777)
+	}
+	syscall.Umask(oldUMask)
 	return
 }
 

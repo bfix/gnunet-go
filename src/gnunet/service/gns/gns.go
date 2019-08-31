@@ -1,8 +1,7 @@
 package gns
 
 import (
-	"log"
-
+	"github.com/bfix/gospel/logger"
 	"gnunet/message"
 	"gnunet/service"
 )
@@ -31,5 +30,5 @@ func (s *GNSService) Stop() error {
 
 // HandleMsg for GNS specific messages.
 func (s *GNSService) HandleMsg(msg message.Message) {
-	log.Printf("GNS<<: %v\n", msg)
+	logger.Printf(logger.DBG, "GNS<<: %v\n", msg)
 }

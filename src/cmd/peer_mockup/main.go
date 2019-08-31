@@ -4,8 +4,8 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"log"
 
+	"github.com/bfix/gospel/logger"
 	"gnunet/core"
 	"gnunet/transport"
 )
@@ -47,7 +47,7 @@ func main() {
 				case ch = <-hdlr:
 					mc := transport.NewMsgChannel(ch)
 					if err = process(mc, t, p); err != nil {
-						log.Println(err)
+						logger.Println(logger.ERROR, err.Error())
 					}
 				}
 			}
@@ -57,7 +57,7 @@ func main() {
 		// connect to peer
 		fmt.Println("Connecting to target peer")
 		if ch, err = transport.NewChannel("tcp+172.17.0.5:2086"); err != nil {
-			log.Println(err)
+			logger.Println(logger.ERROR, err.Error())
 		}
 		mc := transport.NewMsgChannel(ch)
 		err = process(mc, p, t)

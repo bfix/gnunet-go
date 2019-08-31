@@ -2,12 +2,12 @@ package main
 
 import (
 	"flag"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/bfix/gospel/logger"
 	"gnunet/service"
 	"gnunet/service/gns"
 )
@@ -20,11 +20,13 @@ func main() {
 	flag.StringVar(&srvEndp, "s", "unix+/tmp/gnunet-service-gns-go.sock", "GNS service end-point")
 	flag.Parse()
 
+	logger.SetLogLevel(logger.DBG)
+
 	// start a new GNS service
 	gns := gns.NewGNSService()
-	srv := service.NewServiceImpl(gns)
+	srv := service.NewServiceImpl("gns", gns)
 	if err := srv.Start(srvEndp); err != nil {
-		log.Fatal(err)
+		logger.Printf(logger.ERROR, "[gns] Error: '%s'\n", err.Error())
 	}
 	defer srv.Stop()
 
@@ -43,16 +45,16 @@ func main() {
 			case syscall.SIGKILL:
 			case syscall.SIGINT:
 			case syscall.SIGTERM:
-				log.Println("[gns] Terminating service (on signal)")
+				logger.Println(logger.INFO, "[gns] Terminating service (on signal)")
 				break
 			case syscall.SIGHUP:
-				log.Println("[gns] SIGHUP")
+				logger.Println(logger.INFO, "[gns] SIGHUP")
 			default:
-				log.Println("[gns] Unhandled signal: " + sig.String())
+				logger.Println(logger.INFO, "[gns] Unhandled signal: "+sig.String())
 			}
 		// handle heart beat
 		case now := <-tick.C:
-			log.Println("[gns] Heart beat at " + now.String())
+			logger.Println(logger.INFO, "[gns] Heart beat at "+now.String())
 		}
 	}
 }
