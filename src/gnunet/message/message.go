@@ -2,6 +2,8 @@ package message
 
 import (
 	"errors"
+
+	"github.com/bfix/gospel/data"
 )
 
 var (
@@ -25,11 +27,11 @@ func (mh *MessageHeader) Type() uint16 {
 	return mh.MsgType
 }
 
-func GetMsgHeader(data []byte) (mh *MessageHeader, err error) {
-	if data == nil || len(data) < 4 {
+func GetMsgHeader(b []byte) (mh *MessageHeader, err error) {
+	if b == nil || len(b) < 4 {
 		return nil, ErrMsgHeaderTooSmall
 	}
 	mh = new(MessageHeader)
-	err = Unmarshal(mh, data)
+	err = data.Unmarshal(mh, b)
 	return
 }

@@ -2,7 +2,7 @@
 
 This repository has two parts:
 
-* `src` contains a Go implementation of GNUnet: It is WIP and only provides a
+* `src/` contains a Go implementation of GNUnet: It is WIP and only provides a
 very limited coverage of GNUnet. The goal is to have a complete, functionally
 equivalent implementation of the GNUnet protocol in Go.
 
@@ -22,9 +22,17 @@ DOCUMENTATION OR COMPILABLE, RUNNABLE OR EVEN OPERATIONAL SOURCE CODE.
 
 ## Source code
 
-All source code is written in Golang (version 1.10+). 3rd party libraries
-are used to provide helper functionality (logging, MPI, Ed25519 support and
-other crypto-related packages).
+All source code is written in Golang (version 1.11+).
+
+### Dependencies
+
+3rd party libraries are used to provide helper functionality (logging, MPI,
+Ed25519 support and other crypto-related packages). Make sure the dependent
+packages are accessible through `GOPATH`. To install the dependencies:
+
+```bash
+$ go get -u github.com/bfix/gospel/...
+```
 
 ### ./src/cmd folder
 

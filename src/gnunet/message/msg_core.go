@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/bfix/gospel/data"
 	"gnunet/crypto"
 	"gnunet/util"
 )
@@ -61,7 +62,7 @@ func (m *EphemeralKeyMsg) Public() *crypto.PublicKey {
 }
 
 func (m *EphemeralKeyMsg) Verify(pub *crypto.PublicKey) (bool, error) {
-	data, err := Marshal(m.SignedBlock)
+	data, err := data.Marshal(m.SignedBlock)
 	if err != nil {
 		return false, err
 	}
@@ -76,7 +77,7 @@ func NewEphemeralKey(peerId []byte, ltPrv *crypto.PrivateKey) (*crypto.PrivateKe
 	prv := crypto.PrivateKeyFromSeed(seed)
 	copy(msg.SignedBlock.EphemeralKey, prv.Public().Bytes())
 
-	data, err := Marshal(msg.SignedBlock)
+	data, err := data.Marshal(msg.SignedBlock)
 	if err != nil {
 		return nil, nil, err
 	}

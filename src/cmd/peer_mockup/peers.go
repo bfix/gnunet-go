@@ -1,8 +1,8 @@
 package main
 
 import (
+	"github.com/bfix/gospel/data"
 	"gnunet/core"
-	"gnunet/message"
 	"gnunet/util"
 )
 
@@ -24,7 +24,7 @@ func setupPeers(rnd bool) (err error) {
 	if err != nil {
 		return
 	}
-	addr, _ := message.Marshal(util.NewIPAddress([]byte{172, 17, 0, 6}, 2086))
+	addr, _ := data.Marshal(util.NewIPAddress([]byte{172, 17, 0, 6}, 2086))
 	p.AddAddress(util.NewAddress("tcp", addr))
 
 	//------------------------------------------------------------------
@@ -40,7 +40,7 @@ func setupPeers(rnd bool) (err error) {
 	if err != nil {
 		return
 	}
-	addr, _ = message.Marshal(util.NewIPAddress([]byte{172, 17, 0, 5}, 2086))
+	addr, _ = data.Marshal(util.NewIPAddress([]byte{172, 17, 0, 5}, 2086))
 	t.AddAddress(util.NewAddress("tcp", addr))
 	return
 }

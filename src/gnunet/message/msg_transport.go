@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/bfix/gospel/data"
 	"gnunet/crypto"
 	"gnunet/util"
 )
@@ -65,7 +66,7 @@ type SignedAddress struct {
 
 func NewSignedAddress(a *util.Address) *SignedAddress {
 	// serialize address
-	addrData, _ := Marshal(a)
+	addrData, _ := data.Marshal(a)
 	alen := len(addrData)
 	addr := &SignedAddress{
 		SignLength: uint32(alen + 20),
@@ -104,7 +105,7 @@ func NewTransportPongMsg(challenge uint32, a *util.Address) *TransportPongMsg {
 
 func (m *TransportPongMsg) String() string {
 	a := new(util.Address)
-	if err := Unmarshal(a, m.SignedBlock.Address); err == nil {
+	if err := data.Unmarshal(a, m.SignedBlock.Address); err == nil {
 		return fmt.Sprintf("TransportPongMsg{%s,%d}", a, m.Challenge)
 	}
 	return fmt.Sprintf("TransportPongMsg{<unkown>,%d}", m.Challenge)
@@ -116,7 +117,7 @@ func (msg *TransportPongMsg) Header() *MessageHeader {
 }
 
 func (m *TransportPongMsg) Sign(prv *crypto.PrivateKey) error {
-	data, err := Marshal(m.SignedBlock)
+	data, err := data.Marshal(m.SignedBlock)
 	if err != nil {
 		fmt.Printf("Sign: %s\n", err)
 		return err
@@ -131,7 +132,7 @@ func (m *TransportPongMsg) Sign(prv *crypto.PrivateKey) error {
 }
 
 func (m *TransportPongMsg) Verify(pub *crypto.PublicKey) (bool, error) {
-	data, err := Marshal(m.SignedBlock)
+	data, err := data.Marshal(m.SignedBlock)
 	if err != nil {
 		return false, err
 	}
@@ -168,7 +169,7 @@ func NewTransportPingMsg(target []byte, a *util.Address) *TransportPingMsg {
 		copy(m.Target, target)
 	}
 	if a != nil {
-		if addrData, err := Marshal(a); err == nil {
+		if addrData, err := data.Marshal(a); err == nil {
 			m.Address = addrData
 			m.MsgSize += uint16(len(addrData))
 		}
@@ -178,7 +179,7 @@ func NewTransportPingMsg(target []byte, a *util.Address) *TransportPingMsg {
 
 func (m *TransportPingMsg) String() string {
 	a := new(util.Address)
-	Unmarshal(a, m.Address)
+	data.Unmarshal(a, m.Address)
 	return fmt.Sprintf("TransportPingMsg{%s,%s,%d}",
 		util.EncodeBinaryToString(m.Target), a, m.Challenge)
 }

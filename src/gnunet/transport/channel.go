@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/bfix/gospel/data"
 	"gnunet/message"
 )
 
@@ -112,7 +113,7 @@ func (c *MsgChannel) Close() error {
 func (c *MsgChannel) Send(msg message.Message) error {
 
 	// convert message to binary data
-	data, err := message.Marshal(msg)
+	data, err := data.Marshal(msg)
 	if err != nil {
 		return err
 	}
@@ -168,7 +169,7 @@ func (c *MsgChannel) Receive() (message.Message, uint16, error) {
 	if msg == nil {
 		return nil, 0, fmt.Errorf("Message{%d} is nil!\n", mh.MsgType)
 	}
-	if err = message.Unmarshal(msg, c.buf[:mh.MsgSize]); err != nil {
+	if err = data.Unmarshal(msg, c.buf[:mh.MsgSize]); err != nil {
 		return nil, 0, err
 	}
 	fmt.Printf("<== %v\n", msg)

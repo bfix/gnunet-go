@@ -1,14 +1,13 @@
 package crypto
 
 import (
-	"math/big"
-
+	"github.com/bfix/gospel/math"
 	"gnunet/crypto/ed25519"
 	"gnunet/util"
 )
 
 // Mult computes p = d*Q
-func (pub *PublicKey) Mult(d *big.Int) *PublicKey {
+func (pub *PublicKey) Mult(d *math.Int) *PublicKey {
 	var (
 		Q          ed25519.ExtendedGroupElement
 		pge        ed25519.ProjectiveGroupElement
@@ -29,7 +28,7 @@ func (pub *PublicKey) Mult(d *big.Int) *PublicKey {
 }
 
 // AffineX returns the x-coordinate of the affine point.
-func (pub *PublicKey) AffineX() *big.Int {
+func (pub *PublicKey) AffineX() *math.Int {
 	var (
 		ge    ed25519.ExtendedGroupElement
 		buf   [32]byte
@@ -42,7 +41,7 @@ func (pub *PublicKey) AffineX() *big.Int {
 	ed25519.FeInvert(&zi, &ge.Z)
 	ed25519.FeMul(&x, &ge.X, &zi)
 	ed25519.FeToBytes(&buf, &x)
-	return new(big.Int).SetBytes(util.Reverse(buf[:]))
+	return math.NewIntFromBytes(util.Reverse(buf[:]))
 }
 
 // SharedSecret computes a 64 byte shared secret

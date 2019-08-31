@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"math/big"
 	"testing"
+
+	"github.com/bfix/gospel/math"
 )
 
 var (
@@ -40,9 +41,9 @@ var (
 
 func TestDHE(t *testing.T) {
 	// generate two key pairs
-	prv_1 = PrivateKeyFromD(new(big.Int).SetBytes(d_1))
+	prv_1 = PrivateKeyFromD(math.NewIntFromBytes(d_1))
 	pub_1 = prv_1.Public()
-	prv_2 = PrivateKeyFromD(new(big.Int).SetBytes(d_2))
+	prv_2 = PrivateKeyFromD(math.NewIntFromBytes(d_2))
 	pub_2 = prv_2.Public()
 
 	// compute shared secret

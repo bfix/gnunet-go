@@ -8,8 +8,8 @@ import (
 	"crypto/sha512"
 	"fmt"
 	"hash"
-	"math/big"
 
+	"github.com/bfix/gospel/math"
 	"gnunet/crypto/ed25519"
 	"gnunet/util"
 )
@@ -107,11 +107,11 @@ func (pub *PublicKey) Verify(msg []byte, sig *Signature) (bool, error) {
 //----------------------------------------------------------------------
 
 // dsa_get_bounded constructs an integer of order 'n' from binary data (message hash).
-func dsa_get_bounded(data []byte) *big.Int {
-	z := new(big.Int).SetBytes(data)
+func dsa_get_bounded(data []byte) *math.Int {
+	z := math.NewIntFromBytes(data)
 	bits := len(data)*8 - ED25519_BITS
 	if bits > 0 {
-		z.Rsh(z, uint(bits))
+		z = z.Rsh(uint(bits))
 	}
 	return z
 }
@@ -121,12 +121,12 @@ func dsa_get_bounded(data []byte) *big.Int {
 // blinding factor 'k' in an EcDSA signature. It always uses SHA512 as a
 // hashing algorithm.
 type kGenerator interface {
-	init(x *big.Int, h1 []byte) error
-	next() (*big.Int, error)
+	init(x *math.Int, h1 []byte) error
+	next() (*math.Int, error)
 }
 
 // newKGenerator creates a new suitable generator for the binding factor 'k'.
-func newKGenerator(det bool, x *big.Int, h1 []byte) (gen kGenerator, err error) {
+func newKGenerator(det bool, x *math.Int, h1 []byte) (gen kGenerator, err error) {
 	if det {
 		gen = &kGenDet{}
 	} else {
@@ -139,13 +139,13 @@ func newKGenerator(det bool, x *big.Int, h1 []byte) (gen kGenerator, err error) 
 //----------------------------------------------------------------------
 // kGenDet is a RFC6979-compliant generator.
 type kGenDet struct {
-	x    *big.Int
+	x    *math.Int
 	V, K []byte
 	hmac hash.Hash
 }
 
 // init prepares a generator
-func (k *kGenDet) init(x *big.Int, h1 []byte) error {
+func (k *kGenDet) init(x *math.Int, h1 []byte) error {
 	// enforce 512 bit hash value (SHA512)
 	if len(h1) != 64 {
 		return ErrSigHashTooSmall
@@ -190,7 +190,7 @@ func (k *kGenDet) init(x *big.Int, h1 []byte) error {
 }
 
 // next returns the next 'k'
-func (k *kGenDet) next() (*big.Int, error) {
+func (k *kGenDet) next() (*math.Int, error) {
 	k.hmac.Reset()
 	k.hmac.Write(k.V)
 	k.V = k.hmac.Sum(nil)
@@ -218,14 +218,14 @@ type kGenStd struct {
 }
 
 // init prepares a generator
-func (k *kGenStd) init(x *big.Int, h1 []byte) error {
+func (k *kGenStd) init(x *math.Int, h1 []byte) error {
 	return nil
 }
 
 // next returns the next 'k'
-func (*kGenStd) next() (*big.Int, error) {
+func (*kGenStd) next() (*math.Int, error) {
 	// generate random k
-	return rand.Int(rand.Reader, ED25519_N)
+	return math.NewIntRnd(ED25519_N), nil
 }
 
 //----------------------------------------------------------------------
@@ -238,8 +238,8 @@ func (prv *PrivateKey) SignLin(msg []byte) (*Signature, error) {
 	z := dsa_get_bounded(hv[:])
 
 	// dsa_sign creates a signature. A deterministic signature implements RFC6979.
-	dsa_sign := func(det bool) (r, s *big.Int, err error) {
-		zero := big.NewInt(0)
+	dsa_sign := func(det bool) (r, s *math.Int, err error) {
+		zero := math.NewInt(0)
 		gen, err := newKGenerator(det, prv.D(), hv[:])
 		if err != nil {
 			return nil, nil, err
@@ -264,19 +264,15 @@ func (prv *PrivateKey) SignLin(msg []byte) (*Signature, error) {
 			ed25519.FeToBytes(&buf, &x)
 
 			// compute non-zero r
-			a := new(big.Int).SetBytes(util.Reverse(buf[:]))
-			r := new(big.Int).Mod(a, ED25519_N)
+			r := math.NewIntFromBytes(util.Reverse(buf[:])).Mod(ED25519_N)
 			if r.Cmp(zero) == 0 {
 				continue
 			}
 
 			// compute non-zero s
-			ki := new(big.Int).ModInverse(k, ED25519_N)
-			d := prv.D()
-			a = new(big.Int).Mul(r, d)
-			b := new(big.Int).Add(z, a)
-			c := new(big.Int).Mul(ki, b)
-			s := new(big.Int).Mod(c, ED25519_N)
+			ki := k.ModInverse(ED25519_N)
+			s := ki.Mul(z.Add(r.Mul(prv.D()))).Mod(ED25519_N)
+
 			if s.Cmp(zero) == 0 {
 				continue
 			}
@@ -303,8 +299,8 @@ func (pub *PublicKey) VerifyLin(msg []byte, sig *Signature) (bool, error) {
 		return false, ErrSigNotEcDSA
 	}
 	// reconstruct r and s
-	r := new(big.Int).SetBytes(sig.data[:32])
-	s := new(big.Int).SetBytes(sig.data[32:])
+	r := math.NewIntFromBytes(sig.data[:32])
+	s := math.NewIntFromBytes(sig.data[32:])
 	// check r,s values
 	if r.Cmp(ED25519_N) != -1 || s.Cmp(ED25519_N) != -1 {
 		return false, ErrSigInvalidEcDSA
@@ -314,11 +310,9 @@ func (pub *PublicKey) VerifyLin(msg []byte, sig *Signature) (bool, error) {
 	// compute z
 	z := dsa_get_bounded(hv[:])
 	// compute u1, u2
-	si := new(big.Int).ModInverse(s, ED25519_N)
-	b := new(big.Int).Mul(z, si)
-	u1 := new(big.Int).Mod(b, ED25519_N)
-	c := new(big.Int).Mul(r, si)
-	u2 := new(big.Int).Mod(c, ED25519_N)
+	si := s.ModInverse(ED25519_N)
+	u1 := si.Mul(z).Mod(ED25519_N)
+	u2 := si.Mul(r).Mod(ED25519_N)
 	// compute u2 * Q + u1 * G
 	var (
 		Q           ed25519.ExtendedGroupElement
@@ -333,6 +327,6 @@ func (pub *PublicKey) VerifyLin(msg []byte, sig *Signature) (bool, error) {
 	copy(u2B[:], util.Reverse(u2.Bytes()))
 	ed25519.GeDoubleScalarMultVartime(&pge, &u2B, &Q, &u1B)
 	pge.ToBytes(&a)
-	x1 := new(big.Int).Mod(NewPublicKey(a[:]).AffineX(), ED25519_N)
+	x1 := NewPublicKey(a[:]).AffineX().Mod(ED25519_N)
 	return r.Cmp(x1) == 0, nil
 }
