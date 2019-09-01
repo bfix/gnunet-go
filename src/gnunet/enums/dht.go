@@ -7,4 +7,6 @@ var (
 	DHT_RO_FIND_PEER              = 3  // This is a 'FIND-PEER' request, so approximate results are fine.
 	DHT_RO_BART                   = 4  // Possible message option for query key randomization.
 	DHT_RO_LAST_HOP               = 16 // Flag given to monitors if this was the last hop for a GET/PUT.
+
+	DHT_GNS_REPLICATION_LEVEL = 10
 )
