@@ -5,20 +5,29 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"strings"
+	"regexp"
 
 	"gnunet/crypto"
 	"gnunet/util"
 )
 
 func main() {
+	// get arguments
 	flag.Parse()
 	prefixes := flag.Args()
-	if len(prefixes) == 0 {
+	num := len(prefixes)
+	if num == 0 {
 		fmt.Println("No prefixes specified -- done.")
 		return
 	}
 
+	// pre-compile regexp
+	reg := make([]*regexp.Regexp, num)
+	for i, p := range prefixes {
+		reg[i] = regexp.MustCompile(p)
+	}
+
+	// generate new keys in a loop
 	seed := make([]byte, 32)
 	for {
 		n, err := rand.Read(seed)
@@ -28,8 +37,8 @@ func main() {
 		prv := crypto.PrivateKeyFromSeed(seed)
 		pub := prv.Public().Bytes()
 		id := util.EncodeBinaryToString(pub)
-		for _, p := range prefixes {
-			if strings.HasPrefix(id, p) {
+		for _, r := range reg {
+			if r.MatchString(id) {
 				fmt.Printf("%s [%s]\n", id, hex.EncodeToString(seed))
 			}
 		}
