@@ -1,9 +1,13 @@
 {
+	"environ": {
+		"TMP": "/tmp",
+		"RT_SYS": "${TMP}/gnunet-system-runtime"
+	},
 	"dht": {
-		"endpoint": "unix+/tmp/gnunet-system-runtime/gnunet-service-dht.sock"
+		"endpoint": "unix+${RT_SYS}/gnunet-service-dht.sock"
 	},
 	"gns": {
-		"endpoint": "unix+/tmp/gnunet-system-runtime/gnunet-service-gns-go.sock",
+		"endpoint": "unix+${RT_SYS}/gnunet-service-gns-go.sock",
 		"dhtReplLevel": 10
 	}
 }
