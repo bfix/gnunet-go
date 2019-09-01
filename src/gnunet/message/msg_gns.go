@@ -2,10 +2,14 @@ package message
 
 import (
 	"fmt"
-	//	"gnunet/crypto"
+
 	"gnunet/enums"
 	"gnunet/util"
 )
+
+//----------------------------------------------------------------------
+// GNS_LOOKUP
+//----------------------------------------------------------------------
 
 // GNSLookupMsg
 type GNSLookupMsg struct {
@@ -22,26 +26,27 @@ type GNSLookupMsg struct {
 // NewGNSLookupMsg creates a new default message.
 func NewGNSLookupMsg() *GNSLookupMsg {
 	return &GNSLookupMsg{
-		MsgSize:  49, // record size with empty name
+		MsgSize:  48, // record size with no name
 		MsgType:  GNS_LOOKUP,
 		Id:       0,
 		Zone:     make([]byte, 32),
 		Options:  int16(enums.GNS_LO_DEFAULT),
 		Reserved: 0,
 		Type:     int32(enums.GNS_TYPE_ANY),
-		Name:     make([]byte, 1),
+		Name:     nil,
 	}
 }
 
+// SetName
 func (m *GNSLookupMsg) SetName(name string) {
 	m.Name = util.Clone(append([]byte(name), 0))
-	m.MsgSize = uint16(49 + len(m.Name))
+	m.MsgSize = uint16(48 + len(m.Name))
 }
 
 // String
 func (m *GNSLookupMsg) String() string {
 	return fmt.Sprintf(
-		"GNSLookupMsg{Id=%d,Zone=%s,Options=%d,Type=%d, Name=%s}",
+		"GNSLookupMsg{Id=%d,Zone=%s,Options=%d,Type=%d,Name=%s}",
 		m.Id, util.EncodeBinaryToString(m.Zone),
 		m.Options, m.Type, string(m.Name))
 }
