@@ -2,9 +2,7 @@ package transport
 
 import (
 	"net"
-	"os"
 	"strings"
-	"syscall"
 )
 
 ////////////////////////////////////////////////////////////////////////
@@ -32,15 +30,7 @@ func (c *NetworkChannel) Open(spec string) (err error) {
 		return ErrChannelNotImplemented
 	}
 	// open connection
-	if err = os.Remove(parts[1]); err != nil {
-		return
-	}
-	oldUMask := syscall.Umask(0777)
 	c.conn, err = net.Dial(c.network, parts[1])
-	if err == nil {
-		err = os.Chmod(parts[1], 01777)
-	}
-	syscall.Umask(oldUMask)
 	return
 }
 
@@ -87,12 +77,13 @@ func NewNetworkChannelServer(netw string) ChannelServer {
 
 // Open
 func (s *NetworkChannelServer) Open(spec string, hdlr chan<- Channel) (err error) {
+	parts := strings.Split(spec, "+")
 	// check for correct protocol
-	if !strings.HasPrefix(spec, s.network+"+") {
+	if parts[0] != s.network {
 		return ErrChannelNotImplemented
 	}
 	// create listener
-	if s.listener, err = net.Listen(s.network, spec[len(s.network)+1:]); err != nil {
+	if s.listener, err = net.Listen(s.network, parts[1]); err != nil {
 		return
 	}
 	// run go routine to handle channel requests from clients

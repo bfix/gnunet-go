@@ -164,3 +164,40 @@ func TestChannelClientServerTCP(t *testing.T) {
 
 	s.Stop()
 }
+
+func TestChannelClientServerSock(t *testing.T) {
+	time.Sleep(time.Second)
+	s := NewTestChannelServer()
+	if err := s.Start("unix+" + SOCK_ADDR); err != nil {
+		t.Fatal(err)
+	}
+
+	ch, err := NewChannel("unix+" + SOCK_ADDR)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg := []byte("This is just a test -- please ignore...")
+	n, err := ch.Write(msg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != len(msg) {
+		t.Fatal("Send size mismatch")
+	}
+	buf := make([]byte, 4096)
+	n = 0
+	start := time.Now().Unix()
+	for n == 0 && (time.Now().Unix()-start) < 3 {
+		if n, err = ch.Read(buf); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err = ch.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Compare(buf[:n], msg) != 0 {
+		t.Fatal("message send/receive mismatch")
+	}
+
+	s.Stop()
+}

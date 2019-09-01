@@ -118,8 +118,8 @@ func (c *MsgChannel) Send(msg message.Message) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("==> %v\n", msg)
-	fmt.Printf("    [%s]\n", hex.EncodeToString(data))
+	logger.Printf(logger.DBG, "==> %v\n", msg)
+	logger.Printf(logger.DBG, "    [%s]\n", hex.EncodeToString(data))
 
 	// check message header size and packet size
 	mh, err := message.GetMsgHeader(data)
@@ -160,7 +160,6 @@ func (c *MsgChannel) Receive() (message.Message, uint16, error) {
 	if err != nil {
 		return nil, 0, err
 	}
-	logger.Printf(logger.DBG, ">> Msg{%d,%d}\n", mh.MsgType, mh.MsgSize)
 
 	if err := get(4, int(mh.MsgSize)-4); err != nil {
 		return nil, 0, err

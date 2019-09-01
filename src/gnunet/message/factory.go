@@ -41,6 +41,12 @@ func NewEmptyMessage(msgType uint16) (Message, error) {
 	//------------------------------------------------------------------
 	case DHT_CLIENT_GET:
 		return NewDHTClientGetMsg(), nil
+
+	//------------------------------------------------------------------
+	// GNS
+	//------------------------------------------------------------------
+	case GNS_LOOKUP:
+		return NewGNSLookupMsg(), nil
 	}
 	return nil, errors.New(fmt.Sprintf("Unknown message type %d", msgType))
 }

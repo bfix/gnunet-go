@@ -17,7 +17,7 @@ func main() {
 		srvEndp string
 	)
 	// handle command line arguments
-	flag.StringVar(&srvEndp, "s", "unix+/tmp/gnunet-service-gns-go.sock", "GNS service end-point")
+	flag.StringVar(&srvEndp, "s", "unix+/tmp/gnunet-system-runtime/gnunet-service-gns-go.sock", "GNS service end-point")
 	flag.Parse()
 
 	logger.SetLogLevel(logger.DBG)
@@ -28,7 +28,6 @@ func main() {
 	if err := srv.Start(srvEndp); err != nil {
 		logger.Printf(logger.ERROR, "[gns] Error: '%s'\n", err.Error())
 	}
-	defer srv.Stop()
 
 	// handle OS signals
 	sigCh := make(chan os.Signal, 5)
@@ -37,6 +36,7 @@ func main() {
 	// heart beat
 	tick := time.NewTicker(5 * time.Minute)
 
+loop:
 	for {
 		select {
 		// handle OS signals
@@ -46,7 +46,7 @@ func main() {
 			case syscall.SIGINT:
 			case syscall.SIGTERM:
 				logger.Println(logger.INFO, "[gns] Terminating service (on signal)")
-				break
+				break loop
 			case syscall.SIGHUP:
 				logger.Println(logger.INFO, "[gns] SIGHUP")
 			default:
@@ -57,4 +57,9 @@ func main() {
 			logger.Println(logger.INFO, "[gns] Heart beat at "+now.String())
 		}
 	}
+
+	// terminating service
+	srv.Stop()
+	// wait for logger to flush last messages
+	time.Sleep(5 * time.Second)
 }

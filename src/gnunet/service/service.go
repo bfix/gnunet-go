@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/bfix/gospel/logger"
 	"gnunet/message"
@@ -47,6 +48,7 @@ func (si *ServiceImpl) Start(spec string) (err error) {
 	}
 
 	// start channel server
+	logger.Printf(logger.DBG, "[%s] Service starting.\n", si.name)
 	if si.srvc, err = transport.NewChannelServer(spec, si.hdlr); err != nil {
 		return
 	}
@@ -54,19 +56,23 @@ func (si *ServiceImpl) Start(spec string) (err error) {
 
 	// handle clients
 	go func() {
+	loop:
 		for si.running {
 			select {
 			case in := <-si.hdlr:
 				if in == nil {
-					break
+					logger.Printf(logger.DBG, "[%s] Listener terminated.\n", si.name)
+					break loop
 				}
 				switch ch := in.(type) {
 				case transport.Channel:
-					logger.Printf(logger.DBG, "[%s] Client connected\n", si.name)
+					logger.Printf(logger.DBG, "[%s] Client connected.\n", si.name)
 					go si.Serve(ch)
 				}
+			default:
 			}
 		}
+		logger.Printf(logger.DBG, "[%s] Service closing.\n", si.name)
 		si.srvc.Close()
 		si.running = false
 	}()
@@ -81,6 +87,7 @@ func (si *ServiceImpl) Stop() error {
 		return fmt.Errorf("service not running")
 	}
 	si.running = false
+	logger.Printf(logger.DBG, "[%s] Service terminating.\n", si.name)
 
 	return si.impl.Stop()
 }
@@ -91,10 +98,14 @@ func (si *ServiceImpl) Serve(ch transport.Channel) {
 	for {
 		msg, _, err := mc.Receive()
 		if err != nil {
-			logger.Printf(logger.ERROR, "[%s] Message-receive failed: %s\n", si.name, err.Error())
+			if err == io.EOF {
+				logger.Printf(logger.INFO, "[%s] Client channel closed.\n", si.name)
+			} else {
+				logger.Printf(logger.ERROR, "[%s] Message-receive failed: %s\n", si.name, err.Error())
+			}
 			break
 		}
-		logger.Printf(logger.DBG, "[%s] Received msg: %v\n", si.name, msg)
+		logger.Printf(logger.INFO, "[%s] Received msg: %v\n", si.name, msg)
 		si.impl.HandleMsg(msg)
 	}
 	ch.Close()

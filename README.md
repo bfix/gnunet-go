@@ -38,7 +38,11 @@ $ go get -u github.com/bfix/gospel/...
 
 ### ./src/cmd folder
 
-* `vanityid`: Compute GNUnet vanity peer id for a given start pattern.
+* `vanityid`: Compute GNUnet vanity peer id for a given regexp pattern.
+
+```bash
+$ vanityid "^TST[0-9]"
+```
 
 * `gnunet-service-gns-go`: Implementation of the GNS service.
 
