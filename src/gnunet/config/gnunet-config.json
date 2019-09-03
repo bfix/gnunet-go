@@ -9,5 +9,8 @@
 	"gns": {
 		"endpoint": "unix+${RT_SYS}/gnunet-service-gns-go.sock",
 		"dhtReplLevel": 10
+	},
+	"namecache": {
+		"endpoint": "unix+${RT_SYS}/gnunet-service-namecache.sock"
 	}
 }

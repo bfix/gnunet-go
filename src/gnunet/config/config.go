@@ -8,33 +8,63 @@ import (
 	"strings"
 
 	"github.com/bfix/gospel/logger"
-	"gnunet/service/dht"
-	"gnunet/service/gns"
 )
+
+///////////////////////////////////////////////////////////////////////
+// GNS configuration
+
+// GNSConfig
+type GNSConfig struct {
+	Endpoint     string `json:"endpoint"`     // end-point of GNS service
+	DHTReplLevel int    `json:"dhtReplLevel"` // DHT replication level
+}
+
+///////////////////////////////////////////////////////////////////////
+// DHT configuration
+
+// DHTConfig
+type DHTConfig struct {
+	Endpoint string `json:"endpoint"` // end-point of DHT service
+}
+
+///////////////////////////////////////////////////////////////////////
+// Namecache configuration
+
+// NamecacheConfig
+type NamecacheConfig struct {
+	Endpoint string `json:"endpoint"` // end-point of Namecache service
+}
+
+///////////////////////////////////////////////////////////////////////
 
 // Environment settings
 type Environ map[string]string
 
 // Config is the aggregated configuration for GNUnet.
 type Config struct {
-	Env Environ     `json:"environ"`
-	DHT *dht.Config `json:"dht"`
-	GNS *gns.Config `json:"gns"`
+	Env       Environ          `json:"environ"`
+	DHT       *DHTConfig       `json:"dht"`
+	GNS       *GNSConfig       `json:"gns"`
+	Namecache *NamecacheConfig `json:"namecache"`
 }
 
+var (
+	Cfg *Config
+)
+
 // Parse a JSON-encoded configuration file map it to the Config data structure.
-func ParseConfig(fileName string) (config *Config, err error) {
+func ParseConfig(fileName string) (err error) {
 	// parse configuration file
 	file, err := ioutil.ReadFile(fileName)
 	if err != nil {
-		return nil, err
+		return
 	}
 	// unmarshal to Config data structure
-	config = new(Config)
-	if err = json.Unmarshal(file, config); err == nil {
+	Cfg = new(Config)
+	if err = json.Unmarshal(file, Cfg); err == nil {
 		// process all string-based config settings and apply
 		// string substitutions.
-		applySubstitutions(config, config.Env)
+		applySubstitutions(Cfg, Cfg.Env)
 	}
 	return
 }

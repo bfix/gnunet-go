@@ -47,6 +47,6 @@ func (c *Connection) Send(msg message.Message) error {
 	return c.ch.Send(msg)
 }
 
-func (c *Connection) Receive() (message.Message, uint16, error) {
+func (c *Connection) Receive() (message.Message, error) {
 	return c.ch.Receive()
 }

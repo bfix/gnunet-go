@@ -16,6 +16,7 @@ import (
 type Service interface {
 	Start(spec string) error
 	HandleMsg(msg message.Message)
+	SetSendMsg(hdlr func(message.Message) error)
 	Stop() error
 }
 
@@ -96,7 +97,7 @@ func (si *ServiceImpl) Stop() error {
 func (si *ServiceImpl) Serve(ch transport.Channel) {
 	mc := transport.NewMsgChannel(ch)
 	for {
-		msg, _, err := mc.Receive()
+		msg, err := mc.Receive()
 		if err != nil {
 			if err == io.EOF {
 				logger.Printf(logger.INFO, "[%s] Client channel closed.\n", si.name)
@@ -109,4 +110,9 @@ func (si *ServiceImpl) Serve(ch transport.Channel) {
 		si.impl.HandleMsg(msg)
 	}
 	ch.Close()
+}
+
+// SendMsgUndefined
+func SendMsgUndefined(m message.Message) error {
+	return fmt.Errorf("gns.Lookup(): No sender for message: %v\n", m)
 }

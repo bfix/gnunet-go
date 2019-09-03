@@ -20,7 +20,7 @@ func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
 	in := make(chan message.Message)
 	go func() {
 		for {
-			msg, _, err := c.Receive()
+			msg, err := c.Receive()
 			if err != nil {
 				fmt.Printf("Receive: %s\n", err.Error())
 				return

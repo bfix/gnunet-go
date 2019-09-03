@@ -142,7 +142,7 @@ func (c *MsgChannel) Send(msg message.Message) error {
 }
 
 // Receive GNUnet messages over a plain Channel.
-func (c *MsgChannel) Receive() (message.Message, uint16, error) {
+func (c *MsgChannel) Receive() (message.Message, error) {
 	get := func(pos, count int) error {
 		n, err := c.ch.Read(c.buf[pos : pos+count])
 		if err != nil {
@@ -154,27 +154,27 @@ func (c *MsgChannel) Receive() (message.Message, uint16, error) {
 		return nil
 	}
 	if err := get(0, 4); err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	mh, err := message.GetMsgHeader(c.buf[:4])
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
 	if err := get(4, int(mh.MsgSize)-4); err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	msg, err := message.NewEmptyMessage(mh.MsgType)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	if msg == nil {
-		return nil, 0, fmt.Errorf("Message{%d} is nil!\n", mh.MsgType)
+		return nil, fmt.Errorf("Message{%d} is nil!\n", mh.MsgType)
 	}
 	if err = data.Unmarshal(msg, c.buf[:mh.MsgSize]); err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	logger.Printf(logger.DBG, "<== %v\n", msg)
 	logger.Printf(logger.DBG, "    [%s]\n", hex.EncodeToString(c.buf[:mh.MsgSize]))
-	return msg, mh.MsgType, nil
+	return msg, nil
 }
