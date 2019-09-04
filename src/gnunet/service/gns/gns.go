@@ -53,7 +53,7 @@ func (s *GNSService) HandleMsg(msg message.Message) {
 	default:
 	}
 	if err := s.sendMsg(result); err != nil {
-		logger.Printf(logger.ERROR, "gns.Lookup(): Failed to send message: %s\n", err.Error())
+		logger.Printf(logger.ERROR, "gns.Lookup(): Failed to handle request: %s\n", err.Error())
 	}
 	return
 }
@@ -95,28 +95,33 @@ func (s *GNSService) LookupNamecache(query *crypto.HashCode) (result *message.GN
 	result = nil
 
 	// client-connect to the service
+	logger.Println(logger.DBG, "[gns] Connect to Namecache service")
 	var cl *service.Client
 	if cl, err = service.NewClient(config.Cfg.Namecache.Endpoint); err != nil {
 		return
 	}
 	// send request
+	logger.Println(logger.DBG, "[gns] Sending request to Namecache service")
 	if err = cl.SendRequest(req); err != nil {
 		return
 	}
 	// wait for a single response, then close the connection
+	logger.Println(logger.DBG, "[gns] Waiting for response from Namecache service")
 	var resp message.Message
 	if resp, err = cl.ReceiveResponse(); err != nil {
 		return
 	}
+	logger.Println(logger.DBG, "[gns] Closing connection to Namecache service")
 	if err = cl.Close(); err != nil {
 		return
 	}
 
 	// handle message depending on its type
+	logger.Println(logger.DBG, "[gns] Handling response from Namecache service")
 	switch m := resp.(type) {
 	case *message.NamecacheLookupResultMsg:
-
+		logger.Printf(logger.DBG, "--> %v\n", m)
 	}
 	// return response
-	return result, nil
+	return
 }
