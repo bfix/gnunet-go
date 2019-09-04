@@ -2,10 +2,8 @@ package service
 
 import (
 	"fmt"
-	"io"
 
 	"github.com/bfix/gospel/logger"
-	"gnunet/message"
 	"gnunet/transport"
 )
 
@@ -15,8 +13,7 @@ import (
 // Channel semantics in the specification string.
 type Service interface {
 	Start(spec string) error
-	HandleMsg(msg message.Message)
-	SetSendMsg(hdlr func(message.Message) error)
+	ServeClient(ch *transport.MsgChannel)
 	Stop() error
 }
 
@@ -68,7 +65,7 @@ func (si *ServiceImpl) Start(spec string) (err error) {
 				switch ch := in.(type) {
 				case transport.Channel:
 					logger.Printf(logger.DBG, "[%s] Client connected.\n", si.name)
-					go si.Serve(ch)
+					go si.impl.ServeClient(transport.NewMsgChannel(ch))
 				}
 			default:
 			}
@@ -91,28 +88,4 @@ func (si *ServiceImpl) Stop() error {
 	logger.Printf(logger.DBG, "[%s] Service terminating.\n", si.name)
 
 	return si.impl.Stop()
-}
-
-// Serve a client channel.
-func (si *ServiceImpl) Serve(ch transport.Channel) {
-	mc := transport.NewMsgChannel(ch)
-	for {
-		msg, err := mc.Receive()
-		if err != nil {
-			if err == io.EOF {
-				logger.Printf(logger.INFO, "[%s] Client channel closed.\n", si.name)
-			} else {
-				logger.Printf(logger.ERROR, "[%s] Message-receive failed: %s\n", si.name, err.Error())
-			}
-			break
-		}
-		logger.Printf(logger.INFO, "[%s] Received msg: %v\n", si.name, msg)
-		si.impl.HandleMsg(msg)
-	}
-	ch.Close()
-}
-
-// SendMsgUndefined
-func SendMsgUndefined(m message.Message) error {
-	return fmt.Errorf("gns.Lookup(): No sender for message: %v\n", m)
 }
