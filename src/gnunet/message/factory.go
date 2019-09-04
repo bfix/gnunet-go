@@ -50,7 +50,7 @@ func NewEmptyMessage(msgType uint16) (Message, error) {
 	case GNS_LOOKUP:
 		return NewGNSLookupMsg(), nil
 	case GNS_LOOKUP_RESULT:
-		return NewGNSLookupResultMsg(), nil
+		return NewGNSLookupResultMsg(0), nil
 
 	//------------------------------------------------------------------
 	// Namecache

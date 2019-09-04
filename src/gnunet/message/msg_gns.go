@@ -90,11 +90,11 @@ type GNSLookupResultMsg struct {
 }
 
 // NewGNSLookupResultMsg
-func NewGNSLookupResultMsg() *GNSLookupResultMsg {
+func NewGNSLookupResultMsg(id uint32) *GNSLookupResultMsg {
 	return &GNSLookupResultMsg{
 		MsgSize: 12, // Empty result (no records)
 		MsgType: GNS_LOOKUP_RESULT,
-		Id:      0,
+		Id:      id,
 		Count:   0,
 		Records: make([]*GNSResultRecord, 0),
 	}
@@ -113,7 +113,7 @@ func (m *GNSLookupResultMsg) AddRecord(rec *GNSResultRecord) error {
 
 // String
 func (m *GNSLookupResultMsg) String() string {
-	return fmt.Sprintf("GNSLookupResultMsg{Id=%d,Count=%s}", m.Id, m.Count)
+	return fmt.Sprintf("GNSLookupResultMsg{Id=%d,Count=%d}", m.Id, m.Count)
 }
 
 // Header returns the message header in a separate instance.
