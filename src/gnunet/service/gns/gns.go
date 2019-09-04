@@ -2,6 +2,7 @@ package gns
 
 import (
 	"encoding/hex"
+	"io"
 	"time"
 
 	"github.com/bfix/gospel/logger"
@@ -10,6 +11,7 @@ import (
 	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service"
+	"gnunet/transport"
 	"gnunet/util"
 )
 
@@ -19,14 +21,11 @@ import (
 
 // GNSService
 type GNSService struct {
-	sendMsg func(message.Message) error
 }
 
 // NewGNSService
 func NewGNSService() service.Service {
-	return &GNSService{
-		sendMsg: service.SendMsgUndefined,
-	}
+	return &GNSService{}
 }
 
 // Start the GNS service
@@ -39,38 +38,60 @@ func (s *GNSService) Stop() error {
 	return nil
 }
 
-// SetSendMsg
-func (s *GNSService) SetSendMsg(hdlr func(message.Message) error) {
-	s.sendMsg = hdlr
-}
-
-// HandleMsg for GNS specific messages that are delegated to
-// service methods.
-func (s *GNSService) HandleMsg(msg message.Message) {
-	// prepare result message
-	resp := message.NewGNSLookupResultMsg()
-
-	// perform lookup
-	switch m := msg.(type) {
-	case *message.GNSLookupMsg:
-		logger.Println(logger.INFO, "[gns] Lookup request received.")
-		// set request Id in response
-		resp.Id = m.Id
-		// perform lookup on block
-		_, err := s.Lookup(m)
+// Serve a client channel.
+func (s *GNSService) ServeClient(mc *transport.MsgChannel) {
+	for {
+		// receive next message from client
+		msg, err := mc.Receive()
 		if err != nil {
-			logger.Printf(logger.ERROR, "gns.Lookup(): Failed to lookup query: %s\n", err.Error())
+			if err == io.EOF {
+				logger.Println(logger.INFO, "[gns] Client channel closed.")
+			} else {
+				logger.Printf(logger.ERROR, "[gns] Message-receive failed: %s\n", err.Error())
+			}
 			break
 		}
-	default:
-		logger.Printf(logger.ERROR, "gns.Lookup(): Unhandled message of type (%d)\n", msg.Header().MsgType)
-	}
+		logger.Printf(logger.INFO, "[gns] Received msg: %v\n", msg)
 
-	// send response
-	if err := s.sendMsg(resp); err != nil {
-		logger.Printf(logger.ERROR, "gns.Lookup(): Failed to send response: %s\n", err.Error())
+		// perform lookup
+		var resp message.Message
+		switch m := msg.(type) {
+		case *message.GNSLookupMsg:
+			//----------------------------------------------------------
+			// GNS_LOOKUP
+			//----------------------------------------------------------
+			logger.Println(logger.INFO, "[gns] Lookup request received.")
+			resp = message.NewGNSLookupResultMsg(m.Id)
+			// perform lookup on block
+			block, err := s.Lookup(m)
+			if err != nil {
+				logger.Printf(logger.ERROR, "gns.Lookup(): Failed to lookup query: %s\n", err.Error())
+				break
+			}
+			// handle block
+			if block != nil {
+				switch int(m.Type) {
+				case enums.GNS_TYPE_DNS_A:
+					logger.Println(logger.DBG, "[gns] Lookup type: DNS_A")
+				}
+			}
+
+		default:
+			//----------------------------------------------------------
+			// UNKNOWN message type received
+			//----------------------------------------------------------
+			logger.Printf(logger.ERROR, "gns.Lookup(): Unhandled message of type (%d)\n", msg.Header().MsgType)
+			continue
+		}
+
+		// send response
+		if err := mc.Send(resp); err != nil {
+			logger.Printf(logger.ERROR, "gns.Lookup(): Failed to send response: %s\n", err.Error())
+		}
+
 	}
-	return
+	// close client connection
+	mc.Close()
 }
 
 // Lookup handles GNU_LOOKUP messages
@@ -97,16 +118,10 @@ func (s *GNSService) Lookup(m *message.GNSLookupMsg) (block []byte, err error) {
 					logger.Println(logger.DBG, "gns.Lookup(dht): no block found")
 				}
 				// lookup fails completely -- no result
-				return
 			}
 		}
 	}
-
-	switch int(m.Type) {
-	case enums.GNS_TYPE_DNS_A:
-		logger.Println(logger.DBG, "[gns] Lookup type: DNS_A")
-	}
-	return nil, nil
+	return
 }
 
 // LookupNamecache
@@ -118,25 +133,9 @@ func (s *GNSService) LookupNamecache(query *crypto.HashCode) (result []byte, err
 	req.Id = uint32(util.NextID())
 	result = nil
 
-	// client-connect to the service
-	logger.Println(logger.DBG, "[gns] Connect to Namecache service")
-	var cl *service.Client
-	if cl, err = service.NewClient(config.Cfg.Namecache.Endpoint); err != nil {
-		return
-	}
-	// send request
-	logger.Println(logger.DBG, "[gns] Sending request to Namecache service")
-	if err = cl.SendRequest(req); err != nil {
-		return
-	}
-	// wait for a single response, then close the connection
-	logger.Println(logger.DBG, "[gns] Waiting for response from Namecache service")
+	// get response from Namecache service
 	var resp message.Message
-	if resp, err = cl.ReceiveResponse(); err != nil {
-		return
-	}
-	logger.Println(logger.DBG, "[gns] Closing connection to Namecache service")
-	if err = cl.Close(); err != nil {
+	if resp, err = service.ServiceRequestResponse("gns", "Namecache", config.Cfg.Namecache.Endpoint, req); err != nil {
 		return
 	}
 
@@ -154,7 +153,7 @@ func (s *GNSService) LookupNamecache(query *crypto.HashCode) (result []byte, err
 			logger.Println(logger.DBG, "[gns] block not found in namecache")
 			return
 		}
-		// check if data has expired
+		// check if record has expired
 		if int64(m.Expire) < time.Now().Unix() {
 			logger.Printf(logger.ERROR, "[gns] block expired at %s\n", util.Timestamp(m.Expire))
 			return
@@ -178,25 +177,9 @@ func (s *GNSService) LookupDHT(query *crypto.HashCode) (result []byte, err error
 	req.Id = uint64(util.NextID())
 	result = nil
 
-	// client-connect to the service
-	logger.Println(logger.DBG, "[gns] Connect to DHT service")
-	var cl *service.Client
-	if cl, err = service.NewClient(config.Cfg.DHT.Endpoint); err != nil {
-		return
-	}
-	// send request
-	logger.Println(logger.DBG, "[gns] Sending request to DHT service")
-	if err = cl.SendRequest(req); err != nil {
-		return
-	}
-	// wait for a single response, then close the connection
-	logger.Println(logger.DBG, "[gns] Waiting for response from DHT service")
+	// get response from DHT service
 	var resp message.Message
-	if resp, err = cl.ReceiveResponse(); err != nil {
-		return
-	}
-	logger.Println(logger.DBG, "[gns] Closing connection to DHT service")
-	if err = cl.Close(); err != nil {
+	if resp, err = service.ServiceRequestResponse("gns", "DHT", config.Cfg.DHT.Endpoint, req); err != nil {
 		return
 	}
 
@@ -214,7 +197,7 @@ func (s *GNSService) LookupDHT(query *crypto.HashCode) (result []byte, err error
 			logger.Println(logger.DBG, "[gns] block not found in DHT")
 			return
 		}
-		// check if data has expired
+		// check if record has expired
 		if int64(m.Expire) < time.Now().Unix() {
 			logger.Printf(logger.ERROR, "[gns] block expired at %s\n", util.Timestamp(m.Expire))
 			return
