@@ -47,6 +47,16 @@ func NewEmptyMessage(msgType uint16) (Message, error) {
 	//------------------------------------------------------------------
 	case GNS_LOOKUP:
 		return NewGNSLookupMsg(), nil
+	case GNS_LOOKUP_RESULT:
+		return NewGNSLookupResultMsg(), nil
+
+	//------------------------------------------------------------------
+	// Namecache
+	//------------------------------------------------------------------
+	case NAMECACHE_LOOKUP_BLOCK:
+		return NewNamecacheLookupMsg(nil), nil
+	case NAMECACHE_LOOKUP_BLOCK_RESPONSE:
+		return NewNamecacheLookupResultMsg(), nil
 	}
 	return nil, errors.New(fmt.Sprintf("Unknown message type %d", msgType))
 }
