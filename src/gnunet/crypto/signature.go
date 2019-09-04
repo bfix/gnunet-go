@@ -68,9 +68,10 @@ type Signature struct {
 }
 
 // NewSignatureFromBytes
-func NewSignatureFromBytes(data []byte) *Signature {
+func NewSignatureFromBytes(data []byte, isEdDSA bool) *Signature {
 	return &Signature{
-		data: util.Clone(data),
+		data:    util.Clone(data),
+		isEdDSA: isEdDSA,
 	}
 }
 
@@ -90,7 +91,7 @@ func (prv *PrivateKey) Sign(msg []byte) (*Signature, error) {
 	}
 	hv := sha512.Sum512(msg)
 	sig, err := prv.key.Sign(rand.Reader, hv[:], crypto.Hash(0))
-	return NewSignatureFromBytes(sig), err
+	return NewSignatureFromBytes(sig, true), err
 }
 
 // Verify checks an EdDSA signature of a message.
@@ -288,8 +289,7 @@ func (prv *PrivateKey) SignLin(msg []byte) (*Signature, error) {
 	data := make([]byte, 64)
 	util.CopyBlock(data[0:32], r.Bytes())
 	util.CopyBlock(data[32:64], s.Bytes())
-	sig := NewSignatureFromBytes(data)
-	sig.isEdDSA = false
+	sig := NewSignatureFromBytes(data, false)
 	return sig, nil
 }
 
@@ -327,6 +327,6 @@ func (pub *PublicKey) VerifyLin(msg []byte, sig *Signature) (bool, error) {
 	copy(u2B[:], util.Reverse(u2.Bytes()))
 	ed25519.GeDoubleScalarMultVartime(&pge, &u2B, &Q, &u1B)
 	pge.ToBytes(&a)
-	x1 := NewPublicKey(a[:]).AffineX().Mod(ED25519_N)
+	x1 := NewPublicKeyFromBytes(a[:]).AffineX().Mod(ED25519_N)
 	return r.Cmp(x1) == 0, nil
 }

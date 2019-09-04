@@ -136,7 +136,7 @@ func (m *TransportPongMsg) Verify(pub *crypto.PublicKey) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	sig := crypto.NewSignatureFromBytes(m.Signature)
+	sig := crypto.NewSignatureFromBytes(m.Signature, true)
 	return pub.Verify(data, sig)
 }
 

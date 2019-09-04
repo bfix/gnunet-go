@@ -24,7 +24,7 @@ func (pub *PublicKey) Mult(d *math.Int) *PublicKey {
 
 	// convert to public key
 	pge.ToBytes(&a)
-	return NewPublicKey(a[:])
+	return NewPublicKeyFromBytes(a[:])
 }
 
 // AffineX returns the x-coordinate of the affine point.

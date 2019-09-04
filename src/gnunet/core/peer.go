@@ -30,7 +30,7 @@ type Peer struct {
 func NewPeer(data []byte, local bool) (p *Peer, err error) {
 	p = new(Peer)
 	if local {
-		p.prv = crypto.PrivateKeyFromSeed(data)
+		p.prv = crypto.NewPrivateKeyFromSeed(data)
 		p.pub = p.prv.Public()
 		p.ephPrv, p.ephMsg, err = message.NewEphemeralKey(p.pub.Bytes(), p.prv)
 		if err != nil {
@@ -38,7 +38,7 @@ func NewPeer(data []byte, local bool) (p *Peer, err error) {
 		}
 	} else {
 		p.prv = nil
-		p.pub = crypto.NewPublicKey(data)
+		p.pub = crypto.NewPublicKeyFromBytes(data)
 	}
 	p.idString = util.EncodeBinaryToString(p.pub.Bytes())
 	p.addrList = make([]*util.Address, 0)

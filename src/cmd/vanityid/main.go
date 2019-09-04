@@ -34,7 +34,7 @@ func main() {
 		if err != nil || n != 32 {
 			panic(err)
 		}
-		prv := crypto.PrivateKeyFromSeed(seed)
+		prv := crypto.NewPrivateKeyFromSeed(seed)
 		pub := prv.Public().Bytes()
 		id := util.EncodeBinaryToString(pub)
 		for _, r := range reg {

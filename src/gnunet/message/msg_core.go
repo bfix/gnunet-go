@@ -58,7 +58,7 @@ func (msg *EphemeralKeyMsg) Header() *MessageHeader {
 }
 
 func (m *EphemeralKeyMsg) Public() *crypto.PublicKey {
-	return crypto.NewPublicKey(m.SignedBlock.PeerID)
+	return crypto.NewPublicKeyFromBytes(m.SignedBlock.PeerID)
 }
 
 func (m *EphemeralKeyMsg) Verify(pub *crypto.PublicKey) (bool, error) {
@@ -66,7 +66,7 @@ func (m *EphemeralKeyMsg) Verify(pub *crypto.PublicKey) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	sig := crypto.NewSignatureFromBytes(m.Signature)
+	sig := crypto.NewSignatureFromBytes(m.Signature, false)
 	return pub.Verify(data, sig)
 }
 
@@ -74,7 +74,7 @@ func NewEphemeralKey(peerId []byte, ltPrv *crypto.PrivateKey) (*crypto.PrivateKe
 	msg := NewEphemeralKeyMsg()
 	copy(msg.SignedBlock.PeerID, peerId)
 	seed := util.NewRndArray(32)
-	prv := crypto.PrivateKeyFromSeed(seed)
+	prv := crypto.NewPrivateKeyFromSeed(seed)
 	copy(msg.SignedBlock.EphemeralKey, prv.Public().Bytes())
 
 	data, err := data.Marshal(msg.SignedBlock)
