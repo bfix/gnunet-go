@@ -54,6 +54,7 @@ func (msg *NamecacheLookupMsg) Header() *MessageHeader {
 type NamecacheLookupResultMsg struct {
 	MsgSize    uint16 `order:"big"` // total size of message
 	MsgType    uint16 `order:"big"` // NAMECACHE_LOOKUP_BLOCK_RESPONSE (432)
+	Id         uint32 `order:"big"` // Request Id
 	Expire     uint64 `order:"big"` // Expiration time
 	Signature  []byte `size:"64"`   // ECDSA signature
 	DerivedKey []byte `size:"32"`   // Derived public key
@@ -63,8 +64,9 @@ type NamecacheLookupResultMsg struct {
 // NewNamecacheLookupResultMsg creates a new default message.
 func NewNamecacheLookupResultMsg() *NamecacheLookupResultMsg {
 	return &NamecacheLookupResultMsg{
-		MsgSize:    108,
+		MsgSize:    112,
 		MsgType:    NAMECACHE_LOOKUP_BLOCK_RESPONSE,
+		Id:         0,
 		Expire:     0,
 		Signature:  make([]byte, 64),
 		DerivedKey: make([]byte, 32),

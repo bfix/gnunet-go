@@ -40,7 +40,9 @@ func NewEmptyMessage(msgType uint16) (Message, error) {
 	// DHT
 	//------------------------------------------------------------------
 	case DHT_CLIENT_GET:
-		return NewDHTClientGetMsg(), nil
+		return NewDHTClientGetMsg(nil), nil
+	case DHT_CLIENT_RESULT:
+		return NewDHTClientResultMsg(), nil
 
 	//------------------------------------------------------------------
 	// GNS
