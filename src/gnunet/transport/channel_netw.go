@@ -2,7 +2,11 @@ package transport
 
 import (
 	"net"
+	"os"
+	"strconv"
 	"strings"
+
+	"github.com/bfix/gospel/logger"
 )
 
 ////////////////////////////////////////////////////////////////////////
@@ -85,6 +89,29 @@ func (s *NetworkChannelServer) Open(spec string, hdlr chan<- Channel) (err error
 	// create listener
 	if s.listener, err = net.Listen(s.network, parts[1]); err != nil {
 		return
+	}
+	// handle additional parameters ('key[=value]')
+	for _, param := range parts[2:] {
+		frag := strings.Split(param, "=")
+		switch frag[0] {
+		case "perm": // set permissions on 'unix'
+			if s.network == "unix" {
+				if perm, err := strconv.ParseInt(frag[1], 8, 32); err == nil {
+					if err := os.Chmod(parts[1], os.FileMode(perm)); err != nil {
+						logger.Printf(
+							logger.ERROR,
+							"NetworkChannelServer: Failed to set permissions: %s\n",
+							err.Error())
+
+					}
+				} else {
+					logger.Printf(
+						logger.ERROR,
+						"NetworkChannelServer: Invalid permissions '%s'\n",
+						frag[1])
+				}
+			}
+		}
 	}
 	// run go routine to handle channel requests from clients
 	go func() {

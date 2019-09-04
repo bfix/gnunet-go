@@ -7,7 +7,7 @@
 		"endpoint": "unix+${RT_SYS}/gnunet-service-dht.sock"
 	},
 	"gns": {
-		"endpoint": "unix+${RT_SYS}/gnunet-service-gns-go.sock",
+		"endpoint": "unix+${RT_SYS}/gnunet-service-gns-go.sock+perm=0770",
 		"dhtReplLevel": 10
 	},
 	"namecache": {
