@@ -8,25 +8,43 @@ import (
 	"time"
 
 	"github.com/bfix/gospel/logger"
+	"gnunet/config"
 	"gnunet/service"
 	"gnunet/service/gns"
 )
 
 func main() {
+	logger.Println(logger.INFO, "[gns] Starting service...")
 	var (
-		srvEndp string
+		cfgFile  string
+		srvEndp  string
+		err      error
+		logLevel int
 	)
 	// handle command line arguments
-	flag.StringVar(&srvEndp, "s", "unix+/tmp/gnunet-system-runtime/gnunet-service-gns-go.sock", "GNS service end-point")
+	flag.StringVar(&cfgFile, "c", "gnunet-config.json", "GNUnet configuration file")
+	flag.StringVar(&srvEndp, "s", "", "GNS service end-point")
+	flag.IntVar(&logLevel, "L", logger.INFO, "GNS log level (default: INFO)")
 	flag.Parse()
 
-	logger.SetLogLevel(logger.DBG)
+	// read configuration file and set missing arguments.
+	if err = config.ParseConfig(cfgFile); err != nil {
+		logger.Printf(logger.ERROR, "[gns] Invalid configuration file: %s\n", err.Error())
+		return
+	}
+
+	// apply configuration
+	logger.SetLogLevel(logLevel)
+	if len(srvEndp) == 0 {
+		srvEndp = config.Cfg.GNS.Endpoint
+	}
 
 	// start a new GNS service
 	gns := gns.NewGNSService()
 	srv := service.NewServiceImpl("gns", gns)
-	if err := srv.Start(srvEndp); err != nil {
+	if err = srv.Start(srvEndp); err != nil {
 		logger.Printf(logger.ERROR, "[gns] Error: '%s'\n", err.Error())
+		return
 	}
 
 	// handle OS signals
