@@ -10,3 +10,8 @@ func QueryFromPublickeyDerive(pkey *crypto.PublicKey, label string) *crypto.Hash
 	pd := pkey.DeriveKey(label, "gns")
 	return crypto.Hash(pd.Bytes())
 }
+
+// DecryptBlock
+func (s *GNSService) DecryptBlock(pkey *crypto.PublicKey, sig *crypto.Signature, data []byte) ([]byte, error) {
+	return nil, nil
+}
