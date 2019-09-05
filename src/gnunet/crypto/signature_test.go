@@ -94,8 +94,7 @@ func TestEcDSA(t *testing.T) {
 		t.Fatal("Signatures not deterministic")
 	}
 
-	sigT = NewSignatureFromBytes(sig_2)
-	sigT.isEdDSA = false
+	sigT = NewSignatureFromBytes(sig_2, false)
 	rc, err = pub.VerifyLin(msg_2, sigT)
 	if err != nil {
 		t.Fatal(err)

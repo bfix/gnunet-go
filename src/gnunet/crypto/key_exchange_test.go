@@ -37,18 +37,26 @@ var (
 
 	prv_1, prv_2 *PrivateKey
 	pub_1, pub_2 *PublicKey
+	ss_1, ss_2   *HashCode
 )
+
+func calcShared() bool {
+	// compute shared secret
+	ss_1 = SharedSecret(prv_1, pub_2)
+	ss_2 = SharedSecret(prv_2, pub_1)
+	return bytes.Compare(ss_1.Bits, ss_2.Bits) == 0
+}
 
 func TestDHE(t *testing.T) {
 	// generate two key pairs
-	prv_1 = PrivateKeyFromD(math.NewIntFromBytes(d_1))
+	prv_1 = NewPrivateKeyFromD(math.NewIntFromBytes(d_1))
 	pub_1 = prv_1.Public()
-	prv_2 = PrivateKeyFromD(math.NewIntFromBytes(d_2))
+	prv_2 = NewPrivateKeyFromD(math.NewIntFromBytes(d_2))
 	pub_2 = prv_2.Public()
 
-	// compute shared secret
-	ss_1 := SharedSecret(prv_1, pub_2)
-	ss_2 := SharedSecret(prv_2, pub_1)
+	if !calcShared() {
+		t.Fatal("Shared secret mismatch")
+	}
 	if testing.Verbose() {
 		fmt.Printf("SS_1 = %s\n", hex.EncodeToString(ss_1.Bits))
 		fmt.Printf("SS_2 = %s\n", hex.EncodeToString(ss_2.Bits))
@@ -59,7 +67,22 @@ func TestDHE(t *testing.T) {
 		fmt.Printf("SS(computed) = %s\n", hex.EncodeToString(ss_1.Bits))
 		t.Fatal("Wrong shared secret:")
 	}
-	if bytes.Compare(ss_1.Bits, ss_2.Bits) != 0 {
-		t.Fatal("Shared secret mismatch")
+
+}
+
+func TestDHERandom(t *testing.T) {
+	failed := 0
+	for i := 0; i < 1000; i++ {
+		prv_1 = NewPrivateKeyFromD(math.NewIntRnd(ED25519_N))
+		pub_1 = prv_1.Public()
+		prv_2 = NewPrivateKeyFromD(math.NewIntRnd(ED25519_N))
+		pub_2 = prv_2.Public()
+
+		if !calcShared() {
+			failed++
+		}
+	}
+	if failed > 0 {
+		t.Fatalf("Shared secret mismatches: %d/1000", failed)
 	}
 }
