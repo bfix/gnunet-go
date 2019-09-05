@@ -18,8 +18,10 @@ func (pub *PublicKey) Mult(d *math.Int) *PublicKey {
 	if !Q.FromBytes(&a) {
 		return nil
 	}
-	// compute skalar product
-	copy(b[:], util.Reverse(d.Bytes()))
+	// compute scalar product
+	tmp := make([]byte, 32)
+	util.CopyBlock(tmp, d.Bytes())
+	copy(b[:], util.Reverse(tmp))
 	ed25519.GeDoubleScalarMultVartime(&pge, &b, &Q, &zero)
 
 	// convert to public key
