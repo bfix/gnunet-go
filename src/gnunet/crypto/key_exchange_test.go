@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"bytes"
+	"crypto/sha512"
 	"encoding/hex"
 	"fmt"
 	"testing"
@@ -37,14 +38,18 @@ var (
 
 	prv_1, prv_2 *PrivateKey
 	pub_1, pub_2 *PublicKey
-	ss_1, ss_2   *HashCode
+	ss_1, ss_2   []byte
 )
 
-func calcShared() bool {
+func calcSharedSecret() bool {
+	calc := func(prv *PrivateKey, pub *PublicKey) []byte {
+		x := sha512.Sum512(pub.Mult(prv.D()).AffineX().Bytes())
+		return x[:]
+	}
 	// compute shared secret
-	ss_1 = SharedSecret(prv_1, pub_2)
-	ss_2 = SharedSecret(prv_2, pub_1)
-	return bytes.Compare(ss_1.Bits, ss_2.Bits) == 0
+	ss_1 = calc(prv_1, pub_2)
+	ss_2 = calc(prv_2, pub_1)
+	return bytes.Compare(ss_1, ss_2) == 0
 }
 
 func TestDHE(t *testing.T) {
@@ -54,17 +59,17 @@ func TestDHE(t *testing.T) {
 	prv_2 = NewPrivateKeyFromD(math.NewIntFromBytes(d_2))
 	pub_2 = prv_2.Public()
 
-	if !calcShared() {
+	if !calcSharedSecret() {
 		t.Fatal("Shared secret mismatch")
 	}
 	if testing.Verbose() {
-		fmt.Printf("SS_1 = %s\n", hex.EncodeToString(ss_1.Bits))
-		fmt.Printf("SS_2 = %s\n", hex.EncodeToString(ss_2.Bits))
+		fmt.Printf("SS_1 = %s\n", hex.EncodeToString(ss_1))
+		fmt.Printf("SS_2 = %s\n", hex.EncodeToString(ss_2))
 	}
 
-	if bytes.Compare(ss_1.Bits, ss) != 0 {
+	if bytes.Compare(ss_1[:], ss) != 0 {
 		fmt.Printf("SS(expected) = %s\n", hex.EncodeToString(ss))
-		fmt.Printf("SS(computed) = %s\n", hex.EncodeToString(ss_1.Bits))
+		fmt.Printf("SS(computed) = %s\n", hex.EncodeToString(ss_1[:]))
 		t.Fatal("Wrong shared secret:")
 	}
 
@@ -72,13 +77,24 @@ func TestDHE(t *testing.T) {
 
 func TestDHERandom(t *testing.T) {
 	failed := 0
+	once := false
 	for i := 0; i < 1000; i++ {
 		prv_1 = NewPrivateKeyFromD(math.NewIntRnd(ED25519_N))
 		pub_1 = prv_1.Public()
 		prv_2 = NewPrivateKeyFromD(math.NewIntRnd(ED25519_N))
 		pub_2 = prv_2.Public()
 
-		if !calcShared() {
+		if !calcSharedSecret() {
+			if !once {
+				once = true
+				fmt.Printf("d1=%s\n", hex.EncodeToString(prv_1.D().Bytes()))
+				fmt.Printf("d2=%s\n", hex.EncodeToString(prv_2.D().Bytes()))
+				fmt.Printf("ss1=%s\n", hex.EncodeToString(ss_1))
+				fmt.Printf("ss2=%s\n", hex.EncodeToString(ss_2))
+				dd := prv_1.D().Mul(prv_2.D()).Mod(ED25519_N)
+				pk := sha512.Sum512(NewPrivateKeyFromD(dd).Public().AffineX().Bytes())
+				fmt.Printf("ss0=%s\n", hex.EncodeToString(pk[:]))
+			}
 			failed++
 		}
 	}
