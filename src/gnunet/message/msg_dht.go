@@ -1,6 +1,7 @@
 package message
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"gnunet/crypto"
@@ -51,7 +52,8 @@ func (m *DHTClientGetMsg) SetXQuery(xq []byte) []byte {
 }
 
 func (m *DHTClientGetMsg) String() string {
-	return fmt.Sprintf("DHTClientGetMsg{id:%16x}", m.Id)
+	return fmt.Sprintf("DHTClientGetMsg{Id:%d,Type=%d,Options=%d,Repl=%d,Key=%s}",
+		m.Id, m.Type, m.Options, m.ReplLevel, hex.EncodeToString(m.Key.Bits))
 }
 
 // Header returns the message header in a separate instance.
@@ -77,15 +79,25 @@ type DHTClientResultMsg struct {
 }
 
 // NewDHTClientResultMsg creates a new default DHTClientResultMsg object.
-func NewDHTClientResultMsg() *DHTClientResultMsg {
+func NewDHTClientResultMsg(key *crypto.HashCode) *DHTClientResultMsg {
+	if key == nil {
+		key = crypto.NewHashCode()
+	}
 	return &DHTClientResultMsg{
-		MsgSize: 64, // empty message size (no data)
-		MsgType: DHT_CLIENT_RESULT,
+		MsgSize:    64, // empty message size (no data)
+		MsgType:    DHT_CLIENT_RESULT,
+		Type:       0,
+		PutPathLen: 0,
+		GetPathLen: 0,
+		Id:         0,
+		Expire:     0,
+		Key:        key,
+		Data:       make([]byte, 0),
 	}
 }
 
 func (m *DHTClientResultMsg) String() string {
-	return fmt.Sprintf("DHTClientResultMsg{id:%16x}", m.Id)
+	return fmt.Sprintf("DHTClientResultMsg{Id:%d}", m.Id)
 }
 
 // Header returns the message header in a separate instance.
