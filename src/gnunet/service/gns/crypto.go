@@ -13,5 +13,5 @@ func QueryFromPublickeyDerive(pkey *crypto.PublicKey, label string) *crypto.Hash
 
 // DecryptBlock
 func (s *GNSService) DecryptBlock(pkey *crypto.PublicKey, sig *crypto.Signature, data []byte) ([]byte, error) {
-	return nil, nil
+	return data, nil
 }

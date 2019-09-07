@@ -108,18 +108,18 @@ func (s *GNSService) Lookup(m *message.GNSLookupMsg) (block []byte, err error) {
 	}
 	if block == nil {
 		logger.Println(logger.DBG, "gns.Lookup(namecache): no block found")
-		if int(m.Options) == enums.GNS_LO_DEFAULT {
-			// get the block from the DHT
-			if block, err = s.LookupDHT(query); err != nil || block == nil {
-				if err != nil {
-					logger.Printf(logger.ERROR, "gns.Lookup(dht): %s\n", err.Error())
-					block = nil
-				} else {
-					logger.Println(logger.DBG, "gns.Lookup(dht): no block found")
-				}
-				// lookup fails completely -- no result
+		// if int(m.Options) == enums.GNS_LO_DEFAULT {
+		// get the block from the DHT
+		if block, err = s.LookupDHT(query); err != nil || block == nil {
+			if err != nil {
+				logger.Printf(logger.ERROR, "gns.Lookup(dht): %s\n", err.Error())
+				block = nil
+			} else {
+				logger.Println(logger.DBG, "gns.Lookup(dht): no block found")
 			}
+			// lookup fails completely -- no result
 		}
+		//}
 	}
 	return
 }
@@ -154,7 +154,7 @@ func (s *GNSService) LookupNamecache(query *crypto.HashCode) (result []byte, err
 			return
 		}
 		// check if record has expired
-		if int64(m.Expire) < time.Now().Unix() {
+		if m.Expire > 0 && int64(m.Expire) < time.Now().Unix() {
 			logger.Printf(logger.ERROR, "[gns] block expired at %s\n", util.Timestamp(m.Expire))
 			return
 		}
@@ -175,6 +175,9 @@ func (s *GNSService) LookupDHT(query *crypto.HashCode) (result []byte, err error
 	// assemble DHT request
 	req := message.NewDHTClientGetMsg(query)
 	req.Id = uint64(util.NextID())
+	req.ReplLevel = uint32(enums.DHT_GNS_REPLICATION_LEVEL)
+	req.Type = uint32(enums.BLOCK_TYPE_GNS_NAMERECORD)
+	req.Options = uint32(enums.DHT_RO_DEMULTIPLEX_EVERYWHERE)
 	result = nil
 
 	// get response from DHT service
@@ -198,7 +201,7 @@ func (s *GNSService) LookupDHT(query *crypto.HashCode) (result []byte, err error
 			return
 		}
 		// check if record has expired
-		if int64(m.Expire) < time.Now().Unix() {
+		if m.Expire > 0 && int64(m.Expire) < time.Now().Unix() {
 			logger.Printf(logger.ERROR, "[gns] block expired at %s\n", util.Timestamp(m.Expire))
 			return
 		}
