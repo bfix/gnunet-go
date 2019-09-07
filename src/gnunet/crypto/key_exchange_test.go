@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/math"
 )
 
@@ -36,14 +37,14 @@ var (
 		0x05, 0xbd, 0x1b, 0x85, 0xd5, 0xfd, 0x63, 0x60,
 	}
 
-	prv_1, prv_2 *PrivateKey
-	pub_1, pub_2 *PublicKey
+	prv_1, prv_2 *ed25519.PrivateKey
+	pub_1, pub_2 *ed25519.PublicKey
 	ss_1, ss_2   []byte
 )
 
 func calcSharedSecret() bool {
-	calc := func(prv *PrivateKey, pub *PublicKey) []byte {
-		x := sha512.Sum512(pub.Mult(prv.D()).AffineX().Bytes())
+	calc := func(prv *ed25519.PrivateKey, pub *ed25519.PublicKey) []byte {
+		x := sha512.Sum512(pub.Mult(prv.D).Q.X().Bytes())
 		return x[:]
 	}
 	// compute shared secret
@@ -54,9 +55,9 @@ func calcSharedSecret() bool {
 
 func TestDHE(t *testing.T) {
 	// generate two key pairs
-	prv_1 = NewPrivateKeyFromD(math.NewIntFromBytes(d_1))
+	prv_1 = ed25519.NewPrivateKeyFromD(math.NewIntFromBytes(d_1))
 	pub_1 = prv_1.Public()
-	prv_2 = NewPrivateKeyFromD(math.NewIntFromBytes(d_2))
+	prv_2 = ed25519.NewPrivateKeyFromD(math.NewIntFromBytes(d_2))
 	pub_2 = prv_2.Public()
 
 	if !calcSharedSecret() {
@@ -78,21 +79,21 @@ func TestDHE(t *testing.T) {
 func TestDHERandom(t *testing.T) {
 	failed := 0
 	once := false
-	for i := 0; i < 1000; i++ {
-		prv_1 = NewPrivateKeyFromD(math.NewIntRnd(ED25519_N))
+	for i := 0; i < 100; i++ {
+		prv_1 = ed25519.NewPrivateKeyFromD(math.NewIntRnd(ED25519_N))
 		pub_1 = prv_1.Public()
-		prv_2 = NewPrivateKeyFromD(math.NewIntRnd(ED25519_N))
+		prv_2 = ed25519.NewPrivateKeyFromD(math.NewIntRnd(ED25519_N))
 		pub_2 = prv_2.Public()
 
 		if !calcSharedSecret() {
 			if !once {
 				once = true
-				fmt.Printf("d1=%s\n", hex.EncodeToString(prv_1.D().Bytes()))
-				fmt.Printf("d2=%s\n", hex.EncodeToString(prv_2.D().Bytes()))
+				fmt.Printf("d1=%s\n", hex.EncodeToString(prv_1.D.Bytes()))
+				fmt.Printf("d2=%s\n", hex.EncodeToString(prv_2.D.Bytes()))
 				fmt.Printf("ss1=%s\n", hex.EncodeToString(ss_1))
 				fmt.Printf("ss2=%s\n", hex.EncodeToString(ss_2))
-				dd := prv_1.D().Mul(prv_2.D()).Mod(ED25519_N)
-				pk := sha512.Sum512(NewPrivateKeyFromD(dd).Public().AffineX().Bytes())
+				dd := prv_1.D.Mul(prv_2.D).Mod(ED25519_N)
+				pk := sha512.Sum512(ed25519.NewPrivateKeyFromD(dd).Public().Q.X().Bytes())
 				fmt.Printf("ss0=%s\n", hex.EncodeToString(pk[:]))
 			}
 			failed++

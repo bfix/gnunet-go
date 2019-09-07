@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/math"
 	"gnunet/util"
 )
@@ -32,14 +33,14 @@ var (
 		0xBC, 0xD0, 0x1C, 0x0A, 0x0B, 0x8C, 0x02, 0x51,
 	}
 
-	prv = NewPrivateKeyFromSeed(seed)
+	prv = ed25519.NewPrivateKeyFromSeed(seed)
 	pub = prv.Public()
 )
 
 func TestPrvKey(t *testing.T) {
 	if testing.Verbose() {
 		fmt.Printf("PRIVATE (seed=%s)\n", hex.EncodeToString(seed))
-		fmt.Printf("     d = %s\n", hex.EncodeToString(prv_1.D().Bytes()))
+		fmt.Printf("     d = %s\n", hex.EncodeToString(prv_1.D.Bytes()))
 		fmt.Printf("    ID = '%s'\n", util.EncodeBinaryToString(seed))
 	}
 
@@ -56,11 +57,11 @@ func TestPrvKey(t *testing.T) {
 	}
 
 	dVal := math.NewIntFromBytes(d)
-	if !dVal.Equals(prv.D()) {
+	if !dVal.Equals(prv.D) {
 		t.Fatal("Private exponent mismatch")
 	}
 
-	pub2 := NewPrivateKeyFromD(dVal).Public().Bytes()
+	pub2 := ed25519.NewPrivateKeyFromD(dVal).Public().Bytes()
 	if !bytes.Equal(pubB, pub2) {
 		fmt.Printf("PUBLIC2(computed) = %s\n", hex.EncodeToString(pub2))
 		fmt.Printf("PUBLIC2(expected) = %s\n", hex.EncodeToString(pubB))

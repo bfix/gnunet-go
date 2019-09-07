@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"regexp"
 
-	"gnunet/crypto"
+	"github.com/bfix/gospel/crypto/ed25519"
 	"gnunet/util"
 )
 
@@ -34,7 +34,7 @@ func main() {
 		if err != nil || n != 32 {
 			panic(err)
 		}
-		prv := crypto.NewPrivateKeyFromSeed(seed)
+		prv := ed25519.NewPrivateKeyFromSeed(seed)
 		pub := prv.Public().Bytes()
 		id := util.EncodeBinaryToString(pub)
 		for _, r := range reg {

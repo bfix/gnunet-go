@@ -5,6 +5,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/logger"
 	"gnunet/config"
 	"gnunet/crypto"
@@ -97,7 +98,7 @@ func (s *GNSService) ServeClient(mc *transport.MsgChannel) {
 // Lookup handles GNU_LOOKUP messages
 func (s *GNSService) Lookup(m *message.GNSLookupMsg) (block []byte, err error) {
 	// create DHT/NAMECACHE query
-	pkey := crypto.NewPublicKeyFromBytes(m.Zone)
+	pkey := ed25519.NewPublicKeyFromBytes(m.Zone)
 	query := QueryFromPublickeyDerive(pkey, m.GetName())
 
 	// try namecache lookup first
@@ -159,8 +160,12 @@ func (s *GNSService) LookupNamecache(query *crypto.HashCode) (result []byte, err
 			return
 		}
 		// decrypt payload
-		pkey := crypto.NewPublicKeyFromBytes(m.DerivedKey)
-		sig := crypto.NewSignatureFromBytes(m.Signature, false)
+		pkey := ed25519.NewPublicKeyFromBytes(m.DerivedKey)
+		var sig *ed25519.EcSignature
+		if sig, err = ed25519.NewEcSignatureFromBytes(m.Signature); err != nil {
+			logger.Printf(logger.ERROR, "[gns] Failed to read signature: %s\n", err.Error())
+			return
+		}
 		if result, err = s.DecryptBlock(pkey, sig, m.EncData); err != nil {
 			logger.Printf(logger.ERROR, "[gns] Block can't be decrypted: %s\n", err.Error())
 		}

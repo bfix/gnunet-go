@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/bfix/gospel/math"
-	"gnunet/crypto/hkdf"
+	"golang.org/x/crypto/hkdf"
 )
 
 func TestDeriveH_gnunet(t *testing.T) {
@@ -38,7 +38,7 @@ func TestDeriveH_gnunet(t *testing.T) {
 		}
 	)
 	H := math.NewIntFromBytes(OKM).Mod(ED25519_N).Bytes()
-	h := pub.DeriveH("master-home", "gns").Bytes()
+	h := DeriveH(pub, "master-home", "gns").Bytes()
 	if bytes.Compare(h, H) != 0 {
 		if testing.Verbose() {
 			fmt.Printf("H(computed) = %s\n", hex.EncodeToString(h))
@@ -48,7 +48,7 @@ func TestDeriveH_gnunet(t *testing.T) {
 	}
 
 	dpub := pub.Mult(math.NewIntFromBytes(h))
-	x := dpub.AffineX().Bytes()
+	x := dpub.Q.X().Bytes()
 	if bytes.Compare(x, qx) != 0 {
 		if testing.Verbose() {
 			fmt.Printf("derived_x(computed) = %s\n", hex.EncodeToString(x))
@@ -57,7 +57,7 @@ func TestDeriveH_gnunet(t *testing.T) {
 		t.Fatal("x-coordinate mismatch")
 	}
 	pk1 := dpub.Bytes()
-	pk2 := pub.DeriveKey("master-home", "gns").Bytes()
+	pk2 := DeriveKey(pub, "master-home", "gns").Bytes()
 	fmt.Printf("derived(1) = %s\n", hex.EncodeToString(pk1))
 	if bytes.Compare(pk1, pk2) != 0 {
 		if testing.Verbose() {

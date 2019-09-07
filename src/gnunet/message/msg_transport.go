@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/data"
-	"gnunet/crypto"
+	"gnunet/enums"
 	"gnunet/util"
 )
 
@@ -70,7 +71,7 @@ func NewSignedAddress(a *util.Address) *SignedAddress {
 	alen := len(addrData)
 	addr := &SignedAddress{
 		SignLength: uint32(alen + 20),
-		Purpose:    crypto.SIG_TRANSPORT_PONG_OWN,
+		Purpose:    enums.SIG_TRANSPORT_PONG_OWN,
 		ExpireOn:   util.GetAbsoluteTimeOffset(12 * time.Hour),
 		AddrSize:   uint32(alen),
 		Address:    make([]byte, alen),
@@ -116,13 +117,13 @@ func (msg *TransportPongMsg) Header() *MessageHeader {
 	return &MessageHeader{msg.MsgSize, msg.MsgType}
 }
 
-func (m *TransportPongMsg) Sign(prv *crypto.PrivateKey) error {
+func (m *TransportPongMsg) Sign(prv *ed25519.PrivateKey) error {
 	data, err := data.Marshal(m.SignedBlock)
 	if err != nil {
 		fmt.Printf("Sign: %s\n", err)
 		return err
 	}
-	sig, err := prv.Sign(data)
+	sig, err := prv.EdSign(data)
 	if err != nil {
 		fmt.Printf("Sign: %s\n", err)
 		return err
@@ -131,13 +132,16 @@ func (m *TransportPongMsg) Sign(prv *crypto.PrivateKey) error {
 	return nil
 }
 
-func (m *TransportPongMsg) Verify(pub *crypto.PublicKey) (bool, error) {
+func (m *TransportPongMsg) Verify(pub *ed25519.PublicKey) (bool, error) {
 	data, err := data.Marshal(m.SignedBlock)
 	if err != nil {
 		return false, err
 	}
-	sig := crypto.NewSignatureFromBytes(m.Signature, true)
-	return pub.Verify(data, sig)
+	sig, err := ed25519.NewEdSignatureFromBytes(m.Signature)
+	if err != nil {
+		return false, err
+	}
+	return pub.EdVerify(data, sig)
 }
 
 //----------------------------------------------------------------------

@@ -1,54 +1,12 @@
 package crypto
 
 import (
-	"github.com/bfix/gospel/math"
-	"gnunet/crypto/ed25519"
-	"gnunet/util"
+	"github.com/bfix/gospel/crypto/ed25519"
 )
-
-// Mult computes p = d*Q
-func (pub *PublicKey) Mult(d *math.Int) *PublicKey {
-	var (
-		Q          ed25519.ExtendedGroupElement
-		pge        ed25519.ProjectiveGroupElement
-		a, b, zero [32]byte
-	)
-	// compute point Q from public key data
-	copy(a[:], pub.Bytes())
-	if !Q.FromBytes(&a) {
-		return nil
-	}
-	// compute scalar product
-	tmp := make([]byte, 32)
-	util.CopyBlock(tmp, d.Bytes())
-	copy(b[:], util.Reverse(tmp))
-	ed25519.GeDoubleScalarMultVartime(&pge, &b, &Q, &zero)
-
-	// convert to public key
-	pge.ToBytes(&a)
-	return NewPublicKeyFromBytes(a[:])
-}
-
-// AffineX returns the x-coordinate of the affine point.
-func (pub *PublicKey) AffineX() *math.Int {
-	var (
-		ge    ed25519.ExtendedGroupElement
-		buf   [32]byte
-		x, zi ed25519.FieldElement
-	)
-	copy(buf[:], pub.key)
-	if !ge.FromBytes(&buf) {
-		return nil
-	}
-	ed25519.FeInvert(&zi, &ge.Z)
-	ed25519.FeMul(&x, &ge.X, &zi)
-	ed25519.FeToBytes(&buf, &x)
-	return math.NewIntFromBytes(util.Reverse(buf[:]))
-}
 
 // SharedSecret computes a 64 byte shared secret
 // between (prvA,pubB) and (prvB,pubA).
-func SharedSecret(prv *PrivateKey, pub *PublicKey) *HashCode {
-	ss := pub.Mult(prv.D()).AffineX().Bytes()
+func SharedSecret(prv *ed25519.PrivateKey, pub *ed25519.PublicKey) *HashCode {
+	ss := pub.Mult(prv.D).Q.X().Bytes()
 	return Hash(ss)
 }

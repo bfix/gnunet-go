@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/data"
-	"gnunet/crypto"
+	"gnunet/enums"
 	"gnunet/util"
 )
 
@@ -35,7 +36,7 @@ func NewEphemeralKeyMsg() *EphemeralKeyMsg {
 		Signature:    make([]byte, 64),
 		SignedBlock: &EphKeyBlock{
 			SignSize:     88,
-			SigPurpose:   crypto.SIG_ECC_KEY,
+			SigPurpose:   enums.SIG_ECC_KEY,
 			CreateTime:   util.GetAbsoluteTimeNow(),
 			ExpireTime:   util.GetAbsoluteTimeOffset(12 * time.Hour),
 			EphemeralKey: make([]byte, 32),
@@ -57,31 +58,34 @@ func (msg *EphemeralKeyMsg) Header() *MessageHeader {
 	return &MessageHeader{msg.MsgSize, msg.MsgType}
 }
 
-func (m *EphemeralKeyMsg) Public() *crypto.PublicKey {
-	return crypto.NewPublicKeyFromBytes(m.SignedBlock.PeerID)
+func (m *EphemeralKeyMsg) Public() *ed25519.PublicKey {
+	return ed25519.NewPublicKeyFromBytes(m.SignedBlock.PeerID)
 }
 
-func (m *EphemeralKeyMsg) Verify(pub *crypto.PublicKey) (bool, error) {
+func (m *EphemeralKeyMsg) Verify(pub *ed25519.PublicKey) (bool, error) {
 	data, err := data.Marshal(m.SignedBlock)
 	if err != nil {
 		return false, err
 	}
-	sig := crypto.NewSignatureFromBytes(m.Signature, false)
-	return pub.Verify(data, sig)
+	sig, err := ed25519.NewEdSignatureFromBytes(m.Signature)
+	if err != nil {
+		return false, err
+	}
+	return pub.EdVerify(data, sig)
 }
 
-func NewEphemeralKey(peerId []byte, ltPrv *crypto.PrivateKey) (*crypto.PrivateKey, *EphemeralKeyMsg, error) {
+func NewEphemeralKey(peerId []byte, ltPrv *ed25519.PrivateKey) (*ed25519.PrivateKey, *EphemeralKeyMsg, error) {
 	msg := NewEphemeralKeyMsg()
 	copy(msg.SignedBlock.PeerID, peerId)
 	seed := util.NewRndArray(32)
-	prv := crypto.NewPrivateKeyFromSeed(seed)
+	prv := ed25519.NewPrivateKeyFromSeed(seed)
 	copy(msg.SignedBlock.EphemeralKey, prv.Public().Bytes())
 
 	data, err := data.Marshal(msg.SignedBlock)
 	if err != nil {
 		return nil, nil, err
 	}
-	sig, err := ltPrv.Sign(data)
+	sig, err := ltPrv.EdSign(data)
 	if err != nil {
 		return nil, nil, err
 	}
