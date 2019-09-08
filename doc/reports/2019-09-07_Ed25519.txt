@@ -1,0 +1,18 @@
+
+After running more and longer tests I noticed that about every 16th ECDHE key exchanged failed (shared secret mimatch). The investigation lead to a problem in the copied and re-used package source from golang.org/x/crypto/ed25519. The interal scalar multiplication for a point returns the wrong result if the scalar has a bitlen <= 248 (that is, has the most significant byte of its binary representation set to zero).
+
+This bug does not "disturb" the EdDSA key generation (the private scalar is always large enough, because it is generated that way). Even the EdDSA signing and verification algos work OK with it.
+
+I filed an issue with the Golang people (https://github.com/golang/go/issues/34122), but I consider it unlikely that the "bug" will be fixed at all - I even believe that it is on purpose (optimization).
+
+So I wrote a functional, but less performant Ed25519 implementation by re-using the ECC stuff I did for the bitcoin package in the Gospel library. The new code is now also part of it (https://github.com/bfix/gospel/tree/master/crypto/ed25519).
+
+I am using that package in gnunet-go for now; all unit tests pass but I am certain there will be a few minor glitches when it comes to actually using it in processing GNUnet messages.
+
+Therefore I would appreciate feedback (and bug reports); anyone playing around with gnunet-go needs to update:
+
+$ go get -u github.com/bfix/gospel/...
+$ cd gnunet-go
+$ git pull
+
+Cheers, Bernd.
