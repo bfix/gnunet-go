@@ -13,22 +13,19 @@ var (
 	ED25519_N = ed25519.GetCurve().N
 )
 
-// DeriveH derives an integer 'h' in the range [0,n[ with 'n' being the
-// order of the underlying Ed25519 curve. The value of 'h' is derived
-// from the arguments.
+// DeriveH derives an integer 'h' from the arguments.
 func DeriveH(pub *ed25519.PublicKey, label, context string) *math.Int {
 	prk := hkdf.Extract(sha512.New, pub.Bytes(), []byte("key-derivation"))
 	data := append([]byte(label), []byte(context)...)
 	rdr := hkdf.Expand(sha256.New, prk, data)
-	b := make([]byte, 32)
+	b := make([]byte, 64)
 	rdr.Read(b)
-	h := math.NewIntFromBytes(b)
-	return h.Mod(ED25519_N)
+	return math.NewIntFromBytes(b).Mod(ED25519_N)
 }
 
-// PublicKeyDerive "shifts" a public key 'Q' to a new point 'P' where
+// DerivePublicKey "shifts" a public key 'Q' to a new point 'P' where
 // P = h*Q with 'h' being a factor derived from the arguments.
-func DeriveKey(pub *ed25519.PublicKey, label string, context string) *ed25519.PublicKey {
+func DerivePublicKey(pub *ed25519.PublicKey, label string, context string) *ed25519.PublicKey {
 	h := DeriveH(pub, label, context)
 	return pub.Mult(h)
 }
