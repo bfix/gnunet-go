@@ -76,8 +76,8 @@ func NewNamecacheLookupResultMsg() *NamecacheLookupResultMsg {
 
 // String
 func (m *NamecacheLookupResultMsg) String() string {
-	return fmt.Sprintf("NamecacheLookupResultMsg{Expire=%s}",
-		util.Timestamp(m.Expire))
+	return fmt.Sprintf("NamecacheLookupResultMsg{Id=%d,Expire=%s}",
+		m.Id, util.Timestamp(m.Expire))
 }
 
 // Header returns the message header in a separate instance.
