@@ -2,11 +2,13 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
 	"testing"
+
+	"github.com/bfix/gospel/logger"
 )
 
 func TestConfigRead(t *testing.T) {
+	logger.SetLogLevel(logger.WARN)
 	if err := ParseConfig("./gnunet-config.json"); err != nil {
 		t.Fatal(err)
 	}
@@ -15,6 +17,6 @@ func TestConfigRead(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		fmt.Println("cfg=" + string(data))
+		t.Log("cfg=" + string(data))
 	}
 }

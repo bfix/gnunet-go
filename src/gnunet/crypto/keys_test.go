@@ -3,7 +3,6 @@ package crypto
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"testing"
 
 	"github.com/bfix/gospel/crypto/ed25519"
@@ -39,20 +38,20 @@ var (
 
 func TestPrvKey(t *testing.T) {
 	if testing.Verbose() {
-		fmt.Printf("PRIVATE (seed=%s)\n", hex.EncodeToString(seed))
-		fmt.Printf("     d = %s\n", hex.EncodeToString(prv_1.D.Bytes()))
-		fmt.Printf("    ID = '%s'\n", util.EncodeBinaryToString(seed))
+		t.Logf("PRIVATE (seed=%s)\n", hex.EncodeToString(seed))
+		t.Logf("     d = %s\n", hex.EncodeToString(prv_1.D.Bytes()))
+		t.Logf("    ID = '%s'\n", util.EncodeBinaryToString(seed))
 	}
 
 	pubB := pub.Bytes()
 	if testing.Verbose() {
-		fmt.Printf("PUBLIC  = %s\n", hex.EncodeToString(pubB))
-		fmt.Printf("        = '%s'\n", util.EncodeBinaryToString(pubB))
+		t.Logf("PUBLIC  = %s\n", hex.EncodeToString(pubB))
+		t.Logf("        = '%s'\n", util.EncodeBinaryToString(pubB))
 	}
 
 	if !bytes.Equal(pubB, q) {
-		fmt.Printf("PUBLIC(computed) = %s\n", hex.EncodeToString(pubB))
-		fmt.Printf("PUBLIC(expected) = %s\n", hex.EncodeToString(q))
+		t.Logf("PUBLIC(computed) = %s\n", hex.EncodeToString(pubB))
+		t.Logf("PUBLIC(expected) = %s\n", hex.EncodeToString(q))
 		t.Fatal("Public key mismatch")
 	}
 
@@ -63,8 +62,8 @@ func TestPrvKey(t *testing.T) {
 
 	pub2 := ed25519.NewPrivateKeyFromD(dVal).Public().Bytes()
 	if !bytes.Equal(pubB, pub2) {
-		fmt.Printf("PUBLIC2(computed) = %s\n", hex.EncodeToString(pub2))
-		fmt.Printf("PUBLIC2(expected) = %s\n", hex.EncodeToString(pubB))
+		t.Logf("PUBLIC2(computed) = %s\n", hex.EncodeToString(pub2))
+		t.Logf("PUBLIC2(expected) = %s\n", hex.EncodeToString(pubB))
 		t.Fatal("Public key mismatch")
 	}
 }

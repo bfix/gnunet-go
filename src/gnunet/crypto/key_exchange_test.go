@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha512"
 	"encoding/hex"
-	"fmt"
 	"testing"
 
 	"github.com/bfix/gospel/crypto/ed25519"
@@ -64,13 +63,13 @@ func TestDHE(t *testing.T) {
 		t.Fatal("Shared secret mismatch")
 	}
 	if testing.Verbose() {
-		fmt.Printf("SS_1 = %s\n", hex.EncodeToString(ss_1))
-		fmt.Printf("SS_2 = %s\n", hex.EncodeToString(ss_2))
+		t.Logf("SS_1 = %s\n", hex.EncodeToString(ss_1))
+		t.Logf("SS_2 = %s\n", hex.EncodeToString(ss_2))
 	}
 
 	if bytes.Compare(ss_1[:], ss) != 0 {
-		fmt.Printf("SS(expected) = %s\n", hex.EncodeToString(ss))
-		fmt.Printf("SS(computed) = %s\n", hex.EncodeToString(ss_1[:]))
+		t.Logf("SS(expected) = %s\n", hex.EncodeToString(ss))
+		t.Logf("SS(computed) = %s\n", hex.EncodeToString(ss_1[:]))
 		t.Fatal("Wrong shared secret:")
 	}
 
@@ -88,13 +87,13 @@ func TestDHERandom(t *testing.T) {
 		if !calcSharedSecret() {
 			if !once {
 				once = true
-				fmt.Printf("d1=%s\n", hex.EncodeToString(prv_1.D.Bytes()))
-				fmt.Printf("d2=%s\n", hex.EncodeToString(prv_2.D.Bytes()))
-				fmt.Printf("ss1=%s\n", hex.EncodeToString(ss_1))
-				fmt.Printf("ss2=%s\n", hex.EncodeToString(ss_2))
+				t.Logf("d1=%s\n", hex.EncodeToString(prv_1.D.Bytes()))
+				t.Logf("d2=%s\n", hex.EncodeToString(prv_2.D.Bytes()))
+				t.Logf("ss1=%s\n", hex.EncodeToString(ss_1))
+				t.Logf("ss2=%s\n", hex.EncodeToString(ss_2))
 				dd := prv_1.D.Mul(prv_2.D).Mod(ED25519_N)
 				pk := sha512.Sum512(ed25519.NewPrivateKeyFromD(dd).Public().Q.X().Bytes())
-				fmt.Printf("ss0=%s\n", hex.EncodeToString(pk[:]))
+				t.Logf("ss0=%s\n", hex.EncodeToString(pk[:]))
 			}
 			failed++
 		}

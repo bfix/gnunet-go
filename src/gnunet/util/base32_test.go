@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
-	"fmt"
 	"testing"
 )
 
@@ -47,7 +46,7 @@ func TestBase32Preset(t *testing.T) {
 	for _, x := range tests {
 		s := EncodeBinaryToString(x.bin)
 		if testing.Verbose() {
-			fmt.Printf("[%s] ==> %s\n", hex.EncodeToString(x.bin), s)
+			t.Logf("[%s] ==> %s\n", hex.EncodeToString(x.bin), s)
 		}
 		if s != x.str {
 			t.Fatalf("Encoding mismatch: '%s' != '%s' for %s\n", s, x.str, hex.EncodeToString(x.bin))
