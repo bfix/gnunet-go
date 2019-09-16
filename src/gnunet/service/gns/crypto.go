@@ -29,12 +29,12 @@ func deriveBlockKey(label string, pub *ed25519.PublicKey) (iv *crypto.SymmetricI
 	// generate symmetric key
 	prk := hkdf.Extract(sha512.New, []byte(label), pub.Bytes())
 	rdr := hkdf.Expand(sha256.New, prk, []byte("gns-aes-ctx-key"))
-	skey = new(crypto.SymmetricKey)
+	skey = crypto.NewSymmetricKey()
 	rdr.Read(skey.AESKey)
 	rdr.Read(skey.TwofishKey)
 	// generate initialization vector
 	rdr = hkdf.Expand(sha256.New, prk, []byte("gns-aes-ctx-iv"))
-	iv = new(crypto.SymmetricIV)
+	iv = crypto.NewSymmetricIV()
 	rdr.Read(iv.AESIv)
 	rdr.Read(iv.TwofishIv)
 	return
