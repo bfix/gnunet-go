@@ -63,7 +63,7 @@ func (s *GNSService) ServeClient(mc *transport.MsgChannel) {
 			//----------------------------------------------------------
 			logger.Println(logger.INFO, "[gns] Lookup request received.")
 			resp = message.NewGNSLookupResultMsg(m.Id)
-			// perform lookup on block
+			// perform lookup on block (either from Namecache or DHT)
 			block, err := s.Lookup(m)
 			if err != nil {
 				logger.Printf(logger.ERROR, "gns.Lookup(): Failed to lookup query: %s\n", err.Error())
@@ -71,6 +71,7 @@ func (s *GNSService) ServeClient(mc *transport.MsgChannel) {
 			}
 			// handle block
 			if block != nil {
+				logger.Printf(logger.DBG, "[gns] Received block: %v\n", block)
 				switch int(m.Type) {
 				case enums.GNS_TYPE_DNS_A:
 					logger.Println(logger.DBG, "[gns] Lookup type: DNS_A")
@@ -96,13 +97,14 @@ func (s *GNSService) ServeClient(mc *transport.MsgChannel) {
 }
 
 // Lookup handles GNU_LOOKUP messages
-func (s *GNSService) Lookup(m *message.GNSLookupMsg) (block []byte, err error) {
+func (s *GNSService) Lookup(m *message.GNSLookupMsg) (block *GNSBlock, err error) {
 	// create DHT/NAMECACHE query
 	pkey := ed25519.NewPublicKeyFromBytes(m.Zone)
-	query := QueryFromPublickeyDerive(pkey, m.GetName())
+	label := m.GetName()
+	query := QueryFromPublickeyDerive(pkey, label)
 
 	// try namecache lookup first
-	if block, err = s.LookupNamecache(query); err != nil {
+	if block, err = s.LookupNamecache(query, pkey, label); err != nil {
 		logger.Printf(logger.ERROR, "gns.Lookup(namecache): %s\n", err.Error())
 		block = nil
 		return
@@ -111,7 +113,7 @@ func (s *GNSService) Lookup(m *message.GNSLookupMsg) (block []byte, err error) {
 		logger.Println(logger.DBG, "gns.Lookup(namecache): no block found")
 		// if int(m.Options) == enums.GNS_LO_DEFAULT {
 		// get the block from the DHT
-		if block, err = s.LookupDHT(query); err != nil || block == nil {
+		if block, err = s.LookupDHT(query, pkey, label); err != nil || block == nil {
 			if err != nil {
 				logger.Printf(logger.ERROR, "gns.Lookup(dht): %s\n", err.Error())
 				block = nil
@@ -126,13 +128,13 @@ func (s *GNSService) Lookup(m *message.GNSLookupMsg) (block []byte, err error) {
 }
 
 // LookupNamecache
-func (s *GNSService) LookupNamecache(query *crypto.HashCode) (result []byte, err error) {
+func (s *GNSService) LookupNamecache(query *crypto.HashCode, zoneKey *ed25519.PublicKey, label string) (block *GNSBlock, err error) {
 	logger.Printf(logger.DBG, "[gns] LookupNamecache(%s)...\n", hex.EncodeToString(query.Bits))
 
 	// assemble Namecache request
 	req := message.NewNamecacheLookupMsg(query)
 	req.Id = uint32(util.NextID())
-	result = nil
+	block = nil
 
 	// get response from Namecache service
 	var resp message.Message
@@ -159,22 +161,40 @@ func (s *GNSService) LookupNamecache(query *crypto.HashCode) (result []byte, err
 			logger.Printf(logger.ERROR, "[gns] block expired at %s\n", util.Timestamp(m.Expire))
 			return
 		}
+
+		// assemble the GNSBlock from message
+		block = new(GNSBlock)
+		block.Signature = m.Signature
+		block.DerivKey = m.DerivedKey
+		sb := new(SignedBlockData)
+		sb.Purpose = new(crypto.SignaturePurpose)
+		sb.Purpose.Purpose = enums.SIG_GNS_RECORD_SIGN
+		sb.Purpose.Size = uint32(16 + len(m.EncData))
+		sb.Expire = m.Expire
+		sb.Data = m.EncData
+		block.Block = sb
+
 		// decrypt payload
-		pkey := ed25519.NewPublicKeyFromBytes(m.DerivedKey)
-		var sig *ed25519.EcSignature
-		if sig, err = ed25519.NewEcSignatureFromBytes(m.Signature); err != nil {
-			logger.Printf(logger.ERROR, "[gns] Failed to read signature: %s\n", err.Error())
-			return
-		}
-		if result, err = s.DecryptBlock(pkey, sig, m.EncData); err != nil {
+		if sb.Data, err = DecryptBlock(sb.Data, zoneKey, label); err != nil {
 			logger.Printf(logger.ERROR, "[gns] Block can't be decrypted: %s\n", err.Error())
 		}
+
+		//		pkey := ed25519.NewPublicKeyFromBytes(m.DerivedKey)
+		//		var sig *ed25519.EcSignature
+		//		if sig, err = ed25519.NewEcSignatureFromBytes(m.Signature); err != nil {
+		//			logger.Printf(logger.ERROR, "[gns] Failed to read signature: %s\n", err.Error())
+		//			return
+		//		}
+		//		var ok bool
+		//		if err = crypto.EcVerify(data, sig, pkey); err != nil {
+		//			return
+		//		}
 	}
 	return
 }
 
 // LookupDHT
-func (s *GNSService) LookupDHT(query *crypto.HashCode) (result []byte, err error) {
+func (s *GNSService) LookupDHT(query *crypto.HashCode, zoneKey *ed25519.PublicKey, label string) (block *GNSBlock, err error) {
 	logger.Printf(logger.DBG, "[gns] LookupDHT(%s)...\n", hex.EncodeToString(query.Bits))
 
 	// assemble DHT request
@@ -183,7 +203,7 @@ func (s *GNSService) LookupDHT(query *crypto.HashCode) (result []byte, err error
 	req.ReplLevel = uint32(enums.DHT_GNS_REPLICATION_LEVEL)
 	req.Type = uint32(enums.BLOCK_TYPE_GNS_NAMERECORD)
 	req.Options = uint32(enums.DHT_RO_DEMULTIPLEX_EVERYWHERE)
-	result = nil
+	block = nil
 
 	// get response from DHT service
 	var resp message.Message
@@ -209,10 +229,6 @@ func (s *GNSService) LookupDHT(query *crypto.HashCode) (result []byte, err error
 		if m.Expire > 0 && int64(m.Expire) < time.Now().Unix() {
 			logger.Printf(logger.ERROR, "[gns] block expired at %s\n", util.Timestamp(m.Expire))
 			return
-		}
-		// decrypt payload
-		if result, err = s.DecryptBlock(nil, nil, m.Data); err != nil {
-			logger.Printf(logger.ERROR, "[gns] Block can't be decrypted: %s\n", err.Error())
 		}
 	}
 	return
