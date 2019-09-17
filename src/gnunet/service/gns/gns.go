@@ -71,7 +71,7 @@ func (s *GNSService) ServeClient(mc *transport.MsgChannel) {
 			}
 			// handle block
 			if block != nil {
-				logger.Printf(logger.DBG, "[gns] Received block: %v\n", block)
+				logger.Printf(logger.DBG, "[gns] Received block data: %s\n", hex.EncodeToString(block.Block.Data))
 				switch int(m.Type) {
 				case enums.GNS_TYPE_DNS_A:
 					logger.Println(logger.DBG, "[gns] Lookup type: DNS_A")
@@ -149,23 +149,23 @@ func (s *GNSService) LookupNamecache(query *crypto.HashCode, zoneKey *ed25519.Pu
 		// check for matching IDs
 		if m.Id != req.Id {
 			logger.Println(logger.ERROR, "[gns] Got response for unknown ID")
-			return
+			break
 		}
 		// check if block was found
 		if len(m.EncData) == 0 {
 			logger.Println(logger.DBG, "[gns] block not found in namecache")
-			return
+			break
 		}
 		// check if record has expired
 		if m.Expire > 0 && int64(m.Expire) < time.Now().Unix() {
 			logger.Printf(logger.ERROR, "[gns] block expired at %s\n", util.Timestamp(m.Expire))
-			return
+			break
 		}
 
 		// assemble the GNSBlock from message
 		block = new(GNSBlock)
 		block.Signature = m.Signature
-		block.DerivKey = m.DerivedKey
+		block.DerivedKey = m.DerivedKey
 		sb := new(SignedBlockData)
 		sb.Purpose = new(crypto.SignaturePurpose)
 		sb.Purpose.Purpose = enums.SIG_GNS_RECORD_SIGN
@@ -174,21 +174,13 @@ func (s *GNSService) LookupNamecache(query *crypto.HashCode, zoneKey *ed25519.Pu
 		sb.Data = m.EncData
 		block.Block = sb
 
-		// decrypt payload
-		if sb.Data, err = DecryptBlock(sb.Data, zoneKey, label); err != nil {
-			logger.Printf(logger.ERROR, "[gns] Block can't be decrypted: %s\n", err.Error())
+		// verify and decrypt block
+		if err = block.Verify(zoneKey, label); err != nil {
+			break
 		}
-
-		//		pkey := ed25519.NewPublicKeyFromBytes(m.DerivedKey)
-		//		var sig *ed25519.EcSignature
-		//		if sig, err = ed25519.NewEcSignatureFromBytes(m.Signature); err != nil {
-		//			logger.Printf(logger.ERROR, "[gns] Failed to read signature: %s\n", err.Error())
-		//			return
-		//		}
-		//		var ok bool
-		//		if err = crypto.EcVerify(data, sig, pkey); err != nil {
-		//			return
-		//		}
+		if err = block.Decrypt(zoneKey, label); err != nil {
+			break
+		}
 	}
 	return
 }
@@ -218,17 +210,17 @@ func (s *GNSService) LookupDHT(query *crypto.HashCode, zoneKey *ed25519.PublicKe
 		// check for matching IDs
 		if m.Id != req.Id {
 			logger.Println(logger.ERROR, "[gns] Got response for unknown ID")
-			return
+			break
 		}
 		// check if block was found
 		if len(m.Data) == 0 {
 			logger.Println(logger.DBG, "[gns] block not found in DHT")
-			return
+			break
 		}
 		// check if record has expired
 		if m.Expire > 0 && int64(m.Expire) < time.Now().Unix() {
 			logger.Printf(logger.ERROR, "[gns] block expired at %s\n", util.Timestamp(m.Expire))
-			return
+			break
 		}
 	}
 	return
