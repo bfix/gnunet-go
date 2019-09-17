@@ -1,7 +1,6 @@
 package gns
 
 import (
-	"crypto/sha512"
 	"fmt"
 
 	"github.com/bfix/gospel/crypto/ed25519"
@@ -57,8 +56,7 @@ func (b *GNSBlock) Verify(zoneKey *ed25519.PublicKey, label string) (err error) 
 	if buf, err = data.Marshal(b.Block); err != nil {
 		return
 	}
-	signed := sha512.Sum512(buf)
-	if ok, err = dkey.EcVerify(signed[:], sig); err == nil && !ok {
+	if ok, err = dkey.EcVerify(buf, sig); err == nil && !ok {
 		err = fmt.Errorf("Signature verification failed for GNS block")
 	}
 	return
