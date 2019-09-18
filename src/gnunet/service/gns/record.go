@@ -6,23 +6,25 @@ import (
 	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/data"
 	"gnunet/crypto"
+	"gnunet/message"
 )
 
 var (
 	ErrBlockNotDecrypted = fmt.Errorf("GNS block not decrypted")
 )
 
-type GNSRecord struct {
-	Expire   uint64 `order:"big"`     // Expiration time of the record
-	DataSize uint32 `order:"big"`     // size of the data section
-	Type     uint32 `order:"big"`     // Record type
-	Flag     uint32 `order:"big"`     // Flags
-	Data     []byte `size:"DataSize"` // Record data
+type GNSRecordSet struct {
+	Count   uint32                       `order:"big"`  // number of resource records
+	Records []*message.GNSResourceRecord `size:"Count"` // list of resource records
+	Padding []byte                       `size:"*"`     // padding
 }
 
-type GNSRecordSet struct {
-	Count   uint32       `order:"big"`  // number of resource records
-	Records []*GNSRecord `size:"Count"` // list of resource records
+func NewGNSRecordSet() *GNSRecordSet {
+	return &GNSRecordSet{
+		Count:   0,
+		Records: make([]*message.GNSResourceRecord, 0),
+		Padding: make([]byte, 0),
+	}
 }
 
 type SignedBlockData struct {
@@ -46,13 +48,13 @@ func (b *GNSBlock) String() string {
 		b.verified, b.decrypted, len(b.Block.Data))
 }
 
-func (b *GNSBlock) Records() ([]*GNSRecord, error) {
+func (b *GNSBlock) Records() ([]*message.GNSResourceRecord, error) {
 	// check if block is decrypted
 	if !b.decrypted {
 		return nil, ErrBlockNotDecrypted
 	}
 	// parse block data into record set
-	rs := new(GNSRecordSet)
+	rs := NewGNSRecordSet()
 	if err := data.Unmarshal(rs, b.Block.Data); err != nil {
 		return nil, err
 	}

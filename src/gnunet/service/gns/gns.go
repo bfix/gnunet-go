@@ -62,7 +62,8 @@ func (s *GNSService) ServeClient(mc *transport.MsgChannel) {
 			// GNS_LOOKUP
 			//----------------------------------------------------------
 			logger.Println(logger.INFO, "[gns] Lookup request received.")
-			resp = message.NewGNSLookupResultMsg(m.Id)
+			respX := message.NewGNSLookupResultMsg(m.Id)
+			resp = respX
 
 			// perform lookup on block (either from Namecache or DHT)
 			// TODO: run code in a go routine concurrently (would need
@@ -77,19 +78,24 @@ func (s *GNSService) ServeClient(mc *transport.MsgChannel) {
 				logger.Printf(logger.DBG, "[gns] Received block data: %s\n", hex.EncodeToString(block.Block.Data))
 
 				// get records from block
-				rec, err := block.Records()
+				records, err := block.Records()
 				if err != nil {
 					logger.Printf(logger.ERROR, "[gns] Failed to extract records: %s\n", err.Error())
 					break
 				}
-				if len(rec) == 0 {
+				if len(records) == 0 {
 					logger.Println(logger.WARN, "[gns] No records in block")
 					break
 				}
+				// process records
+				for i, rec := range records {
+					logger.Printf(logger.DBG, "[gns] Record #%d: %v\n", i, rec)
 
-				switch int(m.Type) {
-				case enums.GNS_TYPE_DNS_A:
-					logger.Println(logger.DBG, "[gns] Lookup type: DNS_A")
+					// is this the record type we are looking for?
+					if rec.Type == m.Type {
+						// add it to the response message
+						respX.AddRecord(rec)
+					}
 				}
 			}
 

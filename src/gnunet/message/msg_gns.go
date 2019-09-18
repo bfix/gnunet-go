@@ -18,9 +18,9 @@ type GNSLookupMsg struct {
 	MsgType  uint16 `order:"big"` // GNS_LOOKUP (500)
 	Id       uint32 `order:"big"` // Unique identifier for this request (for key collisions).
 	Zone     []byte `size:"32"`   // Zone that is to be used for lookup
-	Options  int16  `order:"big"` // Local options for where to look for results
-	Reserved int16  `order:"big"` // Always 0
-	Type     int32  `order:"big"` // the type of record to look up
+	Options  uint16 `order:"big"` // Local options for where to look for results
+	Reserved uint16 `order:"big"` // Always 0
+	Type     uint32 `order:"big"` // the type of record to look up
 	Name     []byte `size:"*"`    // zero-terminated name to look up
 }
 
@@ -31,9 +31,9 @@ func NewGNSLookupMsg() *GNSLookupMsg {
 		MsgType:  GNS_LOOKUP,
 		Id:       0,
 		Zone:     make([]byte, 32),
-		Options:  int16(enums.GNS_LO_DEFAULT),
+		Options:  uint16(enums.GNS_LO_DEFAULT),
 		Reserved: 0,
-		Type:     int32(enums.GNS_TYPE_ANY),
+		Type:     uint32(enums.GNS_TYPE_ANY),
 		Name:     nil,
 	}
 }
@@ -72,21 +72,26 @@ func (msg *GNSLookupMsg) Header() *MessageHeader {
 // GNS_LOOKUP_RESULT
 //----------------------------------------------------------------------
 
-type GNSResultRecord struct {
-	Expires uint64 `order="big"` // Expiration time for the record
-	Size    uint32 `order="big"` // Number of bytes in 'Data'
-	Type    uint32 `order="big"` // Type of the GNS/DNS record
-	Flags   uint32 `order="big"` // Flags for the record
-	Data    []byte `size="Size"` // Record data
+type GNSResourceRecord struct {
+	Expires uint64 `order:"big"` // Expiration time for the record
+	Size    uint32 `order:"big"` // Number of bytes in 'Data'
+	Type    uint32 `order:"big"` // Type of the GNS/DNS record
+	Flags   uint32 `order:"big"` // Flags for the record
+	Data    []byte `size:"Size"` // Record data
+}
+
+func (r *GNSResourceRecord) String() string {
+	return fmt.Sprintf("GNSResourceRecord{Type=%s,Expire=%s,Flag=%d,Size=%d}",
+		enums.GNS_TYPE[int(r.Type)], util.Timestamp(r.Expires), r.Flags, r.Size)
 }
 
 // GNSLookupResultMsg
 type GNSLookupResultMsg struct {
-	MsgSize uint16             `order:"big"`  // total size of message
-	MsgType uint16             `order:"big"`  // GNS_LOOKUP_RESULT (501)
-	Id      uint32             `order:"big"`  // Unique identifier for this request (for key collisions).
-	Count   uint32             `order:"big"`  // The number of records contained in response
-	Records []*GNSResultRecord `size:"Count"` // GNS result records
+	MsgSize uint16               `order:"big"`  // total size of message
+	MsgType uint16               `order:"big"`  // GNS_LOOKUP_RESULT (501)
+	Id      uint32               `order:"big"`  // Unique identifier for this request (for key collisions).
+	Count   uint32               `order:"big"`  // The number of records contained in response
+	Records []*GNSResourceRecord `size:"Count"` // GNS resource records
 }
 
 // NewGNSLookupResultMsg
@@ -96,18 +101,19 @@ func NewGNSLookupResultMsg(id uint32) *GNSLookupResultMsg {
 		MsgType: GNS_LOOKUP_RESULT,
 		Id:      id,
 		Count:   0,
-		Records: make([]*GNSResultRecord, 0),
+		Records: make([]*GNSResourceRecord, 0),
 	}
 }
 
 // AddRecord
-func (m *GNSLookupResultMsg) AddRecord(rec *GNSResultRecord) error {
-	recSize := 12 + int(rec.Size)
+func (m *GNSLookupResultMsg) AddRecord(rec *GNSResourceRecord) error {
+	recSize := 20 + int(rec.Size)
 	if int(m.MsgSize)+recSize > enums.GNS_MAX_BLOCK_SIZE {
 		return fmt.Errorf("gns.AddRecord(): MAX_BLOCK_SIZE reached")
 	}
 	m.Records = append(m.Records, rec)
 	m.MsgSize += uint16(recSize)
+	m.Count++
 	return nil
 }
 
