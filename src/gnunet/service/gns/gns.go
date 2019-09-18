@@ -92,7 +92,7 @@ func (s *GNSService) ServeClient(mc *transport.MsgChannel) {
 					logger.Printf(logger.DBG, "[gns] Record #%d: %v\n", i, rec)
 
 					// is this the record type we are looking for?
-					if rec.Type == m.Type {
+					if rec.Type == m.Type || int(m.Type) == enums.GNS_TYPE_ANY {
 						// add it to the response message
 						respX.AddRecord(rec)
 					}
