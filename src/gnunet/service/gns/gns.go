@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/bfix/gospel/crypto/ed25519"
+	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
 	"gnunet/config"
 	"gnunet/crypto"
@@ -75,7 +76,7 @@ func (s *GNSService) ServeClient(mc *transport.MsgChannel) {
 			}
 			// handle block
 			if block != nil {
-				logger.Printf(logger.DBG, "[gns] Received block data: %s\n", hex.EncodeToString(block.Block.Data))
+				logger.Printf(logger.DBG, "[gns] Received block data: %s\n", hex.EncodeToString(block.Block.data))
 
 				// get records from block
 				records, err := block.Records()
@@ -126,20 +127,20 @@ func (s *GNSService) Lookup(m *message.GNSLookupMsg) (block *GNSBlock, err error
 
 	// try namecache lookup first
 	if block, err = s.LookupNamecache(query, pkey, label); err != nil {
-		logger.Printf(logger.ERROR, "gns.Lookup(namecache): %s\n", err.Error())
+		logger.Printf(logger.ERROR, "[gns] Lookup(Namecache): %s\n", err.Error())
 		block = nil
 		return
 	}
 	if block == nil {
-		logger.Println(logger.DBG, "gns.Lookup(namecache): no block found")
+		logger.Println(logger.DBG, "[gns] Lookup(Namecache): no block found")
 		if int(m.Options) == enums.GNS_LO_DEFAULT {
 			// get the block from the DHT
 			if block, err = s.LookupDHT(query, pkey, label); err != nil || block == nil {
 				if err != nil {
-					logger.Printf(logger.ERROR, "gns.Lookup(dht): %s\n", err.Error())
+					logger.Printf(logger.ERROR, "[gns] Lookup(DHT): %s\n", err.Error())
 					block = nil
 				} else {
-					logger.Println(logger.DBG, "gns.Lookup(dht): no block found")
+					logger.Println(logger.DBG, "[gns] Lookup(DHT): no block found")
 				}
 				// lookup fails completely -- no result
 			}
@@ -183,7 +184,7 @@ func (s *GNSService) LookupNamecache(query *crypto.HashCode, zoneKey *ed25519.Pu
 			break
 		}
 
-		// assemble the GNSBlock from message
+		// assemble GNSBlock from message
 		block = new(GNSBlock)
 		block.Signature = m.Signature
 		block.DerivedKey = m.DerivedKey
@@ -192,7 +193,7 @@ func (s *GNSService) LookupNamecache(query *crypto.HashCode, zoneKey *ed25519.Pu
 		sb.Purpose.Purpose = enums.SIG_GNS_RECORD_SIGN
 		sb.Purpose.Size = uint32(16 + len(m.EncData))
 		sb.Expire = m.Expire
-		sb.Data = m.EncData
+		sb.EncData = m.EncData
 		block.Block = sb
 
 		// verify and decrypt block
@@ -204,6 +205,12 @@ func (s *GNSService) LookupNamecache(query *crypto.HashCode, zoneKey *ed25519.Pu
 		}
 	}
 	return
+}
+
+// StoreNamecache
+func (s *GNSService) StoreNamecache(query *crypto.HashCode, block *GNSBlock) error {
+	logger.Println(logger.WARN, "[gns] StoreNamecache() not implemented yet!")
+	return nil
 }
 
 // LookupDHT
@@ -242,6 +249,31 @@ func (s *GNSService) LookupDHT(query *crypto.HashCode, zoneKey *ed25519.PublicKe
 		if m.Expire > 0 && int64(m.Expire) < time.Now().Unix() {
 			logger.Printf(logger.ERROR, "[gns] block expired at %s\n", util.Timestamp(m.Expire))
 			break
+		}
+		// check if result is of requested type
+		if int(m.Type) != enums.BLOCK_TYPE_GNS_NAMERECORD {
+			logger.Println(logger.ERROR, "[gns] DHT response has wrong type")
+			break
+		}
+
+		// get GNSBlock from message
+		block = NewGNSBlock()
+		if err = data.Unmarshal(block, m.Data); err != nil {
+			logger.Printf(logger.ERROR, "[gns] can't read GNS block: %s\n", err.Error())
+			break
+		}
+		// verify and decrypt block
+		if err = block.Verify(zoneKey, label); err != nil {
+			break
+		}
+		if err = block.Decrypt(zoneKey, label); err != nil {
+			break
+		}
+
+		// we got a result from DHT that was not in the namecache,
+		// so store it there now.
+		if err = s.StoreNamecache(query, block); err != nil {
+			logger.Printf(logger.ERROR, "[gns] can't store block in Namecache: %s\n", err.Error())
 		}
 	}
 	return

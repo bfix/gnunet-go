@@ -11,13 +11,17 @@ import (
 	"gnunet/util"
 )
 
+type PeerID struct {
+	Key []byte `size:"32"`
+}
+
 type EphKeyBlock struct {
-	SignSize     uint32 `order:"big"` // length of signed block
-	SigPurpose   uint32 `order:"big"` // signature purpose: SIG_ECC_KEY
-	CreateTime   uint64 `order:"big"` // Time of key creation
-	ExpireTime   uint64 `order:"big"` // Time of key expiration
-	EphemeralKey []byte `size:"32"`   // Ephemeral EdDSA public key
-	PeerID       []byte `size:"32"`   // Peer identity (EdDSA public key)
+	SignSize     uint32  `order:"big"` // length of signed block
+	SigPurpose   uint32  `order:"big"` // signature purpose: SIG_ECC_KEY
+	CreateTime   uint64  `order:"big"` // Time of key creation
+	ExpireTime   uint64  `order:"big"` // Time of key expiration
+	EphemeralKey []byte  `size:"32"`   // Ephemeral EdDSA public key
+	PeerID       *PeerID // Peer identity (EdDSA public key)
 }
 
 type EphemeralKeyMsg struct {
@@ -40,14 +44,14 @@ func NewEphemeralKeyMsg() *EphemeralKeyMsg {
 			CreateTime:   util.GetAbsoluteTimeNow(),
 			ExpireTime:   util.GetAbsoluteTimeOffset(12 * time.Hour),
 			EphemeralKey: make([]byte, 32),
-			PeerID:       make([]byte, 32),
+			PeerID:       new(PeerID),
 		},
 	}
 }
 
 func (m *EphemeralKeyMsg) String() string {
 	return fmt.Sprintf("EphKeyMsg{%s,%s,%s,%d}",
-		util.EncodeBinaryToString(m.SignedBlock.PeerID),
+		util.EncodeBinaryToString(m.SignedBlock.PeerID.Key),
 		util.EncodeBinaryToString(m.SignedBlock.EphemeralKey),
 		util.Timestamp(m.SignedBlock.ExpireTime),
 		m.SenderStatus)
@@ -59,7 +63,7 @@ func (msg *EphemeralKeyMsg) Header() *MessageHeader {
 }
 
 func (m *EphemeralKeyMsg) Public() *ed25519.PublicKey {
-	return ed25519.NewPublicKeyFromBytes(m.SignedBlock.PeerID)
+	return ed25519.NewPublicKeyFromBytes(m.SignedBlock.PeerID.Key)
 }
 
 func (m *EphemeralKeyMsg) Verify(pub *ed25519.PublicKey) (bool, error) {
@@ -76,7 +80,7 @@ func (m *EphemeralKeyMsg) Verify(pub *ed25519.PublicKey) (bool, error) {
 
 func NewEphemeralKey(peerId []byte, ltPrv *ed25519.PrivateKey) (*ed25519.PrivateKey, *EphemeralKeyMsg, error) {
 	msg := NewEphemeralKeyMsg()
-	copy(msg.SignedBlock.PeerID, peerId)
+	copy(msg.SignedBlock.PeerID.Key, peerId)
 	seed := util.NewRndArray(32)
 	prv := ed25519.NewPrivateKeyFromSeed(seed)
 	copy(msg.SignedBlock.EphemeralKey, prv.Public().Bytes())

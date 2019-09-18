@@ -38,7 +38,7 @@ func NewDHTClientGetMsg(key *crypto.HashCode) *DHTClientGetMsg {
 		Type:      uint32(enums.BLOCK_TYPE_ANY),
 		Key:       key,
 		Id:        0,
-		XQuery:    make([]byte, 0),
+		XQuery:    nil,
 	}
 }
 
@@ -75,7 +75,9 @@ type DHTClientResultMsg struct {
 	Id         uint64           `order:"big"` // Unique ID of the matching GET request
 	Expire     uint64           `order:"big"` // Expiration time
 	Key        *crypto.HashCode // The key that was searched for
-	Data       []byte           `size:"*"` // put path, get path and actual data
+	PutPath    []*PeerID        `size:"PutPathLen"` // put path
+	GetPath    []*PeerID        `size:"GetPathLen"` // get path
+	Data       []byte           `size:"*"`          // data returned for query
 }
 
 // NewDHTClientResultMsg creates a new default DHTClientResultMsg object.
