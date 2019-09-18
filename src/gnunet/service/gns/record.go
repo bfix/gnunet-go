@@ -8,6 +8,10 @@ import (
 	"gnunet/crypto"
 )
 
+var (
+	ErrBlockNotDecrypted = fmt.Errorf("GNS block not decrypted")
+)
+
 type GNSRecord struct {
 	Expire   uint64 `order:"big"`     // Expiration time of the record
 	DataSize uint32 `order:"big"`     // size of the data section
@@ -31,13 +35,34 @@ type GNSBlock struct {
 	Signature  []byte `size:"64"` // Signature of the block.
 	DerivedKey []byte `size:"32"` // Derived key used for signing
 	Block      *SignedBlockData
+
+	checked   bool // block integrity checked
+	verified  bool // block signature verified (internal)
+	decrypted bool // block data decrypted (internal)
 }
 
 func (b *GNSBlock) String() string {
-	return "GNSBlock{}"
+	return fmt.Sprintf("GNSBlock{Verified=%v,Decrypted=%v,data=[%d]}",
+		b.verified, b.decrypted, len(b.Block.Data))
+}
+
+func (b *GNSBlock) Records() ([]*GNSRecord, error) {
+	// check if block is decrypted
+	if !b.decrypted {
+		return nil, ErrBlockNotDecrypted
+	}
+	// parse block data into record set
+	rs := new(GNSRecordSet)
+	if err := data.Unmarshal(rs, b.Block.Data); err != nil {
+		return nil, err
+	}
+	return rs.Records, nil
 }
 
 func (b *GNSBlock) Verify(zoneKey *ed25519.PublicKey, label string) (err error) {
+	// Integrity check performed
+	b.checked = true
+
 	// verify derived key
 	dkey := ed25519.NewPublicKeyFromBytes(b.DerivedKey)
 	dkey2 := crypto.DerivePublicKey(zoneKey, label, "gns")
@@ -59,12 +84,14 @@ func (b *GNSBlock) Verify(zoneKey *ed25519.PublicKey, label string) (err error) 
 	if ok, err = dkey.EcVerify(buf, sig); err == nil && !ok {
 		err = fmt.Errorf("Signature verification failed for GNS block")
 	}
+	b.verified = true
 	return
 }
 
 func (b *GNSBlock) Decrypt(zoneKey *ed25519.PublicKey, label string) (err error) {
 	// decrypt payload
 	b.Block.Data, err = DecryptBlock(b.Block.Data, zoneKey, label)
+	b.decrypted = true
 	return
 }
 
@@ -75,5 +102,8 @@ func NewGNSBlock() *GNSBlock {
 		Block: &SignedBlockData{
 			Data: nil,
 		},
+		checked:   false,
+		verified:  false,
+		decrypted: false,
 	}
 }

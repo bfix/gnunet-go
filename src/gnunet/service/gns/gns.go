@@ -63,15 +63,30 @@ func (s *GNSService) ServeClient(mc *transport.MsgChannel) {
 			//----------------------------------------------------------
 			logger.Println(logger.INFO, "[gns] Lookup request received.")
 			resp = message.NewGNSLookupResultMsg(m.Id)
+
 			// perform lookup on block (either from Namecache or DHT)
+			// TODO: run code in a go routine concurrently (would need
+			//       access to the message channel to send responses)
 			block, err := s.Lookup(m)
 			if err != nil {
-				logger.Printf(logger.ERROR, "gns.Lookup(): Failed to lookup query: %s\n", err.Error())
+				logger.Printf(logger.ERROR, "[gns] Failed to lookup block: %s\n", err.Error())
 				break
 			}
 			// handle block
 			if block != nil {
 				logger.Printf(logger.DBG, "[gns] Received block data: %s\n", hex.EncodeToString(block.Block.Data))
+
+				// get records from block
+				rec, err := block.Records()
+				if err != nil {
+					logger.Printf(logger.ERROR, "[gns] Failed to extract records: %s\n", err.Error())
+					break
+				}
+				if len(rec) == 0 {
+					logger.Println(logger.WARN, "[gns] No records in block")
+					break
+				}
+
 				switch int(m.Type) {
 				case enums.GNS_TYPE_DNS_A:
 					logger.Println(logger.DBG, "[gns] Lookup type: DNS_A")
@@ -82,13 +97,13 @@ func (s *GNSService) ServeClient(mc *transport.MsgChannel) {
 			//----------------------------------------------------------
 			// UNKNOWN message type received
 			//----------------------------------------------------------
-			logger.Printf(logger.ERROR, "gns.Lookup(): Unhandled message of type (%d)\n", msg.Header().MsgType)
+			logger.Printf(logger.ERROR, "[gns] Unhandled message of type (%d)\n", msg.Header().MsgType)
 			continue
 		}
 
 		// send response
 		if err := mc.Send(resp); err != nil {
-			logger.Printf(logger.ERROR, "gns.Lookup(): Failed to send response: %s\n", err.Error())
+			logger.Printf(logger.ERROR, "[gns] Failed to send response: %s\n", err.Error())
 		}
 
 	}
@@ -111,18 +126,18 @@ func (s *GNSService) Lookup(m *message.GNSLookupMsg) (block *GNSBlock, err error
 	}
 	if block == nil {
 		logger.Println(logger.DBG, "gns.Lookup(namecache): no block found")
-		// if int(m.Options) == enums.GNS_LO_DEFAULT {
-		// get the block from the DHT
-		if block, err = s.LookupDHT(query, pkey, label); err != nil || block == nil {
-			if err != nil {
-				logger.Printf(logger.ERROR, "gns.Lookup(dht): %s\n", err.Error())
-				block = nil
-			} else {
-				logger.Println(logger.DBG, "gns.Lookup(dht): no block found")
+		if int(m.Options) == enums.GNS_LO_DEFAULT {
+			// get the block from the DHT
+			if block, err = s.LookupDHT(query, pkey, label); err != nil || block == nil {
+				if err != nil {
+					logger.Printf(logger.ERROR, "gns.Lookup(dht): %s\n", err.Error())
+					block = nil
+				} else {
+					logger.Println(logger.DBG, "gns.Lookup(dht): no block found")
+				}
+				// lookup fails completely -- no result
 			}
-			// lookup fails completely -- no result
 		}
-		//}
 	}
 	return
 }
