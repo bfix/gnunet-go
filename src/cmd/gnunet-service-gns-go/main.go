@@ -60,10 +60,8 @@ loop:
 		// handle OS signals
 		case sig := <-sigCh:
 			switch sig {
-			case syscall.SIGKILL:
-			case syscall.SIGINT:
-			case syscall.SIGTERM:
-				logger.Println(logger.INFO, "[gns] Terminating service (on signal)")
+			case syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM:
+				logger.Printf(logger.INFO, "[gns] Terminating service (on signal '%s')\n", sig)
 				break loop
 			case syscall.SIGHUP:
 				logger.Println(logger.INFO, "[gns] SIGHUP")
