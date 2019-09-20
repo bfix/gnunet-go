@@ -21,6 +21,7 @@ type Service interface {
 type ServiceImpl struct {
 	impl    Service
 	hdlr    chan transport.Channel
+	ctrl    chan bool
 	srvc    transport.ChannelServer
 	name    string
 	running bool
@@ -31,6 +32,7 @@ func NewServiceImpl(name string, srv Service) *ServiceImpl {
 	return &ServiceImpl{
 		impl:    srv,
 		hdlr:    make(chan transport.Channel),
+		ctrl:    make(chan bool),
 		srvc:    nil,
 		name:    name,
 		running: false,
@@ -67,7 +69,8 @@ func (si *ServiceImpl) Start(spec string) (err error) {
 					logger.Printf(logger.DBG, "[%s] Client connected.\n", si.name)
 					go si.impl.ServeClient(transport.NewMsgChannel(ch))
 				}
-			default:
+			case <-si.ctrl:
+				break loop
 			}
 		}
 		logger.Printf(logger.DBG, "[%s] Service closing.\n", si.name)
@@ -85,6 +88,7 @@ func (si *ServiceImpl) Stop() error {
 		return fmt.Errorf("service not running")
 	}
 	si.running = false
+	si.ctrl <- true
 	logger.Printf(logger.DBG, "[%s] Service terminating.\n", si.name)
 
 	return si.impl.Stop()
