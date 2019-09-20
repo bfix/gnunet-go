@@ -67,17 +67,17 @@ func (msg *DHTClientGetMsg) Header() *MessageHeader {
 
 // DHTClientResultMsg
 type DHTClientResultMsg struct {
-	MsgSize    uint16           `order:"big"` // total size of message
-	MsgType    uint16           `order:"big"` // DHT_CLIENT_RESULT (145)
-	Type       uint32           `order:"big"` // The type for the data
-	PutPathLen uint32           `order:"big"` // Number of peers recorded in outgoing path
-	GetPathLen uint32           `order:"big"` // Number of peers recorded from storage location
-	Id         uint64           `order:"big"` // Unique ID of the matching GET request
-	Expire     uint64           `order:"big"` // Expiration time
-	Key        *crypto.HashCode // The key that was searched for
-	PutPath    []*PeerID        `size:"PutPathLen"` // put path
-	GetPath    []*PeerID        `size:"GetPathLen"` // get path
-	Data       []byte           `size:"*"`          // data returned for query
+	MsgSize    uint16            `order:"big"` // total size of message
+	MsgType    uint16            `order:"big"` // DHT_CLIENT_RESULT (145)
+	Type       uint32            `order:"big"` // The type for the data
+	PutPathLen uint32            `order:"big"` // Number of peers recorded in outgoing path
+	GetPathLen uint32            `order:"big"` // Number of peers recorded from storage location
+	Id         uint64            `order:"big"` // Unique ID of the matching GET request
+	Expire     util.AbsoluteTime // Expiration time
+	Key        *crypto.HashCode  // The key that was searched for
+	PutPath    []*util.PeerID    `size:"PutPathLen"` // put path
+	GetPath    []*util.PeerID    `size:"GetPathLen"` // get path
+	Data       []byte            `size:"*"`          // data returned for query
 }
 
 // NewDHTClientResultMsg creates a new default DHTClientResultMsg object.
@@ -92,14 +92,14 @@ func NewDHTClientResultMsg(key *crypto.HashCode) *DHTClientResultMsg {
 		PutPathLen: 0,
 		GetPathLen: 0,
 		Id:         0,
-		Expire:     0,
+		Expire:     *new(util.AbsoluteTime),
 		Key:        key,
 		Data:       make([]byte, 0),
 	}
 }
 
 func (m *DHTClientResultMsg) String() string {
-	return fmt.Sprintf("DHTClientResultMsg{Id:%d}", m.Id)
+	return fmt.Sprintf("DHTClientResultMsg{id:%d,expire=%s}", m.Id, m.Expire)
 }
 
 // Header returns the message header in a separate instance.

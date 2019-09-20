@@ -11,17 +11,13 @@ import (
 	"gnunet/util"
 )
 
-type PeerID struct {
-	Key []byte `size:"32"`
-}
-
 type EphKeyBlock struct {
-	SignSize     uint32  `order:"big"` // length of signed block
-	SigPurpose   uint32  `order:"big"` // signature purpose: SIG_ECC_KEY
-	CreateTime   uint64  `order:"big"` // Time of key creation
-	ExpireTime   uint64  `order:"big"` // Time of key expiration
-	EphemeralKey []byte  `size:"32"`   // Ephemeral EdDSA public key
-	PeerID       *PeerID // Peer identity (EdDSA public key)
+	SignSize     uint32            `order:"big"` // length of signed block
+	SigPurpose   uint32            `order:"big"` // signature purpose: SIG_ECC_KEY
+	CreateTime   util.AbsoluteTime // Time of key creation
+	ExpireTime   util.RelativeTime // Time to live for key
+	EphemeralKey []byte            `size:"32"` // Ephemeral EdDSA public key
+	PeerID       *util.PeerID      // Peer identity (EdDSA public key)
 }
 
 type EphemeralKeyMsg struct {
@@ -41,19 +37,19 @@ func NewEphemeralKeyMsg() *EphemeralKeyMsg {
 		SignedBlock: &EphKeyBlock{
 			SignSize:     88,
 			SigPurpose:   enums.SIG_ECC_KEY,
-			CreateTime:   util.GetAbsoluteTimeNow(),
-			ExpireTime:   util.GetAbsoluteTimeOffset(12 * time.Hour),
+			CreateTime:   util.AbsoluteTimeNow(),
+			ExpireTime:   util.NewRelativeTime(12 * time.Hour),
 			EphemeralKey: make([]byte, 32),
-			PeerID:       new(PeerID),
+			PeerID:       util.NewPeerID(nil),
 		},
 	}
 }
 
 func (m *EphemeralKeyMsg) String() string {
-	return fmt.Sprintf("EphKeyMsg{%s,%s,%s,%d}",
+	return fmt.Sprintf("EphKeyMsg{peer=%s,ephkey=%s,create=%s,expire=%s,status=%d}",
 		util.EncodeBinaryToString(m.SignedBlock.PeerID.Key),
 		util.EncodeBinaryToString(m.SignedBlock.EphemeralKey),
-		util.Timestamp(m.SignedBlock.ExpireTime),
+		m.SignedBlock.CreateTime, m.SignedBlock.ExpireTime,
 		m.SenderStatus)
 }
 

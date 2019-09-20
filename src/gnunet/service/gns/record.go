@@ -7,6 +7,7 @@ import (
 	"github.com/bfix/gospel/data"
 	"gnunet/crypto"
 	"gnunet/message"
+	"gnunet/util"
 )
 
 var (
@@ -29,8 +30,8 @@ func NewGNSRecordSet() *GNSRecordSet {
 
 type SignedBlockData struct {
 	Purpose *crypto.SignaturePurpose // Size and purpose of signature (8 bytes)
-	Expire  uint64                   `order:"big"` // Expiration time of the block.
-	EncData []byte                   `size:"*"`    // encrypted GNSRecordSet
+	Expire  util.AbsoluteTime        // Expiration time of the block.
+	EncData []byte                   `size:"*"` // encrypted GNSRecordSet
 
 	// transient data (not serialized)
 	data []byte // unencrypted GNSRecord set
@@ -107,7 +108,7 @@ func NewGNSBlock() *GNSBlock {
 		DerivedKey: make([]byte, 32),
 		Block: &SignedBlockData{
 			Purpose: new(crypto.SignaturePurpose),
-			Expire:  0,
+			Expire:  *new(util.AbsoluteTime),
 			EncData: nil,
 			data:    nil,
 		},

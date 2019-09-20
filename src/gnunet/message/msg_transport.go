@@ -15,28 +15,24 @@ import (
 //----------------------------------------------------------------------
 
 type TransportTcpWelcomeMsg struct {
-	MsgSize uint16 `order:"big"` // total size of message
-	MsgType uint16 `order:"big"` // TRANSPORT_TCP_WELCOME (61)
-	PeerID  []byte `size:"32"`   // Peer identity (EdDSA public key)
+	MsgSize uint16       `order:"big"` // total size of message
+	MsgType uint16       `order:"big"` // TRANSPORT_TCP_WELCOME (61)
+	PeerID  *util.PeerID // Peer identity (EdDSA public key)
 }
 
-func NewTransportTcpWelcomeMsg(peerid []byte) *TransportTcpWelcomeMsg {
-	msg := &TransportTcpWelcomeMsg{
+func NewTransportTcpWelcomeMsg(peerid *util.PeerID) *TransportTcpWelcomeMsg {
+	if peerid == nil {
+		peerid = util.NewPeerID(nil)
+	}
+	return &TransportTcpWelcomeMsg{
 		MsgSize: 36,
 		MsgType: TRANSPORT_TCP_WELCOME,
-		PeerID:  make([]byte, 32),
+		PeerID:  peerid,
 	}
-	if peerid != nil {
-		copy(msg.PeerID[:], peerid)
-	} else {
-		msg.MsgSize = 0
-		msg.MsgType = 0
-	}
-	return msg
 }
 
 func (m *TransportTcpWelcomeMsg) String() string {
-	return fmt.Sprintf("TransportTcpWelcomeMsg{'%s'}", util.EncodeBinaryToString(m.PeerID))
+	return fmt.Sprintf("TransportTcpWelcomeMsg{peer=%s}", m.PeerID)
 }
 
 // Header returns the message header in a separate instance.
@@ -58,11 +54,11 @@ func (msg *TransportTcpWelcomeMsg) Header() *MessageHeader {
 //----------------------------------------------------------------------
 
 type SignedAddress struct {
-	SignLength uint32 `order:"big"`     // Length of signed block
-	Purpose    uint32 `order:"big"`     // SIG_TRANSPORT_PONG_OWN
-	ExpireOn   uint64 `order:"big"`     // usec epoch
-	AddrSize   uint32 `order:"big"`     // size of address
-	Address    []byte `size:"AddrSize"` // address
+	SignLength uint32            `order:"big"` // Length of signed block
+	Purpose    uint32            `order:"big"` // SIG_TRANSPORT_PONG_OWN
+	ExpireOn   util.AbsoluteTime // usec epoch
+	AddrSize   uint32            `order:"big"`     // size of address
+	Address    []byte            `size:"AddrSize"` // address
 }
 
 func NewSignedAddress(a *util.Address) *SignedAddress {
@@ -72,7 +68,7 @@ func NewSignedAddress(a *util.Address) *SignedAddress {
 	addr := &SignedAddress{
 		SignLength: uint32(alen + 20),
 		Purpose:    enums.SIG_TRANSPORT_PONG_OWN,
-		ExpireOn:   util.GetAbsoluteTimeOffset(12 * time.Hour),
+		ExpireOn:   util.AbsoluteTimeNow().Add(12 * time.Hour),
 		AddrSize:   uint32(alen),
 		Address:    make([]byte, alen),
 	}
@@ -107,9 +103,10 @@ func NewTransportPongMsg(challenge uint32, a *util.Address) *TransportPongMsg {
 func (m *TransportPongMsg) String() string {
 	a := new(util.Address)
 	if err := data.Unmarshal(a, m.SignedBlock.Address); err == nil {
-		return fmt.Sprintf("TransportPongMsg{%s,%d}", a, m.Challenge)
+		return fmt.Sprintf("TransportPongMsg{addr=%s,challenge=%d}",
+			a, m.Challenge)
 	}
-	return fmt.Sprintf("TransportPongMsg{<unkown>,%d}", m.Challenge)
+	return fmt.Sprintf("TransportPongMsg{addr=<unkown>,%d}", m.Challenge)
 }
 
 // Header returns the message header in a separate instance.
@@ -120,12 +117,10 @@ func (msg *TransportPongMsg) Header() *MessageHeader {
 func (m *TransportPongMsg) Sign(prv *ed25519.PrivateKey) error {
 	data, err := data.Marshal(m.SignedBlock)
 	if err != nil {
-		fmt.Printf("Sign: %s\n", err)
 		return err
 	}
 	sig, err := prv.EdSign(data)
 	if err != nil {
-		fmt.Printf("Sign: %s\n", err)
 		return err
 	}
 	copy(m.Signature, sig.Bytes())
@@ -154,23 +149,23 @@ func (m *TransportPongMsg) Verify(pub *ed25519.PublicKey) (bool, error) {
 //----------------------------------------------------------------------
 
 type TransportPingMsg struct {
-	MsgSize   uint16 `order:"big"` // total size of message
-	MsgType   uint16 `order:"big"` // TRANSPORT_PING (372)
-	Challenge uint32 // Challenge code (to ensure fresh reply)
-	Target    []byte `size:"32"` // EdDSA public key (long-term) of target peer
-	Address   []byte `size:"*"`  // encoded address
+	MsgSize   uint16       `order:"big"` // total size of message
+	MsgType   uint16       `order:"big"` // TRANSPORT_PING (372)
+	Challenge uint32       // Challenge code (to ensure fresh reply)
+	Target    *util.PeerID // EdDSA public key (long-term) of target peer
+	Address   []byte       `size:"*"` // encoded address
 }
 
-func NewTransportPingMsg(target []byte, a *util.Address) *TransportPingMsg {
+func NewTransportPingMsg(target *util.PeerID, a *util.Address) *TransportPingMsg {
+	if target == nil {
+		target = util.NewPeerID(nil)
+	}
 	m := &TransportPingMsg{
 		MsgSize:   uint16(40),
 		MsgType:   TRANSPORT_PING,
 		Challenge: util.RndUInt32(),
-		Target:    make([]byte, 32),
+		Target:    target,
 		Address:   nil,
-	}
-	if target != nil {
-		copy(m.Target, target)
 	}
 	if a != nil {
 		if addrData, err := data.Marshal(a); err == nil {
@@ -184,8 +179,8 @@ func NewTransportPingMsg(target []byte, a *util.Address) *TransportPingMsg {
 func (m *TransportPingMsg) String() string {
 	a := new(util.Address)
 	data.Unmarshal(a, m.Address)
-	return fmt.Sprintf("TransportPingMsg{%s,%s,%d}",
-		util.EncodeBinaryToString(m.Target), a, m.Challenge)
+	return fmt.Sprintf("TransportPingMsg{target=%s,addr=%s,challenge=%d}",
+		m.Target, a, m.Challenge)
 }
 
 // Header returns the message header in a separate instance.
@@ -208,17 +203,17 @@ func (msg *TransportPingMsg) Header() *MessageHeader {
 //----------------------------------------------------------------------
 
 type HelloAddress struct {
-	Transport string // Name of transport
-	AddrSize  uint16 `order:"big"`     // Size of address entry
-	ExpireOn  uint64 `order:"big"`     // Expiry date
-	Address   []byte `size:"AddrSize"` // Address specification
+	Transport string            // Name of transport
+	AddrSize  uint16            `order:"big"` // Size of address entry
+	ExpireOn  util.AbsoluteTime // Expiry date
+	Address   []byte            `size:"AddrSize"` // Address specification
 }
 
 func NewAddress(a *util.Address) *HelloAddress {
 	addr := &HelloAddress{
 		Transport: a.Transport,
 		AddrSize:  uint16(len(a.Address)),
-		ExpireOn:  util.GetAbsoluteTimeOffset(12 * time.Hour),
+		ExpireOn:  util.AbsoluteTimeNow().Add(12 * time.Hour),
 		Address:   make([]byte, len(a.Address)),
 	}
 	copy(addr.Address, a.Address)
@@ -226,33 +221,34 @@ func NewAddress(a *util.Address) *HelloAddress {
 }
 
 func (a *HelloAddress) String() string {
-	return fmt.Sprintf("Address{%s,%s}", util.AddressString(a.Transport, a.Address), util.Timestamp(a.ExpireOn))
+	return fmt.Sprintf("Address{%s,expire=%s}",
+		util.AddressString(a.Transport, a.Address), a.ExpireOn)
 }
 
 type HelloMsg struct {
 	MsgSize    uint16          `order:"big"` // total size of message
 	MsgType    uint16          `order:"big"` // HELLO (17)
 	FriendOnly uint32          `order:"big"` // =1: do not gossip this HELLO
-	PeerID     []byte          `size:"32"`   // EdDSA public key (long-term)
-	Addresses  []*HelloAddress `size:"*"`    // List of end-point addressess
+	PeerID     *util.PeerID    // EdDSA public key (long-term)
+	Addresses  []*HelloAddress `size:"*"` // List of end-point addressess
 }
 
-func NewHelloMsg(peerid []byte) *HelloMsg {
-	m := &HelloMsg{
+func NewHelloMsg(peerid *util.PeerID) *HelloMsg {
+	if peerid == nil {
+		peerid = util.NewPeerID(nil)
+	}
+	return &HelloMsg{
 		MsgSize:    40,
 		MsgType:    HELLO,
 		FriendOnly: 0,
-		PeerID:     make([]byte, 32),
+		PeerID:     peerid,
 		Addresses:  make([]*HelloAddress, 0),
 	}
-	if peerid != nil {
-		copy(m.PeerID, peerid)
-	}
-	return m
 }
 
 func (m *HelloMsg) String() string {
-	return fmt.Sprintf("HelloMsg{%s,%d,%v}", util.EncodeBinaryToString(m.PeerID), m.FriendOnly, m.Addresses)
+	return fmt.Sprintf("HelloMsg{peer=%s,friendsonly=%d,addr=%v}",
+		m.PeerID, m.FriendOnly, m.Addresses)
 }
 
 func (m *HelloMsg) AddAddress(a *HelloAddress) {
@@ -295,26 +291,23 @@ func (msg *SessionAckMsg) Header() *MessageHeader {
 //----------------------------------------------------------------------
 
 type SessionSynMsg struct {
-	MsgSize   uint16 `order:"big"` // total size of message
-	MsgType   uint16 `order:"big"` // TRANSPORT_SESSION_SYN (375)
-	Reserved  uint32 `order:"big"` // reserved (=0)
-	Timestamp uint64 `order:"big"` // usec epoch
+	MsgSize   uint16            `order:"big"` // total size of message
+	MsgType   uint16            `order:"big"` // TRANSPORT_SESSION_SYN (375)
+	Reserved  uint32            `order:"big"` // reserved (=0)
+	Timestamp util.AbsoluteTime // usec epoch
 }
 
-func NewSessionSynMsg(t uint64) *SessionSynMsg {
-	if t == 0 {
-		t = util.GetAbsoluteTimeNow()
-	}
+func NewSessionSynMsg() *SessionSynMsg {
 	return &SessionSynMsg{
 		MsgSize:   16,
 		MsgType:   TRANSPORT_SESSION_SYN,
 		Reserved:  0,
-		Timestamp: t,
+		Timestamp: util.AbsoluteTimeNow(),
 	}
 }
 
 func (m *SessionSynMsg) String() string {
-	return fmt.Sprintf("SessionSyn{%s}", util.Timestamp(m.Timestamp))
+	return fmt.Sprintf("SessionSyn{timestamp=%s}", m.Timestamp)
 }
 
 // Header returns the message header in a separate instance.
@@ -327,26 +320,23 @@ func (msg *SessionSynMsg) Header() *MessageHeader {
 //----------------------------------------------------------------------
 
 type SessionSynAckMsg struct {
-	MsgSize   uint16 `order:"big"` // total size of message
-	MsgType   uint16 `order:"big"` // TRANSPORT_SESSION_SYN_ACK (376)
-	Reserved  uint32 `order:"big"` // reserved (=0)
-	Timestamp uint64 `order:"big"` // usec epoch
+	MsgSize   uint16            `order:"big"` // total size of message
+	MsgType   uint16            `order:"big"` // TRANSPORT_SESSION_SYN_ACK (376)
+	Reserved  uint32            `order:"big"` // reserved (=0)
+	Timestamp util.AbsoluteTime // usec epoch
 }
 
-func NewSessionSynAckMsg(t uint64) *SessionSynAckMsg {
-	if t == 0 {
-		t = util.GetAbsoluteTimeNow()
-	}
+func NewSessionSynAckMsg() *SessionSynAckMsg {
 	return &SessionSynAckMsg{
 		MsgSize:   16,
 		MsgType:   TRANSPORT_SESSION_SYN_ACK,
 		Reserved:  0,
-		Timestamp: t,
+		Timestamp: util.AbsoluteTimeNow(),
 	}
 }
 
 func (m *SessionSynAckMsg) String() string {
-	return fmt.Sprintf("SessionSynAck{%s}", util.Timestamp(m.Timestamp))
+	return fmt.Sprintf("SessionSynAck{timestamp=%s}", m.Timestamp)
 }
 
 // Header returns the message header in a separate instance.

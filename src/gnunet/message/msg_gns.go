@@ -73,16 +73,16 @@ func (msg *GNSLookupMsg) Header() *MessageHeader {
 //----------------------------------------------------------------------
 
 type GNSResourceRecord struct {
-	Expires uint64 `order:"big"` // Expiration time for the record
-	Size    uint32 `order:"big"` // Number of bytes in 'Data'
-	Type    uint32 `order:"big"` // Type of the GNS/DNS record
-	Flags   uint32 `order:"big"` // Flags for the record
-	Data    []byte `size:"Size"` // Record data
+	Expires util.AbsoluteTime // Expiration time for the record
+	Size    uint32            `order:"big"` // Number of bytes in 'Data'
+	Type    uint32            `order:"big"` // Type of the GNS/DNS record
+	Flags   uint32            `order:"big"` // Flags for the record
+	Data    []byte            `size:"Size"` // Record data
 }
 
 func (r *GNSResourceRecord) String() string {
-	return fmt.Sprintf("GNSResourceRecord{Type=%s,Expire=%s,Flag=%d,Size=%d}",
-		enums.GNS_TYPE[int(r.Type)], util.Timestamp(r.Expires), r.Flags, r.Size)
+	return fmt.Sprintf("GNSResourceRecord{type=%s,expire=%s,flags=%d,size=%d}",
+		enums.GNS_TYPE[int(r.Type)], r.Expires, r.Flags, r.Size)
 }
 
 // GNSLookupResultMsg

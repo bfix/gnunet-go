@@ -18,9 +18,9 @@ func NewEmptyMessage(msgType uint16) (Message, error) {
 	case TRANSPORT_SESSION_QUOTA:
 		return NewSessionQuotaMsg(0), nil
 	case TRANSPORT_SESSION_SYN:
-		return NewSessionSynMsg(0), nil
+		return NewSessionSynMsg(), nil
 	case TRANSPORT_SESSION_SYN_ACK:
-		return NewSessionSynAckMsg(0), nil
+		return NewSessionSynAckMsg(), nil
 	case TRANSPORT_SESSION_ACK:
 		return new(SessionAckMsg), nil
 	case TRANSPORT_PING:

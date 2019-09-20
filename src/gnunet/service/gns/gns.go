@@ -178,8 +178,8 @@ func (s *GNSService) LookupNamecache(query *crypto.HashCode, zoneKey *ed25519.Pu
 			break
 		}
 		// check if record has expired
-		if util.Expired(m.Expire) {
-			logger.Printf(logger.ERROR, "[gns] block expired at %s\n", util.Timestamp(m.Expire))
+		if m.Expire.Expired() {
+			logger.Printf(logger.ERROR, "[gns] block expired at %s\n", m.Expire)
 			break
 		}
 
@@ -245,8 +245,8 @@ func (s *GNSService) LookupDHT(query *crypto.HashCode, zoneKey *ed25519.PublicKe
 			break
 		}
 		// check if record has expired
-		if util.Expired(m.Expire) {
-			logger.Printf(logger.ERROR, "[gns] block expired at %s\n", util.Timestamp(m.Expire))
+		if m.Expire.Expired() {
+			logger.Printf(logger.ERROR, "[gns] block expired at %s\n", m.Expire)
 			break
 		}
 		// check if result is of requested type

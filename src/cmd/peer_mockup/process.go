@@ -32,7 +32,8 @@ func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
 	// are we initiating the connection?
 	init := (from == p)
 	if init {
-		c.Send(message.NewTransportTcpWelcomeMsg(p.GetID()))
+		peerid := util.NewPeerID(p.GetID())
+		c.Send(message.NewTransportTcpWelcomeMsg(peerid))
 	}
 
 	// remember peer addresses (only ONE!)
@@ -50,11 +51,13 @@ func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
 			switch msg := m.(type) {
 
 			case *message.TransportTcpWelcomeMsg:
+				peerid := util.NewPeerID(p.GetID())
 				if init {
-					c.Send(message.NewHelloMsg(p.GetID()))
-					c.Send(message.NewTransportPingMsg(t.GetID(), tAddr))
+					c.Send(message.NewHelloMsg(peerid))
+					target := util.NewPeerID(t.GetID())
+					c.Send(message.NewTransportPingMsg(target, tAddr))
 				} else {
-					c.Send(message.NewTransportTcpWelcomeMsg(p.GetID()))
+					c.Send(message.NewTransportTcpWelcomeMsg(peerid))
 				}
 
 			case *message.HelloMsg:
@@ -80,7 +83,8 @@ func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
 				}
 
 			case *message.SessionSynMsg:
-				mOut := message.NewSessionSynAckMsg(msg.Timestamp)
+				mOut := message.NewSessionSynAckMsg()
+				mOut.Timestamp = msg.Timestamp
 				if send[message.TRANSPORT_PONG] {
 					c.Send(mOut)
 				} else {
