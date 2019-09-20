@@ -3,6 +3,7 @@ package util
 import (
 	"encoding/hex"
 	"fmt"
+	"math"
 	"net"
 	"time"
 )
@@ -17,6 +18,9 @@ func AddressString(transport string, addr []byte) string {
 }
 
 func Timestamp(ts uint64) string {
+	if ts == math.MaxUint64 {
+		return "Never"
+	}
 	t := time.Unix(int64(ts/(1000*1000)), int64((ts%1000)*1000))
 	return t.Format(time.RFC3339Nano)
 }

@@ -3,7 +3,6 @@ package gns
 import (
 	"encoding/hex"
 	"io"
-	"time"
 
 	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/data"
@@ -179,7 +178,7 @@ func (s *GNSService) LookupNamecache(query *crypto.HashCode, zoneKey *ed25519.Pu
 			break
 		}
 		// check if record has expired
-		if m.Expire > 0 && int64(m.Expire) < time.Now().Unix() {
+		if util.Expired(m.Expire) {
 			logger.Printf(logger.ERROR, "[gns] block expired at %s\n", util.Timestamp(m.Expire))
 			break
 		}
@@ -246,7 +245,7 @@ func (s *GNSService) LookupDHT(query *crypto.HashCode, zoneKey *ed25519.PublicKe
 			break
 		}
 		// check if record has expired
-		if m.Expire > 0 && int64(m.Expire) < time.Now().Unix() {
+		if util.Expired(m.Expire) {
 			logger.Printf(logger.ERROR, "[gns] block expired at %s\n", util.Timestamp(m.Expire))
 			break
 		}
