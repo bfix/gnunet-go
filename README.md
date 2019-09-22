@@ -22,7 +22,7 @@ DOCUMENTATION OR COMPILABLE, RUNNABLE OR EVEN OPERATIONAL SOURCE CODE.
 
 ## Source code
 
-All source code is written in Golang (version 1.11+).
+All source code is written in Golang (version 1.13+).
 
 ### Dependencies
 
@@ -38,19 +38,43 @@ $ go get -u github.com/bfix/gospel/...
 
 ### ./src/cmd folder
 
-* `vanityid`: Compute GNUnet vanity peer id for a given regexp pattern.
+
+#### `gnunet-service-gns-go`: Implementation of the GNS service.
+
+#### `peer_mockup`: test message exchange on the lowest level (transport).
+
+#### `vanityid`: Compute GNUnet vanity peer and ego id for a given regexp pattern.
+
+N.B.: Key generation is slow at the moment, so be patient! To generate a single
+matching key some 1,000,000 keys need to be generated for a four letter prefix;
+this can take more than 30 minutes on average (depending on your CPU).
 
 ```bash
 $ vanityid "^TST[0-9]"
 ```
 
-* `gnunet-service-gns-go`: Implementation of the GNS service.
+Keys matching the pattern are printed to the console in the following format:
 
-* `peer_mockup`: test message exchange on the lowest level (transport).
+```bash
+<vanity_id> [<hex.seed>][<hex.scalar>] (<count> tries, <time> elapsed)
+```
+The value of `count` tells how many key had been generated before a match was
+found; `time` is the time needed to find a match.
 
+To generate the key files, make sure GNUnet **is not running** and do: 
+
+```bash
+$ # use a vanity peer id:
+$ echo "<hex.seed>" | xxd -r -p > /var/lib/gnunet/.local/share/gnunet/private_key.ecc
+$ sudo chown gnunet:gnunet /var/lib/gnunet/.local/share/gnunet/private_key.ecc
+$ sudo chmod 600 /var/lib/gnunet/.local/share/gnunet/private_key.ecc
+$ # use a vanity ego id:
+$ echo "<hex.scalar>" | xxd -r -p > ~/.local/share/gnunet/identity/egos/<vanity_ego>
+$ chmod 600 ~/.local/share/gnunet/identity/egos/<vanity_ego>
+```
 ### ./src/gnunet folder
 
-Packages used to implement GNUnet protocols (currently only TRANSPORT
+Packages used to implement GNUnet protocols (currently only some of TRANSPORT
 and GNS).
 
 ## Documentation
