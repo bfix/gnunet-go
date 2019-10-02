@@ -57,3 +57,23 @@ func SymmetricDecrypt(data []byte, skey *SymmetricKey, iv *SymmetricIV) ([]byte,
 	stream.XORKeyStream(out, out)
 	return out, nil
 }
+
+func SymmetricEncrypt(data []byte, skey *SymmetricKey, iv *SymmetricIV) ([]byte, error) {
+	// Encrypt with AES CFB stream cipher
+	aes, err := aes.NewCipher(skey.AESKey)
+	if err != nil {
+		return nil, err
+	}
+	stream := cipher.NewCFBEncrypter(aes, iv.AESIv)
+	out := make([]byte, len(data))
+	stream.XORKeyStream(out, data)
+
+	// Encrypt with Twofish CFB stream cipher
+	tf, err := twofish.NewCipher(skey.TwofishKey)
+	if err != nil {
+		return nil, err
+	}
+	stream = cipher.NewCFBEncrypter(tf, iv.TwofishIv)
+	stream.XORKeyStream(out, out)
+	return out, nil
+}
