@@ -19,13 +19,13 @@ func QueryFromPublickeyDerive(pkey *ed25519.PublicKey, label string) *crypto.Has
 // DecryptBlock
 func DecryptBlock(data []byte, zoneKey *ed25519.PublicKey, label string) (out []byte, err error) {
 	// derive key material for decryption
-	iv, skey := deriveBlockKey(label, zoneKey)
+	iv, skey := DeriveBlockKey(label, zoneKey)
 	// perform decryption
 	return crypto.SymmetricDecrypt(data, skey, iv)
 }
 
-// Derive a symmetric key to decipher a GNS block
-func deriveBlockKey(label string, pub *ed25519.PublicKey) (iv *crypto.SymmetricIV, skey *crypto.SymmetricKey) {
+// DeriveBlockKey returns a symmetric key to decipher a GNS block
+func DeriveBlockKey(label string, pub *ed25519.PublicKey) (iv *crypto.SymmetricIV, skey *crypto.SymmetricKey) {
 	// generate symmetric key
 	prk := hkdf.Extract(sha512.New, []byte(label), pub.Bytes())
 	rdr := hkdf.Expand(sha256.New, prk, []byte("gns-aes-ctx-key"))
