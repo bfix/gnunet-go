@@ -9,13 +9,6 @@ import (
 	"golang.org/x/crypto/hkdf"
 )
 
-// QueryFromPublickeyDerive calculates the DHT query for a given label in a
-// given zone (identified by PKEY).
-func QueryFromPublickeyDerive(pkey *ed25519.PublicKey, label string) *crypto.HashCode {
-	pd := crypto.DerivePublicKey(pkey, label, "gns")
-	return crypto.Hash(pd.Bytes())
-}
-
 // DecryptBlock
 func DecryptBlock(data []byte, zoneKey *ed25519.PublicKey, label string) (out []byte, err error) {
 	// derive key material for decryption
