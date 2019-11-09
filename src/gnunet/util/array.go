@@ -23,6 +23,15 @@ func Reverse(b []byte) []byte {
 	return r
 }
 
+func ReverseStrings(s []string) []string {
+	sl := len(s)
+	r := make([]string, sl)
+	for i := 0; i < sl; i++ {
+		r[sl-i-1] = s[i]
+	}
+	return r
+}
+
 // CopyBlock copies 'in' to 'out' so that 'out' is filled completely.
 // - If 'in' is larger than 'out', it is left-truncated before copy
 // - If 'in' is smaller than 'out', it is left-padded with 0 before copy
