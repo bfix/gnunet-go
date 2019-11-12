@@ -77,27 +77,22 @@ func (s *GNSService) ServeClient(mc *transport.MsgChannel) {
 			//       access to the message channel to send responses)
 			pkey := ed25519.NewPublicKeyFromBytes(m.Zone)
 			label := m.GetName()
-			block, err := s.Lookup(pkey, label, int(m.Options) == enums.GNS_LO_DEFAULT)
+			recset, err := s.Resolve(label, pkey, int(m.Type), int(m.Options))
 			if err != nil {
 				logger.Printf(logger.ERROR, "[gns] Failed to lookup block: %s\n", err.Error())
 				break
 			}
-			// handle block
-			if block != nil {
-				logger.Printf(logger.DBG, "[gns] Received block data: %s\n", hex.EncodeToString(block.Block.data))
+			// handle records
+			if recset != nil {
+				logger.Printf(logger.DBG, "[gns] Received record set with %d entries\n", recset.Count)
 
 				// get records from block
-				records, err := block.Records()
-				if err != nil {
-					logger.Printf(logger.ERROR, "[gns] Failed to extract records: %s\n", err.Error())
-					break
-				}
-				if len(records) == 0 {
+				if recset.Count == 0 {
 					logger.Println(logger.WARN, "[gns] No records in block")
 					break
 				}
 				// process records
-				for i, rec := range records {
+				for i, rec := range recset.Records {
 					logger.Printf(logger.DBG, "[gns] Record #%d: %v\n", i, rec)
 
 					// is this the record type we are looking for?
