@@ -28,6 +28,11 @@ func NewGNSRecordSet() *GNSRecordSet {
 	}
 }
 
+func (rs *GNSRecordSet) AddRecord(rec *message.GNSResourceRecord) {
+	rs.Count++
+	rs.Records = append(rs.Records, rec)
+}
+
 type SignedBlockData struct {
 	Purpose *crypto.SignaturePurpose // Size and purpose of signature (8 bytes)
 	Expire  util.AbsoluteTime        // Expiration time of the block.
