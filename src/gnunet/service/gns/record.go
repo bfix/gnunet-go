@@ -102,7 +102,7 @@ func (b *GNSBlock) Verify(zoneKey *ed25519.PublicKey, label string) (err error) 
 
 func (b *GNSBlock) Decrypt(zoneKey *ed25519.PublicKey, label string) (err error) {
 	// decrypt payload
-	b.Block.data, err = DecryptBlock(b.Block.EncData, zoneKey, label)
+	b.Block.data, err = crypto.DecryptBlock(b.Block.EncData, zoneKey, label)
 	b.decrypted = true
 	return
 }

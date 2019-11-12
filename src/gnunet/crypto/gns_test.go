@@ -1,4 +1,4 @@
-package gns
+package crypto
 
 import (
 	"bytes"
@@ -40,7 +40,7 @@ func TestDeriveBlockKey(t *testing.T) {
 		}
 	)
 
-	iv, skey := deriveBlockKey(LABEL, ed25519.NewPublicKeyFromBytes(PUB))
+	iv, skey := DeriveBlockKey(LABEL, ed25519.NewPublicKeyFromBytes(PUB))
 
 	if bytes.Compare(IV[:16], iv.AESIv) != 0 {
 		t.Logf("AES_IV(computed) = %s\n", hex.EncodeToString(iv.AESIv))
