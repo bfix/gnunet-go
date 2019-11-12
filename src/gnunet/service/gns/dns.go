@@ -163,6 +163,11 @@ func (gns *GNSModule) ResolveDNS(name string, servers []string, kind int, pkey *
 					addr = net.IP(rec.Data)
 				}
 			}
+			// check if we have an IP address available
+			if addr == nil {
+				logger.Printf(logger.WARN, "[dns] No IP address for nameserver in GNS")
+				continue
+			}
 		}
 		// query DNS concurrently
 		go queryDNS(idx, name, addr, kind, res)
