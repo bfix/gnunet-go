@@ -1,6 +1,7 @@
 package gns
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -149,6 +150,7 @@ type GNSModule struct {
 func (gns *GNSModule) Resolve(path string, pkey *ed25519.PublicKey, kind int, mode int) (set *GNSRecordSet, err error) {
 	// get the name elements in reverse order
 	names := util.ReverseStringList(strings.Split(path, "."))
+	logger.Printf(logger.DBG, "[gns] Resolver called for %v\n", names)
 
 	// check for relative path
 	if pkey != nil {
@@ -197,6 +199,8 @@ func (gns *GNSModule) ResolveRelative(names []string, pkey *ed25519.PublicKey, k
 	var records []*message.GNSResourceRecord
 name_loop:
 	for ; len(names) > 0; names = names[1:] {
+		logger.Printf(logger.DBG, "[gns] ResolveRelative '%s' in '%s'\n", names[0], util.EncodeBinaryToString(pkey.Bytes()))
+
 		// resolve next level
 		var block *GNSBlock
 		if block, err = gns.Lookup(pkey, names[0], mode == enums.GNS_LO_DEFAULT); err != nil {
@@ -252,12 +256,23 @@ name_loop:
 					inst = hdlr.(*Gns2DnsHandler)
 				}
 				// extract list of names in DATA block:
-				dnsNames := util.StringList(rec.Data)
+				logger.Printf(logger.DBG, "[gns] GNS2DNS data: %s\n", hex.EncodeToString(rec.Data))
+				var dnsNames []string
+				for pos := 0; ; {
+					next, name := DNSNameFromBytes(rec.Data, pos)
+					if len(name) == 0 {
+						break
+					}
+					dnsNames = append(dnsNames, name)
+					pos = next
+				}
+				logger.Printf(logger.DBG, "[gns] GNS2DNS params: %v\n", dnsNames)
 				if len(dnsNames) != 2 {
 					err = ErrInvalidRecordBody
 					return
 				}
 				// Add to collection of requests
+				logger.Printf(logger.DBG, "[gns] GNS2DNS: query for '%s' on '%s'\n", dnsNames[0], dnsNames[1])
 				if !inst.AddRequest(dnsNames[0], dnsNames[1]) {
 					err = ErrInvalidRecordBody
 					return
@@ -270,11 +285,14 @@ name_loop:
 			case *Gns2DnsHandler:
 				// we need to handle delegation to DNS: returns a list of found
 				// resource records in DNS (filter by 'kind')
-				fqdn := strings.Join(util.ReverseStringList(names), ".") + "." + inst.Name
+				fqdn := strings.Join(util.ReverseStringList(names[1:]), ".") + "." + inst.Name
 				if set, err = gns.ResolveDNS(fqdn, inst.Servers, kind, pkey); err != nil {
+					logger.Println(logger.ERROR, "[gns] GNS2DNS resilution failed.")
 					return
 				}
+				// we are done with resolution; pass on records to caller
 				records = set.Records
+				break name_loop
 			}
 		}
 	}
