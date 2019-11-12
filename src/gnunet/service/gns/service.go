@@ -77,7 +77,7 @@ func (s *GNSService) ServeClient(mc *transport.MsgChannel) {
 			//       access to the message channel to send responses)
 			pkey := ed25519.NewPublicKeyFromBytes(m.Zone)
 			label := m.GetName()
-			block, err := s.Lookup(pkey, label, int(m.Type), int(m.Options))
+			block, err := s.Lookup(pkey, label, int(m.Options) == enums.GNS_LO_DEFAULT)
 			if err != nil {
 				logger.Printf(logger.ERROR, "[gns] Failed to lookup block: %s\n", err.Error())
 				break
