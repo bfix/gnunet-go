@@ -7,6 +7,7 @@ import (
 	"gnunet/config"
 	"gnunet/crypto"
 	"gnunet/enums"
+	"gnunet/message"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/crypto/ed25519"
@@ -19,7 +20,10 @@ import (
 
 // Error codes
 var (
-	ErrUnknownTLD = fmt.Errorf("Unknown TLD in name")
+	ErrUnknownTLD        = fmt.Errorf("Unknown TLD in name")
+	ErrInvalidRecordType = fmt.Errorf("Invalid resource record type")
+	ErrInvalidRecordBody = fmt.Errorf("Invalid resource record body")
+	ErrInvalidPKEY       = fmt.Errorf("Invalid PKEY resource record")
 )
 
 //----------------------------------------------------------------------
@@ -47,6 +51,62 @@ func NewQuery(pkey *ed25519.PublicKey, label string) *Query {
 		Derived: pd,
 		Key:     key,
 	}
+}
+
+//----------------------------------------------------------------------
+// GNS blocks with special types (PKEY, GNS2DNS) require special
+// treatment with respect to other resource records with different types
+// in the same block. Usually only certain other types (or not at all)
+// are allowed and the allowed ones are required to deliver a consistent
+// list of resulting resource records passed back to the caller.
+//----------------------------------------------------------------------
+
+// BlockHandler interface.
+type BlockHandler interface {
+	// TypeAction returns a flag indicating how a resource record of a
+	// given type is to be treated:
+	//   = -1: Record is not allowed (terminates lookup with an error)
+	//   =  0: Record is allowed but will be ignored
+	//   =  1: Record is allowed and will be processed
+	TypeAction(int) int
+}
+
+// Gns2DnsHandler implementing the BlockHandler interface
+type Gns2DnsHandler struct {
+	Name    string
+	Servers []string
+}
+
+// NewGns2DnsHandler returns a new BlockHandler instance
+func NewGns2DnsHandler() *Gns2DnsHandler {
+	return &Gns2DnsHandler{
+		Name:    "",
+		Servers: make([]string, 0),
+	}
+}
+
+// TypeAction return a flag indicating how a resource record of a given type
+// is to be treated (see RecordMaster interface)
+func (m *Gns2DnsHandler) TypeAction(t int) int {
+	// only process other GNS2DNS records
+	if t == enums.GNS_TYPE_GNS2DNS {
+		return 1
+	}
+	// skip everything else
+	return 0
+}
+
+// AddRequest adds the DNS request for "name" at "server" to the list
+// of requests. All GNS2DNS records must query for the same name
+func (m *Gns2DnsHandler) AddRequest(name, server string) bool {
+	if len(m.Servers) == 0 {
+		m.Name = name
+	}
+	if name != m.Name {
+		return false
+	}
+	m.Servers = append(m.Servers, server)
+	return true
 }
 
 //----------------------------------------------------------------------
@@ -84,12 +144,23 @@ type GNSModule struct {
 	GetLocalZone func(name string) (*ed25519.PublicKey, error)
 }
 
-// Resolve a GNS name with multiple levels by proocessing simple (PKEY,Label)
-// lookups in sequence.
-func (gns *GNSModule) Resolve(path string, kind int, options int) (block *GNSBlock, err error) {
-	// split the full name (path) into elements
-	names := util.ReverseStrings(strings.Split(path, "."))
+// Resolve a GNS name with multiple elements, If pkey is not nil, the name
+// is interpreted as "relative to current zone".
+func (gns *GNSModule) Resolve(path string, pkey *ed25519.PublicKey, kind int, mode int) (set *GNSRecordSet, err error) {
+	// get the name elements in reverse order
+	names := util.ReverseStringList(strings.Split(path, "."))
 
+	// check for relative path
+	if pkey != nil {
+		//resolve relative path
+		return gns.ResolveRelative(names, pkey, kind, mode)
+	}
+	// resolve absolute path
+	return gns.ResolveAbsolute(names, kind, mode)
+}
+
+// Resolve a fully qualified GNS absolute name (with multiple levels).
+func (gns *GNSModule) ResolveAbsolute(names []string, kind int, mode int) (set *GNSRecordSet, err error) {
 	// get the root zone key for the TLD
 	var (
 		pkey *ed25519.PublicKey
@@ -115,23 +186,112 @@ func (gns *GNSModule) Resolve(path string, kind int, options int) (block *GNSBlo
 		// (4) we can't resolve this TLD
 		return nil, ErrUnknownTLD
 	}
-	// now we can resolve recursively
-	return gns.recursiveResolve(pkey, names[1:], kind, options)
+	// continue with resolution relative to a zone.
+	return gns.ResolveRelative(names[1:], pkey, kind, mode)
 }
 
-// Recursive resolution
-func (gns *GNSModule) recursiveResolve(pkey *ed25519.PublicKey, names []string, kind int, options int) (block *GNSBlock, err error) {
-	// resolve next level
-	if block, err = gns.Lookup(pkey, names[0], kind, options); err != nil {
-		// failed to resolve name
-		return
+// Resolve relative path (to a given zone) recursively by processing simple
+// (PKEY,Label) lookups in sequence and handle intermediate GNS record types
+func (gns *GNSModule) ResolveRelative(names []string, pkey *ed25519.PublicKey, kind int, mode int) (set *GNSRecordSet, err error) {
+	// Process all names in sequence
+	var records []*message.GNSResourceRecord
+name_loop:
+	for ; len(names) > 0; names = names[1:] {
+		// resolve next level
+		var block *GNSBlock
+		if block, err = gns.Lookup(pkey, names[0], mode == enums.GNS_LO_DEFAULT); err != nil {
+			// failed to resolve name
+			return
+		}
+		// set new mode after processing right-most label in LOCAL_MASTER mode
+		if mode == enums.GNS_LO_LOCAL_MASTER {
+			mode = enums.GNS_LO_DEFAULT
+		}
+		// post-process block by inspecting contained resource records for
+		// special GNS types
+		var hdlr BlockHandler
+		if records, err = block.Records(); err != nil {
+			return
+		}
+		for _, rec := range records {
+			// let a block handler decide how to handle records
+			if hdlr != nil {
+				switch hdlr.TypeAction(int(rec.Type)) {
+				case -1:
+					// No records of this type allowed in block
+					err = ErrInvalidRecordType
+					return
+				case 0:
+					// records of this type are simply ignored
+					continue
+				case 1:
+					// process record of this type
+				}
+			}
+			switch int(rec.Type) {
+			//----------------------------------------------------------
+			case enums.GNS_TYPE_PKEY:
+				// check for single RR and sane key data
+				if len(rec.Data) != 32 || len(records) > 1 {
+					err = ErrInvalidPKEY
+					return
+				}
+				// set new PKEY and continue resolution
+				pkey = ed25519.NewPublicKeyFromBytes(rec.Data)
+				continue name_loop
+
+			//----------------------------------------------------------
+			case enums.GNS_TYPE_GNS2DNS:
+				// get the master controlling this block; create a new
+				// one if necessary
+				var inst *Gns2DnsHandler
+				if hdlr == nil {
+					inst = NewGns2DnsHandler()
+					hdlr = inst
+				} else {
+					inst = hdlr.(*Gns2DnsHandler)
+				}
+				// extract list of names in DATA block:
+				dnsNames := util.StringList(rec.Data)
+				if len(dnsNames) != 2 {
+					err = ErrInvalidRecordBody
+					return
+				}
+				// Add to collection of requests
+				if !inst.AddRequest(dnsNames[0], dnsNames[1]) {
+					err = ErrInvalidRecordBody
+					return
+				}
+			}
+		}
+		// handle special block cases
+		if hdlr != nil {
+			switch inst := hdlr.(type) {
+			case *Gns2DnsHandler:
+				// we need to handle delegation to DNS: returns a list of found
+				// resource records in DNS (filter by 'kind')
+				fqdn := strings.Join(util.ReverseStringList(names), ".") + "." + inst.Name
+				if set, err = gns.ResolveDNS(fqdn, inst.Servers, kind, pkey); err != nil {
+					return
+				}
+				records = set.Records
+			}
+		}
 	}
-	// handle block
+	// Assemble resulting resource record set
+	set = NewGNSRecordSet()
+	for _, rec := range records {
+		// is this the record type we are looking for?
+		if kind == enums.GNS_TYPE_ANY || int(rec.Type) == kind {
+			// add it to the result
+			set.AddRecord(rec)
+		}
+	}
 	return
 }
 
 // Lookup name in GNS.
-func (gns *GNSModule) Lookup(pkey *ed25519.PublicKey, label string, kind int, options int) (block *GNSBlock, err error) {
+func (gns *GNSModule) Lookup(pkey *ed25519.PublicKey, label string, remote bool) (block *GNSBlock, err error) {
 
 	// create query (lookup key)
 	query := NewQuery(pkey, label)
@@ -144,7 +304,7 @@ func (gns *GNSModule) Lookup(pkey *ed25519.PublicKey, label string, kind int, op
 	}
 	if block == nil {
 		logger.Println(logger.DBG, "[gns] local Lookup: no block found")
-		if options == enums.GNS_LO_DEFAULT {
+		if remote {
 			// get the block from a remote lookup
 			if block, err = gns.LookupRemote(query); err != nil || block == nil {
 				if err != nil {
