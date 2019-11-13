@@ -4,7 +4,8 @@ var (
 	_id = 0
 )
 
+// generate next unique identifier (unique in the running process/application)
 func NextID() int {
-	_id += 1
+	_id++
 	return _id
 }

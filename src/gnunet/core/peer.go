@@ -3,30 +3,25 @@ package core
 import (
 	"fmt"
 
-	"github.com/bfix/gospel/crypto/ed25519"
 	"gnunet/message"
 	"gnunet/util"
+
+	"github.com/bfix/gospel/crypto/ed25519"
 )
 
-/*
-type Peer interface {
-	GetID() []byte
-	GetIDString() string
-	GetAddressList() []*util.Address
-	Sign(msg []byte) ([]byte, error)
-	Verify(msg, sig []byte) bool
-}
-*/
-
+// Peer represents a node in the GNUnet P2P network.
 type Peer struct {
-	pub      *ed25519.PublicKey
-	idString string
-	addrList []*util.Address
-	prv      *ed25519.PrivateKey      // long-term signing key
+	prv      *ed25519.PrivateKey      // node private key (long-term signing key)
+	pub      *ed25519.PublicKey       // node public key (=identifier)
+	idString string                   // node identifier as string
+	addrList []*util.Address          // list of addresses associated with node
 	ephPrv   *ed25519.PrivateKey      // ephemeral signing key
 	ephMsg   *message.EphemeralKeyMsg // ephemeral signing key message
 }
 
+// NewPeer instantiates a new peer object from given data. If a local peer
+// is created, the data is the seed for generating the private key of the node;
+// for a remote peer the data is the binary representation of its public key.
 func NewPeer(data []byte, local bool) (p *Peer, err error) {
 	p = new(Peer)
 	if local {
@@ -45,42 +40,52 @@ func NewPeer(data []byte, local bool) (p *Peer, err error) {
 	return
 }
 
+// EphKeyMsg returns a new initialized message to negotiate session keys.
 func (p *Peer) EphKeyMsg() *message.EphemeralKeyMsg {
 	return p.ephMsg
 }
 
+// SetEphKeyMsg saves a template for new key negotiation messages.
 func (p *Peer) SetEphKeyMsg(msg *message.EphemeralKeyMsg) {
 	p.ephMsg = msg
 }
 
+// EphPrvKey returns the current ephemeral private key.
 func (p *Peer) EphPrvKey() *ed25519.PrivateKey {
 	return p.ephPrv
 }
 
+// PrvKey return the private key of the node.
 func (p *Peer) PrvKey() *ed25519.PrivateKey {
 	return p.prv
 }
 
+// PubKey return the public key of the node.
 func (p *Peer) PubKey() *ed25519.PublicKey {
 	return p.pub
 }
 
+// GetID returns the node ID (public key) in binary format
 func (p *Peer) GetID() []byte {
 	return p.pub.Bytes()
 }
 
+// GetIDString returns the string representation of the public key of the node.
 func (p *Peer) GetIDString() string {
 	return p.idString
 }
 
+// GetAddressList returns a list of addresses associated with this peer.
 func (p *Peer) GetAddressList() []*util.Address {
 	return p.addrList
 }
 
+// AddAddress adds a new address for a node.
 func (p *Peer) AddAddress(a *util.Address) {
 	p.addrList = append(p.addrList, a)
 }
 
+// Sign a message with the (long-term) private key.
 func (p *Peer) Sign(msg []byte) (*ed25519.EdSignature, error) {
 	if p.prv == nil {
 		return nil, fmt.Errorf("No private key")
@@ -88,6 +93,7 @@ func (p *Peer) Sign(msg []byte) (*ed25519.EdSignature, error) {
 	return p.prv.EdSign(msg)
 }
 
+// Verify a message signature with the public key of a peer.
 func (p *Peer) Verify(msg []byte, sig *ed25519.EdSignature) (bool, error) {
 	return p.pub.EdVerify(msg, sig)
 }

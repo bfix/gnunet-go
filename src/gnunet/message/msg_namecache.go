@@ -33,7 +33,7 @@ func NewNamecacheLookupMsg(query *crypto.HashCode) *NamecacheLookupMsg {
 	}
 }
 
-// String
+// String returns a human-readable representation of the message.
 func (m *NamecacheLookupMsg) String() string {
 	return fmt.Sprintf("NamecacheLookupMsg{Id=%d,Query=%s}",
 		m.Id, hex.EncodeToString(m.Query.Bits))
@@ -72,7 +72,7 @@ func NewNamecacheLookupResultMsg() *NamecacheLookupResultMsg {
 	}
 }
 
-// String
+// String returns a human-readable representation of the message.
 func (m *NamecacheLookupResultMsg) String() string {
 	return fmt.Sprintf("NamecacheLookupResultMsg{id=%d,expire=%s}",
 		m.Id, m.Expire)

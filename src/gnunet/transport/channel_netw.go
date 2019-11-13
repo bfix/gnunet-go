@@ -14,11 +14,12 @@ import (
 
 // NetworkChannel
 type NetworkChannel struct {
-	network string
-	conn    net.Conn
+	network string   // network protocol identifier ("tcp", "unix", ...)
+	conn    net.Conn // associated connection
 }
 
-// NewNetworkChannel
+// NewNetworkChannel creates a new channel for a given network protocol.
+// The channel is in pending state and need to be opened before use.
 func NewNetworkChannel(netw string) Channel {
 	return &NetworkChannel{
 		network: netw,
@@ -26,7 +27,11 @@ func NewNetworkChannel(netw string) Channel {
 	}
 }
 
-// Open
+// Open a network channel based on specification:
+// The specification is a string separated into parts by the '+' delimiter
+// (e.g. "unix+/tmp/gnunet-service-gns-go.sock+perm=0770"). The network
+// identifier (first part) must match the network specification of the
+// underlaying NetworkChannel instance.
 func (c *NetworkChannel) Open(spec string) (err error) {
 	parts := strings.Split(spec, "+")
 	// check for correct protocol
@@ -38,7 +43,7 @@ func (c *NetworkChannel) Open(spec string) (err error) {
 	return
 }
 
-// Close
+// Close a network channel
 func (c *NetworkChannel) Close() error {
 	if c.conn != nil {
 		return c.conn.Close()
@@ -46,7 +51,8 @@ func (c *NetworkChannel) Close() error {
 	return ErrChannelNotOpened
 }
 
-// Read
+// Read bytes from a network channel into buffer: Returns the number of read
+// bytes and an error code. Only works on open channels ;)
 func (c *NetworkChannel) Read(buf []byte) (int, error) {
 	if c.conn == nil {
 		return 0, ErrChannelNotOpened
@@ -54,7 +60,8 @@ func (c *NetworkChannel) Read(buf []byte) (int, error) {
 	return c.conn.Read(buf)
 }
 
-// Write
+// Write buffer to a network channel: Returns the number of written bytes and
+// an error code.
 func (c *NetworkChannel) Write(buf []byte) (int, error) {
 	if c.conn == nil {
 		return 0, ErrChannelNotOpened
@@ -67,8 +74,8 @@ func (c *NetworkChannel) Write(buf []byte) (int, error) {
 
 // NetworkChannelServer
 type NetworkChannelServer struct {
-	network  string
-	listener net.Listener
+	network  string       // network protocol to listen on
+	listener net.Listener // reference to listener object
 }
 
 // NewNetworkChannelServer
@@ -79,7 +86,9 @@ func NewNetworkChannelServer(netw string) ChannelServer {
 	}
 }
 
-// Open
+// Open a network channel server (= start running it) based on the given
+// specification. For every client connection to the server, the associated
+// network channel for the connection is send via the hdlr channel.
 func (s *NetworkChannelServer) Open(spec string, hdlr chan<- Channel) (err error) {
 	parts := strings.Split(spec, "+")
 	// check for correct protocol
@@ -136,7 +145,7 @@ func (s *NetworkChannelServer) Open(spec string, hdlr chan<- Channel) (err error
 	return nil
 }
 
-// Close
+// Close a network channel server (= stop the server)
 func (s *NetworkChannelServer) Close() error {
 	if s.listener != nil {
 		err := s.listener.Close()
@@ -147,27 +156,35 @@ func (s *NetworkChannelServer) Close() error {
 }
 
 ////////////////////////////////////////////////////////////////////////
+// helper functions to instantiate network channels and servers for
+// common network protocols
 
+// NewSocketChannel: Unix Domain Socket connection
 func NewSocketChannel() Channel {
 	return NewNetworkChannel("unix")
 }
 
+// NewTCPChannel: TCP connection
 func NewTCPChannel() Channel {
 	return NewNetworkChannel("tcp")
 }
 
+// NewUDPChannel: UDP connection
 func NewUDPChannel() Channel {
 	return NewNetworkChannel("udp")
 }
 
+// NewSocketChannelServer: Unix Domain Socket listener
 func NewSocketChannelServer() ChannelServer {
 	return NewNetworkChannelServer("unix")
 }
 
+// NewTCPChannelServer: TCP listener
 func NewTCPChannelServer() ChannelServer {
 	return NewNetworkChannelServer("tcp")
 }
 
+// NewUDPChannelServer: UDP listener
 func NewUDPChannelServer() ChannelServer {
 	return NewNetworkChannelServer("udp")
 }

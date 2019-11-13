@@ -11,6 +11,7 @@ import (
 	"gnunet/message"
 )
 
+// Error codes
 var (
 	ErrChannelNotImplemented = fmt.Errorf("Protocol not implemented")
 	ErrChannelNotOpened      = fmt.Errorf("Channel not opened")

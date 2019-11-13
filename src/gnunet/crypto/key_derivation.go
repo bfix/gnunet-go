@@ -9,6 +9,7 @@ import (
 	"golang.org/x/crypto/hkdf"
 )
 
+// Curve parameters
 var (
 	ED25519_N = ed25519.GetCurve().N
 )

@@ -5,21 +5,25 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/bfix/gospel/crypto/ed25519"
-	"github.com/bfix/gospel/data"
+	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/util"
+
+	"github.com/bfix/gospel/crypto/ed25519"
+	"github.com/bfix/gospel/data"
 )
 
+// EphKeyBlock defines the layout of signed ephemeral key with attributes.
 type EphKeyBlock struct {
-	SignSize     uint32            `order:"big"` // length of signed block
-	SigPurpose   uint32            `order:"big"` // signature purpose: SIG_ECC_KEY
-	CreateTime   util.AbsoluteTime // Time of key creation
-	ExpireTime   util.RelativeTime // Time to live for key
-	EphemeralKey []byte            `size:"32"` // Ephemeral EdDSA public key
-	PeerID       *util.PeerID      // Peer identity (EdDSA public key)
+	Purpose      *crypto.SignaturePurpose // signature purpose: SIG_ECC_KEY
+	CreateTime   util.AbsoluteTime        // Time of key creation
+	ExpireTime   util.RelativeTime        // Time to live for key
+	EphemeralKey []byte                   `size:"32"` // Ephemeral EdDSA public key
+	PeerID       *util.PeerID             // Peer identity (EdDSA public key)
 }
 
+// EphemeralKeyMsg announces a new transient key for a peer. The key is signed
+// by the issuing peer.
 type EphemeralKeyMsg struct {
 	MsgSize      uint16 `order:"big"` // total size of message
 	MsgType      uint16 `order:"big"` // CORE_EPHEMERAL_KEY (88)
@@ -28,6 +32,7 @@ type EphemeralKeyMsg struct {
 	SignedBlock  *EphKeyBlock
 }
 
+// NewEphemeralKeyMsg creates an empty message for key announcement.
 func NewEphemeralKeyMsg() *EphemeralKeyMsg {
 	return &EphemeralKeyMsg{
 		MsgSize:      160,
@@ -35,8 +40,10 @@ func NewEphemeralKeyMsg() *EphemeralKeyMsg {
 		SenderStatus: 1,
 		Signature:    make([]byte, 64),
 		SignedBlock: &EphKeyBlock{
-			SignSize:     88,
-			SigPurpose:   enums.SIG_ECC_KEY,
+			Purpose: &crypto.SignaturePurpose{
+				Size:    88,
+				Purpose: enums.SIG_ECC_KEY,
+			},
 			CreateTime:   util.AbsoluteTimeNow(),
 			ExpireTime:   util.NewRelativeTime(12 * time.Hour),
 			EphemeralKey: make([]byte, 32),
@@ -45,6 +52,7 @@ func NewEphemeralKeyMsg() *EphemeralKeyMsg {
 	}
 }
 
+// String returns a human-readable representation of the message.
 func (m *EphemeralKeyMsg) String() string {
 	return fmt.Sprintf("EphKeyMsg{peer=%s,ephkey=%s,create=%s,expire=%s,status=%d}",
 		util.EncodeBinaryToString(m.SignedBlock.PeerID.Key),
@@ -58,10 +66,13 @@ func (msg *EphemeralKeyMsg) Header() *MessageHeader {
 	return &MessageHeader{msg.MsgSize, msg.MsgType}
 }
 
+// Public extracts the public key of an announcing peer.
 func (m *EphemeralKeyMsg) Public() *ed25519.PublicKey {
 	return ed25519.NewPublicKeyFromBytes(m.SignedBlock.PeerID.Key)
 }
 
+// Verify the integrity of the message data using the public key of the
+// announcing peer.
 func (m *EphemeralKeyMsg) Verify(pub *ed25519.PublicKey) (bool, error) {
 	data, err := data.Marshal(m.SignedBlock)
 	if err != nil {
@@ -74,6 +85,8 @@ func (m *EphemeralKeyMsg) Verify(pub *ed25519.PublicKey) (bool, error) {
 	return pub.EdVerify(data, sig)
 }
 
+// NewEphemeralKey creates a new ephemeral key signed by a long-term private
+// key and the corresponding GNUnet message to announce the new key.
 func NewEphemeralKey(peerId []byte, ltPrv *ed25519.PrivateKey) (*ed25519.PrivateKey, *EphemeralKeyMsg, error) {
 	msg := NewEphemeralKeyMsg()
 	copy(msg.SignedBlock.PeerID.Key, peerId)

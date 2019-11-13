@@ -51,6 +51,7 @@ func (m *DHTClientGetMsg) SetXQuery(xq []byte) []byte {
 	return prev
 }
 
+// String returns a human-readable representation of the message.
 func (m *DHTClientGetMsg) String() string {
 	return fmt.Sprintf("DHTClientGetMsg{Id:%d,Type=%d,Options=%d,Repl=%d,Key=%s}",
 		m.Id, m.Type, m.Options, m.ReplLevel, hex.EncodeToString(m.Key.Bits))
@@ -98,6 +99,7 @@ func NewDHTClientResultMsg(key *crypto.HashCode) *DHTClientResultMsg {
 	}
 }
 
+// String returns a human-readable representation of the message.
 func (m *DHTClientResultMsg) String() string {
 	return fmt.Sprintf("DHTClientResultMsg{id:%d,expire=%s}", m.Id, m.Expire)
 }

@@ -1,9 +1,10 @@
 package service
 
 import (
-	"github.com/bfix/gospel/logger"
 	"gnunet/message"
 	"gnunet/transport"
+
+	"github.com/bfix/gospel/logger"
 )
 
 // Client

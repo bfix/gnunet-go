@@ -3,9 +3,10 @@ package message
 import (
 	"fmt"
 
-	"github.com/bfix/gospel/logger"
 	"gnunet/enums"
 	"gnunet/util"
+
+	"github.com/bfix/gospel/logger"
 )
 
 //----------------------------------------------------------------------
@@ -38,13 +39,13 @@ func NewGNSLookupMsg() *GNSLookupMsg {
 	}
 }
 
-// SetName
+// SetName appends the name to lookup to the message
 func (m *GNSLookupMsg) SetName(name string) {
 	m.Name = util.Clone(append([]byte(name), 0))
 	m.MsgSize = uint16(48 + len(m.Name))
 }
 
-// GetName
+// GetName returns the name to lookup from the message
 func (m *GNSLookupMsg) GetName() string {
 	size := len(m.Name)
 	if m.Name[size-1] != 0 {
@@ -55,7 +56,7 @@ func (m *GNSLookupMsg) GetName() string {
 	return string(m.Name[:size])
 }
 
-// String
+// String returns a human-readable representation of the message.
 func (m *GNSLookupMsg) String() string {
 	return fmt.Sprintf(
 		"GNSLookupMsg{Id=%d,Zone=%s,Options=%d,Type=%d,Name=%s}",
@@ -72,6 +73,8 @@ func (msg *GNSLookupMsg) Header() *MessageHeader {
 // GNS_LOOKUP_RESULT
 //----------------------------------------------------------------------
 
+// GNSResourceRecord is the GNUnet-specific representation of resource
+// records (not to be confused with DNS resource records).
 type GNSResourceRecord struct {
 	Expires util.AbsoluteTime // Expiration time for the record
 	Size    uint32            `order:"big"` // Number of bytes in 'Data'
@@ -80,6 +83,7 @@ type GNSResourceRecord struct {
 	Data    []byte            `size:"Size"` // Record data
 }
 
+// String returns a human-readable representation of the message.
 func (r *GNSResourceRecord) String() string {
 	return fmt.Sprintf("GNSResourceRecord{type=%s,expire=%s,flags=%d,size=%d}",
 		enums.GNS_TYPE[int(r.Type)], r.Expires, r.Flags, r.Size)
@@ -105,7 +109,7 @@ func NewGNSLookupResultMsg(id uint32) *GNSLookupResultMsg {
 	}
 }
 
-// AddRecord
+// AddRecord adds a GNS resource recordto the response message.
 func (m *GNSLookupResultMsg) AddRecord(rec *GNSResourceRecord) error {
 	recSize := 20 + int(rec.Size)
 	if int(m.MsgSize)+recSize > enums.GNS_MAX_BLOCK_SIZE {
@@ -117,7 +121,7 @@ func (m *GNSLookupResultMsg) AddRecord(rec *GNSResourceRecord) error {
 	return nil
 }
 
-// String
+// String returns a human-readable representation of the message.
 func (m *GNSLookupResultMsg) String() string {
 	return fmt.Sprintf("GNSLookupResultMsg{Id=%d,Count=%d}", m.Id, m.Count)
 }

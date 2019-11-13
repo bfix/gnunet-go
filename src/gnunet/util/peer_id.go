@@ -1,9 +1,11 @@
 package util
 
+// PeerID is the 32-byte binary representation od a Ed25519 key
 type PeerID struct {
 	Key []byte `size:"32"`
 }
 
+// NewPeerID creates a new object from the data.
 func NewPeerID(data []byte) *PeerID {
 	if data == nil {
 		data = make([]byte, 32)
@@ -22,6 +24,7 @@ func NewPeerID(data []byte) *PeerID {
 	}
 }
 
+// String returns a human-readable representation of a peer id.
 func (p *PeerID) String() string {
 	return EncodeBinaryToString(p.Key)
 }

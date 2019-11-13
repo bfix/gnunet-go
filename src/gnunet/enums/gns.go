@@ -1,5 +1,6 @@
 package enums
 
+// GNS constants
 var (
 	GNS_MAX_BLOCK_SIZE = (63 * 1024) // Maximum size of a value that can be stored in a GNS block.
 

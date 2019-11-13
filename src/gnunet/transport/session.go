@@ -1,7 +1,6 @@
 package transport
 
-import ()
-
+// Session states
 const (
 	KX_STATE_DOWN         = iota // No handshake yet.
 	KX_STATE_KEY_SENT            // We've sent our session key.

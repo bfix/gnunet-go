@@ -7,9 +7,10 @@ import (
 	"regexp"
 	"strings"
 
+	"gnunet/util"
+
 	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/logger"
-	"gnunet/util"
 )
 
 ///////////////////////////////////////////////////////////////////////
@@ -64,6 +65,7 @@ type Config struct {
 }
 
 var (
+	// Cfg is the global configuration
 	Cfg *Config
 )
 
@@ -88,6 +90,8 @@ var (
 	rx = regexp.MustCompile("\\$\\{([^\\}]*)\\}")
 )
 
+// substString is a helper function to substitute environment variables
+// with actual values.
 func substString(s string, env map[string]string) string {
 	matches := rx.FindAllStringSubmatch(s, -1)
 	for _, m := range matches {
@@ -102,7 +106,8 @@ func substString(s string, env map[string]string) string {
 	return s
 }
 
-// applySubstitutions
+// applySubstitutions traverses the configuration data structure
+// and applies string substitutions to all string values.
 func applySubstitutions(x interface{}, env map[string]string) {
 
 	var process func(v reflect.Value)
@@ -140,10 +145,11 @@ func applySubstitutions(x interface{}, env map[string]string) {
 			}
 		}
 	}
-
+	// start processing at the top-level structure
 	v := reflect.ValueOf(x)
 	switch v.Kind() {
 	case reflect.Ptr:
+		// indirect top-level
 		e := v.Elem()
 		if e.IsValid() {
 			process(e)
@@ -151,6 +157,7 @@ func applySubstitutions(x interface{}, env map[string]string) {
 			logger.Printf(logger.ERROR, "[config] 'nil' pointer encountered")
 		}
 	case reflect.Struct:
+		// direct top-level
 		process(v)
 	}
 }

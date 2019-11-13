@@ -3,8 +3,9 @@ package service
 import (
 	"fmt"
 
-	"github.com/bfix/gospel/logger"
 	"gnunet/transport"
+
+	"github.com/bfix/gospel/logger"
 )
 
 // Service is an interface for GNUnet services. Every service has one channel

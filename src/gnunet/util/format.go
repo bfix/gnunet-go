@@ -1,22 +1,13 @@
 package util
 
 import (
-	"encoding/hex"
 	"fmt"
-	"net"
 )
-
-func AddressString(transport string, addr []byte) string {
-	if transport == "tcp" || transport == "udp" {
-		alen := len(addr)
-		port := uint(addr[alen-2])*256 + uint(addr[alen-1])
-		return fmt.Sprintf("%s:%s:%d", transport, net.IP(addr[:alen-2]).String(), port)
-	}
-	return fmt.Sprintf("%s:%s", transport, hex.EncodeToString(addr))
-}
 
 var scale = " kMGTPEO"
 
+// Scale1024 returns an integer value (e.g. a size) as a human-readable
+// string with scales: a size of 183467245 would result in "174,967M"
 func Scale1024(n uint64) string {
 	v := float64(n)
 	var i int
