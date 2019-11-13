@@ -63,7 +63,7 @@ func queryDNS(id int, name string, server net.IP, kind RRTypeList, res chan *GNS
 	}
 	m.Question[0] = dns.Question{
 		dns.Fqdn(name),
-		dns.TypeANY, // TODO: replace with 'kind' values
+		dns.TypeANY,
 		dns.ClassINET,
 	}
 
@@ -91,27 +91,30 @@ func queryDNS(id int, name string, server net.IP, kind RRTypeList, res chan *GNS
 		}
 		set := NewGNSRecordSet()
 		for _, record := range in.Answer {
-			// create a new GNS resource record
-			rr := new(message.GNSResourceRecord)
-			rr.Expires = util.AbsoluteTimeNever()
-			rr.Flags = 0
-			rr.Type = uint32(record.Header().Rrtype)
-			rr.Size = uint32(record.Header().Rdlength)
-			rr.Data = make([]byte, rr.Size)
+			// check if answer record is of requested type
+			if kind.HasType(int(record.Header().Rrtype)) {
+				// create a new GNS resource record
+				rr := new(message.GNSResourceRecord)
+				rr.Expires = util.AbsoluteTimeNever()
+				rr.Flags = 0
+				rr.Type = uint32(record.Header().Rrtype)
+				rr.Size = uint32(record.Header().Rdlength)
+				rr.Data = make([]byte, rr.Size)
 
-			// get wire-format of resource record
-			buf := make([]byte, 2048)
-			n, err := dns.PackRR(record, buf, 0, nil, false)
-			if err != nil {
-				logger.Printf(logger.WARN, "[dns][%d] Failed to get RR data for %s\n", id, err.Error())
-				continue
+				// get wire-format of resource record
+				buf := make([]byte, 2048)
+				n, err := dns.PackRR(record, buf, 0, nil, false)
+				if err != nil {
+					logger.Printf(logger.WARN, "[dns][%d] Failed to get RR data for %s\n", id, err.Error())
+					continue
+				}
+				if n < int(rr.Size) {
+					logger.Printf(logger.WARN, "[dns][%d] Nit enough data in RR (%d != %d)\n", id, n, rr.Size)
+					continue
+				}
+				copy(rr.Data, buf[n-int(rr.Size):])
+				set.AddRecord(rr)
 			}
-			if n < int(rr.Size) {
-				logger.Printf(logger.WARN, "[dns][%d] Nit enough data in RR (%d != %d)\n", id, n, rr.Size)
-				continue
-			}
-			copy(rr.Data, buf[n-int(rr.Size):])
-			set.AddRecord(rr)
 		}
 		logger.Printf(logger.WARN, "[dns][%d] %d resource records extracted from response (%d/5).\n", id, set.Count, retry+1)
 		res <- set
@@ -159,6 +162,7 @@ func (gns *GNSModule) ResolveDNS(name string, servers []string, kind RRTypeList,
 				switch int(rec.Type) {
 				case enums.GNS_TYPE_DNS_AAAA:
 					addr = net.IP(rec.Data)
+					// we prefer IPv6
 					break rec_loop
 				case enums.GNS_TYPE_DNS_A:
 					addr = net.IP(rec.Data)
