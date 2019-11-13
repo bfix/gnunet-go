@@ -55,82 +55,35 @@ func NewQuery(pkey *ed25519.PublicKey, label string) *Query {
 }
 
 //----------------------------------------------------------------------
-// GNS blocks with special types (PKEY, GNS2DNS) require special
-// treatment with respect to other resource records with different types
-// in the same block. Usually only certain other types (or not at all)
-// are allowed and the allowed ones are required to deliver a consistent
-// list of resulting resource records passed back to the caller.
-//----------------------------------------------------------------------
-
-// BlockHandler interface.
-type BlockHandler interface {
-	// TypeAction returns a flag indicating how a resource record of a
-	// given type is to be treated:
-	//   = -1: Record is not allowed (terminates lookup with an error)
-	//   =  0: Record is allowed but will be ignored
-	//   =  1: Record is allowed and will be processed
-	TypeAction(int) int
-}
-
-// Gns2DnsHandler implementing the BlockHandler interface
-type Gns2DnsHandler struct {
-	Name    string
-	Servers []string
-}
-
-// NewGns2DnsHandler returns a new BlockHandler instance
-func NewGns2DnsHandler() *Gns2DnsHandler {
-	return &Gns2DnsHandler{
-		Name:    "",
-		Servers: make([]string, 0),
-	}
-}
-
-// TypeAction return a flag indicating how a resource record of a given type
-// is to be treated (see RecordMaster interface)
-func (m *Gns2DnsHandler) TypeAction(t int) int {
-	// only process other GNS2DNS records
-	if t == enums.GNS_TYPE_GNS2DNS {
-		return 1
-	}
-	// skip everything else
-	return 0
-}
-
-// AddRequest adds the DNS request for "name" at "server" to the list
-// of requests. All GNS2DNS records must query for the same name
-func (m *Gns2DnsHandler) AddRequest(name, server string) bool {
-	if len(m.Servers) == 0 {
-		m.Name = name
-	}
-	if name != m.Name {
-		return false
-	}
-	m.Servers = append(m.Servers, server)
-	return true
-}
-
-//----------------------------------------------------------------------
 // The GNS module (recursively) resolves GNS names:
-// Resolves DNS-like names (e.g. "minecraft.servers.bob.games") to the
-// requested resource records (RRs). In short, the resolution process
-// works as follows:
+// Resolves DNS-like names (e.g. "minecraft.servers.bob.games"; a name is
+// a list of labels with '.' as separator) to the requested resource
+// records (RRs). In short, the resolution process works as follows:
 //
 //  Resolve(name):
 //  --------------
-//  (1) split the full name into elements in reverse order: names[]
-//  (2) Resolve first element (root zone, right-most name part, name[0]) to
+//  (1) split the name ('.' as separator) into labels in reverse order: labels[]
+//  (2) Resolve first label (= root zone, right-most name part, labels[0]) to
 //      a zone public key PKEY:
-//      (a) the name is a string representation of a public key -> (3)
-//      (b) the zone key for the name is stored in the config file -> (3)
-//      (c) a local zone with that given name -> (3)
+//      (a) the label is a string representation of a public key -> (3)
+//      (b) the zone key for the label is stored in the config file -> (3)
+//      (c) a local zone with that given label -> (3)
 //      (d) ERROR: "Unknown root zone"
-//  (3) names = names[1:] // remove first element
-//      block = Lookup (PKEY, names[0]):
-//      (a) If last element of namess: -> (4)
-//      (b) block is PKEY record:
-//          PKEY <- block, --> (3)
-//  (4) return block: it is the responsibility of the caller to assemble
+//  (3) labels = labels[1:]
+//      records = Resolve (labels[0], PKEY)
+//      If last label in name: -> (5)
+//  (4) for all rec in records:
+//          (b) if rec is a PKEY record:
+//                  PKEY <- record, --> (3)
+//          (c) if rec is a GNS2DNS record:
+//                  delegate to DNS to resolve rest of name -> (5)
+//          (d) if rec is BOX record:
+//                  if rest of name is pattern "_service._proto" and matches
+//                  the values in the BOX:
+//                      Replace records with resource record from BOX -> (5)
+//      resolution failed: name not completely processed and no zone available
+//
+//  (5) return records: it is the responsibility of the caller to assemble
 //      the desired result from block data (e.g. filter for requested
 //      resource record types).
 //----------------------------------------------------------------------
@@ -145,10 +98,10 @@ type GNSModule struct {
 	GetLocalZone func(name string) (*ed25519.PublicKey, error)
 }
 
-// Resolve a GNS name with multiple elements, If pkey is not nil, the name
+// Resolve a GNS name with multiple labels. If pkey is not nil, the name
 // is interpreted as "relative to current zone".
-func (gns *GNSModule) Resolve(path string, pkey *ed25519.PublicKey, kind int, mode int) (set *GNSRecordSet, err error) {
-	// get the name elements in reverse order
+func (gns *GNSModule) Resolve(path string, pkey *ed25519.PublicKey, kind RRTypeList, mode int) (set *GNSRecordSet, err error) {
+	// get the labels in reverse order
 	names := util.ReverseStringList(strings.Split(path, "."))
 	logger.Printf(logger.DBG, "[gns] Resolver called for %v\n", names)
 
@@ -161,8 +114,8 @@ func (gns *GNSModule) Resolve(path string, pkey *ed25519.PublicKey, kind int, mo
 	return gns.ResolveAbsolute(names, kind, mode)
 }
 
-// Resolve a fully qualified GNS absolute name (with multiple levels).
-func (gns *GNSModule) ResolveAbsolute(names []string, kind int, mode int) (set *GNSRecordSet, err error) {
+// Resolve a fully qualified GNS absolute name (with multiple labels).
+func (gns *GNSModule) ResolveAbsolute(names []string, kind RRTypeList, mode int) (set *GNSRecordSet, err error) {
 	// get the root zone key for the TLD
 	var (
 		pkey *ed25519.PublicKey
@@ -194,7 +147,7 @@ func (gns *GNSModule) ResolveAbsolute(names []string, kind int, mode int) (set *
 
 // Resolve relative path (to a given zone) recursively by processing simple
 // (PKEY,Label) lookups in sequence and handle intermediate GNS record types
-func (gns *GNSModule) ResolveRelative(names []string, pkey *ed25519.PublicKey, kind int, mode int) (set *GNSRecordSet, err error) {
+func (gns *GNSModule) ResolveRelative(names []string, pkey *ed25519.PublicKey, kind RRTypeList, mode int) (set *GNSRecordSet, err error) {
 	// Process all names in sequence
 	var records []*message.GNSResourceRecord
 name_loop:
@@ -213,10 +166,10 @@ name_loop:
 		}
 		// post-process block by inspecting contained resource records for
 		// special GNS types
-		var hdlr BlockHandler
 		if records, err = block.Records(); err != nil {
 			return
 		}
+		var hdlr BlockHandler
 		for _, rec := range records {
 			// let a block handler decide how to handle records
 			if hdlr != nil {
@@ -236,13 +189,15 @@ name_loop:
 			//----------------------------------------------------------
 			case enums.GNS_TYPE_PKEY:
 				// check for single RR and sane key data
-				if len(rec.Data) != 32 || len(records) > 1 {
+				if len(rec.Data) != 32 && hdlr != nil {
 					err = ErrInvalidPKEY
 					return
 				}
-				// set new PKEY and continue resolution
-				pkey = ed25519.NewPublicKeyFromBytes(rec.Data)
-				continue name_loop
+				// set a PKEY handler
+				inst := NewPkeyHandler()
+				inst.pkey = ed25519.NewPublicKeyFromBytes(rec.Data)
+				hdlr = inst
+				continue
 
 			//----------------------------------------------------------
 			case enums.GNS_TYPE_GNS2DNS:
@@ -282,12 +237,27 @@ name_loop:
 		// handle special block cases
 		if hdlr != nil {
 			switch inst := hdlr.(type) {
+
+			//----------------------------------------------------------
+			// Post-process PKEY
+			case *PkeyHandler:
+				// PKEY must be sole record in block
+				if len(records) > 1 {
+					logger.Println(logger.ERROR, "[gns] PKEY with other records not allowed.")
+					return nil, ErrInvalidPKEY
+				}
+				// set new zone and continue
+				pkey = inst.pkey
+				continue name_loop
+
+			//----------------------------------------------------------
+			// Post-process GNS2DNS
 			case *Gns2DnsHandler:
 				// we need to handle delegation to DNS: returns a list of found
 				// resource records in DNS (filter by 'kind')
 				fqdn := strings.Join(util.ReverseStringList(names[1:]), ".") + "." + inst.Name
 				if set, err = gns.ResolveDNS(fqdn, inst.Servers, kind, pkey); err != nil {
-					logger.Println(logger.ERROR, "[gns] GNS2DNS resilution failed.")
+					logger.Println(logger.ERROR, "[gns] GNS2DNS resolution failed.")
 					return
 				}
 				// we are done with resolution; pass on records to caller
@@ -296,11 +266,11 @@ name_loop:
 			}
 		}
 	}
-	// Assemble resulting resource record set
+	// Assemble resulting resource record set by filtering for requested types.
 	set = NewGNSRecordSet()
 	for _, rec := range records {
 		// is this the record type we are looking for?
-		if kind == enums.GNS_TYPE_ANY || int(rec.Type) == kind {
+		if kind.HasType(int(rec.Type)) {
 			// add it to the result
 			set.AddRecord(rec)
 		}

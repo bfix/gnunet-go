@@ -4,9 +4,6 @@ import (
 	"encoding/hex"
 	"io"
 
-	"github.com/bfix/gospel/crypto/ed25519"
-	"github.com/bfix/gospel/data"
-	"github.com/bfix/gospel/logger"
 	"gnunet/config"
 	"gnunet/crypto"
 	"gnunet/enums"
@@ -14,6 +11,10 @@ import (
 	"gnunet/service"
 	"gnunet/transport"
 	"gnunet/util"
+
+	"github.com/bfix/gospel/crypto/ed25519"
+	"github.com/bfix/gospel/data"
+	"github.com/bfix/gospel/logger"
 )
 
 //----------------------------------------------------------------------
@@ -77,7 +78,8 @@ func (s *GNSService) ServeClient(mc *transport.MsgChannel) {
 			//       access to the message channel to send responses)
 			pkey := ed25519.NewPublicKeyFromBytes(m.Zone)
 			label := m.GetName()
-			recset, err := s.Resolve(label, pkey, int(m.Type), int(m.Options))
+			kind := NewRRTypeList(int(m.Type))
+			recset, err := s.Resolve(label, pkey, kind, int(m.Options))
 			if err != nil {
 				logger.Printf(logger.ERROR, "[gns] Failed to lookup block: %s\n", err.Error())
 				break
