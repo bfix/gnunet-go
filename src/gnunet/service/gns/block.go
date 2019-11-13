@@ -1,6 +1,7 @@
 package gns
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"gnunet/crypto"
@@ -164,6 +165,82 @@ type BlockHandler interface {
 	//   =  0: Record is allowed but will be ignored
 	//   =  1: Record is allowed and will be processed
 	TypeAction(int) int
+
+	// Post-process a record: handler can modify/replace a resource
+	// record based on their own logic (e.g. BOX)
+	PostProcess(*message.GNSResourceRecord) *message.GNSResourceRecord
+}
+
+//----------------------------------------------------------------------
+// Manage list of block handlers
+// Under normal circumstances there is only one (or none) block handler
+// per block, but future constructs may allow multiple block handlers
+// to be present. The block handler list implements the BlockHandler
+// interface.
+//----------------------------------------------------------------------
+
+// BlockHandlerList is a list of block handlers instantiated.
+type BlockHandlerList struct {
+	list map[string]BlockHandler
+	keys []string
+}
+
+// NewBlockHandlerList instantiates an empty list of block handlers.
+func NewBlockHandlerList() *BlockHandlerList {
+	return &BlockHandlerList{
+		list: make(map[string]BlockHandler),
+		keys: make([]string, 0),
+	}
+}
+
+// GetHandler returns a BlockHandler for the given key. If no block handler exists
+// under the given name, a new one is created and stored in the list. The type of
+// the new block handler is derived from the key value.
+func (hl *BlockHandlerList) GetHandler(key string) (hdlr BlockHandler) {
+	// return handler for given key if it exists
+	var ok bool
+	if hdlr, ok = hl.list[key]; ok {
+		return
+	}
+	// create a new one
+	switch key {
+	case "pkey":
+		hdlr = NewPkeyHandler()
+	case "gns2dns":
+		hdlr = NewGns2DnsHandler()
+	case "box":
+		hdlr = NewBoxHandler()
+	}
+	hl.list[key] = hdlr
+	return hdlr
+}
+
+// TypeAction of the handler list: If any active block handler...
+// * ... rejects a record, it gets finally rejected.
+// * ... ignores a record, it will be ignored if no other handler rejects it.
+func (hl *BlockHandlerList) TypeAction(t int) int {
+	rc := 1
+	for _, hdlr := range hl.list {
+		switch hdlr.TypeAction(t) {
+		case -1:
+			return -1
+		case 0:
+			rc = 0
+		}
+	}
+	return rc
+}
+
+// PostProcess a record
+func (hl *BlockHandlerList) PostProcess(rec *message.GNSResourceRecord) *message.GNSResourceRecord {
+	// Post-process the record through all handlers. Usually no two handlers
+	// post-process the same record, but it is not possible to do so. The
+	// sequence of post-processing is determined by the sequence
+	for _, key := range hl.keys {
+		hdlr := hl.list[key]
+		rec = hdlr.PostProcess(rec)
+	}
+	return rec
 }
 
 //----------------------------------------------------------------------
@@ -184,9 +261,15 @@ func NewPkeyHandler() *PkeyHandler {
 
 // TypeAction return a flag indicating how a resource record of a given type
 // is to be treated (see BlockHandler interface)
-func (m *PkeyHandler) TypeAction(t int) int {
+func (h *PkeyHandler) TypeAction(t int) int {
 	// everything else is not allowed
 	return -1
+}
+
+// PostProcess a record
+func (h *PkeyHandler) PostProcess(rec *message.GNSResourceRecord) *message.GNSResourceRecord {
+	// no post-processing required
+	return rec
 }
 
 //----------------------------------------------------------------------
@@ -208,8 +291,8 @@ func NewGns2DnsHandler() *Gns2DnsHandler {
 }
 
 // TypeAction return a flag indicating how a resource record of a given type
-// is to be treated (see RecordMaster interface)
-func (m *Gns2DnsHandler) TypeAction(t int) int {
+// is to be treated (see BlockHandler interface)
+func (h *Gns2DnsHandler) TypeAction(t int) int {
 	// only process other GNS2DNS records
 	if t == enums.GNS_TYPE_GNS2DNS {
 		return 1
@@ -218,21 +301,75 @@ func (m *Gns2DnsHandler) TypeAction(t int) int {
 	return 0
 }
 
+// PostProcess a record
+func (h *Gns2DnsHandler) PostProcess(rec *message.GNSResourceRecord) *message.GNSResourceRecord {
+	// no post-processing required
+	return rec
+}
+
 // AddRequest adds the DNS request for "name" at "server" to the list
 // of requests. All GNS2DNS records must query for the same name
-func (m *Gns2DnsHandler) AddRequest(name, server string) bool {
-	if len(m.Servers) == 0 {
-		m.Name = name
+func (h *Gns2DnsHandler) AddRequest(name, server string) bool {
+	if len(h.Servers) == 0 {
+		h.Name = name
 	}
-	if name != m.Name {
+	if name != h.Name {
 		return false
 	}
-	m.Servers = append(m.Servers, server)
+	h.Servers = append(h.Servers, server)
 	return true
 }
 
+//----------------------------------------------------------------------
+// BOX handler
+//----------------------------------------------------------------------
+
+// BoxHandler implementing the BlockHandler interface
+type BoxHandler struct {
+	boxes map[string]*Box
+}
+
+// NewBoxHandler returns a new BlockHandler instance
+func NewBoxHandler() *BoxHandler {
+	return &BoxHandler{
+		boxes: make(map[string]*Box),
+	}
+}
+
+// TypeAction return a flag indicating how a resource record of a given type
+// is to be treated (see BlockHandler interface)
+func (h *BoxHandler) TypeAction(t int) int {
+	// process record
+	return 1
+}
+
+// PostProcess a record
+func (h *BoxHandler) PostProcess(rec *message.GNSResourceRecord) *message.GNSResourceRecord {
+	// check for boxed record
+	if int(rec.Type) == enums.GNS_TYPE_BOX {
+		// locate the BOX for the record (that has been validated before)
+		key := hex.EncodeToString(rec.Data[:8])
+		if box, ok := h.boxes[key]; ok {
+			// valid box found: assemble new resource record.
+			rr := new(message.GNSResourceRecord)
+			rr.Expires = rec.Expires
+			rr.Flags = rec.Flags
+			rr.Type = box.Type
+			rr.Size = uint32(len(box.RR))
+			rr.Data = box.RR
+			return rr
+		}
+	}
+	return rec
+}
+
+// AddBox adds the BOX instance to the handler
+func (h *BoxHandler) AddBox(box *Box) {
+	h.boxes[box.key] = box
+}
+
 //======================================================================
-// Lost of resource records types
+// List of resource records types (for GNS/DNS queries)
 //======================================================================
 
 // RRTypeList is a list of integers representing RR types.
