@@ -115,7 +115,7 @@ func (gns *GNSModule) Resolve(path string, pkey *ed25519.PublicKey, kind RRTypeL
 }
 
 // Resolve a fully qualified GNS absolute name (with multiple labels).
-func (gns *GNSModule) ResolveAbsolute(names []string, kind RRTypeList, mode int) (set *GNSRecordSet, err error) {
+func (gns *GNSModule) ResolveAbsolute(labels []string, kind RRTypeList, mode int) (set *GNSRecordSet, err error) {
 	// get the root zone key for the TLD
 	var (
 		pkey *ed25519.PublicKey
@@ -123,40 +123,43 @@ func (gns *GNSModule) ResolveAbsolute(names []string, kind RRTypeList, mode int)
 	)
 	for {
 		// (1) check if TLD is a public key string
-		if len(names[0]) == 52 {
-			if data, err = util.DecodeStringToBinary(names[0], 32); err == nil {
+		if len(labels[0]) == 52 {
+			if data, err = util.DecodeStringToBinary(labels[0], 32); err == nil {
 				if pkey = ed25519.NewPublicKeyFromBytes(data); pkey != nil {
 					break
 				}
 			}
 		}
 		// (2) check if TLD is in our local config
-		if pkey = config.Cfg.GNS.GetRootZoneKey(names[0]); pkey != nil {
+		if pkey = config.Cfg.GNS.GetRootZoneKey(labels[0]); pkey != nil {
 			break
 		}
 		// (3) check if TLD is one of our identities
-		if pkey, err = gns.GetLocalZone(names[0]); err == nil {
+		if pkey, err = gns.GetLocalZone(labels[0]); err == nil {
 			break
 		}
 		// (4) we can't resolve this TLD
 		return nil, ErrUnknownTLD
 	}
 	// continue with resolution relative to a zone.
-	return gns.ResolveRelative(names[1:], pkey, kind, mode)
+	return gns.ResolveRelative(labels[1:], pkey, kind, mode)
 }
 
 // Resolve relative path (to a given zone) recursively by processing simple
 // (PKEY,Label) lookups in sequence and handle intermediate GNS record types
-func (gns *GNSModule) ResolveRelative(names []string, pkey *ed25519.PublicKey, kind RRTypeList, mode int) (set *GNSRecordSet, err error) {
+func (gns *GNSModule) ResolveRelative(labels []string, pkey *ed25519.PublicKey, kind RRTypeList, mode int) (set *GNSRecordSet, err error) {
 	// Process all names in sequence
-	var records []*message.GNSResourceRecord
+	var (
+		records []*message.GNSResourceRecord // final resource records from resolution
+		hdlrs   *BlockHandlerList            // list of block handlers in final step
+	)
 name_loop:
-	for ; len(names) > 0; names = names[1:] {
-		logger.Printf(logger.DBG, "[gns] ResolveRelative '%s' in '%s'\n", names[0], util.EncodeBinaryToString(pkey.Bytes()))
+	for ; len(labels) > 0; labels = labels[1:] {
+		logger.Printf(logger.DBG, "[gns] ResolveRelative '%s' in '%s'\n", labels[0], util.EncodeBinaryToString(pkey.Bytes()))
 
 		// resolve next level
 		var block *GNSBlock
-		if block, err = gns.Lookup(pkey, names[0], mode == enums.GNS_LO_DEFAULT); err != nil {
+		if block, err = gns.Lookup(pkey, labels[0], mode == enums.GNS_LO_DEFAULT); err != nil {
 			// failed to resolve name
 			return
 		}
@@ -169,47 +172,45 @@ name_loop:
 		if records, err = block.Records(); err != nil {
 			return
 		}
-		var hdlr BlockHandler
+		// list of block handlers for this block
+		hdlrs = NewBlockHandlerList()
 		for _, rec := range records {
-			// let a block handler decide how to handle records
-			if hdlr != nil {
-				switch hdlr.TypeAction(int(rec.Type)) {
-				case -1:
-					// No records of this type allowed in block
-					err = ErrInvalidRecordType
-					return
-				case 0:
-					// records of this type are simply ignored
-					continue
-				case 1:
-					// process record of this type
-				}
+
+			// let a block handlers decide how to handle records
+			switch hdlrs.TypeAction(int(rec.Type)) {
+			case -1:
+				// No records of this type allowed in block
+				err = ErrInvalidRecordType
+				return
+			case 0:
+				// records of this type are simply ignored
+				continue
+			case 1:
+				// process record of this type
 			}
+
+			// Process record based on its type
 			switch int(rec.Type) {
+
 			//----------------------------------------------------------
 			case enums.GNS_TYPE_PKEY:
-				// check for single RR and sane key data
-				if len(rec.Data) != 32 && hdlr != nil {
+				// check for sane key data
+				if len(rec.Data) != 32 {
 					err = ErrInvalidPKEY
 					return
 				}
 				// set a PKEY handler
-				inst := NewPkeyHandler()
-				inst.pkey = ed25519.NewPublicKeyFromBytes(rec.Data)
-				hdlr = inst
+				hdlr := hdlrs.GetHandler("pkey").(*PkeyHandler)
+				if hdlr.pkey != nil {
+					// fails if pkey is already set (from a previous record)
+					err = ErrInvalidPKEY
+					return
+				}
+				hdlr.pkey = ed25519.NewPublicKeyFromBytes(rec.Data)
 				continue
 
 			//----------------------------------------------------------
 			case enums.GNS_TYPE_GNS2DNS:
-				// get the master controlling this block; create a new
-				// one if necessary
-				var inst *Gns2DnsHandler
-				if hdlr == nil {
-					inst = NewGns2DnsHandler()
-					hdlr = inst
-				} else {
-					inst = hdlr.(*Gns2DnsHandler)
-				}
 				// extract list of names in DATA block:
 				logger.Printf(logger.DBG, "[gns] GNS2DNS data: %s\n", hex.EncodeToString(rec.Data))
 				var dnsNames []string
@@ -227,48 +228,65 @@ name_loop:
 					return
 				}
 				// Add to collection of requests
+				hdlr := hdlrs.GetHandler("gns2dns").(*Gns2DnsHandler)
 				logger.Printf(logger.DBG, "[gns] GNS2DNS: query for '%s' on '%s'\n", dnsNames[0], dnsNames[1])
-				if !inst.AddRequest(dnsNames[0], dnsNames[1]) {
+				if !hdlr.AddRequest(dnsNames[0], dnsNames[1]) {
 					err = ErrInvalidRecordBody
 					return
 				}
+
+			//----------------------------------------------------------
+			case enums.GNS_TYPE_BOX:
+				// check if we need to process the BOX record:
+				// (1) only two remaining labels
+				if len(labels) != 3 {
+					continue
+				}
+				// (2) remaining labels must start with '_'
+				if labels[1][0] != '_' || labels[2][0] != '_' {
+					continue
+				}
+				// (3) check of "svc" and "proto" match values in the BOX
+				box := NewBox(rec.Data)
+				if box.Matches(labels[1:]) {
+					// get the handler instance and add BOX
+					hdlr := hdlrs.GetHandler("box").(*BoxHandler)
+					hdlr.AddBox(box)
+				}
 			}
 		}
-		// handle special block cases
-		if hdlr != nil {
-			switch inst := hdlr.(type) {
-
-			//----------------------------------------------------------
-			// Post-process PKEY
-			case *PkeyHandler:
-				// PKEY must be sole record in block
-				if len(records) > 1 {
-					logger.Println(logger.ERROR, "[gns] PKEY with other records not allowed.")
-					return nil, ErrInvalidPKEY
-				}
-				// set new zone and continue
-				pkey = inst.pkey
-				continue name_loop
-
-			//----------------------------------------------------------
-			// Post-process GNS2DNS
-			case *Gns2DnsHandler:
-				// we need to handle delegation to DNS: returns a list of found
-				// resource records in DNS (filter by 'kind')
-				fqdn := strings.Join(util.ReverseStringList(names[1:]), ".") + "." + inst.Name
-				if set, err = gns.ResolveDNS(fqdn, inst.Servers, kind, pkey); err != nil {
-					logger.Println(logger.ERROR, "[gns] GNS2DNS resolution failed.")
-					return
-				}
-				// we are done with resolution; pass on records to caller
-				records = set.Records
-				break name_loop
+		// handle special block cases in priority order:
+		// (1) PKEY record: continue resolution with new zone
+		if hdlr := hdlrs.GetHandler("pkey").(*PkeyHandler); hdlr != nil {
+			// PKEY must be sole record in block
+			if len(records) > 1 {
+				logger.Println(logger.ERROR, "[gns] PKEY with other records not allowed.")
+				return nil, ErrInvalidPKEY
 			}
+			// set new zone and continue
+			pkey = hdlr.pkey
+			continue name_loop
+		}
+		// (2) GNS2DNS records: delegate resolution to DNS
+		if hdlr := hdlrs.GetHandler("dns2dns").(*Gns2DnsHandler); hdlr != nil {
+			// we need to handle delegation to DNS: returns a list of found
+			// resource records in DNS (filter by 'kind')
+			fqdn := strings.Join(util.ReverseStringList(labels[1:]), ".") + "." + hdlr.Name
+			if set, err = gns.ResolveDNS(fqdn, hdlr.Servers, kind, pkey); err != nil {
+				logger.Println(logger.ERROR, "[gns] GNS2DNS resolution failed.")
+				return
+			}
+			// we are done with resolution; pass on records to caller
+			records = set.Records
+			break name_loop
 		}
 	}
 	// Assemble resulting resource record set by filtering for requested types.
+	// Records might get transformed by active block handlers.
 	set = NewGNSRecordSet()
 	for _, rec := range records {
+		// allow block handlers to modify/replace a resource record
+		rec = hdlrs.PostProcess(rec)
 		// is this the record type we are looking for?
 		if kind.HasType(int(rec.Type)) {
 			// add it to the result
