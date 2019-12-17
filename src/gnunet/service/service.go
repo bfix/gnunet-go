@@ -49,7 +49,7 @@ func (si *ServiceImpl) Start(spec string) (err error) {
 	}
 
 	// start channel server
-	logger.Printf(logger.DBG, "[%s] Service starting.\n", si.name)
+	logger.Printf(logger.INFO, "[%s] Service starting.\n", si.name)
 	if si.srvc, err = transport.NewChannelServer(spec, si.hdlr); err != nil {
 		return
 	}
@@ -62,19 +62,19 @@ func (si *ServiceImpl) Start(spec string) (err error) {
 			select {
 			case in := <-si.hdlr:
 				if in == nil {
-					logger.Printf(logger.DBG, "[%s] Listener terminated.\n", si.name)
+					logger.Printf(logger.INFO, "[%s] Listener terminated.\n", si.name)
 					break loop
 				}
 				switch ch := in.(type) {
 				case transport.Channel:
-					logger.Printf(logger.DBG, "[%s] Client connected.\n", si.name)
+					logger.Printf(logger.INFO, "[%s] Client connected.\n", si.name)
 					go si.impl.ServeClient(transport.NewMsgChannel(ch))
 				}
 			case <-si.ctrl:
 				break loop
 			}
 		}
-		logger.Printf(logger.DBG, "[%s] Service closing.\n", si.name)
+		logger.Printf(logger.INFO, "[%s] Service closing.\n", si.name)
 		si.srvc.Close()
 		si.running = false
 	}()
@@ -90,7 +90,7 @@ func (si *ServiceImpl) Stop() error {
 	}
 	si.running = false
 	si.ctrl <- true
-	logger.Printf(logger.DBG, "[%s] Service terminating.\n", si.name)
+	logger.Printf(logger.INFO, "[%s] Service terminating.\n", si.name)
 
 	return si.impl.Stop()
 }
