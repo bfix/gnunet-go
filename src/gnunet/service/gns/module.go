@@ -309,7 +309,6 @@ func (gns *GNSModule) Lookup(pkey *ed25519.PublicKey, label string, remote bool)
 		return
 	}
 	if block == nil {
-		logger.Println(logger.DBG, "[gns] local Lookup: no block found")
 		if remote {
 			// get the block from a remote lookup
 			if block, err = gns.LookupRemote(query); err != nil || block == nil {
@@ -318,12 +317,15 @@ func (gns *GNSModule) Lookup(pkey *ed25519.PublicKey, label string, remote bool)
 					block = nil
 				} else {
 					logger.Println(logger.DBG, "[gns] remote Lookup: no block found")
+					err = fmt.Errorf("No block found")
 				}
 				// lookup fails completely -- no result
 				return
 			}
 			// store RRs from remote locally.
 			gns.StoreLocal(query, block)
+		} else {
+			err = fmt.Errorf("No block found")
 		}
 	}
 	return

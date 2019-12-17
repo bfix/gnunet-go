@@ -148,7 +148,7 @@ func (s *GNSService) LookupNamecache(query *Query) (block *GNSBlock, err error) 
 			break
 		}
 		// check if block was found
-		if len(m.EncData) == 0 {
+		if len(m.EncData) == 0 || util.IsNull(m.EncData) {
 			logger.Println(logger.DBG, "[gns] block not found in namecache")
 			break
 		}

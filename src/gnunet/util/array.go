@@ -30,6 +30,16 @@ func Reverse(b []byte) []byte {
 	return r
 }
 
+// IsNull returns true if all bytes in an array are set to 0.
+func IsNull(b []byte) bool {
+	for _, v := range b {
+		if v != 0 {
+			return false
+		}
+	}
+	return true
+}
+
 // CopyBlock copies 'in' to 'out' so that 'out' is filled completely.
 // - If 'in' is larger than 'out', it is left-truncated before copy
 // - If 'in' is smaller than 'out', it is left-padded with 0 before copy
