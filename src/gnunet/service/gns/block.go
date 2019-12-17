@@ -196,11 +196,14 @@ func NewBlockHandlerList() *BlockHandlerList {
 // GetHandler returns a BlockHandler for the given key. If no block handler exists
 // under the given name, a new one is created and stored in the list. The type of
 // the new block handler is derived from the key value.
-func (hl *BlockHandlerList) GetHandler(key string) (hdlr BlockHandler) {
+func (hl *BlockHandlerList) GetHandler(key string, create bool) (hdlr BlockHandler) {
 	// return handler for given key if it exists
 	var ok bool
 	if hdlr, ok = hl.list[key]; ok {
 		return
+	}
+	if !create {
+		return nil
 	}
 	// create a new one
 	switch key {

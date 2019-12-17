@@ -1,6 +1,7 @@
 package gns
 
 import (
+	"encoding/hex"
 	"fmt"
 	"net"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"gnunet/util"
 
 	"github.com/bfix/gospel/crypto/ed25519"
+	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
 	"github.com/miekg/dns"
 )
@@ -93,6 +95,14 @@ func queryDNS(id int, name string, server net.IP, kind RRTypeList, res chan *GNS
 		for _, record := range in.Answer {
 			// check if answer record is of requested type
 			if kind.HasType(int(record.Header().Rrtype)) {
+				// get wire-format of resource record
+				buf := make([]byte, 2048)
+				n, err := dns.PackRR(record, buf, 0, nil, false)
+				if err != nil {
+					logger.Printf(logger.WARN, "[dns][%d] Failed to get RR data for %s\n", id, err.Error())
+					continue
+				}
+
 				// create a new GNS resource record
 				rr := new(message.GNSResourceRecord)
 				rr.Expires = util.AbsoluteTimeNever()
@@ -101,18 +111,15 @@ func queryDNS(id int, name string, server net.IP, kind RRTypeList, res chan *GNS
 				rr.Size = uint32(record.Header().Rdlength)
 				rr.Data = make([]byte, rr.Size)
 
-				// get wire-format of resource record
-				buf := make([]byte, 2048)
-				n, err := dns.PackRR(record, buf, 0, nil, false)
-				if err != nil {
-					logger.Printf(logger.WARN, "[dns][%d] Failed to get RR data for %s\n", id, err.Error())
-					continue
-				}
 				if n < int(rr.Size) {
-					logger.Printf(logger.WARN, "[dns][%d] Nit enough data in RR (%d != %d)\n", id, n, rr.Size)
+					logger.Printf(logger.WARN, "[dns][%d] Not enough data in RR (%d != %d)\n", id, n, rr.Size)
 					continue
 				}
 				copy(rr.Data, buf[n-int(rr.Size):])
+
+				out, _ := data.Marshal(rr)
+				logger.Printf(logger.DBG, "RR: %s\n", hex.EncodeToString(out))
+
 				set.AddRecord(rr)
 			}
 		}
@@ -136,6 +143,7 @@ func (gns *GNSModule) ResolveDNS(name string, servers []string, kind RRTypeList,
 	for idx, srv := range servers {
 		// check if srv is an IPv4/IPv6 address
 		addr := net.ParseIP(srv)
+		logger.Printf(logger.DBG, "ParseIP('%s', len=%d) --> %v\n", srv, len(srv), addr)
 		if addr == nil {
 			query := NewRRTypeList(enums.GNS_TYPE_DNS_A, enums.GNS_TYPE_DNS_AAAA)
 			// no; resolve server name in GNS

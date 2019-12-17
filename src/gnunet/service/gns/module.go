@@ -200,7 +200,7 @@ name_loop:
 					return
 				}
 				// set a PKEY handler
-				hdlr := hdlrs.GetHandler("pkey").(*PkeyHandler)
+				hdlr := hdlrs.GetHandler("pkey", true).(*PkeyHandler)
 				if hdlr.pkey != nil {
 					// fails if pkey is already set (from a previous record)
 					err = ErrInvalidPKEY
@@ -213,24 +213,17 @@ name_loop:
 			case enums.GNS_TYPE_GNS2DNS:
 				// extract list of names in DATA block:
 				logger.Printf(logger.DBG, "[gns] GNS2DNS data: %s\n", hex.EncodeToString(rec.Data))
-				var dnsNames []string
-				for pos := 0; ; {
-					next, name := DNSNameFromBytes(rec.Data, pos)
-					if len(name) == 0 {
-						break
-					}
-					dnsNames = append(dnsNames, name)
-					pos = next
-				}
-				logger.Printf(logger.DBG, "[gns] GNS2DNS params: %v\n", dnsNames)
-				if len(dnsNames) != 2 {
+
+				next, dnsQuery := DNSNameFromBytes(rec.Data, 0)
+				dnsServer := string(rec.Data[next : len(rec.Data)-1])
+				logger.Printf(logger.DBG, "[gns] GNS2DNS query '%s'@'%s'\n", dnsQuery, dnsServer)
+				if len(dnsServer) == 0 || len(dnsQuery) == 0 {
 					err = ErrInvalidRecordBody
 					return
 				}
 				// Add to collection of requests
-				hdlr := hdlrs.GetHandler("gns2dns").(*Gns2DnsHandler)
-				logger.Printf(logger.DBG, "[gns] GNS2DNS: query for '%s' on '%s'\n", dnsNames[0], dnsNames[1])
-				if !hdlr.AddRequest(dnsNames[0], dnsNames[1]) {
+				hdlr := hdlrs.GetHandler("gns2dns", true).(*Gns2DnsHandler)
+				if !hdlr.AddRequest(dnsQuery, dnsServer) {
 					err = ErrInvalidRecordBody
 					return
 				}
@@ -250,29 +243,34 @@ name_loop:
 				box := NewBox(rec.Data)
 				if box.Matches(labels[1:]) {
 					// get the handler instance and add BOX
-					hdlr := hdlrs.GetHandler("box").(*BoxHandler)
+					hdlr := hdlrs.GetHandler("box", true).(*BoxHandler)
 					hdlr.AddBox(box)
 				}
 			}
 		}
 		// handle special block cases in priority order:
 		// (1) PKEY record: continue resolution with new zone
-		if hdlr := hdlrs.GetHandler("pkey").(*PkeyHandler); hdlr != nil {
+		if hdlr := hdlrs.GetHandler("pkey", false); hdlr != nil {
 			// PKEY must be sole record in block
 			if len(records) > 1 {
 				logger.Println(logger.ERROR, "[gns] PKEY with other records not allowed.")
 				return nil, ErrInvalidPKEY
 			}
 			// set new zone and continue
-			pkey = hdlr.pkey
+			pkey = hdlr.(*PkeyHandler).pkey
 			continue name_loop
 		}
 		// (2) GNS2DNS records: delegate resolution to DNS
-		if hdlr := hdlrs.GetHandler("dns2dns").(*Gns2DnsHandler); hdlr != nil {
+		if hdlr := hdlrs.GetHandler("gns2dns", false); hdlr != nil {
+			g2d_hdlr := hdlr.(*Gns2DnsHandler)
 			// we need to handle delegation to DNS: returns a list of found
 			// resource records in DNS (filter by 'kind')
-			fqdn := strings.Join(util.ReverseStringList(labels[1:]), ".") + "." + hdlr.Name
-			if set, err = gns.ResolveDNS(fqdn, hdlr.Servers, kind, pkey); err != nil {
+			lbls := strings.Join(util.ReverseStringList(labels[1:]), ".")
+			if len(lbls) > 0 {
+				lbls += "."
+			}
+			fqdn := lbls + g2d_hdlr.Name
+			if set, err = gns.ResolveDNS(fqdn, g2d_hdlr.Servers, kind, pkey); err != nil {
 				logger.Println(logger.ERROR, "[gns] GNS2DNS resolution failed.")
 				return
 			}
