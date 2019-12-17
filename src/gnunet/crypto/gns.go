@@ -11,14 +11,14 @@ import (
 // DeriveBlockKey returns a symmetric key and initialization vector to decipher a GNS block.
 func DeriveBlockKey(label string, pub *ed25519.PublicKey) (iv *SymmetricIV, skey *SymmetricKey) {
 	// generate symmetric key
-	prk := hkdf.Extract(sha512.New, []byte("gns-aes-ctx-key"), pub.Bytes())
+	prk := hkdf.Extract(sha512.New, pub.Bytes(), []byte("gns-aes-ctx-key"))
 	rdr := hkdf.Expand(sha256.New, prk, []byte(label))
 	skey = NewSymmetricKey()
 	rdr.Read(skey.AESKey)
 	rdr.Read(skey.TwofishKey)
 
 	// generate initialization vector
-	prk = hkdf.Extract(sha512.New, []byte("gns-aes-ctx-iv"), pub.Bytes())
+	prk = hkdf.Extract(sha512.New, pub.Bytes(), []byte("gns-aes-ctx-iv"))
 	rdr = hkdf.Expand(sha256.New, prk, []byte(label))
 	iv = NewSymmetricIV()
 	rdr.Read(iv.AESIv)
