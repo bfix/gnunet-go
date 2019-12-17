@@ -1,7 +1,6 @@
 package gns
 
 import (
-	"encoding/hex"
 	"fmt"
 	"net"
 	"strings"
@@ -12,7 +11,6 @@ import (
 	"gnunet/util"
 
 	"github.com/bfix/gospel/crypto/ed25519"
-	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
 	"github.com/miekg/dns"
 )
@@ -105,7 +103,8 @@ func queryDNS(id int, name string, server net.IP, kind RRTypeList, res chan *GNS
 
 				// create a new GNS resource record
 				rr := new(message.GNSResourceRecord)
-				rr.Expires = util.AbsoluteTimeNever()
+				expires := time.Now().Add(time.Duration(record.Header().Ttl) * time.Second)
+				rr.Expires = util.NewAbsoluteTime(expires)
 				rr.Flags = 0
 				rr.Type = uint32(record.Header().Rrtype)
 				rr.Size = uint32(record.Header().Rdlength)
@@ -116,10 +115,6 @@ func queryDNS(id int, name string, server net.IP, kind RRTypeList, res chan *GNS
 					continue
 				}
 				copy(rr.Data, buf[n-int(rr.Size):])
-
-				out, _ := data.Marshal(rr)
-				logger.Printf(logger.DBG, "RR: %s\n", hex.EncodeToString(out))
-
 				set.AddRecord(rr)
 			}
 		}
