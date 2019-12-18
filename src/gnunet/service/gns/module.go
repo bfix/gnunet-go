@@ -1,7 +1,6 @@
 package gns
 
 import (
-	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -73,14 +72,18 @@ func NewQuery(pkey *ed25519.PublicKey, label string) *Query {
 //      records = Resolve (labels[0], PKEY)
 //      If last label in name: -> (5)
 //  (4) for all rec in records:
-//          (b) if rec is a PKEY record:
+//          (a) if rec is a PKEY record:
 //                  PKEY <- record, --> (3)
-//          (c) if rec is a GNS2DNS record:
+//          (b) if rec is a GNS2DNS record:
 //                  delegate to DNS to resolve rest of name -> (5)
-//          (d) if rec is BOX record:
+//          (c) if rec is BOX record:
 //                  if rest of name is pattern "_service._proto" and matches
 //                  the values in the BOX:
 //                      Replace records with resource record from BOX -> (5)
+//          (d) if rec is CNAME record:
+//                  if no remaining labels:
+//                      if requested types include CNAME -> (5)
+//                      if
 //      resolution failed: name not completely processed and no zone available
 //
 //  (5) return records: it is the responsibility of the caller to assemble
@@ -172,105 +175,39 @@ name_loop:
 		if records, err = block.Records(); err != nil {
 			return
 		}
-		// list of block handlers for this block
-		hdlrs = NewBlockHandlerList()
-		for _, rec := range records {
-
-			// let a block handlers decide how to handle records
-			switch hdlrs.TypeAction(int(rec.Type)) {
-			case -1:
-				// No records of this type allowed in block
-				err = ErrInvalidRecordType
-				return
-			case 0:
-				// records of this type are simply ignored
-				continue
-			case 1:
-				// process record of this type
-			}
-
-			// Process record based on its type
-			switch int(rec.Type) {
-
-			//----------------------------------------------------------
-			case enums.GNS_TYPE_PKEY:
-				// check for sane key data
-				if len(rec.Data) != 32 {
-					err = ErrInvalidPKEY
-					return
-				}
-				// set a PKEY handler
-				hdlr := hdlrs.GetHandler("pkey", true).(*PkeyHandler)
-				if hdlr.pkey != nil {
-					// fails if pkey is already set (from a previous record)
-					err = ErrInvalidPKEY
-					return
-				}
-				hdlr.pkey = ed25519.NewPublicKeyFromBytes(rec.Data)
-				continue
-
-			//----------------------------------------------------------
-			case enums.GNS_TYPE_GNS2DNS:
-				// extract list of names in DATA block:
-				logger.Printf(logger.DBG, "[gns] GNS2DNS data: %s\n", hex.EncodeToString(rec.Data))
-
-				next, dnsQuery := DNSNameFromBytes(rec.Data, 0)
-				dnsServer := string(rec.Data[next : len(rec.Data)-1])
-				logger.Printf(logger.DBG, "[gns] GNS2DNS query '%s'@'%s'\n", dnsQuery, dnsServer)
-				if len(dnsServer) == 0 || len(dnsQuery) == 0 {
-					err = ErrInvalidRecordBody
-					return
-				}
-				// Add to collection of requests
-				hdlr := hdlrs.GetHandler("gns2dns", true).(*Gns2DnsHandler)
-				if !hdlr.AddRequest(dnsQuery, dnsServer) {
-					err = ErrInvalidRecordBody
-					return
-				}
-
-			//----------------------------------------------------------
-			case enums.GNS_TYPE_BOX:
-				// check if we need to process the BOX record:
-				// (1) only two remaining labels
-				if len(labels) != 3 {
-					continue
-				}
-				// (2) remaining labels must start with '_'
-				if labels[1][0] != '_' || labels[2][0] != '_' {
-					continue
-				}
-				// (3) check of "svc" and "proto" match values in the BOX
-				box := NewBox(rec.Data)
-				if box.Matches(labels[1:]) {
-					// get the handler instance and add BOX
-					hdlr := hdlrs.GetHandler("box", true).(*BoxHandler)
-					hdlr.AddBox(box)
-				}
-			}
+		// assemble a list of block handlers for this block: if multiple
+		// block handlers are present, they are consistent with all block
+		// records.
+		if hdlrs, err = NewBlockHandlerList(records, labels[1:]); err != nil {
+			// conflicting block handler records found: terminate with error.
+			// (N.B.: The BlockHandlerList class executes the logic which mix
+			// of resource records in a single block is considered valid.)
+			return
 		}
+
+		//--------------------------------------------------------------
 		// handle special block cases in priority order:
-		// (1) PKEY record: continue resolution with new zone
-		if hdlr := hdlrs.GetHandler("pkey", false); hdlr != nil {
-			// PKEY must be sole record in block
-			if len(records) > 1 {
-				logger.Println(logger.ERROR, "[gns] PKEY with other records not allowed.")
-				return nil, ErrInvalidPKEY
+		//--------------------------------------------------------------
+
+		if hdlr := hdlrs.GetHandler(enums.GNS_TYPE_PKEY); hdlr != nil {
+			// (1) PKEY record:
+			inst := hdlr.(*PkeyHandler)
+			// if labels are pending, set new zone and continue resolution
+			if len(labels) > 1 {
+				pkey = inst.pkey
+				continue name_loop
 			}
-			// set new zone and continue
-			pkey = hdlr.(*PkeyHandler).pkey
-			continue name_loop
-		}
-		// (2) GNS2DNS records: delegate resolution to DNS
-		if hdlr := hdlrs.GetHandler("gns2dns", false); hdlr != nil {
-			g2d_hdlr := hdlr.(*Gns2DnsHandler)
+		} else if hdlr := hdlrs.GetHandler(enums.GNS_TYPE_GNS2DNS); hdlr != nil {
+			// (2) GNS2DNS records: delegate resolution to DNS
+			inst := hdlr.(*Gns2DnsHandler)
 			// we need to handle delegation to DNS: returns a list of found
 			// resource records in DNS (filter by 'kind')
 			lbls := strings.Join(util.ReverseStringList(labels[1:]), ".")
 			if len(lbls) > 0 {
 				lbls += "."
 			}
-			fqdn := lbls + g2d_hdlr.Name
-			if set, err = gns.ResolveDNS(fqdn, g2d_hdlr.Servers, kind, pkey); err != nil {
+			fqdn := lbls + inst.Name
+			if set, err = gns.ResolveDNS(fqdn, inst.Servers, kind, pkey); err != nil {
 				logger.Println(logger.ERROR, "[gns] GNS2DNS resolution failed.")
 				return
 			}
@@ -283,8 +220,6 @@ name_loop:
 	// Records might get transformed by active block handlers.
 	set = NewGNSRecordSet()
 	for _, rec := range records {
-		// allow block handlers to modify/replace a resource record
-		rec = hdlrs.PostProcess(rec)
 		// is this the record type we are looking for?
 		if kind.HasType(int(rec.Type)) {
 			// add it to the result
