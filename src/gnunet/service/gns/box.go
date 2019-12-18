@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"strings"
 
+	"gnunet/message"
+
 	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
 )
@@ -17,17 +19,19 @@ type Box struct {
 	RR    []byte `size:"*"`    // embedded RR
 
 	// transient attributes (not serialized)
-	key string
+	key string                     // map key for box instance
+	rec *message.GNSResourceRecord // originating RR
 }
 
 // NewBox creates a new box instance from a BOX resource record.
-func NewBox(buf []byte) *Box {
+func NewBox(rec *message.GNSResourceRecord) *Box {
 	b := new(Box)
-	if err := data.Unmarshal(b, buf); err != nil {
+	if err := data.Unmarshal(b, rec.Data); err != nil {
 		logger.Printf(logger.ERROR, "[gns] Can't unmarshal BOX")
 		return nil
 	}
-	b.key = hex.EncodeToString(buf[:8])
+	b.key = hex.EncodeToString(rec.Data[:8])
+	b.rec = rec
 	return b
 }
 

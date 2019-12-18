@@ -214,6 +214,14 @@ name_loop:
 			// we are done with resolution; pass on records to caller
 			records = set.Records
 			break name_loop
+		} else if hdlr := hdlrs.GetHandler(enums.GNS_TYPE_BOX); hdlr != nil {
+			// (3) BOX records:
+			inst := hdlr.(*BoxHandler)
+			new_records := inst.Records(kind).Records
+			if len(new_records) > 0 {
+				records = new_records
+				break name_loop
+			}
 		}
 	}
 	// Assemble resulting resource record set by filtering for requested types.

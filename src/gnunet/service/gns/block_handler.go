@@ -49,11 +49,11 @@ type BlockHandler interface {
 	//   = -1: Record is not allowed
 	//   =  0: Record is allowed but will be ignored
 	//   =  1: Record is allowed and will be processed
-	TypeAction(int) int
+	TypeAction(t int) int
 
-	// Records returns a list of RR of the given type associated with
+	// Records returns a list of RR of the given types associated with
 	// the custom handler
-	Records(t int) *GNSRecordSet
+	Records(kind RRTypeList) *GNSRecordSet
 }
 
 //----------------------------------------------------------------------
@@ -190,9 +190,9 @@ func (h *PkeyHandler) TypeAction(t int) int {
 }
 
 // Records returns a list of RR of the given type associated with this handler
-func (h *PkeyHandler) Records(t int) *GNSRecordSet {
+func (h *PkeyHandler) Records(kind RRTypeList) *GNSRecordSet {
 	rs := NewGNSRecordSet()
-	if t == enums.GNS_TYPE_PKEY {
+	if kind.HasType(enums.GNS_TYPE_PKEY) {
 		rs.AddRecord(h.rec)
 	}
 	return rs
@@ -260,9 +260,9 @@ func (h *Gns2DnsHandler) TypeAction(t int) int {
 }
 
 // Records returns a list of RR of the given type associated with this handler
-func (h *Gns2DnsHandler) Records(t int) *GNSRecordSet {
+func (h *Gns2DnsHandler) Records(kind RRTypeList) *GNSRecordSet {
 	rs := NewGNSRecordSet()
-	if t == enums.GNS_TYPE_GNS2DNS {
+	if kind.HasType(enums.GNS_TYPE_GNS2DNS) {
 		for _, rec := range h.recs {
 			rs.AddRecord(rec)
 		}
@@ -276,8 +276,7 @@ func (h *Gns2DnsHandler) Records(t int) *GNSRecordSet {
 
 // BoxHandler implementing the BlockHandler interface
 type BoxHandler struct {
-	boxes map[string]*Box              // map of found boxes
-	recs  []*message.GNSResourceRecord // list of rersource records
+	boxes map[string]*Box // map of found boxes
 }
 
 // NewBoxHandler returns a new BlockHandler instance
@@ -287,7 +286,6 @@ func NewBoxHandler(rec *message.GNSResourceRecord, labels []string) (BlockHandle
 	}
 	h := &BoxHandler{
 		boxes: make(map[string]*Box),
-		recs:  make([]*message.GNSResourceRecord, 0),
 	}
 	if err := h.AddRecord(rec, labels); err != nil {
 		return nil, err
@@ -300,6 +298,7 @@ func (h *BoxHandler) AddRecord(rec *message.GNSResourceRecord, labels []string) 
 	if int(rec.Type) != enums.GNS_TYPE_BOX {
 		return ErrInvalidRecordType
 	}
+	logger.Printf(logger.DBG, "[box-rr] for labels %v\n", labels)
 	// check if we need to process the BOX record:
 	// (1) only two remaining labels
 	if len(labels) != 2 {
@@ -310,10 +309,10 @@ func (h *BoxHandler) AddRecord(rec *message.GNSResourceRecord, labels []string) 
 		return nil
 	}
 	// (3) check of "svc" and "proto" match values in the BOX
-	box := NewBox(rec.Data)
+	box := NewBox(rec)
 	if box.Matches(labels) {
+		logger.Println(logger.DBG, "[box-rr] MATCH -- adding record")
 		h.boxes[box.key] = box
-		h.recs = append(h.recs, rec)
 	}
 	return nil
 }
@@ -326,22 +325,18 @@ func (h *BoxHandler) TypeAction(t int) int {
 }
 
 // Records returns a list of RR of the given type associated with this handler
-func (h *BoxHandler) Records(t int) *GNSRecordSet {
+func (h *BoxHandler) Records(kind RRTypeList) *GNSRecordSet {
 	rs := NewGNSRecordSet()
-	if t == enums.GNS_TYPE_GNS2DNS {
-		for _, rec := range h.recs {
-			// locate the BOX for the record (that has been validated before)
-			key := hex.EncodeToString(rec.Data[:8])
-			if box, ok := h.boxes[key]; ok {
-				// valid box found: assemble new resource record.
-				rr := new(message.GNSResourceRecord)
-				rr.Expires = rec.Expires
-				rr.Flags = rec.Flags
-				rr.Type = box.Type
-				rr.Size = uint32(len(box.RR))
-				rr.Data = box.RR
-				rs.AddRecord(rr)
-			}
+	for _, box := range h.boxes {
+		if kind.HasType(int(box.Type)) {
+			// valid box found: assemble new resource record.
+			rr := new(message.GNSResourceRecord)
+			rr.Expires = box.rec.Expires
+			rr.Flags = box.rec.Flags
+			rr.Type = box.Type
+			rr.Size = uint32(len(box.RR))
+			rr.Data = box.RR
+			rs.AddRecord(rr)
 		}
 	}
 	return rs
@@ -394,9 +389,9 @@ func (h *LehoHandler) TypeAction(t int) int {
 }
 
 // Records returns a list of RR of the given type associated with this handler
-func (h *LehoHandler) Records(t int) *GNSRecordSet {
+func (h *LehoHandler) Records(kind RRTypeList) *GNSRecordSet {
 	rs := NewGNSRecordSet()
-	if t == enums.GNS_TYPE_LEHO {
+	if kind.HasType(enums.GNS_TYPE_LEHO) {
 		rs.AddRecord(h.rec)
 	}
 	return rs
