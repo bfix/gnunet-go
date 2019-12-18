@@ -79,22 +79,15 @@ func NewBlockHandlerList(records []*message.GNSResourceRecord, labels []string) 
 	hl := &BlockHandlerList{
 		list: make(map[int]BlockHandler),
 	}
-	// build a list of record types that are handled by a custom handler.
-	rrList := NewRRTypeList(
-		enums.GNS_TYPE_PKEY,
-		enums.GNS_TYPE_GNS2DNS,
-		enums.GNS_TYPE_BOX,
-		enums.GNS_TYPE_LEHO)
 
 	// Traverse record list and build list of handler instances
 	for _, rec := range records {
 		// check for custom handler type
 		rrType := int(rec.Type)
-		if rrList.HasType(rrType) {
+		if creat, ok := customHandler[rrType]; ok {
 			// check if a handler for given type already exists
 			var (
 				hdlr BlockHandler
-				ok   bool
 				err  error
 			)
 			if hdlr, ok = hl.list[rrType]; ok {
@@ -105,17 +98,7 @@ func NewBlockHandlerList(records []*message.GNSResourceRecord, labels []string) 
 				continue
 			}
 			// create a new handler instance
-			switch rrType {
-			case enums.GNS_TYPE_PKEY:
-				hdlr, err = NewPkeyHandler(rec, labels)
-			case enums.GNS_TYPE_GNS2DNS:
-				hdlr, err = NewGns2DnsHandler(rec, labels)
-			case enums.GNS_TYPE_BOX:
-				hdlr, err = NewBoxHandler(rec, labels)
-			case enums.GNS_TYPE_LEHO:
-				hdlr, err = NewLehoHandler(rec, labels)
-			}
-			if err != nil {
+			if hdlr, err = creat(rec, labels); err != nil {
 				return nil, err
 			}
 			// store handler in list
