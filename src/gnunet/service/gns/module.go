@@ -20,10 +20,7 @@ import (
 
 // Error codes
 var (
-	ErrUnknownTLD        = fmt.Errorf("Unknown TLD in name")
-	ErrInvalidRecordType = fmt.Errorf("Invalid resource record type")
-	ErrInvalidRecordBody = fmt.Errorf("Invalid resource record body")
-	ErrInvalidPKEY       = fmt.Errorf("Invalid PKEY resource record")
+	ErrUnknownTLD = fmt.Errorf("Unknown TLD in name")
 )
 
 //----------------------------------------------------------------------
@@ -83,7 +80,7 @@ func NewQuery(pkey *ed25519.PublicKey, label string) *Query {
 //          (d) if rec is CNAME record:
 //                  if no remaining labels:
 //                      if requested types include CNAME -> (5)
-//                      if
+//                      -> Resolve(CNAME)
 //      resolution failed: name not completely processed and no zone available
 //
 //  (5) return records: it is the responsibility of the caller to assemble
@@ -119,30 +116,23 @@ func (gns *GNSModule) Resolve(path string, pkey *ed25519.PublicKey, kind RRTypeL
 
 // Resolve a fully qualified GNS absolute name (with multiple labels).
 func (gns *GNSModule) ResolveAbsolute(labels []string, kind RRTypeList, mode int) (set *GNSRecordSet, err error) {
-	// get the root zone key for the TLD
-	var (
-		pkey *ed25519.PublicKey
-		data []byte
-	)
-	for {
-		// (1) check if TLD is a public key string
-		if len(labels[0]) == 52 {
-			if data, err = util.DecodeStringToBinary(labels[0], 32); err == nil {
-				if pkey = ed25519.NewPublicKeyFromBytes(data); pkey != nil {
-					break
-				}
-			}
-		}
+	// get the zone key for the TLD
+	// (1) check if TLD is a PKEY
+	pkey := gns.GetZoneKey(labels[0])
+	if pkey == nil {
 		// (2) check if TLD is in our local config
-		if pkey = config.Cfg.GNS.GetRootZoneKey(labels[0]); pkey != nil {
-			break
-		}
+		pkey = config.Cfg.GNS.GetRootZoneKey(labels[0])
+	}
+	if pkey == nil {
 		// (3) check if TLD is one of our identities
-		if pkey, err = gns.GetLocalZone(labels[0]); err == nil {
-			break
+		pkey, err = gns.GetLocalZone(labels[0])
+	}
+	if pkey == nil {
+		if err == nil {
+			err = ErrUnknownTLD
 		}
 		// (4) we can't resolve this TLD
-		return nil, ErrUnknownTLD
+		return
 	}
 	// continue with resolution relative to a zone.
 	return gns.ResolveRelative(labels[1:], pkey, kind, mode)
@@ -156,7 +146,6 @@ func (gns *GNSModule) ResolveRelative(labels []string, pkey *ed25519.PublicKey, 
 		records []*message.GNSResourceRecord // final resource records from resolution
 		hdlrs   *BlockHandlerList            // list of block handlers in final step
 	)
-name_loop:
 	for ; len(labels) > 0; labels = labels[1:] {
 		logger.Printf(logger.DBG, "[gns] ResolveRelative '%s' in '%s'\n", labels[0], util.EncodeBinaryToString(pkey.Bytes()))
 
@@ -192,16 +181,24 @@ name_loop:
 		if hdlr := hdlrs.GetHandler(enums.GNS_TYPE_PKEY); hdlr != nil {
 			// (1) PKEY record:
 			inst := hdlr.(*PkeyHandler)
-			// if labels are pending, set new zone and continue resolution
-			if len(labels) > 1 {
-				pkey = inst.pkey
-				continue name_loop
+			// if labels are pending, set new zone and continue resolution;
+			// otherwise resolve "@" label for the zone if no PKEY record
+			// was requested.
+			pkey = inst.pkey
+			if len(labels) == 1 && !kind.HasType(enums.GNS_TYPE_PKEY) {
+				labels = append(labels, "@")
 			}
 		} else if hdlr := hdlrs.GetHandler(enums.GNS_TYPE_GNS2DNS); hdlr != nil {
-			// (2) GNS2DNS records: delegate resolution to DNS
+			// (2) GNS2DNS records
 			inst := hdlr.(*Gns2DnsHandler)
-			// we need to handle delegation to DNS: returns a list of found
-			// resource records in DNS (filter by 'kind')
+			// if we are at the end of the path and the requested type
+			// includes GNS_TYPE_GNS2DNS, the GNS2DNS records are returned...
+			if len(labels) == 1 && kind.HasType(enums.GNS_TYPE_GNS2DNS) {
+				records = inst.recs
+				break
+			}
+			// ... otherwise we need to handle delegation to DNS: returns a
+			// list of found resource records in DNS (filter by 'kind')
 			lbls := strings.Join(util.ReverseStringList(labels[1:]), ".")
 			if len(lbls) > 0 {
 				lbls += "."
@@ -213,15 +210,30 @@ name_loop:
 			}
 			// we are done with resolution; pass on records to caller
 			records = set.Records
-			break name_loop
+			break
 		} else if hdlr := hdlrs.GetHandler(enums.GNS_TYPE_BOX); hdlr != nil {
 			// (3) BOX records:
 			inst := hdlr.(*BoxHandler)
 			new_records := inst.Records(kind).Records
 			if len(new_records) > 0 {
 				records = new_records
-				break name_loop
+				break
 			}
+		} else if hdlr := hdlrs.GetHandler(enums.GNS_TYPE_DNS_CNAME); hdlr != nil {
+			// (4) CNAME records:
+			inst := hdlr.(*CnameHandler)
+			// if we are at the end of the path and the requested type
+			// includes GNS_TYPE_DNS_CNAME, the records are returned...
+			if len(labels) == 1 && kind.HasType(enums.GNS_TYPE_DNS_CNAME) {
+				break
+			}
+			if set, err = gns.ResolveUnknown(inst.name, pkey, kind); err != nil {
+				logger.Println(logger.ERROR, "[gns] CNAME resolution failed.")
+				return
+			}
+			// we are done with resolution; pass on records to caller
+			records = set.Records
+			break
 		}
 	}
 	// Assemble resulting resource record set by filtering for requested types.
@@ -235,6 +247,49 @@ name_loop:
 		}
 	}
 	return
+}
+
+// ResolveUnknown resolves a name either in GNS (if applicable) or DNS:
+// If the name is a relative GNS path (ending in ".+"), it is resolved in GNS
+// relative to the zone PKEY. If the name is an absolute GNS name (ending in
+// a PKEY TLD), it is also resolved with GNS. All other names are resolved
+// via DNS queries.
+func (gns *GNSModule) ResolveUnknown(name string, pkey *ed25519.PublicKey, kind RRTypeList) (set *GNSRecordSet, err error) {
+	// relative GNS-based server name?
+	if strings.HasSuffix(name, ".+") {
+		// resolve server name relative to current zone
+		name = strings.TrimSuffix(name, ".+")
+		if set, err = gns.Resolve(name, pkey, kind, enums.GNS_LO_DEFAULT); err != nil {
+			return
+		}
+	} else {
+		// check for absolute GNS name (with PKEY as TLD)
+		if zk := gns.GetZoneKey(name); zk != nil {
+			// resolve absolute GNS name (name ends in a PKEY)
+			if set, err = gns.Resolve(util.StripPathRight(name), zk, kind, enums.GNS_LO_DEFAULT); err != nil {
+				return
+			}
+		} else {
+			// resolve the server name via DNS
+			if set = QueryDNS(util.NextID(), name, nil, kind); set == nil {
+				err = ErrNoDNSResults
+			}
+		}
+	}
+	return
+}
+
+// GetZoneKey returns the PKEY (or nil) from an absolute GNS path.
+func (gns *GNSModule) GetZoneKey(path string) *ed25519.PublicKey {
+	labels := util.ReverseStringList(strings.Split(path, "."))
+	if len(labels[0]) == 52 {
+		if data, err := util.DecodeStringToBinary(labels[0], 32); err == nil {
+			if pkey := ed25519.NewPublicKeyFromBytes(data); pkey != nil {
+				return pkey
+			}
+		}
+	}
+	return nil
 }
 
 // Lookup name in GNS.
