@@ -80,8 +80,6 @@ and GNS).
 
 ## Documentation
 
-* papers: 3rd party papers on GNUnet and crypto (mostly academic)
 * raw: raw ASCII protocol definition
-* reports: findings in the GNUnet source code
 * specification: texinfo protocol definition
 
