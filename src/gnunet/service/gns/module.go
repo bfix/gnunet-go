@@ -203,7 +203,7 @@ func (gns *GNSModule) ResolveRelative(labels []string, pkey *ed25519.PublicKey, 
 			if len(lbls) > 0 {
 				lbls += "."
 			}
-			fqdn := lbls + inst.Name
+			fqdn := lbls + inst.Query
 			if set, err = gns.ResolveDNS(fqdn, inst.Servers, kind, pkey); err != nil {
 				logger.Println(logger.ERROR, "[gns] GNS2DNS resolution failed.")
 				return

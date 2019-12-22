@@ -60,6 +60,9 @@ type BlockHandler interface {
 	// Records returns a list of RR of the given types associated with
 	// the custom handler
 	Records(kind RRTypeList) *GNSRecordSet
+
+	// Name returns the human-readable name of the handler
+	Name() string
 }
 
 //----------------------------------------------------------------------
@@ -121,6 +124,7 @@ func NewBlockHandlerList(records []*message.GNSResourceRecord, labels []string) 
 	// all the other records of varying type
 	for _, hdlr := range hl.list {
 		if !hdlr.Coexist(hl.counts) {
+			logger.Printf(logger.ERROR, "[gns] %s.Coexist() failed!\n", hdlr.Name())
 			return nil, ErrInvalidRecordMix
 		}
 	}
@@ -198,13 +202,18 @@ func (h *PkeyHandler) Records(kind RRTypeList) *GNSRecordSet {
 	return rs
 }
 
+// Name returns the human-readable name of the handler.
+func (h *PkeyHandler) Name() string {
+	return "PKEY_Handler"
+}
+
 //----------------------------------------------------------------------
 // GNS2DNS handler
 //----------------------------------------------------------------------
 
 // Gns2DnsHandler implementing the BlockHandler interface
 type Gns2DnsHandler struct {
-	Name    string                       // DNS query name
+	Query   string                       // DNS query name
 	Servers []string                     // DNS servers to ask
 	recs    []*message.GNSResourceRecord // list of rersource records
 }
@@ -215,7 +224,7 @@ func NewGns2DnsHandler(rec *message.GNSResourceRecord, labels []string) (BlockHa
 		return nil, ErrInvalidRecordType
 	}
 	h := &Gns2DnsHandler{
-		Name:    "",
+		Query:   "",
 		Servers: make([]string, 0),
 		recs:    make([]*message.GNSResourceRecord, 0),
 	}
@@ -242,9 +251,9 @@ func (h *Gns2DnsHandler) AddRecord(rec *message.GNSResourceRecord, labels []stri
 
 	// check if all GNS2DNS records refer to the same query name
 	if len(h.Servers) == 0 {
-		h.Name = dnsQuery
+		h.Query = dnsQuery
 	}
-	if dnsQuery != h.Name {
+	if dnsQuery != h.Query {
 		return ErrInvalidRecordBody
 	}
 	h.Servers = append(h.Servers, dnsServer)
@@ -268,6 +277,11 @@ func (h *Gns2DnsHandler) Records(kind RRTypeList) *GNSRecordSet {
 		}
 	}
 	return rs
+}
+
+// Name returns the human-readable name of the handler.
+func (h *Gns2DnsHandler) Name() string {
+	return "GNS2DNS_Handler"
 }
 
 //----------------------------------------------------------------------
@@ -342,6 +356,11 @@ func (h *BoxHandler) Records(kind RRTypeList) *GNSRecordSet {
 	return rs
 }
 
+// Name returns the human-readable name of the handler.
+func (h *BoxHandler) Name() string {
+	return "BOX_Handler"
+}
+
 //----------------------------------------------------------------------
 // LEHO handler
 //----------------------------------------------------------------------
@@ -386,7 +405,7 @@ func (h *LehoHandler) Coexist(cm util.CounterMap) bool {
 	if cm.Num(enums.GNS_TYPE_LEHO) != 1 {
 		return false
 	}
-	return cm.Num(enums.GNS_TYPE_DNS_A) == 1 || cm.Num(enums.GNS_TYPE_DNS_AAAA) == 1
+	return (cm.Num(enums.GNS_TYPE_DNS_A) + cm.Num(enums.GNS_TYPE_DNS_AAAA)) > 1
 }
 
 // Records returns a list of RR of the given type associated with this handler
@@ -396,6 +415,11 @@ func (h *LehoHandler) Records(kind RRTypeList) *GNSRecordSet {
 		rs.AddRecord(h.rec)
 	}
 	return rs
+}
+
+// Name returns the human-readable name of the handler.
+func (h *LehoHandler) Name() string {
+	return "LEHO_Handler"
 }
 
 //----------------------------------------------------------------------
@@ -449,4 +473,9 @@ func (h *CnameHandler) Records(kind RRTypeList) *GNSRecordSet {
 		rs.AddRecord(h.rec)
 	}
 	return rs
+}
+
+// Name returns the human-readable name of the handler.
+func (h *CnameHandler) Name() string {
+	return "CNAME_Handler"
 }
