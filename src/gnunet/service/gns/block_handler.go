@@ -21,6 +21,7 @@ var (
 	ErrInvalidRecordBody = fmt.Errorf("Invalid resource record body")
 	ErrInvalidPKEY       = fmt.Errorf("Invalid PKEY resource record")
 	ErrInvalidCNAME      = fmt.Errorf("Invalid CNAME resource record")
+	ErrInvalidVPN        = fmt.Errorf("Invalid VPN resource record")
 	ErrInvalidRecordMix  = fmt.Errorf("Invalid mix of RR types in block")
 	ErrBlockHandler      = fmt.Errorf("Internal block handler failure")
 )
@@ -33,6 +34,7 @@ var (
 		enums.GNS_TYPE_BOX:       NewBoxHandler,
 		enums.GNS_TYPE_LEHO:      NewLehoHandler,
 		enums.GNS_TYPE_DNS_CNAME: NewCnameHandler,
+		enums.GNS_TYPE_VPN:       NewVpnHandler,
 	}
 )
 
@@ -518,4 +520,58 @@ func (h *CnameHandler) Records(kind RRTypeList) *GNSRecordSet {
 // Name returns the human-readable name of the handler.
 func (h *CnameHandler) Name() string {
 	return "CNAME_Handler"
+}
+
+//----------------------------------------------------------------------
+// VPN handler
+//----------------------------------------------------------------------
+
+// VpnHandler implementing the BlockHandler interface
+type VpnHandler struct {
+	rec *message.GNSResourceRecord
+}
+
+// NewVpnHandler returns a new BlockHandler instance
+func NewVpnHandler(rec *message.GNSResourceRecord, labels []string) (BlockHandler, error) {
+	if int(rec.Type) != enums.GNS_TYPE_VPN {
+		return nil, ErrInvalidRecordType
+	}
+	h := &VpnHandler{}
+	if err := h.AddRecord(rec, labels); err != nil {
+		return nil, err
+	}
+	return h, nil
+}
+
+// AddRecord inserts a VPN record into the handler.
+func (h *VpnHandler) AddRecord(rec *message.GNSResourceRecord, labels []string) error {
+	if int(rec.Type) != enums.GNS_TYPE_VPN {
+		return ErrInvalidRecordType
+	}
+	if h.rec != nil {
+		return ErrInvalidVPN
+	}
+	h.rec = rec
+	return nil
+}
+
+// Coexist return a flag indicating how a resource record of a given type
+// is to be treated (see BlockHandler interface)
+func (h *VpnHandler) Coexist(cm util.CounterMap) bool {
+	// anything goes
+	return true
+}
+
+// Records returns a list of RR of the given type associated with this handler
+func (h *VpnHandler) Records(kind RRTypeList) *GNSRecordSet {
+	rs := NewGNSRecordSet()
+	if kind.HasType(enums.GNS_TYPE_VPN) {
+		rs.AddRecord(h.rec)
+	}
+	return rs
+}
+
+// Name returns the human-readable name of the handler.
+func (h *VpnHandler) Name() string {
+	return "VPN_Handler"
 }

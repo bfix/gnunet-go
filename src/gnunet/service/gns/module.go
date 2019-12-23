@@ -248,6 +248,17 @@ func (gns *GNSModule) ResolveRelative(labels []string, pkey *ed25519.PublicKey, 
 			}
 		}
 	}
+
+	// if no records of the requested type (either A or AAAA) have been found,
+	// and we have a VPN record, return this instead.
+	if set.Count == 0 && (kind.HasType(enums.GNS_TYPE_DNS_A) || kind.HasType(enums.GNS_TYPE_DNS_AAAA)) {
+		// check for VPN record
+		if hdlr := hdlrs.GetHandler(enums.GNS_TYPE_VPN); hdlr != nil {
+			// add VPN record to result set
+			inst := hdlr.(*VpnHandler)
+			set.AddRecord(inst.rec)
+		}
+	}
 	return
 }
 
