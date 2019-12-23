@@ -4,6 +4,11 @@ package enums
 var (
 	GNS_MAX_BLOCK_SIZE = (63 * 1024) // Maximum size of a value that can be stored in a GNS block.
 
+	// GNS record flags
+	GNS_FLAG_PRIVATE = 2
+	GNS_FLAGS_EXPREL = 8
+	GNS_FLAG_SHADOW  = 16
+
 	// GNS record types
 	GNS_TYPE_ANY                   = 0     // Record type indicating any record/'*'
 	GNS_TYPE_DNS_A                 = 1     // [RFC1035] IPv4 Address record

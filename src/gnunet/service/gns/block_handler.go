@@ -74,12 +74,16 @@ type BlockHandler interface {
 // The BlockHandlerList maintains a map of actually instantiated handlers
 // (indexed by record type) and a list of record types (with occurrence
 // count) in the block.
+// The instance is also responsible for any required post-processing like
+// filtering out expired records (and eventually "activating" associated
+// shadow records collect from the same block).
 //----------------------------------------------------------------------
 
 // BlockHandlerList is a list of block handlers instantiated.
 type BlockHandlerList struct {
-	list   map[int]BlockHandler // list of handler instances
-	counts util.CounterMap      // count number of RRs by type
+	list    map[int]BlockHandler         // list of handler instances
+	counts  util.CounterMap              // count number of RRs by type
+	shadows []*message.GNSResourceRecord // list of shadow records
 }
 
 // NewBlockHandlerList instantiates an a list of active block handlers
@@ -87,8 +91,9 @@ type BlockHandlerList struct {
 func NewBlockHandlerList(records []*message.GNSResourceRecord, labels []string) (*BlockHandlerList, error) {
 	// initialize block handler list
 	hl := &BlockHandlerList{
-		list:   make(map[int]BlockHandler),
-		counts: make(util.CounterMap),
+		list:    make(map[int]BlockHandler),
+		counts:  make(util.CounterMap),
+		shadows: make([]*message.GNSResourceRecord, 0),
 	}
 
 	// Traverse record list and build list of handler instances
@@ -96,6 +101,12 @@ func NewBlockHandlerList(records []*message.GNSResourceRecord, labels []string) 
 		// update counter map
 		rrType := int(rec.Type)
 		hl.counts.Add(rrType)
+
+		// check for SHADOW record.
+		if (int(rec.Flags) & enums.GNS_FLAG_SHADOW) != 0 {
+			// add to list of shadows
+			hl.shadows = append(hl.shadows, rec)
+		}
 
 		// check for custom handler type
 		if creat, ok := customHandler[rrType]; ok {
@@ -141,6 +152,28 @@ func (hl *BlockHandlerList) GetHandler(t int) BlockHandler {
 		return hdlr
 	}
 	return nil
+}
+
+// FinalizeRecord post-processes records: Filtering out expired records (and
+// replacing them with a shadow record if available).
+func (hl *BlockHandlerList) FinalizeRecord(rec *message.GNSResourceRecord) *message.GNSResourceRecord {
+	// filter out shadow records...
+	if (int(rec.Flags) & enums.GNS_FLAG_SHADOW) != 0 {
+		return nil
+	}
+	// check for expired record
+	if rec.Expires.Expired() {
+		// do we have an associated shadow record?
+		for _, shadow := range hl.shadows {
+			if shadow.Type == rec.Type && !shadow.Expires.Expired() {
+				// deliver un-expired shadow record instead.
+				return shadow
+			}
+		}
+		// expired and un-shadowed record is dropped
+		return nil
+	}
+	return rec
 }
 
 //----------------------------------------------------------------------

@@ -243,7 +243,9 @@ func (gns *GNSModule) ResolveRelative(labels []string, pkey *ed25519.PublicKey, 
 		// is this the record type we are looking for?
 		if kind.HasType(int(rec.Type)) {
 			// add it to the result
-			set.AddRecord(rec)
+			if rec = hdlrs.FinalizeRecord(rec); rec != nil {
+				set.AddRecord(rec)
+			}
 		}
 	}
 	return
