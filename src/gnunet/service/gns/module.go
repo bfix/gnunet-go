@@ -167,7 +167,7 @@ func (gns *GNSModule) ResolveRelative(labels []string, pkey *ed25519.PublicKey, 
 		// assemble a list of block handlers for this block: if multiple
 		// block handlers are present, they are consistent with all block
 		// records.
-		if hdlrs, err = NewBlockHandlerList(records, labels[1:]); err != nil {
+		if hdlrs, records, err = NewBlockHandlerList(records, labels[1:]); err != nil {
 			// conflicting block handler records found: terminate with error.
 			// (N.B.: The BlockHandlerList class executes the logic which mix
 			// of resource records in a single block is considered valid.)

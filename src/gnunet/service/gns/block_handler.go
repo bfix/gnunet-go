@@ -81,32 +81,55 @@ type BlockHandler interface {
 
 // BlockHandlerList is a list of block handlers instantiated.
 type BlockHandlerList struct {
-	list    map[int]BlockHandler         // list of handler instances
-	counts  util.CounterMap              // count number of RRs by type
-	shadows []*message.GNSResourceRecord // list of shadow records
+	list   map[int]BlockHandler // list of handler instances
+	counts util.CounterMap      // count number of RRs by type
 }
 
 // NewBlockHandlerList instantiates an a list of active block handlers
 // for a given set of records (GNS block).
-func NewBlockHandlerList(records []*message.GNSResourceRecord, labels []string) (*BlockHandlerList, error) {
+func NewBlockHandlerList(records []*message.GNSResourceRecord, labels []string) (*BlockHandlerList, []*message.GNSResourceRecord, error) {
 	// initialize block handler list
 	hl := &BlockHandlerList{
-		list:    make(map[int]BlockHandler),
-		counts:  make(util.CounterMap),
-		shadows: make([]*message.GNSResourceRecord, 0),
+		list:   make(map[int]BlockHandler),
+		counts: make(util.CounterMap),
 	}
 
-	// Traverse record list and build list of handler instances
+	// first pass: build list of shadow records in this block
+	shadows := make([]*message.GNSResourceRecord, 0)
 	for _, rec := range records {
+		// filter out shadow records...
+		if (int(rec.Flags) & enums.GNS_FLAG_SHADOW) != 0 {
+			shadows = append(shadows, rec)
+		}
+	}
+	// second pass: normalize block by filtering out expired records (and
+	// replacing them with shadow records if available
+	active := make([]*message.GNSResourceRecord, 0)
+	for _, rec := range records {
+		// don't process shadow records again
+		if (int(rec.Flags) & enums.GNS_FLAG_SHADOW) != 0 {
+			continue
+		}
+		// check for expired record
+		if rec.Expires.Expired() {
+			// do we have an associated shadow record?
+			for _, shadow := range shadows {
+				if shadow.Type == rec.Type && !shadow.Expires.Expired() {
+					// deliver un-expired shadow record instead.
+					shadow.Flags &^= uint32(enums.GNS_FLAG_SHADOW)
+					active = append(active, shadow)
+				}
+			}
+		} else {
+			active = append(active, rec)
+		}
+	}
+
+	// Third pass: Traverse active list and build list of handler instances.
+	for _, rec := range active {
 		// update counter map
 		rrType := int(rec.Type)
 		hl.counts.Add(rrType)
-
-		// check for SHADOW record.
-		if (int(rec.Flags) & enums.GNS_FLAG_SHADOW) != 0 {
-			// add to list of shadows
-			hl.shadows = append(hl.shadows, rec)
-		}
 
 		// check for custom handler type
 		if creat, ok := customHandler[rrType]; ok {
@@ -118,13 +141,13 @@ func NewBlockHandlerList(records []*message.GNSResourceRecord, labels []string) 
 			if hdlr, ok = hl.list[rrType]; ok {
 				// add record to existing handler
 				if err = hdlr.AddRecord(rec, labels); err != nil {
-					return nil, err
+					return nil, active, err
 				}
 				continue
 			}
 			// create a new handler instance
 			if hdlr, err = creat(rec, labels); err != nil {
-				return nil, err
+				return nil, active, err
 			}
 			// store handler in list
 			hl.list[rrType] = hdlr
@@ -136,11 +159,11 @@ func NewBlockHandlerList(records []*message.GNSResourceRecord, labels []string) 
 	for _, hdlr := range hl.list {
 		if !hdlr.Coexist(hl.counts) {
 			logger.Printf(logger.ERROR, "[gns] %s.Coexist() failed!\n", hdlr.Name())
-			return nil, ErrInvalidRecordMix
+			return nil, active, ErrInvalidRecordMix
 		}
 	}
 	// return assembled handler list
-	return hl, nil
+	return hl, active, nil
 }
 
 // GetHandler returns a BlockHandler for the given key. If no block handler exists
@@ -154,25 +177,9 @@ func (hl *BlockHandlerList) GetHandler(t int) BlockHandler {
 	return nil
 }
 
-// FinalizeRecord post-processes records: Filtering out expired records (and
-// replacing them with a shadow record if available).
+// FinalizeRecord post-processes records
 func (hl *BlockHandlerList) FinalizeRecord(rec *message.GNSResourceRecord) *message.GNSResourceRecord {
-	// filter out shadow records...
-	if (int(rec.Flags) & enums.GNS_FLAG_SHADOW) != 0 {
-		return nil
-	}
-	// check for expired record
-	if rec.Expires.Expired() {
-		// do we have an associated shadow record?
-		for _, shadow := range hl.shadows {
-			if shadow.Type == rec.Type && !shadow.Expires.Expired() {
-				// deliver un-expired shadow record instead.
-				return shadow
-			}
-		}
-		// expired and un-shadowed record is dropped
-		return nil
-	}
+	// no implementation yet
 	return rec
 }
 
