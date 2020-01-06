@@ -76,6 +76,6 @@ loop:
 
 	// terminating service
 	srv.Stop()
-	// wait for logger to flush last messages
-	time.Sleep(5 * time.Second)
+	// flush last messages
+	logger.Flush()
 }

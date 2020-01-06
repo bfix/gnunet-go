@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"sync"
 
 	"gnunet/transport"
 
@@ -14,7 +15,7 @@ import (
 // Channel semantics in the specification string.
 type Service interface {
 	Start(spec string) error
-	ServeClient(ch *transport.MsgChannel)
+	ServeClient(wg *sync.WaitGroup, ch *transport.MsgChannel)
 	Stop() error
 }
 
@@ -24,6 +25,7 @@ type ServiceImpl struct {
 	hdlr    chan transport.Channel
 	ctrl    chan bool
 	srvc    transport.ChannelServer
+	wg      *sync.WaitGroup
 	name    string
 	running bool
 }
@@ -35,6 +37,7 @@ func NewServiceImpl(name string, srv Service) *ServiceImpl {
 		hdlr:    make(chan transport.Channel),
 		ctrl:    make(chan bool),
 		srvc:    nil,
+		wg:      new(sync.WaitGroup),
 		name:    name,
 		running: false,
 	}
@@ -56,7 +59,9 @@ func (si *ServiceImpl) Start(spec string) (err error) {
 	si.running = true
 
 	// handle clients
+	si.wg.Add(1)
 	go func() {
+		defer si.wg.Done()
 	loop:
 		for si.running {
 			select {
@@ -68,7 +73,7 @@ func (si *ServiceImpl) Start(spec string) (err error) {
 				switch ch := in.(type) {
 				case transport.Channel:
 					logger.Printf(logger.INFO, "[%s] Client connected.\n", si.name)
-					go si.impl.ServeClient(transport.NewMsgChannel(ch))
+					go si.impl.ServeClient(si.wg, transport.NewMsgChannel(ch))
 				}
 			case <-si.ctrl:
 				break loop
@@ -92,5 +97,7 @@ func (si *ServiceImpl) Stop() error {
 	si.ctrl <- true
 	logger.Printf(logger.INFO, "[%s] Service terminating.\n", si.name)
 
-	return si.impl.Stop()
+	err := si.impl.Stop()
+	si.wg.Wait()
+	return err
 }

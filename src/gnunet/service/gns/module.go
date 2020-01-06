@@ -95,7 +95,6 @@ type GNSModule struct {
 	LookupLocal  func(query *Query) (*GNSBlock, error)
 	StoreLocal   func(query *Query, block *GNSBlock) error
 	LookupRemote func(query *Query) (*GNSBlock, error)
-	GetLocalZone func(name string) (*ed25519.PublicKey, error)
 }
 
 // Resolve a GNS name with multiple labels. If pkey is not nil, the name
@@ -124,14 +123,8 @@ func (gns *GNSModule) ResolveAbsolute(labels []string, kind RRTypeList, mode int
 		pkey = config.Cfg.GNS.GetRootZoneKey(labels[0])
 	}
 	if pkey == nil {
-		// (3) check if TLD is one of our identities
-		pkey, err = gns.GetLocalZone(labels[0])
-	}
-	if pkey == nil {
-		if err == nil {
-			err = ErrUnknownTLD
-		}
-		// (4) we can't resolve this TLD
+		// we can't resolve this TLD
+		err = ErrUnknownTLD
 		return
 	}
 	// continue with resolution relative to a zone.

@@ -3,6 +3,7 @@ package gns
 import (
 	"encoding/hex"
 	"io"
+	"sync"
 
 	"gnunet/config"
 	"gnunet/crypto"
@@ -33,7 +34,6 @@ func NewGNSService() service.Service {
 	inst.LookupLocal = inst.LookupNamecache
 	inst.StoreLocal = inst.StoreNamecache
 	inst.LookupRemote = inst.LookupDHT
-	inst.GetLocalZone = inst.GetPrivateZone
 	return inst
 }
 
@@ -48,7 +48,9 @@ func (s *GNSService) Stop() error {
 }
 
 // Serve a client channel.
-func (s *GNSService) ServeClient(mc *transport.MsgChannel) {
+func (s *GNSService) ServeClient(wg *sync.WaitGroup, mc *transport.MsgChannel) {
+	defer wg.Done()
+loop:
 	for {
 		// receive next message from client
 		msg, err := mc.Receive()
@@ -58,7 +60,7 @@ func (s *GNSService) ServeClient(mc *transport.MsgChannel) {
 			} else {
 				logger.Printf(logger.ERROR, "[gns] Message-receive failed: %s\n", err.Error())
 			}
-			break
+			break loop
 		}
 		logger.Printf(logger.INFO, "[gns] Received msg: %v\n", msg)
 
@@ -74,50 +76,51 @@ func (s *GNSService) ServeClient(mc *transport.MsgChannel) {
 			resp = respX
 
 			// perform lookup on block (locally and remote)
-			// TODO: run code in a go routine concurrently (would need
-			//       access to the message channel to send responses)
-			pkey := ed25519.NewPublicKeyFromBytes(m.Zone)
-			label := m.GetName()
-			kind := NewRRTypeList(int(m.Type))
-			recset, err := s.Resolve(label, pkey, kind, int(m.Options))
-			if err != nil {
-				logger.Printf(logger.ERROR, "[gns] Failed to lookup block: %s\n", err.Error())
-				break
-			}
-			// handle records
-			if recset != nil {
-				logger.Printf(logger.DBG, "[gns] Received record set with %d entries\n", recset.Count)
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
 
-				// get records from block
-				if recset.Count == 0 {
-					logger.Println(logger.WARN, "[gns] No records in block")
-					break
+				pkey := ed25519.NewPublicKeyFromBytes(m.Zone)
+				label := m.GetName()
+				kind := NewRRTypeList(int(m.Type))
+				recset, err := s.Resolve(label, pkey, kind, int(m.Options))
+				if err != nil {
+					logger.Printf(logger.ERROR, "[gns] Failed to lookup block: %s\n", err.Error())
+					return
 				}
-				// process records
-				for i, rec := range recset.Records {
-					logger.Printf(logger.DBG, "[gns] Record #%d: %v\n", i, rec)
+				// handle records
+				if recset != nil {
+					logger.Printf(logger.DBG, "[gns] Received record set with %d entries\n", recset.Count)
 
-					// is this the record type we are looking for?
-					if rec.Type == m.Type || int(m.Type) == enums.GNS_TYPE_ANY {
-						// add it to the response message
-						respX.AddRecord(rec)
+					// get records from block
+					if recset.Count == 0 {
+						logger.Println(logger.WARN, "[gns] No records in block")
+						return
+					}
+					// process records
+					for i, rec := range recset.Records {
+						logger.Printf(logger.DBG, "[gns] Record #%d: %v\n", i, rec)
+
+						// is this the record type we are looking for?
+						if rec.Type == m.Type || int(m.Type) == enums.GNS_TYPE_ANY {
+							// add it to the response message
+							respX.AddRecord(rec)
+						}
 					}
 				}
-			}
+				// send response
+				if err := mc.Send(resp); err != nil {
+					logger.Printf(logger.ERROR, "[gns] Failed to send response: %s\n", err.Error())
+				}
+			}()
 
 		default:
 			//----------------------------------------------------------
 			// UNKNOWN message type received
 			//----------------------------------------------------------
 			logger.Printf(logger.ERROR, "[gns] Unhandled message of type (%d)\n", msg.Header().MsgType)
-			continue
+			break loop
 		}
-
-		// send response
-		if err := mc.Send(resp); err != nil {
-			logger.Printf(logger.ERROR, "[gns] Failed to send response: %s\n", err.Error())
-		}
-
 	}
 	// close client connection
 	mc.Close()
@@ -251,9 +254,4 @@ func (s *GNSService) LookupDHT(query *Query) (block *GNSBlock, err error) {
 		}
 	}
 	return
-}
-
-// GetPrivateZone
-func (s *GNSService) GetPrivateZone(name string) (*ed25519.PublicKey, error) {
-	return nil, nil
 }
