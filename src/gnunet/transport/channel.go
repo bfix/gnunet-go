@@ -22,11 +22,14 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"path"
 	"strings"
+
+	"gnunet/message"
+	"gnunet/util"
 
 	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
-	"gnunet/message"
 )
 
 // Error codes
@@ -97,12 +100,19 @@ var channelServerImpl = map[string]ChannelServerFactory{
 }
 
 // NewChannelServer
-func NewChannelServer(spec string, hdlr chan<- Channel) (ChannelServer, error) {
+func NewChannelServer(spec string, hdlr chan<- Channel) (cs ChannelServer, err error) {
 	parts := strings.Split(spec, "+")
+
 	if fac, ok := channelServerImpl[parts[0]]; ok {
-		inst := fac()
-		err := inst.Open(spec, hdlr)
-		return inst, err
+		// check if the basedir for the spec exists...
+		if err = util.EnforceDirExists(path.Base(parts[1])); err != nil {
+			return
+		}
+		// instantiate server implementation
+		cs = fac()
+		// create the domain socket and listen to it.
+		err = cs.Open(spec, hdlr)
+		return
 	}
 	return nil, ErrChannelNotImplemented
 }
