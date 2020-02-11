@@ -25,9 +25,6 @@ import (
 	"regexp"
 	"strings"
 
-	"gnunet/util"
-
-	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/logger"
 )
 
@@ -36,21 +33,9 @@ import (
 
 // GNSConfig
 type GNSConfig struct {
-	Endpoint     string            `json:"endpoint"`     // end-point of GNS service
-	DHTReplLevel int               `json:"dhtReplLevel"` // DHT replication level
-	RootZones    map[string]string `json:"rootZones"`    // pre-configured root zones
-}
-
-// GetRootZoneKey returns the zone key (PKEY) for a pre-configured root with given name.
-func (gns *GNSConfig) GetRootZoneKey(name string) *ed25519.PublicKey {
-	// lookup key in the dictionary
-	if dStr, ok := gns.RootZones[name]; ok {
-		if data, err := util.DecodeStringToBinary(dStr, 32); err == nil {
-			return ed25519.NewPublicKeyFromBytes(data)
-		}
-	}
-	// no pkey found.
-	return nil
+	Endpoint     string `json:"endpoint"`     // end-point of GNS service
+	DHTReplLevel int    `json:"dhtReplLevel"` // DHT replication level
+	MaxDepth     int    `json:"maxDepth"`     // maximum recursion depth in resolution
 }
 
 ///////////////////////////////////////////////////////////////////////

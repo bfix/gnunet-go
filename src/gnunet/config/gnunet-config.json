@@ -9,9 +9,7 @@
 	"gns": {
 		"endpoint": "unix+${RT_SYS}/gnunet-service-gns-go.sock+perm=0770",
 		"dhtReplLevel": 10,
-		"rootZones": {
-			"home": "ACAB23DC3SEECJORPHQNVRH965A6N74B1M37S721IG4RBQ15PJLL"
-		}
+		"maxDepth": 250
 	},
 	"namecache": {
 		"endpoint": "unix+${RT_SYS}/gnunet-service-namecache.sock"
