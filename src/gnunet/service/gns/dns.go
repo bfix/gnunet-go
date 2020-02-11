@@ -147,7 +147,7 @@ func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *message.GNSR
 // ResolveDNS resolves a name in DNS. Multiple DNS servers are queried in
 // parallel; the first result delivered by any of the servers is returned
 // as the result list of matching resource records.
-func (gns *GNSModule) ResolveDNS(name string, servers []string, kind RRTypeList, pkey *ed25519.PublicKey) (set *message.GNSRecordSet, err error) {
+func (gns *GNSModule) ResolveDNS(name string, servers []string, kind RRTypeList, pkey *ed25519.PublicKey, depth int) (set *message.GNSRecordSet, err error) {
 	logger.Printf(logger.DBG, "[dns] Resolution of '%s' starting...\n", name)
 
 	// start DNS queries concurrently
@@ -160,7 +160,7 @@ func (gns *GNSModule) ResolveDNS(name string, servers []string, kind RRTypeList,
 		if addr == nil {
 			// no, it is a name... try to resolve an IP address from the name
 			query := NewRRTypeList(enums.GNS_TYPE_DNS_A, enums.GNS_TYPE_DNS_AAAA)
-			if set, err = gns.ResolveUnknown(srv, pkey, query); err != nil {
+			if set, err = gns.ResolveUnknown(srv, pkey, query, depth+1); err != nil {
 				logger.Printf(logger.ERROR, "[dns] Can't resolve NS server '%s': %s\n", srv, err.Error())
 				continue
 			}
