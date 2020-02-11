@@ -1,6 +1,7 @@
 package namecache
 
 import (
+	"gnunet/message"
 	"gnunet/service/gns"
 )
 
@@ -16,10 +17,10 @@ import (
 type NamecacheModule struct {
 }
 
-func (nc *NamecacheModule) Get(query *gns.Query) (*gns.GNSBlock, error) {
+func (nc *NamecacheModule) Get(query *gns.Query) (*message.GNSBlock, error) {
 	return nil, nil
 }
 
-func (nc *NamecacheModule) Put(query *gns.Query, block *gns.GNSBlock) error {
+func (nc *NamecacheModule) Put(query *gns.Query, block *message.GNSBlock) error {
 	return nil
 }

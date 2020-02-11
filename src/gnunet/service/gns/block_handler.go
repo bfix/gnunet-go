@@ -61,7 +61,7 @@ type BlockHandler interface {
 
 	// Records returns a list of RR of the given types associated with
 	// the custom handler
-	Records(kind RRTypeList) *GNSRecordSet
+	Records(kind RRTypeList) *message.GNSRecordSet
 
 	// Name returns the human-readable name of the handler
 	Name() string
@@ -236,8 +236,8 @@ func (h *PkeyHandler) Coexist(cm util.CounterMap) bool {
 }
 
 // Records returns a list of RR of the given type associated with this handler
-func (h *PkeyHandler) Records(kind RRTypeList) *GNSRecordSet {
-	rs := NewGNSRecordSet()
+func (h *PkeyHandler) Records(kind RRTypeList) *message.GNSRecordSet {
+	rs := message.NewGNSRecordSet()
 	if kind.HasType(enums.GNS_TYPE_PKEY) {
 		rs.AddRecord(h.rec)
 	}
@@ -311,8 +311,8 @@ func (h *Gns2DnsHandler) Coexist(cm util.CounterMap) bool {
 }
 
 // Records returns a list of RR of the given type associated with this handler
-func (h *Gns2DnsHandler) Records(kind RRTypeList) *GNSRecordSet {
-	rs := NewGNSRecordSet()
+func (h *Gns2DnsHandler) Records(kind RRTypeList) *message.GNSRecordSet {
+	rs := message.NewGNSRecordSet()
 	if kind.HasType(enums.GNS_TYPE_GNS2DNS) {
 		for _, rec := range h.recs {
 			rs.AddRecord(rec)
@@ -381,8 +381,8 @@ func (h *BoxHandler) Coexist(cm util.CounterMap) bool {
 }
 
 // Records returns a list of RR of the given type associated with this handler
-func (h *BoxHandler) Records(kind RRTypeList) *GNSRecordSet {
-	rs := NewGNSRecordSet()
+func (h *BoxHandler) Records(kind RRTypeList) *message.GNSRecordSet {
+	rs := message.NewGNSRecordSet()
 	for _, box := range h.boxes {
 		if kind.HasType(int(box.Type)) {
 			// valid box found: assemble new resource record.
@@ -451,8 +451,8 @@ func (h *LehoHandler) Coexist(cm util.CounterMap) bool {
 }
 
 // Records returns a list of RR of the given type associated with this handler
-func (h *LehoHandler) Records(kind RRTypeList) *GNSRecordSet {
-	rs := NewGNSRecordSet()
+func (h *LehoHandler) Records(kind RRTypeList) *message.GNSRecordSet {
+	rs := message.NewGNSRecordSet()
 	if kind.HasType(enums.GNS_TYPE_LEHO) {
 		rs.AddRecord(h.rec)
 	}
@@ -509,8 +509,8 @@ func (h *CnameHandler) Coexist(cm util.CounterMap) bool {
 }
 
 // Records returns a list of RR of the given type associated with this handler
-func (h *CnameHandler) Records(kind RRTypeList) *GNSRecordSet {
-	rs := NewGNSRecordSet()
+func (h *CnameHandler) Records(kind RRTypeList) *message.GNSRecordSet {
+	rs := message.NewGNSRecordSet()
 	if kind.HasType(enums.GNS_TYPE_DNS_CNAME) {
 		rs.AddRecord(h.rec)
 	}
@@ -563,8 +563,8 @@ func (h *VpnHandler) Coexist(cm util.CounterMap) bool {
 }
 
 // Records returns a list of RR of the given type associated with this handler
-func (h *VpnHandler) Records(kind RRTypeList) *GNSRecordSet {
-	rs := NewGNSRecordSet()
+func (h *VpnHandler) Records(kind RRTypeList) *message.GNSRecordSet {
+	rs := message.NewGNSRecordSet()
 	if kind.HasType(enums.GNS_TYPE_VPN) {
 		rs.AddRecord(h.rec)
 	}

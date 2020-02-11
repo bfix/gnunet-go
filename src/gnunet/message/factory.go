@@ -59,6 +59,10 @@ func NewEmptyMessage(msgType uint16) (Message, error) {
 		return NewNamecacheLookupMsg(nil), nil
 	case NAMECACHE_LOOKUP_BLOCK_RESPONSE:
 		return NewNamecacheLookupResultMsg(), nil
+	case NAMECACHE_BLOCK_CACHE:
+		return NewNamecacheCacheMsg(nil), nil
+	case NAMECACHE_BLOCK_CACHE_RESPONSE:
+		return NewNamecacheCacheResponseMsg(), nil
 	}
 	return nil, errors.New(fmt.Sprintf("Unknown message type %d", msgType))
 }

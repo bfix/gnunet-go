@@ -45,7 +45,7 @@ func DNSNameFromBytes(b []byte, offset int) (int, string) {
 	return pos + 1, str
 }
 
-func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *GNSRecordSet {
+func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *message.GNSRecordSet {
 	// get default nameserver if not defined.
 	if server == nil {
 		server = net.IPv4(8, 8, 8, 8)
@@ -90,7 +90,7 @@ func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *GNSRecordSet
 			logger.Printf(logger.ERROR, "[dns][%d] No results\n", id)
 			return nil
 		}
-		set := NewGNSRecordSet()
+		set := message.NewGNSRecordSet()
 		for _, record := range in.Answer {
 			// check if answer record is of requested type
 			if kind.HasType(int(record.Header().Rrtype)) {
@@ -129,11 +129,11 @@ func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *GNSRecordSet
 // ResolveDNS resolves a name in DNS. Multiple DNS servers are queried in
 // parallel; the first result delivered by any of the servers is returned
 // as the result list of matching resource records.
-func (gns *GNSModule) ResolveDNS(name string, servers []string, kind RRTypeList, pkey *ed25519.PublicKey) (set *GNSRecordSet, err error) {
+func (gns *GNSModule) ResolveDNS(name string, servers []string, kind RRTypeList, pkey *ed25519.PublicKey) (set *message.GNSRecordSet, err error) {
 	logger.Printf(logger.DBG, "[dns] Resolution of '%s' starting...\n", name)
 
 	// start DNS queries concurrently
-	res := make(chan *GNSRecordSet)
+	res := make(chan *message.GNSRecordSet)
 	running := 0
 	for _, srv := range servers {
 		// check if srv is an IPv4/IPv6 address

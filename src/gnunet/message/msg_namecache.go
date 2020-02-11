@@ -82,3 +82,85 @@ func (m *NamecacheLookupResultMsg) String() string {
 func (msg *NamecacheLookupResultMsg) Header() *MessageHeader {
 	return &MessageHeader{msg.MsgSize, msg.MsgType}
 }
+
+//----------------------------------------------------------------------
+// NAMECACHE_CACHE_BLOCK
+//----------------------------------------------------------------------
+
+// NamecacheCacheMsg
+type NamecacheCacheMsg struct {
+	MsgSize    uint16            `order:"big"` // total size of message
+	MsgType    uint16            `order:"big"` // NAMECACHE_CACHE_BLOCK (433)
+	Id         uint32            `order:"big"` // Request Id
+	Expire     util.AbsoluteTime // Expiration time
+	Signature  []byte            `size:"64"` // ECDSA signature
+	DerivedKey []byte            `size:"32"` // Derived public key
+	EncData    []byte            `size:"*"`  // Encrypted block data
+}
+
+// NewNamecacheLookupMsg creates a new default message.
+func NewNamecacheCacheMsg(block *GNSBlock) *NamecacheCacheMsg {
+	msg := &NamecacheCacheMsg{
+		MsgSize:    108,
+		MsgType:    NAMECACHE_BLOCK_CACHE,
+		Id:         0,
+		Expire:     *new(util.AbsoluteTime),
+		Signature:  make([]byte, 64),
+		DerivedKey: make([]byte, 32),
+		EncData:    make([]byte, 0),
+	}
+	if block != nil {
+		msg.Expire = block.Block.Expire
+		copy(msg.Signature, block.Signature)
+		copy(msg.DerivedKey, block.DerivedKey)
+		size := len(block.Block.EncData)
+		msg.EncData = make([]byte, size)
+		copy(msg.EncData, block.Block.EncData)
+		msg.MsgSize += uint16(size)
+	}
+	return msg
+}
+
+// String returns a human-readable representation of the message.
+func (m *NamecacheCacheMsg) String() string {
+	return fmt.Sprintf("NewNamecacheCacheMsg{id=%d,expire=%s}",
+		m.Id, m.Expire)
+}
+
+// Header returns the message header in a separate instance.
+func (msg *NamecacheCacheMsg) Header() *MessageHeader {
+	return &MessageHeader{msg.MsgSize, msg.MsgType}
+}
+
+//----------------------------------------------------------------------
+// NAMECACHE_BLOCK_CACHE_RESPONSE
+//----------------------------------------------------------------------
+
+// NamecacheCacheResponseMsg
+type NamecacheCacheResponseMsg struct {
+	MsgSize uint16 `order:"big"` // total size of message
+	MsgType uint16 `order:"big"` // NAMECACHE_LOOKUP_BLOCK_RESPONSE (432)
+	Id      uint32 `order:"big"` // Request Id
+	Result  int32  `order:"big"` // Result code
+}
+
+// NewNamecacheCacheResponseMsg creates a new default message.
+func NewNamecacheCacheResponseMsg() *NamecacheCacheResponseMsg {
+	return &NamecacheCacheResponseMsg{
+		MsgSize: 12,
+		MsgType: NAMECACHE_BLOCK_CACHE_RESPONSE,
+		Id:      0,
+		Result:  0,
+	}
+}
+
+// String returns a human-readable representation of the message.
+func (m *NamecacheCacheResponseMsg) String() string {
+	return fmt.Sprintf("NamecacheCacheResponseMsg{id=%d,result=%d}",
+		m.Id, m.Result)
+}
+
+// Header returns the message header in a separate instance.
+func (msg *NamecacheCacheResponseMsg) Header() *MessageHeader {
+	return &MessageHeader{msg.MsgSize, msg.MsgType}
+}

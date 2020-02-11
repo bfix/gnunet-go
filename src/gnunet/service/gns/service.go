@@ -83,7 +83,7 @@ loop:
 				pkey := ed25519.NewPublicKeyFromBytes(m.Zone)
 				label := m.GetName()
 				kind := NewRRTypeList(int(m.Type))
-				recset, err := s.Resolve(label, pkey, kind, int(m.Options))
+				recset, err := s.Resolve(label, pkey, kind, int(m.Options), 0)
 				if err != nil {
 					logger.Printf(logger.ERROR, "[gns] Failed to lookup block: %s\n", err.Error())
 					return
@@ -127,7 +127,7 @@ loop:
 }
 
 // LookupNamecache
-func (s *GNSService) LookupNamecache(query *Query) (block *GNSBlock, err error) {
+func (s *GNSService) LookupNamecache(query *Query) (block *message.GNSBlock, err error) {
 	logger.Printf(logger.DBG, "[gns] LookupNamecache(%s)...\n", hex.EncodeToString(query.Key.Bits))
 
 	// assemble Namecache request
@@ -162,10 +162,10 @@ func (s *GNSService) LookupNamecache(query *Query) (block *GNSBlock, err error) 
 		}
 
 		// assemble GNSBlock from message
-		block = new(GNSBlock)
+		block = new(message.GNSBlock)
 		block.Signature = m.Signature
 		block.DerivedKey = m.DerivedKey
-		sb := new(SignedBlockData)
+		sb := new(message.SignedBlockData)
 		sb.Purpose = new(crypto.SignaturePurpose)
 		sb.Purpose.Purpose = enums.SIG_GNS_RECORD_SIGN
 		sb.Purpose.Size = uint32(16 + len(m.EncData))
@@ -185,13 +185,13 @@ func (s *GNSService) LookupNamecache(query *Query) (block *GNSBlock, err error) 
 }
 
 // StoreNamecache
-func (s *GNSService) StoreNamecache(query *Query, block *GNSBlock) error {
+func (s *GNSService) StoreNamecache(query *Query, block *message.GNSBlock) error {
 	logger.Println(logger.WARN, "[gns] StoreNamecache() not implemented yet!")
 	return nil
 }
 
 // LookupDHT
-func (s *GNSService) LookupDHT(query *Query) (block *GNSBlock, err error) {
+func (s *GNSService) LookupDHT(query *Query) (block *message.GNSBlock, err error) {
 	logger.Printf(logger.DBG, "[gns] LookupDHT(%s)...\n", hex.EncodeToString(query.Key.Bits))
 
 	// assemble DHT request
@@ -234,7 +234,7 @@ func (s *GNSService) LookupDHT(query *Query) (block *GNSBlock, err error) {
 		}
 
 		// get GNSBlock from message
-		block = NewGNSBlock()
+		block = message.NewGNSBlock()
 		if err = data.Unmarshal(block, m.Data); err != nil {
 			logger.Printf(logger.ERROR, "[gns] can't read GNS block: %s\n", err.Error())
 			break
