@@ -1,7 +1,26 @@
+// This file is part of gnunet-go, a GNUnet-implementation in Golang.
+// Copyright (C) 2019, 2020 Bernd Fix  >Y<
+//
+// gnunet-go is free software: you can redistribute it and/or modify it
+// under the terms of the GNU Affero General Public License as published
+// by the Free Software Foundation, either version 3 of the License,
+// or (at your option) any later version.
+//
+// gnunet-go is distributed in the hope that it will be useful, but
+// WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+// Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
+// SPDX-License-Identifier: AGPL3.0-or-later
+
 package gns
 
 import (
 	"encoding/hex"
+	"fmt"
 	"io"
 	"sync"
 
@@ -16,6 +35,13 @@ import (
 	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
+)
+
+// Error codes
+var (
+	ErrInvalidID           = fmt.Errorf("Invalid/unassociated ID")
+	ErrBlockExpired        = fmt.Errorf("Block expired")
+	ErrInvalidResponseType = fmt.Errorf("Invald response type")
 )
 
 //----------------------------------------------------------------------
@@ -148,6 +174,7 @@ func (s *GNSService) LookupNamecache(query *Query) (block *message.GNSBlock, err
 		// check for matching IDs
 		if m.Id != req.Id {
 			logger.Println(logger.ERROR, "[gns] Got response for unknown ID")
+			err = ErrInvalidID
 			break
 		}
 		// check if block was found
@@ -158,6 +185,7 @@ func (s *GNSService) LookupNamecache(query *Query) (block *message.GNSBlock, err
 		// check if record has expired
 		if m.Expire.Expired() {
 			logger.Printf(logger.ERROR, "[gns] block expired at %s\n", m.Expire)
+			err = ErrBlockExpired
 			break
 		}
 
@@ -180,14 +208,47 @@ func (s *GNSService) LookupNamecache(query *Query) (block *message.GNSBlock, err
 		if err = block.Decrypt(query.Zone, query.Label); err != nil {
 			break
 		}
+	default:
+		logger.Printf(logger.ERROR, "[gns] Got invalid response type (%d)\n", m.Header().MsgType)
+		err = ErrInvalidResponseType
 	}
 	return
 }
 
 // StoreNamecache
-func (s *GNSService) StoreNamecache(query *Query, block *message.GNSBlock) error {
-	logger.Println(logger.WARN, "[gns] StoreNamecache() not implemented yet!")
-	return nil
+func (s *GNSService) StoreNamecache(block *message.GNSBlock) (err error) {
+	logger.Println(logger.DBG, "[gns] StoreNamecache()...")
+
+	// assemble Namecache request
+	req := message.NewNamecacheCacheMsg(block)
+	req.Id = uint32(util.NextID())
+
+	// get response from Namecache service
+	var resp message.Message
+	if resp, err = service.ServiceRequestResponse("gns", "Namecache", config.Cfg.Namecache.Endpoint, req); err != nil {
+		return
+	}
+
+	// handle message depending on its type
+	logger.Println(logger.DBG, "[gns] Handling response from Namecache service")
+	switch m := resp.(type) {
+	case *message.NamecacheCacheResponseMsg:
+		// check for matching IDs
+		if m.Id != req.Id {
+			logger.Println(logger.ERROR, "[gns] Got response for unknown ID")
+			err = ErrInvalidID
+			break
+		}
+		// check result
+		if m.Result == 0 {
+			return nil
+		}
+		return fmt.Errorf("Failed with rc=%d", m.Result)
+	default:
+		logger.Printf(logger.ERROR, "[gns] Got invalid response type (%d)\n", m.Header().MsgType)
+		err = ErrInvalidResponseType
+	}
+	return
 }
 
 // LookupDHT
@@ -249,7 +310,7 @@ func (s *GNSService) LookupDHT(query *Query) (block *message.GNSBlock, err error
 
 		// we got a result from DHT that was not in the namecache,
 		// so store it there now.
-		if err = s.StoreNamecache(query, block); err != nil {
+		if err = s.StoreNamecache(block); err != nil {
 			logger.Printf(logger.ERROR, "[gns] can't store block in Namecache: %s\n", err.Error())
 		}
 	}
