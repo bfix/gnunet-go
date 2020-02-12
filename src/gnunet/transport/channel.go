@@ -105,7 +105,7 @@ func NewChannelServer(spec string, hdlr chan<- Channel) (cs ChannelServer, err e
 
 	if fac, ok := channelServerImpl[parts[0]]; ok {
 		// check if the basedir for the spec exists...
-		if err = util.EnforceDirExists(path.Base(parts[1])); err != nil {
+		if err = util.EnforceDirExists(path.Dir(parts[1])); err != nil {
 			return
 		}
 		// instantiate server implementation
