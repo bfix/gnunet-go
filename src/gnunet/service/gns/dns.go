@@ -40,6 +40,57 @@ var (
 	ErrNoDNSResults = fmt.Errorf("No valid DNS results")
 )
 
+//----------------------------------------------------------------------
+// List of resource records types (for GNS/DNS queries)
+//----------------------------------------------------------------------
+
+// RRTypeList is a list of integers representing RR types.
+type RRTypeList []int
+
+// Initialize a new type list with given type values
+func NewRRTypeList(args ...int) (res RRTypeList) {
+	for _, val := range args {
+		// if GNS_TYPE_ANY is encountered, it becomes the sole type
+		if val == enums.GNS_TYPE_ANY {
+			res = make(RRTypeList, 1)
+			res[0] = val
+			return
+		}
+		res = append(res, val)
+	}
+	// if no types are passed, mode ANY is set.
+	if len(res) == 0 {
+		res = make(RRTypeList, 1)
+		res[0] = enums.GNS_TYPE_ANY
+		return
+	}
+	return
+}
+
+// IsAny returns true if no type is filtered.
+func (tl RRTypeList) IsAny() bool {
+	return tl[0] == enums.GNS_TYPE_ANY
+}
+
+// HasType returns true if the type is included in the list
+func (tl RRTypeList) HasType(t int) bool {
+	// return true if type is GNS_TYPE_ANY
+	if tl[0] == enums.GNS_TYPE_ANY {
+		return true
+	}
+	// check for type in list
+	for _, val := range tl {
+		if val == t {
+			return true
+		}
+	}
+	return false
+}
+
+//----------------------------------------------------------------------
+// Helper functions
+//----------------------------------------------------------------------
+
 // Convert DNS name from its binary representation [RFC1034]:
 // A string is a sequence of a (len,chars...) tupels terminated by a (len=0,).
 // The name parts are concatenated with "." as separator.
@@ -144,6 +195,10 @@ func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *message.GNSR
 	return nil
 }
 
+//----------------------------------------------------------------------
+// GNSModule methods
+//----------------------------------------------------------------------
+
 // ResolveDNS resolves a name in DNS. Multiple DNS servers are queried in
 // parallel; the first result delivered by any of the servers is returned
 // as the result list of matching resource records.
@@ -160,7 +215,7 @@ func (gns *GNSModule) ResolveDNS(name string, servers []string, kind RRTypeList,
 		if addr == nil {
 			// no, it is a name... try to resolve an IP address from the name
 			query := NewRRTypeList(enums.GNS_TYPE_DNS_A, enums.GNS_TYPE_DNS_AAAA)
-			if set, err = gns.ResolveUnknown(srv, pkey, query, depth+1); err != nil {
+			if set, err = gns.ResolveUnknown(srv, nil, pkey, query, depth+1); err != nil {
 				logger.Printf(logger.ERROR, "[dns] Can't resolve NS server '%s': %s\n", srv, err.Error())
 				continue
 			}

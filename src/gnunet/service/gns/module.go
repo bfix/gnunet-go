@@ -245,10 +245,10 @@ func (gns *GNSModule) ResolveRelative(labels []string, pkey *ed25519.PublicKey, 
 			inst := hdlr.(*CnameHandler)
 			// if we are at the end of the path and the requested type
 			// includes GNS_TYPE_DNS_CNAME, the records are returned...
-			if len(labels) == 1 && kind.HasType(enums.GNS_TYPE_DNS_CNAME) {
+			if len(labels) == 1 && kind.HasType(enums.GNS_TYPE_DNS_CNAME) && !kind.IsAny() {
 				break
 			}
-			if set, err = gns.ResolveUnknown(inst.name, pkey, kind, depth+1); err != nil {
+			if set, err = gns.ResolveUnknown(inst.name, labels, pkey, kind, depth+1); err != nil {
 				logger.Println(logger.ERROR, "[gns] CNAME resolution failed.")
 				return
 			}
@@ -288,11 +288,14 @@ func (gns *GNSModule) ResolveRelative(labels []string, pkey *ed25519.PublicKey, 
 // relative to the zone PKEY. If the name is an absolute GNS name (ending in
 // a PKEY TLD), it is also resolved with GNS. All other names are resolved
 // via DNS queries.
-func (gns *GNSModule) ResolveUnknown(name string, pkey *ed25519.PublicKey, kind RRTypeList, depth int) (set *message.GNSRecordSet, err error) {
+func (gns *GNSModule) ResolveUnknown(name string, labels []string, pkey *ed25519.PublicKey, kind RRTypeList, depth int) (set *message.GNSRecordSet, err error) {
 	// relative GNS-based server name?
 	if strings.HasSuffix(name, ".+") {
 		// resolve server name relative to current zone
 		name = strings.TrimSuffix(name, ".+")
+		for _, label := range util.ReverseStringList(labels) {
+			name += "." + label
+		}
 		if set, err = gns.Resolve(name, pkey, kind, enums.GNS_LO_DEFAULT, depth+1); err != nil {
 			return
 		}
