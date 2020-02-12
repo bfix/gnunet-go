@@ -522,8 +522,8 @@ func (h *CnameHandler) AddRecord(rec *message.GNSResourceRecord, labels []string
 // Coexist return a flag indicating how a resource record of a given type
 // is to be treated (see BlockHandler interface)
 func (h *CnameHandler) Coexist(cm util.CounterMap) bool {
-	// anything goes
-	return true
+	// only a single CNAME allowed
+	return len(cm) == 1 && cm.Num(enums.GNS_TYPE_DNS_CNAME) == 1
 }
 
 // Records returns a list of RR of the given type associated with this handler
