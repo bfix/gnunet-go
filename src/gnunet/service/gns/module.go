@@ -176,6 +176,10 @@ func (gns *GNSModule) ResolveRelative(labels []string, pkey *ed25519.PublicKey, 
 			}
 			mode = enums.GNS_LO_DEFAULT
 		}
+		// signal NO_DATA if no block is found
+		if block == nil {
+			return
+		}
 		// post-process block by inspecting contained resource records for
 		// special GNS types
 		if records, err = block.Records(); err != nil {
