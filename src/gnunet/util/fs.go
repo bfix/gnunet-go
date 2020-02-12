@@ -21,19 +21,23 @@ package util
 import (
 	"fmt"
 	"os"
+
+	"github.com/bfix/gospel/logger"
 )
 
-// EnforceDirExists make sure that the base path of a given
-func EnforceDirExists(name string) error {
-	fi, err := os.Lstat(name)
+// EnforceDirExists make sure that the path
+func EnforceDirExists(path string) error {
+	logger.Printf(logger.DBG, "[util] Checking directory '%s'...\n", path)
+	fi, err := os.Lstat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return os.Mkdir(name, 0770)
+			logger.Printf(logger.DBG, "[util] Creating directory '%s'...\n", path)
+			return os.Mkdir(path, 0770)
 		}
 		return err
 	}
 	if !fi.IsDir() {
-		return fmt.Errorf("Not a directory (%s)", name)
+		return fmt.Errorf("Not a directory (%s)", path)
 	}
 	return nil
 }
