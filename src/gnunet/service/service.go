@@ -91,6 +91,7 @@ func (si *ServiceImpl) Start(spec string) (err error) {
 				switch ch := in.(type) {
 				case transport.Channel:
 					logger.Printf(logger.INFO, "[%s] Client connected.\n", si.name)
+					si.wg.Add(1)
 					go si.impl.ServeClient(si.wg, transport.NewMsgChannel(ch))
 				}
 			case <-si.ctrl:
