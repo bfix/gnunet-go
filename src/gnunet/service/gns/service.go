@@ -104,7 +104,14 @@ loop:
 			// perform lookup on block (locally and remote)
 			wg.Add(1)
 			go func() {
-				defer wg.Done()
+				defer func() {
+					// send response
+					if err := mc.Send(resp); err != nil {
+						logger.Printf(logger.ERROR, "[gns] Failed to send response: %s\n", err.Error())
+					}
+					// go-routine finished
+					wg.Done()
+				}()
 
 				pkey := ed25519.NewPublicKeyFromBytes(m.Zone)
 				label := m.GetName()
@@ -133,10 +140,6 @@ loop:
 							respX.AddRecord(rec)
 						}
 					}
-				}
-				// send response
-				if err := mc.Send(resp); err != nil {
-					logger.Printf(logger.ERROR, "[gns] Failed to send response: %s\n", err.Error())
 				}
 			}()
 
