@@ -23,9 +23,10 @@ var (
 	GNS_MAX_BLOCK_SIZE = (63 * 1024) // Maximum size of a value that can be stored in a GNS block.
 
 	// GNS record flags
-	GNS_FLAG_PRIVATE = 2
-	GNS_FLAGS_EXPREL = 8
-	GNS_FLAG_SHADOW  = 16
+	GNS_FLAG_PRIVATE = 2  // Record is not shared on the DHT
+	GNS_FLAG_SUPPL   = 4  // Supplemental records (e.g. NICK) in a block
+	GNS_FLAG_EXPREL  = 8  // Expire time in record is in relative time.
+	GNS_FLAG_SHADOW  = 16 // Record is ignored if non-expired records of same type exist in block
 
 	// GNS record types
 	GNS_TYPE_ANY                   = 0     // Record type indicating any record/'*'
