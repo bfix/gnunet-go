@@ -460,14 +460,8 @@ func (h *LehoHandler) AddRecord(rec *message.GNSResourceRecord, labels []string)
 // Coexist return a flag indicating how a resource record of a given type
 // is to be treated (see BlockHandler interface)
 func (h *LehoHandler) Coexist(cm util.CounterMap) bool {
-	// requires exactly one A/AAAA record alongside single LEHO
-	if len(cm) != 2 {
-		return false
-	}
-	if cm.Num(enums.GNS_TYPE_LEHO) != 1 {
-		return false
-	}
-	return (cm.Num(enums.GNS_TYPE_DNS_A) + cm.Num(enums.GNS_TYPE_DNS_AAAA)) > 1
+	// requires exactly one LEHO and any number of other records.
+	return cm.Num(enums.GNS_TYPE_LEHO) == 1
 }
 
 // Records returns a list of RR of the given type associated with this handler
