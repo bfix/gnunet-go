@@ -81,6 +81,18 @@ func NewEmptyMessage(msgType uint16) (Message, error) {
 		return NewNamecacheCacheMsg(nil), nil
 	case NAMECACHE_BLOCK_CACHE_RESPONSE:
 		return NewNamecacheCacheResponseMsg(), nil
+
+	//------------------------------------------------------------------
+	// Revocation
+	//------------------------------------------------------------------
+	case REVOCATION_QUERY:
+		return NewRevocationQueryMsg(nil), nil
+	case REVOCATION_QUERY_RESPONSE:
+		return NewRevocationQueryResponseMsg(true), nil
+	case REVOCATION_REVOKE:
+		return NewRevocationRevokeMsg(0, nil, nil), nil
+	case REVOCATION_REVOKE_RESPONSE:
+		return NewRevocationRevokeResponseMsg(false), nil
 	}
 	return nil, errors.New(fmt.Sprintf("Unknown message type %d", msgType))
 }
