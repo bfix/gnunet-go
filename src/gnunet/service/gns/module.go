@@ -280,6 +280,16 @@ func (gns *GNSModule) ResolveRelative(labels []string, pkey *ed25519.PublicKey, 
 			set.AddRecord(inst.rec)
 		}
 	}
+
+	// if the result set is not empty, add all supplemental records we are not
+	// asking for explicitly.
+	if set.Count > 0 {
+		for _, rec := range records {
+			if !kind.HasType(int(rec.Type)) && (int(rec.Flags)&enums.GNS_FLAG_SUPPL) != 0 {
+				set.AddRecord(rec)
+			}
+		}
+	}
 	return
 }
 
