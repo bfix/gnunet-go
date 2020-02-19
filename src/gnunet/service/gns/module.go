@@ -214,7 +214,7 @@ func (gns *GNSModule) ResolveRelative(labels []string, pkey *ed25519.PublicKey, 
 			inst := hdlr.(*Gns2DnsHandler)
 			// if we are at the end of the path and the requested type
 			// includes GNS_TYPE_GNS2DNS, the GNS2DNS records are returned...
-			if len(labels) == 1 && kind.HasType(enums.GNS_TYPE_GNS2DNS) {
+			if len(labels) == 1 && kind.HasType(enums.GNS_TYPE_GNS2DNS) && !kind.IsAny() {
 				records = inst.recs
 				break
 			}
@@ -246,8 +246,10 @@ func (gns *GNSModule) ResolveRelative(labels []string, pkey *ed25519.PublicKey, 
 			// if we are at the end of the path and the requested type
 			// includes GNS_TYPE_DNS_CNAME, the records are returned...
 			if len(labels) == 1 && kind.HasType(enums.GNS_TYPE_DNS_CNAME) && !kind.IsAny() {
+				logger.Println(logger.DBG, "[gns] CNAME requested.")
 				break
 			}
+			logger.Println(logger.DBG, "[gns] CNAME resolution required.")
 			if set, err = gns.ResolveUnknown(inst.name, labels, pkey, kind, depth+1); err != nil {
 				logger.Println(logger.ERROR, "[gns] CNAME resolution failed.")
 				return
