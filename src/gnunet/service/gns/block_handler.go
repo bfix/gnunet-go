@@ -148,10 +148,12 @@ func NewBlockHandlerList(records []*message.GNSResourceRecord, labels []string) 
 	// Third pass: Traverse active list and build list of handler instances.
 	for _, rec := range active {
 		// update counter map for non-supplemental records
-		rrType := int(rec.Type)
-		if (rrType & enums.GNS_FLAG_SUPPL) == 0 {
-			hl.counts.Add(rrType)
+		if (int(rec.Flags) & enums.GNS_FLAG_SUPPL) != 0 {
+			logger.Printf(logger.DBG, "[gns] handler_list: skip %v\n", rec)
+			continue
 		}
+		rrType := int(rec.Type)
+		hl.counts.Add(rrType)
 
 		// check for custom handler type
 		if creat, ok := customHandler[rrType]; ok {
