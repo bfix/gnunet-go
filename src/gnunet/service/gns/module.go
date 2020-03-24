@@ -229,6 +229,19 @@ func (gns *GNSModule) ResolveRelative(labels []string, pkey *ed25519.PublicKey, 
 				logger.Println(logger.ERROR, "[gns] GNS2DNS resolution failed.")
 				return
 			}
+			// add synthetic LEHO record if we have results and are at the
+			// end of the name (labels).
+			if len(set.Records) > 0 && len(labels) == 1 {
+				// add LEHO supplemental record: The TTL of the new record is
+				// the longest-living record in the current set.
+				expires := util.AbsoluteTimeNow()
+				for _, rec := range set.Records {
+					if rec.Expires.Compare(expires) > 0 {
+						expires = rec.Expires
+					}
+				}
+				set.Records = append(set.Records, gns.newLEHORecord(inst.Query, expires))
+			}
 			// we are done with resolution; pass on records to caller
 			records = set.Records
 			break
@@ -371,4 +384,17 @@ func (gns *GNSModule) Lookup(pkey *ed25519.PublicKey, label string, mode int) (b
 		}
 	}
 	return
+}
+
+// newLEHORecord creates a new supplemental GNS record of type LEHO.
+func (gns *GNSModule) newLEHORecord(name string, expires util.AbsoluteTime) *message.GNSResourceRecord {
+	rr := new(message.GNSResourceRecord)
+	rr.Expires = expires
+	rr.Flags = uint32(enums.GNS_FLAG_SUPPL)
+	rr.Type = uint32(enums.GNS_TYPE_LEHO)
+	rr.Size = uint32(len(name) + 1)
+	rr.Data = make([]byte, rr.Size)
+	copy(rr.Data, []byte(name))
+	rr.Data[len(name)] = 0
+	return rr
 }
