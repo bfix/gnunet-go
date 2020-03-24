@@ -51,7 +51,7 @@ var (
 type Channel interface {
 	Open(spec string) error
 	Close() error
-	Read([]byte) (int, error)
+	Read([]byte, chan interface{}) (int, error)
 	Write([]byte) (int, error)
 }
 
@@ -171,9 +171,9 @@ func (c *MsgChannel) Send(msg message.Message) error {
 }
 
 // Receive GNUnet messages over a plain Channel.
-func (c *MsgChannel) Receive() (message.Message, error) {
+func (c *MsgChannel) Receive(cmd chan interface{}) (message.Message, error) {
 	get := func(pos, count int) error {
-		n, err := c.ch.Read(c.buf[pos : pos+count])
+		n, err := c.ch.Read(c.buf[pos:pos+count], cmd)
 		if err != nil {
 			return err
 		}

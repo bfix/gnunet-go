@@ -25,36 +25,49 @@ import (
 	"github.com/bfix/gospel/logger"
 )
 
-// Client
+// Client type: Use to perform client-side interactions with GNUnet services.
 type Client struct {
-	ch *transport.MsgChannel
+	ch *transport.MsgChannel // channel for message exchange
 }
 
-// NewClient
+// NewClient creates a new client instance for the given channel endpoint.
 func NewClient(endp string) (*Client, error) {
-	//
+	// create a new channel to endpoint.
 	ch, err := transport.NewChannel(endp)
 	if err != nil {
 		return nil, err
 	}
+	// wrap into a message channel for the client.
 	return &Client{
 		ch: transport.NewMsgChannel(ch),
 	}, nil
 }
 
+// SendRequest sends a give message to the service.
 func (c *Client) SendRequest(req message.Message) error {
 	return c.ch.Send(req)
 }
 
-func (c *Client) ReceiveResponse() (message.Message, error) {
-	return c.ch.Receive()
+// ReceiveResponse waits for a response from the service; it can be interrupted
+// by sending "false" to the cmd channel.
+func (c *Client) ReceiveResponse(cmd chan interface{}) (message.Message, error) {
+	return c.ch.Receive(cmd)
 }
 
+// Close a client; no further message exchange is possible.
 func (c *Client) Close() error {
 	return c.ch.Close()
 }
 
-func ServiceRequestResponse(caller, callee, endp string, req message.Message) (message.Message, error) {
+// ServiceRequestResponse is a helper method for a one request - one response
+// secenarios of client/serice interactions.
+func ServiceRequestResponse(
+	caller string,
+	callee string,
+	endp string,
+	req message.Message,
+	cmd chan interface{}) (message.Message, error) {
+
 	// client-connect to the service
 	logger.Printf(logger.DBG, "[%s] Connect to %s service\n", caller, callee)
 	cl, err := NewClient(endp)
@@ -69,7 +82,7 @@ func ServiceRequestResponse(caller, callee, endp string, req message.Message) (m
 	// wait for a single response, then close the connection
 	logger.Printf(logger.DBG, "[%s] Waiting for response from %s service\n", caller, callee)
 	var resp message.Message
-	if resp, err = cl.ReceiveResponse(); err != nil {
+	if resp, err = cl.ReceiveResponse(cmd); err != nil {
 		return nil, err
 	}
 	logger.Printf(logger.DBG, "[%s] Closing connection to %s service\n", caller, callee)

@@ -72,6 +72,6 @@ func (c *Connection) Send(msg message.Message) error {
 }
 
 // Receive a message on the connection
-func (c *Connection) Receive() (message.Message, error) {
-	return c.ch.Receive()
+func (c *Connection) Receive(cmd chan interface{}) (message.Message, error) {
+	return c.ch.Receive(cmd)
 }

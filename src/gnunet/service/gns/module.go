@@ -111,14 +111,21 @@ func NewQuery(pkey *ed25519.PublicKey, label string) *Query {
 type GNSModule struct {
 	// Use function references for calls to methods in other modules:
 	//
-	LookupLocal  func(query *Query) (*message.GNSBlock, error)
-	StoreLocal   func(block *message.GNSBlock) error
-	LookupRemote func(query *Query) (*message.GNSBlock, error)
+	LookupLocal  func(query *Query, cmd chan interface{}) (*message.GNSBlock, error)
+	StoreLocal   func(block *message.GNSBlock, cmd chan interface{}) error
+	LookupRemote func(query *Query, cmd chan interface{}) (*message.GNSBlock, error)
 }
 
 // Resolve a GNS name with multiple labels. If pkey is not nil, the name
 // is interpreted as "relative to current zone".
-func (gns *GNSModule) Resolve(path string, pkey *ed25519.PublicKey, kind RRTypeList, mode int, depth int) (set *message.GNSRecordSet, err error) {
+func (gns *GNSModule) Resolve(
+	path string,
+	pkey *ed25519.PublicKey,
+	kind RRTypeList,
+	mode int,
+	depth int,
+	cmd chan interface{}) (set *message.GNSRecordSet, err error) {
+
 	// check for recursion depth
 	if depth > config.Cfg.GNS.MaxDepth {
 		return nil, ErrGNSRecursionExceeded
@@ -130,14 +137,20 @@ func (gns *GNSModule) Resolve(path string, pkey *ed25519.PublicKey, kind RRTypeL
 	// check for relative path
 	if pkey != nil {
 		//resolve relative path
-		return gns.ResolveRelative(names, pkey, kind, mode, depth)
+		return gns.ResolveRelative(names, pkey, kind, mode, depth, cmd)
 	}
 	// resolve absolute path
-	return gns.ResolveAbsolute(names, kind, mode, depth)
+	return gns.ResolveAbsolute(names, kind, mode, depth, cmd)
 }
 
 // Resolve a fully qualified GNS absolute name (with multiple labels).
-func (gns *GNSModule) ResolveAbsolute(labels []string, kind RRTypeList, mode int, depth int) (set *message.GNSRecordSet, err error) {
+func (gns *GNSModule) ResolveAbsolute(
+	labels []string,
+	kind RRTypeList,
+	mode int,
+	depth int,
+	cmd chan interface{}) (set *message.GNSRecordSet, err error) {
+
 	// get the zone key for the TLD
 	pkey := gns.GetZoneKey(labels[0])
 	if pkey == nil {
@@ -146,12 +159,19 @@ func (gns *GNSModule) ResolveAbsolute(labels []string, kind RRTypeList, mode int
 		return
 	}
 	// continue with resolution relative to a zone.
-	return gns.ResolveRelative(labels[1:], pkey, kind, mode, depth)
+	return gns.ResolveRelative(labels[1:], pkey, kind, mode, depth, cmd)
 }
 
 // Resolve relative path (to a given zone) recursively by processing simple
 // (PKEY,Label) lookups in sequence and handle intermediate GNS record types
-func (gns *GNSModule) ResolveRelative(labels []string, pkey *ed25519.PublicKey, kind RRTypeList, mode int, depth int) (set *message.GNSRecordSet, err error) {
+func (gns *GNSModule) ResolveRelative(
+	labels []string,
+	pkey *ed25519.PublicKey,
+	kind RRTypeList,
+	mode int,
+	depth int,
+	cmd chan interface{}) (set *message.GNSRecordSet, err error) {
+
 	// Process all names in sequence
 	var (
 		records []*message.GNSResourceRecord // final resource records from resolution
@@ -162,7 +182,7 @@ func (gns *GNSModule) ResolveRelative(labels []string, pkey *ed25519.PublicKey, 
 
 		// resolve next level
 		var block *message.GNSBlock
-		if block, err = gns.Lookup(pkey, labels[0], mode); err != nil {
+		if block, err = gns.Lookup(pkey, labels[0], mode, cmd); err != nil {
 			// failed to resolve name
 			return
 		}
@@ -225,7 +245,7 @@ func (gns *GNSModule) ResolveRelative(labels []string, pkey *ed25519.PublicKey, 
 				lbls += "."
 			}
 			fqdn := lbls + inst.Query
-			if set, err = gns.ResolveDNS(fqdn, inst.Servers, kind, pkey, depth); err != nil {
+			if set, err = gns.ResolveDNS(fqdn, inst.Servers, kind, pkey, depth, cmd); err != nil {
 				logger.Println(logger.ERROR, "[gns] GNS2DNS resolution failed.")
 				return
 			}
@@ -263,7 +283,7 @@ func (gns *GNSModule) ResolveRelative(labels []string, pkey *ed25519.PublicKey, 
 				break
 			}
 			logger.Println(logger.DBG, "[gns] CNAME resolution required.")
-			if set, err = gns.ResolveUnknown(inst.name, labels, pkey, kind, depth+1); err != nil {
+			if set, err = gns.ResolveUnknown(inst.name, labels, pkey, kind, depth+1, cmd); err != nil {
 				logger.Println(logger.ERROR, "[gns] CNAME resolution failed.")
 				return
 			}
@@ -313,7 +333,14 @@ func (gns *GNSModule) ResolveRelative(labels []string, pkey *ed25519.PublicKey, 
 // relative to the zone PKEY. If the name is an absolute GNS name (ending in
 // a PKEY TLD), it is also resolved with GNS. All other names are resolved
 // via DNS queries.
-func (gns *GNSModule) ResolveUnknown(name string, labels []string, pkey *ed25519.PublicKey, kind RRTypeList, depth int) (set *message.GNSRecordSet, err error) {
+func (gns *GNSModule) ResolveUnknown(
+	name string,
+	labels []string,
+	pkey *ed25519.PublicKey,
+	kind RRTypeList,
+	depth int,
+	cmd chan interface{}) (set *message.GNSRecordSet, err error) {
+
 	// relative GNS-based server name?
 	if strings.HasSuffix(name, ".+") {
 		// resolve server name relative to current zone
@@ -321,14 +348,14 @@ func (gns *GNSModule) ResolveUnknown(name string, labels []string, pkey *ed25519
 		for _, label := range util.ReverseStringList(labels) {
 			name += "." + label
 		}
-		if set, err = gns.Resolve(name, pkey, kind, enums.GNS_LO_DEFAULT, depth+1); err != nil {
+		if set, err = gns.Resolve(name, pkey, kind, enums.GNS_LO_DEFAULT, depth+1, cmd); err != nil {
 			return
 		}
 	} else {
 		// check for absolute GNS name (with PKEY as TLD)
 		if zk := gns.GetZoneKey(name); zk != nil {
 			// resolve absolute GNS name (name ends in a PKEY)
-			if set, err = gns.Resolve(util.StripPathRight(name), zk, kind, enums.GNS_LO_DEFAULT, depth+1); err != nil {
+			if set, err = gns.Resolve(util.StripPathRight(name), zk, kind, enums.GNS_LO_DEFAULT, depth+1, cmd); err != nil {
 				return
 			}
 		} else {
@@ -355,13 +382,17 @@ func (gns *GNSModule) GetZoneKey(path string) *ed25519.PublicKey {
 }
 
 // Lookup name in GNS.
-func (gns *GNSModule) Lookup(pkey *ed25519.PublicKey, label string, mode int) (block *message.GNSBlock, err error) {
+func (gns *GNSModule) Lookup(
+	pkey *ed25519.PublicKey,
+	label string,
+	mode int,
+	cmd chan interface{}) (block *message.GNSBlock, err error) {
 
 	// create query (lookup key)
 	query := NewQuery(pkey, label)
 
 	// try local lookup first
-	if block, err = gns.LookupLocal(query); err != nil {
+	if block, err = gns.LookupLocal(query, cmd); err != nil {
 		logger.Printf(logger.ERROR, "[gns] local Lookup: %s\n", err.Error())
 		block = nil
 		return
@@ -369,7 +400,7 @@ func (gns *GNSModule) Lookup(pkey *ed25519.PublicKey, label string, mode int) (b
 	if block == nil {
 		if mode == enums.GNS_LO_DEFAULT {
 			// get the block from a remote lookup
-			if block, err = gns.LookupRemote(query); err != nil || block == nil {
+			if block, err = gns.LookupRemote(query, cmd); err != nil || block == nil {
 				if err != nil {
 					logger.Printf(logger.ERROR, "[gns] remote Lookup: %s\n", err.Error())
 					block = nil
@@ -380,7 +411,7 @@ func (gns *GNSModule) Lookup(pkey *ed25519.PublicKey, label string, mode int) (b
 				return
 			}
 			// store RRs from remote locally.
-			gns.StoreLocal(block)
+			gns.StoreLocal(block, cmd)
 		}
 	}
 	return

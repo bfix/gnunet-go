@@ -18,9 +18,10 @@ func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
 
 	// read and push next message
 	in := make(chan message.Message)
+	cmd := make(chan interface{})
 	go func() {
 		for {
-			msg, err := c.Receive()
+			msg, err := c.Receive(cmd)
 			if err != nil {
 				fmt.Printf("Receive: %s\n", err.Error())
 				return

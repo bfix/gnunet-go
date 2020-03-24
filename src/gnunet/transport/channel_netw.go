@@ -71,7 +71,7 @@ func (c *NetworkChannel) Close() error {
 
 // Read bytes from a network channel into buffer: Returns the number of read
 // bytes and an error code. Only works on open channels ;)
-func (c *NetworkChannel) Read(buf []byte) (int, error) {
+func (c *NetworkChannel) Read(buf []byte, cmd chan interface{}) (int, error) {
 	if c.conn == nil {
 		return 0, ErrChannelNotOpened
 	}

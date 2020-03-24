@@ -35,10 +35,10 @@ import (
 type NamecacheModule struct {
 }
 
-func (nc *NamecacheModule) Get(query *gns.Query) (*message.GNSBlock, error) {
+func (nc *NamecacheModule) Get(query *gns.Query, cmd chan interface{}) (*message.GNSBlock, error) {
 	return nil, nil
 }
 
-func (nc *NamecacheModule) Put(block *message.GNSBlock) error {
+func (nc *NamecacheModule) Put(block *message.GNSBlock, cmd chan interface{}) error {
 	return nil
 }
