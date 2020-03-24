@@ -78,6 +78,25 @@ func (t AbsoluteTime) Expired() bool {
 	return t.Val < uint64(time.Now().Unix())
 }
 
+// Compare two times (-1 = (t < t2), 0 = (t == t2), 1 = (t > t2)
+func (t AbsoluteTime) Compare(t2 AbsoluteTime) int {
+	if t.Val == math.MaxUint64 {
+		if t2.Val == math.MaxUint64 {
+			return 0
+		}
+		return 1
+	}
+	if t2.Val == math.MaxUint64 {
+		return -1
+	}
+	if t.Val < t2.Val {
+		return -1
+	} else if t.Val == t2.Val {
+		return 0
+	}
+	return 1
+}
+
 //----------------------------------------------------------------------
 // Relative time
 //----------------------------------------------------------------------
