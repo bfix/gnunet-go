@@ -23,6 +23,7 @@ import (
 	"sync"
 
 	"gnunet/transport"
+	"gnunet/util"
 
 	"github.com/bfix/gospel/logger"
 )
@@ -33,19 +34,20 @@ import (
 // Channel semantics in the specification string.
 type Service interface {
 	Start(spec string) error
-	ServeClient(wg *sync.WaitGroup, ch *transport.MsgChannel)
+	ServeClient(wg *sync.WaitGroup, ch *transport.MsgChannel, cmd chan interface{})
 	Stop() error
 }
 
 // ServiceImpl is an implementation of generic service functionality.
 type ServiceImpl struct {
-	impl    Service
-	hdlr    chan transport.Channel
-	ctrl    chan bool
-	srvc    transport.ChannelServer
-	wg      *sync.WaitGroup
-	name    string
-	running bool
+	impl    Service                  // Specific service implementation
+	hdlr    chan transport.Channel   // Channel from listener
+	ctrl    chan bool                // Control channel
+	srvc    transport.ChannelServer  // multi-user service
+	wg      *sync.WaitGroup          // wait group for go routine synchronization
+	name    string                   // service name
+	running bool                     // service currently running?
+	pending map[int]chan interface{} // map of pending client sessions
 }
 
 // NewServiceImpl instantiates a new ServiceImpl object.
@@ -58,6 +60,7 @@ func NewServiceImpl(name string, srv Service) *ServiceImpl {
 		wg:      new(sync.WaitGroup),
 		name:    name,
 		running: false,
+		pending: make(map[int]chan interface{}),
 	}
 }
 
@@ -90,14 +93,28 @@ func (si *ServiceImpl) Start(spec string) (err error) {
 				}
 				switch ch := in.(type) {
 				case transport.Channel:
-					logger.Printf(logger.INFO, "[%s] Client connected.\n", si.name)
+					clientID := util.NextID()
+					cmdCh := make(chan interface{})
+					si.pending[clientID] = cmdCh
+					logger.Printf(logger.INFO, "[%s] Client '%d' connected.\n", si.name, clientID)
 					si.wg.Add(1)
-					go si.impl.ServeClient(si.wg, transport.NewMsgChannel(ch))
+					go func() {
+						// serve client on the message channel
+						si.impl.ServeClient(si.wg, transport.NewMsgChannel(ch), cmdCh)
+						// session is done now.
+						logger.Printf(logger.INFO, "[%s] Session with client '%d' ended.\n", si.name, clientID)
+						delete(si.pending, clientID)
+					}()
 				}
 			case <-si.ctrl:
 				break loop
 			}
 		}
+		// notify pending tasks to terminate
+		for _, cmdCh := range si.pending {
+			cmdCh <- true
+		}
+		// close-down service
 		logger.Printf(logger.INFO, "[%s] Service closing.\n", si.name)
 		si.srvc.Close()
 		si.running = false
