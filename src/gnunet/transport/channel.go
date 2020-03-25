@@ -28,6 +28,7 @@ import (
 	"gnunet/message"
 	"gnunet/util"
 
+	"github.com/bfix/gospel/concurrent"
 	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
 )
@@ -36,6 +37,7 @@ import (
 var (
 	ErrChannelNotImplemented = fmt.Errorf("Protocol not implemented")
 	ErrChannelNotOpened      = fmt.Errorf("Channel not opened")
+	ErrChannelInterrupted    = fmt.Errorf("Channel interrupted")
 )
 
 ////////////////////////////////////////////////////////////////////////
@@ -51,8 +53,8 @@ var (
 type Channel interface {
 	Open(spec string) error
 	Close() error
-	Read([]byte, chan interface{}) (int, error)
-	Write([]byte) (int, error)
+	Read([]byte, *concurrent.Signaller) (int, error)
+	Write([]byte, *concurrent.Signaller) (int, error)
 }
 
 // ChannelFactory instantiates specific Channel imülementations.
@@ -140,7 +142,7 @@ func (c *MsgChannel) Close() error {
 }
 
 // Send a GNUnet message over a channel.
-func (c *MsgChannel) Send(msg message.Message) error {
+func (c *MsgChannel) Send(msg message.Message, sig *concurrent.Signaller) error {
 
 	// convert message to binary data
 	data, err := data.Marshal(msg)
@@ -160,7 +162,7 @@ func (c *MsgChannel) Send(msg message.Message) error {
 	}
 
 	// send packet
-	n, err := c.ch.Write(data)
+	n, err := c.ch.Write(data, sig)
 	if err != nil {
 		return err
 	}
@@ -171,9 +173,9 @@ func (c *MsgChannel) Send(msg message.Message) error {
 }
 
 // Receive GNUnet messages over a plain Channel.
-func (c *MsgChannel) Receive(cmd chan interface{}) (message.Message, error) {
+func (c *MsgChannel) Receive(sig *concurrent.Signaller) (message.Message, error) {
 	get := func(pos, count int) error {
-		n, err := c.ch.Read(c.buf[pos:pos+count], cmd)
+		n, err := c.ch.Read(c.buf[pos:pos+count], sig)
 		if err != nil {
 			return err
 		}

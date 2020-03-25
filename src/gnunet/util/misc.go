@@ -22,6 +22,7 @@ import (
 	"strings"
 )
 
+// CounterMap
 type CounterMap map[interface{}]int
 
 func (cm CounterMap) Add(i interface{}) int {

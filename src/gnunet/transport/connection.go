@@ -21,6 +21,8 @@ package transport
 import (
 	"gnunet/core"
 	"gnunet/message"
+
+	"github.com/bfix/gospel/concurrent"
 )
 
 // Connection for communicating peers
@@ -67,11 +69,11 @@ func (c *Connection) Close() error {
 }
 
 // Send a message on the connection
-func (c *Connection) Send(msg message.Message) error {
-	return c.ch.Send(msg)
+func (c *Connection) Send(msg message.Message, sig *concurrent.Signaller) error {
+	return c.ch.Send(msg, sig)
 }
 
 // Receive a message on the connection
-func (c *Connection) Receive(cmd chan interface{}) (message.Message, error) {
-	return c.ch.Receive(cmd)
+func (c *Connection) Receive(sig *concurrent.Signaller) (message.Message, error) {
+	return c.ch.Receive(sig)
 }

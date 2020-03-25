@@ -32,6 +32,7 @@ import (
 	"gnunet/transport"
 	"gnunet/util"
 
+	"github.com/bfix/gospel/concurrent"
 	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
@@ -65,24 +66,31 @@ func NewGNSService() service.Service {
 
 // Start the GNS service
 func (s *GNSService) Start(spec string) error {
+	// start new signaller
+	s.sig = concurrent.NewSignaller()
 	return nil
 }
 
 // Stop the GNS service
 func (s *GNSService) Stop() error {
+	// terminate shared signaller
+	s.sig.Retire()
 	return nil
 }
 
 // Serve a client channel.
-func (s *GNSService) ServeClient(wg *sync.WaitGroup, mc *transport.MsgChannel, cmd chan interface{}) {
+func (s *GNSService) ServeClient(wg *sync.WaitGroup, mc *transport.MsgChannel) {
 	defer wg.Done()
+
 loop:
 	for {
 		// receive next message from client
-		msg, err := mc.Receive(cmd)
+		msg, err := mc.Receive(s.sig)
 		if err != nil {
 			if err == io.EOF {
 				logger.Println(logger.INFO, "[gns] Client channel closed.")
+			} else if err == transport.ErrChannelInterrupted {
+				logger.Println(logger.INFO, "[gns] Service operation interrupted.")
 			} else {
 				logger.Printf(logger.ERROR, "[gns] Message-receive failed: %s\n", err.Error())
 			}
@@ -106,7 +114,7 @@ loop:
 			go func() {
 				defer func() {
 					// send response
-					if err := mc.Send(resp); err != nil {
+					if err := mc.Send(resp, s.sig); err != nil {
 						logger.Printf(logger.ERROR, "[gns] Failed to send response: %s\n", err.Error())
 					}
 					// go-routine finished
@@ -116,7 +124,7 @@ loop:
 				pkey := ed25519.NewPublicKeyFromBytes(m.Zone)
 				label := m.GetName()
 				kind := NewRRTypeList(int(m.Type))
-				recset, err := s.Resolve(label, pkey, kind, int(m.Options), 0, cmd)
+				recset, err := s.Resolve(label, pkey, kind, int(m.Options), 0)
 				if err != nil {
 					logger.Printf(logger.ERROR, "[gns] Failed to lookup block: %s\n", err.Error())
 					return
@@ -156,7 +164,7 @@ loop:
 }
 
 // LookupNamecache
-func (s *GNSService) LookupNamecache(query *Query, cmd chan interface{}) (block *message.GNSBlock, err error) {
+func (s *GNSService) LookupNamecache(query *Query) (block *message.GNSBlock, err error) {
 	logger.Printf(logger.DBG, "[gns] LookupNamecache(%s)...\n", hex.EncodeToString(query.Key.Bits))
 
 	// assemble Namecache request
@@ -166,7 +174,7 @@ func (s *GNSService) LookupNamecache(query *Query, cmd chan interface{}) (block 
 
 	// get response from Namecache service
 	var resp message.Message
-	if resp, err = service.ServiceRequestResponse("gns", "Namecache", config.Cfg.Namecache.Endpoint, req, cmd); err != nil {
+	if resp, err = service.ServiceRequestResponse("gns", "Namecache", config.Cfg.Namecache.Endpoint, req, s.sig); err != nil {
 		return
 	}
 
@@ -219,7 +227,7 @@ func (s *GNSService) LookupNamecache(query *Query, cmd chan interface{}) (block 
 }
 
 // StoreNamecache
-func (s *GNSService) StoreNamecache(block *message.GNSBlock, cmd chan interface{}) (err error) {
+func (s *GNSService) StoreNamecache(block *message.GNSBlock) (err error) {
 	logger.Println(logger.DBG, "[gns] StoreNamecache()...")
 
 	// assemble Namecache request
@@ -228,7 +236,7 @@ func (s *GNSService) StoreNamecache(block *message.GNSBlock, cmd chan interface{
 
 	// get response from Namecache service
 	var resp message.Message
-	if resp, err = service.ServiceRequestResponse("gns", "Namecache", config.Cfg.Namecache.Endpoint, req, cmd); err != nil {
+	if resp, err = service.ServiceRequestResponse("gns", "Namecache", config.Cfg.Namecache.Endpoint, req, s.sig); err != nil {
 		return
 	}
 
@@ -255,7 +263,7 @@ func (s *GNSService) StoreNamecache(block *message.GNSBlock, cmd chan interface{
 }
 
 // LookupDHT
-func (s *GNSService) LookupDHT(query *Query, cmd chan interface{}) (block *message.GNSBlock, err error) {
+func (s *GNSService) LookupDHT(query *Query) (block *message.GNSBlock, err error) {
 	logger.Printf(logger.DBG, "[gns] LookupDHT(%s)...\n", hex.EncodeToString(query.Key.Bits))
 
 	// assemble DHT request
@@ -268,7 +276,7 @@ func (s *GNSService) LookupDHT(query *Query, cmd chan interface{}) (block *messa
 
 	// get response from DHT service
 	var resp message.Message
-	if resp, err = service.ServiceRequestResponse("gns", "DHT", config.Cfg.DHT.Endpoint, req, cmd); err != nil {
+	if resp, err = service.ServiceRequestResponse("gns", "DHT", config.Cfg.DHT.Endpoint, req, s.sig); err != nil {
 		return
 	}
 
@@ -313,7 +321,7 @@ func (s *GNSService) LookupDHT(query *Query, cmd chan interface{}) (block *messa
 
 		// we got a result from DHT that was not in the namecache,
 		// so store it there now.
-		if err = s.StoreNamecache(block, cmd); err != nil {
+		if err = s.StoreNamecache(block); err != nil {
 			logger.Printf(logger.ERROR, "[gns] can't store block in Namecache: %s\n", err.Error())
 		}
 	}

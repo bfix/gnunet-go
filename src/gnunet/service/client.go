@@ -22,6 +22,7 @@ import (
 	"gnunet/message"
 	"gnunet/transport"
 
+	"github.com/bfix/gospel/concurrent"
 	"github.com/bfix/gospel/logger"
 )
 
@@ -44,14 +45,14 @@ func NewClient(endp string) (*Client, error) {
 }
 
 // SendRequest sends a give message to the service.
-func (c *Client) SendRequest(req message.Message) error {
-	return c.ch.Send(req)
+func (c *Client) SendRequest(req message.Message, sig *concurrent.Signaller) error {
+	return c.ch.Send(req, sig)
 }
 
 // ReceiveResponse waits for a response from the service; it can be interrupted
 // by sending "false" to the cmd channel.
-func (c *Client) ReceiveResponse(cmd chan interface{}) (message.Message, error) {
-	return c.ch.Receive(cmd)
+func (c *Client) ReceiveResponse(sig *concurrent.Signaller) (message.Message, error) {
+	return c.ch.Receive(sig)
 }
 
 // Close a client; no further message exchange is possible.
@@ -66,7 +67,7 @@ func ServiceRequestResponse(
 	callee string,
 	endp string,
 	req message.Message,
-	cmd chan interface{}) (message.Message, error) {
+	sig *concurrent.Signaller) (message.Message, error) {
 
 	// client-connect to the service
 	logger.Printf(logger.DBG, "[%s] Connect to %s service\n", caller, callee)
@@ -76,13 +77,13 @@ func ServiceRequestResponse(
 	}
 	// send request
 	logger.Printf(logger.DBG, "[%s] Sending request to %s service\n", caller, callee)
-	if err = cl.SendRequest(req); err != nil {
+	if err = cl.SendRequest(req, sig); err != nil {
 		return nil, err
 	}
 	// wait for a single response, then close the connection
 	logger.Printf(logger.DBG, "[%s] Waiting for response from %s service\n", caller, callee)
 	var resp message.Message
-	if resp, err = cl.ReceiveResponse(cmd); err != nil {
+	if resp, err = cl.ReceiveResponse(sig); err != nil {
 		return nil, err
 	}
 	logger.Printf(logger.DBG, "[%s] Closing connection to %s service\n", caller, callee)

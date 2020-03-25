@@ -24,8 +24,29 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/bfix/gospel/concurrent"
 	"github.com/bfix/gospel/logger"
 )
+
+// ChannelResult for read/write operations on channels.
+type ChannelResult struct {
+	count int   // number of bytes read/written
+	err   error // error (or nil)
+}
+
+// NewChannelResult instanciates a new object with given attributes.
+func NewChannelResult(n int, err error) *ChannelResult {
+	return &ChannelResult{
+		count: n,
+		err:   err,
+	}
+}
+
+// Values() returns the attributes of a result instance (for passing up the
+// call stack).
+func (cr *ChannelResult) Values() (int, error) {
+	return cr.count, cr.err
+}
 
 ////////////////////////////////////////////////////////////////////////
 // Generic network-based Channel
@@ -71,20 +92,72 @@ func (c *NetworkChannel) Close() error {
 
 // Read bytes from a network channel into buffer: Returns the number of read
 // bytes and an error code. Only works on open channels ;)
-func (c *NetworkChannel) Read(buf []byte, cmd chan interface{}) (int, error) {
+// The read can be aborted by sending 'true' on the cmd interface; the
+// channel is closed after such interruption.
+func (c *NetworkChannel) Read(buf []byte, sig *concurrent.Signaller) (int, error) {
+	// check if the channel is open
 	if c.conn == nil {
 		return 0, ErrChannelNotOpened
 	}
-	return c.conn.Read(buf)
+	// perform operation in go-routine
+	result := make(chan *ChannelResult)
+	go func() {
+		result <- NewChannelResult(c.conn.Read(buf))
+	}()
+
+	listener := sig.Listen()
+	defer sig.Drop(listener)
+	for {
+		select {
+		// handle terminate command
+		case x := <-listener:
+			switch val := x.(type) {
+			case bool:
+				if val {
+					c.conn.Close()
+					c.conn = nil
+					return 0, ErrChannelInterrupted
+				}
+			}
+		// handle result of read operation
+		case res := <-result:
+			return res.Values()
+		}
+	}
 }
 
 // Write buffer to a network channel: Returns the number of written bytes and
-// an error code.
-func (c *NetworkChannel) Write(buf []byte) (int, error) {
+// an error code. The write operation can be aborted by sending 'true' on the
+// command channel; the network channel is closed after such interrupt.
+func (c *NetworkChannel) Write(buf []byte, sig *concurrent.Signaller) (int, error) {
+	// check if we have an open channel to write to.
 	if c.conn == nil {
 		return 0, ErrChannelNotOpened
 	}
-	return c.conn.Write(buf)
+	// perform operation in go-routine
+	result := make(chan *ChannelResult)
+	go func() {
+		result <- NewChannelResult(c.conn.Write(buf))
+	}()
+
+	listener := sig.Listen()
+	defer sig.Drop(listener)
+	for {
+		select {
+		// handle terminate command
+		case x := <-listener:
+			switch val := x.(type) {
+			case bool:
+				if val {
+					c.conn.Close()
+					return 0, ErrChannelInterrupted
+				}
+			}
+		// handle result of read operation
+		case res := <-result:
+			return res.Values()
+		}
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////

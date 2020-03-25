@@ -9,6 +9,12 @@ import (
 	"gnunet/message"
 	"gnunet/transport"
 	"gnunet/util"
+
+	"github.com/bfix/gospel/concurrent"
+)
+
+var (
+	sig = concurrent.NewSignaller()
 )
 
 func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
@@ -18,10 +24,9 @@ func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
 
 	// read and push next message
 	in := make(chan message.Message)
-	cmd := make(chan interface{})
 	go func() {
 		for {
-			msg, err := c.Receive(cmd)
+			msg, err := c.Receive(sig)
 			if err != nil {
 				fmt.Printf("Receive: %s\n", err.Error())
 				return
@@ -34,7 +39,7 @@ func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
 	init := (from == p)
 	if init {
 		peerid := util.NewPeerID(p.GetID())
-		c.Send(message.NewTransportTcpWelcomeMsg(peerid))
+		c.Send(message.NewTransportTcpWelcomeMsg(peerid), sig)
 	}
 
 	// remember peer addresses (only ONE!)
@@ -54,11 +59,11 @@ func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
 			case *message.TransportTcpWelcomeMsg:
 				peerid := util.NewPeerID(p.GetID())
 				if init {
-					c.Send(message.NewHelloMsg(peerid))
+					c.Send(message.NewHelloMsg(peerid), sig)
 					target := util.NewPeerID(t.GetID())
-					c.Send(message.NewTransportPingMsg(target, tAddr))
+					c.Send(message.NewTransportPingMsg(target, tAddr), sig)
 				} else {
-					c.Send(message.NewTransportTcpWelcomeMsg(peerid))
+					c.Send(message.NewTransportTcpWelcomeMsg(peerid), sig)
 				}
 
 			case *message.HelloMsg:
@@ -68,7 +73,7 @@ func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
 				if err := mOut.Sign(p.PrvKey()); err != nil {
 					return err
 				}
-				c.Send(mOut)
+				c.Send(mOut, sig)
 
 			case *message.TransportPongMsg:
 				rc, err := msg.Verify(t.PubKey())
@@ -80,14 +85,14 @@ func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
 				}
 				send[message.TRANSPORT_PONG] = true
 				if mOut, ok := pending[message.TRANSPORT_SESSION_SYN]; ok {
-					c.Send(mOut)
+					c.Send(mOut, sig)
 				}
 
 			case *message.SessionSynMsg:
 				mOut := message.NewSessionSynAckMsg()
 				mOut.Timestamp = msg.Timestamp
 				if send[message.TRANSPORT_PONG] {
-					c.Send(mOut)
+					c.Send(mOut, sig)
 				} else {
 					pending[message.TRANSPORT_SESSION_SYN] = mOut
 				}
@@ -98,7 +103,7 @@ func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
 			case *message.SessionAckMsg:
 
 			case *message.SessionKeepAliveMsg:
-				c.Send(message.NewSessionKeepAliveRespMsg(msg.Nonce))
+				c.Send(message.NewSessionKeepAliveRespMsg(msg.Nonce), sig)
 
 			case *message.EphemeralKeyMsg:
 				rc, err := msg.Verify(t.PubKey())
@@ -109,7 +114,7 @@ func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
 					return errors.New("EPHKEY verification failed")
 				}
 				t.SetEphKeyMsg(msg)
-				c.Send(p.EphKeyMsg())
+				c.Send(p.EphKeyMsg(), sig)
 				secret := crypto.SharedSecret(p.EphPrvKey(), t.EphKeyMsg().Public())
 				c.SharedSecret(util.Clone(secret.Bits[:]))
 
