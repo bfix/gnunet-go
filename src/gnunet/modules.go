@@ -29,6 +29,7 @@
 package gnunet
 
 import (
+	"gnunet/service/dht"
 	"gnunet/service/gns"
 	"gnunet/service/namecache"
 )
@@ -37,6 +38,7 @@ import (
 type Instances struct {
 	GNS       *gns.GNSModule
 	Namecache *namecache.NamecacheModule
+	DHT       *dht.DHTModule
 }
 
 // Local reference to instance list
@@ -50,9 +52,14 @@ func init() {
 	// Namecache (no calls to other modules)
 	Modules.Namecache = new(namecache.NamecacheModule)
 
+	// DHT (no calls to other modules)
+	Modules.DHT = new(dht.DHTModule)
+
 	// GNS (calls Namecache, DHT and Identity)
 	Modules.GNS = &gns.GNSModule{
-		LookupLocal: Modules.Namecache.Get,
-		StoreLocal:  Modules.Namecache.Put,
+		LookupLocal:  Modules.Namecache.Get,
+		StoreLocal:   Modules.Namecache.Put,
+		LookupRemote: Modules.DHT.Get,
+		CancelRemote: Modules.DHT.Cancel,
 	}
 }
