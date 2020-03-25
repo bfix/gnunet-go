@@ -59,6 +59,8 @@ func NewEmptyMessage(msgType uint16) (Message, error) {
 	//------------------------------------------------------------------
 	case DHT_CLIENT_GET:
 		return NewDHTClientGetMsg(nil), nil
+	case DHT_CLIENT_GET_STOP:
+		return NewDHTClientGetStopMsg(nil), nil
 	case DHT_CLIENT_RESULT:
 		return NewDHTClientResultMsg(nil), nil
 

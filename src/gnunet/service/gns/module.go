@@ -26,6 +26,7 @@ import (
 	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/message"
+	"gnunet/transport"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/concurrent"
@@ -114,6 +115,7 @@ type GNSModule struct {
 	LookupLocal  func(query *Query) (*message.GNSBlock, error)
 	StoreLocal   func(block *message.GNSBlock) error
 	LookupRemote func(query *Query) (*message.GNSBlock, error)
+	CancelRemote func(query *Query) error
 
 	sig *concurrent.Signaller // shared signalling channel
 }
@@ -399,7 +401,15 @@ func (gns *GNSModule) Lookup(
 			// get the block from a remote lookup
 			if block, err = gns.LookupRemote(query); err != nil || block == nil {
 				if err != nil {
-					logger.Printf(logger.ERROR, "[gns] remote Lookup: %s\n", err.Error())
+					// check for aborted remote lookup: we need to cancel the query
+					if err == transport.ErrChannelInterrupted {
+						logger.Println(logger.WARN, "[gns] remote Lookup aborted -- cleaning up.")
+						if err = gns.CancelRemote(query); err != nil {
+							logger.Printf(logger.ERROR, "[gns] remote Lookup abort failed: %s\n", err.Error())
+						}
+					} else {
+						logger.Printf(logger.ERROR, "[gns] remote Lookup failed: %s\n", err.Error())
+					}
 					block = nil
 				} else {
 					logger.Println(logger.DBG, "[gns] remote Lookup: no block found")

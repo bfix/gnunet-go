@@ -126,3 +126,39 @@ func (m *DHTClientResultMsg) String() string {
 func (msg *DHTClientResultMsg) Header() *MessageHeader {
 	return &MessageHeader{msg.MsgSize, msg.MsgType}
 }
+
+//----------------------------------------------------------------------
+// DHT_CLIENT_GET_STOP
+//----------------------------------------------------------------------
+
+// DHTClientGetStopMsg
+type DHTClientGetStopMsg struct {
+	MsgSize  uint16           `order:"big"` // total size of message
+	MsgType  uint16           `order:"big"` // DHT_CLIENT_GET_STOP (144)
+	Reserved uint32           `order:"big"` // Reserved (0)
+	Id       uint64           `order:"big"` // Unique ID identifying this request
+	Key      *crypto.HashCode // The key to search for
+}
+
+// NewDHTClientGetStopMsg creates a new default DHTClientGetStopMsg object.
+func NewDHTClientGetStopMsg(key *crypto.HashCode) *DHTClientGetStopMsg {
+	if key == nil {
+		key = new(crypto.HashCode)
+	}
+	return &DHTClientGetStopMsg{
+		MsgSize: 80,
+		MsgType: DHT_CLIENT_GET_STOP,
+		Id:      0,
+		Key:     key,
+	}
+}
+
+// String returns a human-readable representation of the message.
+func (m *DHTClientGetStopMsg) String() string {
+	return fmt.Sprintf("DHTClientGetStopMsg{Id:%d,Key=%s}", m.Id, hex.EncodeToString(m.Key.Bits))
+}
+
+// Header returns the message header in a separate instance.
+func (msg *DHTClientGetStopMsg) Header() *MessageHeader {
+	return &MessageHeader{msg.MsgSize, msg.MsgType}
+}

@@ -61,6 +61,7 @@ func NewGNSService() service.Service {
 	inst.LookupLocal = inst.LookupNamecache
 	inst.StoreLocal = inst.StoreNamecache
 	inst.LookupRemote = inst.LookupDHT
+	inst.CancelRemote = inst.CancelDHT
 	return inst
 }
 
@@ -323,6 +324,33 @@ func (s *GNSService) LookupDHT(query *Query) (block *message.GNSBlock, err error
 		// so store it there now.
 		if err = s.StoreNamecache(block); err != nil {
 			logger.Printf(logger.ERROR, "[gns] can't store block in Namecache: %s\n", err.Error())
+		}
+	}
+	return
+}
+
+// CancelDHT
+func (s *GNSService) CancelDHT(query *Query) (err error) {
+	logger.Printf(logger.DBG, "[gns] CancelDHT(%s)...\n", hex.EncodeToString(query.Key.Bits))
+
+	// assemble DHT request
+	req := message.NewDHTClientGetStopMsg(query.Key)
+	req.Id = uint64(util.NextID())
+
+	// get response from DHT service
+	var resp message.Message
+	if resp, err = service.ServiceRequestResponse("gns", "DHT", config.Cfg.DHT.Endpoint, req, s.sig); err != nil {
+		return
+	}
+
+	// handle message depending on its type
+	logger.Println(logger.DBG, "[gns] Handling response from DHT service")
+	switch m := resp.(type) {
+	case *message.DHTClientResultMsg:
+		// check for matching IDs
+		if m.Id != req.Id {
+			logger.Println(logger.ERROR, "[gns] Got response for unknown ID")
+			break
 		}
 	}
 	return
