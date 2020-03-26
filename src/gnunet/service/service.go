@@ -98,27 +98,33 @@ func (si *ServiceImpl) Start(spec string) (err error) {
 				case transport.Channel:
 					// run a new session with context
 					ctx := NewSessionContext()
-					clientID := ctx.Id
-					si.pending[clientID] = ctx
-					logger.Printf(logger.INFO, "[%s] Client '%d' connected.\n", si.name, clientID)
+					sessId := ctx.Id
+					si.pending[sessId] = ctx
+					logger.Printf(logger.INFO, "[%s] Session '%d' started.\n", si.name, sessId)
 
 					go func() {
 						// serve client on the message channel
 						si.impl.ServeClient(ctx, transport.NewMsgChannel(ch))
 						// session is done now.
-						logger.Printf(logger.INFO, "[%s] Session with client '%d' ended.\n", si.name, clientID)
-						si.drop <- clientID
+						logger.Printf(logger.INFO, "[%s] Session with client '%d' ended.\n", si.name, sessId)
+						si.drop <- sessId
 					}()
 				}
 
 			// handle session removal
-			case clientID := <-si.drop:
-				delete(si.pending, clientID)
+			case sessId := <-si.drop:
+				delete(si.pending, sessId)
 
 			// handle cancelation signal on listener.
 			case <-si.ctrl:
 				break loop
 			}
+		}
+
+		// terminate pending sessions
+		for _, ctx := range si.pending {
+			logger.Printf(logger.DBG, "[%s] Session '%d' closing...\n", si.name, ctx.Id)
+			ctx.Cancel()
 		}
 
 		// close-down service
