@@ -44,24 +44,25 @@ func NewSessionContext() *SessionContext {
 	}
 }
 
+// Cancel all go-routines associated with this context.
+func (ctx *SessionContext) Cancel() {
+	// send signal to terminate...
+	ctx.sig.Send(true)
+	// wait for session go-routines to finish
+	ctx.wg.Wait()
+}
+
+// Add a go-routine to the wait group.
 func (ctx *SessionContext) Add() {
 	ctx.wg.Add(1)
 }
 
-func (ctx *SessionContext) Done() {
+// Remove a go-routine from the wait group.
+func (ctx *SessionContext) Remove() {
 	ctx.wg.Done()
 }
 
+// Signaller returns the working instance for the context.
 func (ctx *SessionContext) Signaller() *concurrent.Signaller {
 	return ctx.sig
 }
-
-/*
-
-
-func (ctx *SessionContext)
-
-func (ctx *SessionContext)
-
-func (ctx *SessionContext)
-*/
