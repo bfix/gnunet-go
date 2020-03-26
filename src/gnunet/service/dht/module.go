@@ -20,6 +20,7 @@ package dht
 
 import (
 	"gnunet/message"
+	"gnunet/service"
 	"gnunet/service/gns"
 )
 
@@ -35,14 +36,14 @@ import (
 type DHTModule struct {
 }
 
-func (nc *DHTModule) Get(query *gns.Query) (*message.GNSBlock, error) {
+func (nc *DHTModule) Get(ctx *service.SessionContext, query *gns.Query) (*message.GNSBlock, error) {
 	return nil, nil
 }
 
-func (nc *DHTModule) Cancel(query *gns.Query) error {
+func (nc *DHTModule) Cancel(ctx *service.SessionContext, query *gns.Query) error {
 	return nil
 }
 
-func (nc *DHTModule) Put(block *message.GNSBlock) error {
+func (nc *DHTModule) Put(ctx *service.SessionContext, block *message.GNSBlock) error {
 	return nil
 }

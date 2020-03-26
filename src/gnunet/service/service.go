@@ -23,7 +23,6 @@ import (
 	"sync"
 
 	"gnunet/transport"
-	"gnunet/util"
 
 	"github.com/bfix/gospel/logger"
 )
@@ -34,7 +33,7 @@ import (
 // Channel semantics in the specification string.
 type Service interface {
 	Start(spec string) error
-	ServeClient(wg *sync.WaitGroup, ch *transport.MsgChannel)
+	ServeClient(ctx *SessionContext, ch *transport.MsgChannel)
 	Stop() error
 }
 
@@ -43,10 +42,12 @@ type ServiceImpl struct {
 	impl    Service                 // Specific service implementation
 	hdlr    chan transport.Channel  // Channel from listener
 	ctrl    chan bool               // Control channel
+	drop    chan int                // Channel to drop a session from pending list
 	srvc    transport.ChannelServer // multi-user service
 	wg      *sync.WaitGroup         // wait group for go routine synchronization
 	name    string                  // service name
 	running bool                    // service currently running?
+	pending map[int]*SessionContext // list of pending sessions
 }
 
 // NewServiceImpl instantiates a new ServiceImpl object.
@@ -55,10 +56,12 @@ func NewServiceImpl(name string, srv Service) *ServiceImpl {
 		impl:    srv,
 		hdlr:    make(chan transport.Channel),
 		ctrl:    make(chan bool),
+		drop:    make(chan int),
 		srvc:    nil,
 		wg:      new(sync.WaitGroup),
 		name:    name,
 		running: false,
+		pending: make(map[int]*SessionContext),
 	}
 }
 
@@ -84,6 +87,8 @@ func (si *ServiceImpl) Start(spec string) (err error) {
 	loop:
 		for si.running {
 			select {
+
+			// handle incoming connections
 			case in := <-si.hdlr:
 				if in == nil {
 					logger.Printf(logger.INFO, "[%s] Listener terminated.\n", si.name)
@@ -91,20 +96,31 @@ func (si *ServiceImpl) Start(spec string) (err error) {
 				}
 				switch ch := in.(type) {
 				case transport.Channel:
-					clientID := util.NextID()
+					// run a new session with context
+					ctx := NewSessionContext()
+					clientID := ctx.Id
+					si.pending[clientID] = ctx
 					logger.Printf(logger.INFO, "[%s] Client '%d' connected.\n", si.name, clientID)
-					si.wg.Add(1)
+
 					go func() {
 						// serve client on the message channel
-						si.impl.ServeClient(si.wg, transport.NewMsgChannel(ch))
+						si.impl.ServeClient(ctx, transport.NewMsgChannel(ch))
 						// session is done now.
 						logger.Printf(logger.INFO, "[%s] Session with client '%d' ended.\n", si.name, clientID)
+						si.drop <- clientID
 					}()
 				}
+
+			// handle session removal
+			case clientID := <-si.drop:
+				delete(si.pending, clientID)
+
+			// handle cancelation signal on listener.
 			case <-si.ctrl:
 				break loop
 			}
 		}
+
 		// close-down service
 		logger.Printf(logger.INFO, "[%s] Service closing.\n", si.name)
 		si.srvc.Close()

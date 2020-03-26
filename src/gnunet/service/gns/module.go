@@ -26,10 +26,10 @@ import (
 	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/message"
+	"gnunet/service"
 	"gnunet/transport"
 	"gnunet/util"
 
-	"github.com/bfix/gospel/concurrent"
 	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/logger"
 )
@@ -112,17 +112,16 @@ func NewQuery(pkey *ed25519.PublicKey, label string) *Query {
 // GNSModule handles the resolution of GNS names to RRs bundled in a block.
 type GNSModule struct {
 	// Use function references for calls to methods in other modules:
-	LookupLocal  func(query *Query) (*message.GNSBlock, error)
-	StoreLocal   func(block *message.GNSBlock) error
-	LookupRemote func(query *Query) (*message.GNSBlock, error)
-	CancelRemote func(query *Query) error
-
-	sig *concurrent.Signaller // shared signalling channel
+	LookupLocal  func(ctx *service.SessionContext, query *Query) (*message.GNSBlock, error)
+	StoreLocal   func(ctx *service.SessionContext, block *message.GNSBlock) error
+	LookupRemote func(ctx *service.SessionContext, query *Query) (*message.GNSBlock, error)
+	CancelRemote func(ctx *service.SessionContext, query *Query) error
 }
 
 // Resolve a GNS name with multiple labels. If pkey is not nil, the name
 // is interpreted as "relative to current zone".
 func (gns *GNSModule) Resolve(
+	ctx *service.SessionContext,
 	path string,
 	pkey *ed25519.PublicKey,
 	kind RRTypeList,
@@ -140,14 +139,15 @@ func (gns *GNSModule) Resolve(
 	// check for relative path
 	if pkey != nil {
 		//resolve relative path
-		return gns.ResolveRelative(names, pkey, kind, mode, depth)
+		return gns.ResolveRelative(ctx, names, pkey, kind, mode, depth)
 	}
 	// resolve absolute path
-	return gns.ResolveAbsolute(names, kind, mode, depth)
+	return gns.ResolveAbsolute(ctx, names, kind, mode, depth)
 }
 
 // Resolve a fully qualified GNS absolute name (with multiple labels).
 func (gns *GNSModule) ResolveAbsolute(
+	ctx *service.SessionContext,
 	labels []string,
 	kind RRTypeList,
 	mode int,
@@ -161,12 +161,13 @@ func (gns *GNSModule) ResolveAbsolute(
 		return
 	}
 	// continue with resolution relative to a zone.
-	return gns.ResolveRelative(labels[1:], pkey, kind, mode, depth)
+	return gns.ResolveRelative(ctx, labels[1:], pkey, kind, mode, depth)
 }
 
 // Resolve relative path (to a given zone) recursively by processing simple
 // (PKEY,Label) lookups in sequence and handle intermediate GNS record types
 func (gns *GNSModule) ResolveRelative(
+	ctx *service.SessionContext,
 	labels []string,
 	pkey *ed25519.PublicKey,
 	kind RRTypeList,
@@ -183,7 +184,7 @@ func (gns *GNSModule) ResolveRelative(
 
 		// resolve next level
 		var block *message.GNSBlock
-		if block, err = gns.Lookup(pkey, labels[0], mode); err != nil {
+		if block, err = gns.Lookup(ctx, pkey, labels[0], mode); err != nil {
 			// failed to resolve name
 			return
 		}
@@ -246,7 +247,7 @@ func (gns *GNSModule) ResolveRelative(
 				lbls += "."
 			}
 			fqdn := lbls + inst.Query
-			if set, err = gns.ResolveDNS(fqdn, inst.Servers, kind, pkey, depth); err != nil {
+			if set, err = gns.ResolveDNS(ctx, fqdn, inst.Servers, kind, pkey, depth); err != nil {
 				logger.Println(logger.ERROR, "[gns] GNS2DNS resolution failed.")
 				return
 			}
@@ -284,7 +285,7 @@ func (gns *GNSModule) ResolveRelative(
 				break
 			}
 			logger.Println(logger.DBG, "[gns] CNAME resolution required.")
-			if set, err = gns.ResolveUnknown(inst.name, labels, pkey, kind, depth+1); err != nil {
+			if set, err = gns.ResolveUnknown(ctx, inst.name, labels, pkey, kind, depth+1); err != nil {
 				logger.Println(logger.ERROR, "[gns] CNAME resolution failed.")
 				return
 			}
@@ -335,6 +336,7 @@ func (gns *GNSModule) ResolveRelative(
 // a PKEY TLD), it is also resolved with GNS. All other names are resolved
 // via DNS queries.
 func (gns *GNSModule) ResolveUnknown(
+	ctx *service.SessionContext,
 	name string,
 	labels []string,
 	pkey *ed25519.PublicKey,
@@ -348,14 +350,14 @@ func (gns *GNSModule) ResolveUnknown(
 		for _, label := range util.ReverseStringList(labels) {
 			name += "." + label
 		}
-		if set, err = gns.Resolve(name, pkey, kind, enums.GNS_LO_DEFAULT, depth+1); err != nil {
+		if set, err = gns.Resolve(ctx, name, pkey, kind, enums.GNS_LO_DEFAULT, depth+1); err != nil {
 			return
 		}
 	} else {
 		// check for absolute GNS name (with PKEY as TLD)
 		if zk := gns.GetZoneKey(name); zk != nil {
 			// resolve absolute GNS name (name ends in a PKEY)
-			if set, err = gns.Resolve(util.StripPathRight(name), zk, kind, enums.GNS_LO_DEFAULT, depth+1); err != nil {
+			if set, err = gns.Resolve(ctx, util.StripPathRight(name), zk, kind, enums.GNS_LO_DEFAULT, depth+1); err != nil {
 				return
 			}
 		} else {
@@ -383,6 +385,7 @@ func (gns *GNSModule) GetZoneKey(path string) *ed25519.PublicKey {
 
 // Lookup name in GNS.
 func (gns *GNSModule) Lookup(
+	ctx *service.SessionContext,
 	pkey *ed25519.PublicKey,
 	label string,
 	mode int) (block *message.GNSBlock, err error) {
@@ -391,7 +394,7 @@ func (gns *GNSModule) Lookup(
 	query := NewQuery(pkey, label)
 
 	// try local lookup first
-	if block, err = gns.LookupLocal(query); err != nil {
+	if block, err = gns.LookupLocal(ctx, query); err != nil {
 		logger.Printf(logger.ERROR, "[gns] local Lookup: %s\n", err.Error())
 		block = nil
 		return
@@ -399,12 +402,12 @@ func (gns *GNSModule) Lookup(
 	if block == nil {
 		if mode == enums.GNS_LO_DEFAULT {
 			// get the block from a remote lookup
-			if block, err = gns.LookupRemote(query); err != nil || block == nil {
+			if block, err = gns.LookupRemote(ctx, query); err != nil || block == nil {
 				if err != nil {
 					// check for aborted remote lookup: we need to cancel the query
 					if err == transport.ErrChannelInterrupted {
 						logger.Println(logger.WARN, "[gns] remote Lookup aborted -- cleaning up.")
-						if err = gns.CancelRemote(query); err != nil {
+						if err = gns.CancelRemote(ctx, query); err != nil {
 							logger.Printf(logger.ERROR, "[gns] remote Lookup abort failed: %s\n", err.Error())
 						}
 					} else {
@@ -418,7 +421,7 @@ func (gns *GNSModule) Lookup(
 				return
 			}
 			// store RRs from remote locally.
-			gns.StoreLocal(block)
+			gns.StoreLocal(ctx, block)
 		}
 	}
 	return
