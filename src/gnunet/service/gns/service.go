@@ -75,7 +75,7 @@ func (s *GNSService) Stop() error {
 
 // Serve a client channel.
 func (s *GNSService) ServeClient(ctx *service.SessionContext, mc *transport.MsgChannel) {
-	defer ctx.Done()
+	defer ctx.Remove()
 
 loop:
 	for {
@@ -113,7 +113,7 @@ loop:
 						logger.Printf(logger.ERROR, "[gns] Failed to send response: %s\n", err.Error())
 					}
 					// go-routine finished
-					ctx.Done()
+					ctx.Remove()
 				}()
 
 				pkey := ed25519.NewPublicKeyFromBytes(m.Zone)
@@ -154,6 +154,8 @@ loop:
 			break loop
 		}
 	}
+	// cancel all tasks running for this session/connection
+	ctx.Cancel()
 	// close client connection
 	mc.Close()
 }
