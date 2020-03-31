@@ -146,10 +146,11 @@ func NewDHTClientGetStopMsg(key *crypto.HashCode) *DHTClientGetStopMsg {
 		key = new(crypto.HashCode)
 	}
 	return &DHTClientGetStopMsg{
-		MsgSize: 80,
-		MsgType: DHT_CLIENT_GET_STOP,
-		Id:      0,
-		Key:     key,
+		MsgSize:  80,
+		MsgType:  DHT_CLIENT_GET_STOP,
+		Reserved: 0, // mandatory
+		Id:       0,
+		Key:      key,
 	}
 }
 
