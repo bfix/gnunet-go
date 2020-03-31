@@ -89,6 +89,8 @@ loop:
 				break loop
 			case syscall.SIGHUP:
 				logger.Println(logger.INFO, "[gns] SIGHUP")
+			case syscall.SIGURG:
+				// TODO: https://github.com/golang/go/issues/37942
 			default:
 				logger.Println(logger.INFO, "[gns] Unhandled signal: "+sig.String())
 			}
