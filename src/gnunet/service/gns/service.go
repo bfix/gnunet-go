@@ -75,11 +75,11 @@ func (s *GNSService) Stop() error {
 
 // Serve a client channel.
 func (s *GNSService) ServeClient(ctx *service.SessionContext, mc *transport.MsgChannel) {
-	defer ctx.Remove()
 
 loop:
 	for {
 		// receive next message from client
+		logger.Printf(logger.DBG, "[gns] Waiting for message in session '%d'...\n", ctx.Id)
 		msg, err := mc.Receive(ctx.Signaller())
 		if err != nil {
 			if err == io.EOF {
@@ -105,12 +105,14 @@ loop:
 			resp = respX
 
 			// perform lookup on block (locally and remote)
-			ctx.Add()
 			go func() {
+				ctx.Add()
 				defer func() {
 					// send response
-					if err := mc.Send(resp, ctx.Signaller()); err != nil {
-						logger.Printf(logger.ERROR, "[gns] Failed to send response: %s\n", err.Error())
+					if resp != nil {
+						if err := mc.Send(resp, ctx.Signaller()); err != nil {
+							logger.Printf(logger.ERROR, "[gns] Failed to send response: %s\n", err.Error())
+						}
 					}
 					// go-routine finished
 					ctx.Remove()
@@ -122,6 +124,9 @@ loop:
 				recset, err := s.Resolve(ctx, label, pkey, kind, int(m.Options), 0)
 				if err != nil {
 					logger.Printf(logger.ERROR, "[gns] Failed to lookup block: %s\n", err.Error())
+					if err == transport.ErrChannelInterrupted {
+						resp = nil
+					}
 					return
 				}
 				// handle records
@@ -155,7 +160,9 @@ loop:
 		}
 	}
 	// cancel all tasks running for this session/connection
+	logger.Printf(logger.INFO, "[gns] Start closing session '%d'...\n", ctx.Id)
 	ctx.Cancel()
+
 	// close client connection
 	mc.Close()
 }
