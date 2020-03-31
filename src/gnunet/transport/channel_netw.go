@@ -85,9 +85,16 @@ func (c *NetworkChannel) Open(spec string) (err error) {
 // Close a network channel
 func (c *NetworkChannel) Close() error {
 	if c.conn != nil {
-		return c.conn.Close()
+		rc := c.conn.Close()
+		c.conn = nil
+		return rc
 	}
 	return ErrChannelNotOpened
+}
+
+// IsOpen returns true if the channel is opened
+func (c *NetworkChannel) IsOpen() bool {
+	return c.conn != nil
 }
 
 // Read bytes from a network channel into buffer: Returns the number of read

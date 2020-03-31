@@ -38,6 +38,7 @@ var (
 	ErrChannelNotImplemented = fmt.Errorf("Protocol not implemented")
 	ErrChannelNotOpened      = fmt.Errorf("Channel not opened")
 	ErrChannelInterrupted    = fmt.Errorf("Channel interrupted")
+	ErrChannelClosed         = fmt.Errorf("Channel closed")
 )
 
 ////////////////////////////////////////////////////////////////////////
@@ -51,10 +52,11 @@ var (
 //     "tcp+1.2.3.4:5"       -- for TCP channels
 //     "udp+1.2.3.4:5"       -- for UDP channels
 type Channel interface {
-	Open(spec string) error
-	Close() error
-	Read([]byte, *concurrent.Signaller) (int, error)
-	Write([]byte, *concurrent.Signaller) (int, error)
+	Open(spec string) error                           // open channel (for read/write)
+	Close() error                                     // close open channel
+	IsOpen() bool                                     // check if channel is open
+	Read([]byte, *concurrent.Signaller) (int, error)  // read from channel
+	Write([]byte, *concurrent.Signaller) (int, error) // write to channel
 }
 
 // ChannelFactory instantiates specific Channel imülementations.
@@ -144,6 +146,11 @@ func (c *MsgChannel) Close() error {
 // Send a GNUnet message over a channel.
 func (c *MsgChannel) Send(msg message.Message, sig *concurrent.Signaller) error {
 
+	// check for closed channel
+	if !c.ch.IsOpen() {
+		return ErrChannelClosed
+	}
+
 	// convert message to binary data
 	data, err := data.Marshal(msg)
 	if err != nil {
@@ -174,6 +181,12 @@ func (c *MsgChannel) Send(msg message.Message, sig *concurrent.Signaller) error 
 
 // Receive GNUnet messages over a plain Channel.
 func (c *MsgChannel) Receive(sig *concurrent.Signaller) (message.Message, error) {
+	// check for closed channel
+	if !c.ch.IsOpen() {
+		return nil, ErrChannelClosed
+	}
+
+	// get bytes from channel
 	get := func(pos, count int) error {
 		n, err := c.ch.Read(c.buf[pos:pos+count], sig)
 		if err != nil {
@@ -184,6 +197,7 @@ func (c *MsgChannel) Receive(sig *concurrent.Signaller) (message.Message, error)
 		}
 		return nil
 	}
+
 	if err := get(0, 4); err != nil {
 		return nil, err
 	}
