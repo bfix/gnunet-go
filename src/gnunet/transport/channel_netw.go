@@ -121,8 +121,6 @@ func (c *NetworkChannel) Read(buf []byte, sig *concurrent.Signaller) (int, error
 			switch val := x.(type) {
 			case bool:
 				if val {
-					c.conn.Close()
-					c.conn = nil
 					return 0, ErrChannelInterrupted
 				}
 			}
@@ -156,7 +154,6 @@ func (c *NetworkChannel) Write(buf []byte, sig *concurrent.Signaller) (int, erro
 			switch val := x.(type) {
 			case bool:
 				if val {
-					c.conn.Close()
 					return 0, ErrChannelInterrupted
 				}
 			}
