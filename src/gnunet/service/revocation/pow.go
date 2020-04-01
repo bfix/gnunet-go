@@ -20,12 +20,12 @@ package revocation
 
 import (
 	"bytes"
+	"crypto/cipher"
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/binary"
 	"sync"
 
-	"gnunet/crypto"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/crypto/ed25519"
@@ -33,6 +33,7 @@ import (
 	"github.com/bfix/gospel/math"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/crypto/scrypt"
+	"golang.org/x/crypto/twofish"
 )
 
 //----------------------------------------------------------------------
@@ -73,6 +74,11 @@ func (r *RevData) GetNonce() uint64 {
 	return r.Nonce
 }
 
+// GetBlob returns the binary representation of RevData
+func (r *RevData) GetBlob() []byte {
+	return r.blob
+}
+
 // Next selects the next nonce to be tested.
 func (r *RevData) Next() {
 	var incr func(pos int)
@@ -91,33 +97,27 @@ func (r *RevData) Next() {
 func (r *RevData) Compute() (*math.Int, error) {
 
 	// generate key material
-	k, err := scrypt.Key(r.blob, []byte("gnunet-revocation-proof-of-work"), 2, 8, 2, 64)
+	k, err := scrypt.Key(r.blob, []byte("gnunet-revocation-proof-of-work"), 2, 8, 2, 32)
 	if err != nil {
 		return nil, err
 	}
-
-	// generate keys
-	skey := crypto.NewSymmetricKey()
-	copy(skey.AESKey, k[:32])
-	copy(skey.TwofishKey, k[32:])
 
 	// generate initialization vector
-	iv := crypto.NewSymmetricIV()
-	prk := hkdf.Extract(sha512.New, k[:32], []byte("gnunet-proof-of-work-ivAES!"))
+	iv := make([]byte, 16)
+	prk := hkdf.Extract(sha512.New, k, []byte("gnunet-proof-of-work-iv"))
 	rdr := hkdf.Expand(sha256.New, prk, []byte("gnunet-revocation-proof-of-work"))
-	rdr.Read(iv.AESIv)
-	prk = hkdf.Extract(sha512.New, k[32:], []byte("gnunet-proof-of-work-ivFISH"))
-	rdr = hkdf.Expand(sha256.New, prk, []byte("gnunet-revocation-proof-of-work"))
-	rdr.Read(iv.TwofishIv)
+	rdr.Read(iv)
 
-	// perform encryption
-	enc, err := crypto.SymmetricEncrypt(r.blob, skey, iv)
+	// Encrypt with Twofish CFB stream cipher
+	out := make([]byte, len(r.blob))
+	tf, err := twofish.NewCipher(k)
 	if err != nil {
 		return nil, err
 	}
+	cipher.NewCFBEncrypter(tf, iv).XORKeyStream(out, r.blob)
 
 	// compute result
-	result, err := scrypt.Key(enc, []byte("gnunet-revocation-proof-of-work"), 2, 8, 2, 64)
+	result, err := scrypt.Key(out, []byte("gnunet-revocation-proof-of-work"), 2, 8, 2, 64)
 	return math.NewIntFromBytes(result), nil
 }
 

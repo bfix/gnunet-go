@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
@@ -19,16 +20,17 @@ func main() {
 	flag.IntVar(&bits, "b", 25, "Number of leading zero bits")
 	flag.BoolVar(&quiet, "q", false, "Be quiet")
 	flag.Parse()
+
+	// pre-set difficulty
 	fmt.Printf("Leading zeros required: %d\n", bits)
+	difficulty := math.TWO.Pow(512 - bits).Sub(math.ONE)
+	fmt.Printf("==> Difficulty: %v\n", difficulty)
 
 	// generate a random key pair
 	pkey, _ := ed25519.NewKeypair()
 
 	// initialize RevData structure
 	rd := revocation.NewRevData(0, pkey)
-
-	// pre-set difficulty
-	difficulty := math.TWO.Pow(512 - bits).Sub(math.ONE)
 
 	var count uint64 = 0
 	for {
@@ -45,4 +47,5 @@ func main() {
 	}
 	fmt.Printf("PoW found after %d iterations:\n", count)
 	fmt.Printf("--> Nonce=%d\n", rd.GetNonce())
+	fmt.Printf("    REV = %s\n", hex.EncodeToString(rd.GetBlob()))
 }
