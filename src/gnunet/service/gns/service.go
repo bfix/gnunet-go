@@ -75,45 +75,46 @@ func (s *GNSService) Stop() error {
 // Serve a client channel.
 func (s *GNSService) ServeClient(ctx *service.SessionContext, mc *transport.MsgChannel) {
 
+	reqId := 0
 loop:
 	for {
 		// receive next message from client
-		logger.Printf(logger.DBG, "[gns] Waiting for message in session '%d'...\n", ctx.Id)
+		reqId++
+		logger.Printf(logger.DBG, "[gns:%d:%d] Waiting for client request...\n", ctx.Id, reqId)
 		msg, err := mc.Receive(ctx.Signaller())
 		if err != nil {
 			if err == io.EOF {
-				logger.Println(logger.INFO, "[gns] Client channel closed.")
+				logger.Printf(logger.INFO, "[gns:%d:%d] Client channel closed.\n", ctx.Id, reqId)
 			} else if err == transport.ErrChannelInterrupted {
-				logger.Println(logger.INFO, "[gns] Service operation interrupted.")
+				logger.Printf(logger.INFO, "[gns:%d:%d] Service operation interrupted.\n", ctx.Id, reqId)
 			} else {
-				logger.Printf(logger.ERROR, "[gns] Message-receive failed: %s\n", err.Error())
+				logger.Printf(logger.ERROR, "[gns:%d:%d] Message-receive failed: %s\n", ctx.Id, reqId, err.Error())
 			}
 			break loop
 		}
-		logger.Printf(logger.INFO, "[gns] Received msg: %v\n", msg)
+		logger.Printf(logger.INFO, "[gns:%d:%d] Received request: %v\n", ctx.Id, reqId, msg)
 
 		// perform lookup
-		var resp message.Message
 		switch m := msg.(type) {
 		case *message.GNSLookupMsg:
 			//----------------------------------------------------------
 			// GNS_LOOKUP
 			//----------------------------------------------------------
-			logger.Println(logger.INFO, "[gns] Lookup request received.")
-			respX := message.NewGNSLookupResultMsg(m.Id)
-			resp = respX
 
 			// perform lookup on block (locally and remote)
-			go func() {
+			go func(id int, m *message.GNSLookupMsg) {
+				logger.Printf(logger.INFO, "[gns:%d:%d] Lookup request received.\n", ctx.Id, id)
+				resp := message.NewGNSLookupResultMsg(m.Id)
 				ctx.Add()
 				defer func() {
 					// send response
 					if resp != nil {
 						if err := mc.Send(resp, ctx.Signaller()); err != nil {
-							logger.Printf(logger.ERROR, "[gns] Failed to send response: %s\n", err.Error())
+							logger.Printf(logger.ERROR, "[gns:%d:%d] Failed to send response: %s\n", ctx.Id, id, err.Error())
 						}
 					}
 					// go-routine finished
+					logger.Printf(logger.DBG, "[gns:%d:%d] Lookup request finished.\n", ctx.Id, id)
 					ctx.Remove()
 				}()
 
@@ -122,7 +123,7 @@ loop:
 				kind := NewRRTypeList(int(m.Type))
 				recset, err := s.Resolve(ctx, label, pkey, kind, int(m.Options), 0)
 				if err != nil {
-					logger.Printf(logger.ERROR, "[gns] Failed to lookup block: %s\n", err.Error())
+					logger.Printf(logger.ERROR, "[gns:%d:%d] Failed to lookup block: %s\n", ctx.Id, id, err.Error())
 					if err == transport.ErrChannelInterrupted {
 						resp = nil
 					}
@@ -130,40 +131,40 @@ loop:
 				}
 				// handle records
 				if recset != nil {
-					logger.Printf(logger.DBG, "[gns] Received record set with %d entries\n", recset.Count)
+					logger.Printf(logger.DBG, "[gns:%d:%d] Received record set with %d entries\n", ctx.Id, id, recset.Count)
 
 					// get records from block
 					if recset.Count == 0 {
-						logger.Println(logger.WARN, "[gns] No records in block")
+						logger.Printf(logger.WARN, "[gns:%d:%d] No records in block\n", ctx.Id, id)
 						return
 					}
 					// process records
 					for i, rec := range recset.Records {
-						logger.Printf(logger.DBG, "[gns] Record #%d: %v\n", i, rec)
+						logger.Printf(logger.DBG, "[gns:%d:%d] Record #%d: %v\n", ctx.Id, id, i, rec)
 
 						// is this the record type we are looking for?
 						if rec.Type == m.Type || int(m.Type) == enums.GNS_TYPE_ANY {
 							// add it to the response message
-							respX.AddRecord(rec)
+							resp.AddRecord(rec)
 						}
 					}
 				}
-			}()
+			}(reqId, m)
 
 		default:
 			//----------------------------------------------------------
 			// UNKNOWN message type received
 			//----------------------------------------------------------
-			logger.Printf(logger.ERROR, "[gns] Unhandled message of type (%d)\n", msg.Header().MsgType)
+			logger.Printf(logger.ERROR, "[gns:%d:%d] Unhandled message of type (%d)\n", ctx.Id, reqId, msg.Header().MsgType)
 			break loop
 		}
 	}
-	// cancel all tasks running for this session/connection
-	logger.Printf(logger.INFO, "[gns] Start closing session '%d'...\n", ctx.Id)
-	ctx.Cancel()
-
 	// close client connection
 	mc.Close()
+
+	// cancel all tasks running for this session/connection
+	logger.Printf(logger.INFO, "[gns:%d] Start closing session... [%d]\n", ctx.Id, ctx.Waiting())
+	ctx.Cancel()
 }
 
 // LookupNamecache
