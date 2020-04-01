@@ -69,7 +69,7 @@ func ServiceRequestResponse(
 	req message.Message) (message.Message, error) {
 
 	// client-connect to the service
-	logger.Printf(logger.DBG, "[%s] Connect to %s service\n", caller, callee)
+	logger.Printf(logger.DBG, "[%s] Connecting to %s service...\n", caller, callee)
 	cl, err := NewClient(endp)
 	if err != nil {
 		return nil, err
