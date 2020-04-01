@@ -30,17 +30,19 @@ import (
 // by a service; the session is handled by the 'ServeClient' method of a
 // service implementation.
 type SessionContext struct {
-	Id  int                   // session identifier
-	wg  *sync.WaitGroup       // wait group for the session
-	sig *concurrent.Signaller // signaller for the session
+	Id      int                   // session identifier
+	wg      *sync.WaitGroup       // wait group for the session
+	sig     *concurrent.Signaller // signaller for the session
+	pending int                   // number of pending go-routines
 }
 
 // NewSessionContext instantiates a new session context.
 func NewSessionContext() *SessionContext {
 	return &SessionContext{
-		Id:  util.NextID(),
-		wg:  new(sync.WaitGroup),
-		sig: concurrent.NewSignaller(),
+		Id:      util.NextID(),
+		wg:      new(sync.WaitGroup),
+		sig:     concurrent.NewSignaller(),
+		pending: 0,
 	}
 }
 
@@ -55,11 +57,18 @@ func (ctx *SessionContext) Cancel() {
 // Add a go-routine to the wait group.
 func (ctx *SessionContext) Add() {
 	ctx.wg.Add(1)
+	ctx.pending++
 }
 
 // Remove a go-routine from the wait group.
 func (ctx *SessionContext) Remove() {
 	ctx.wg.Done()
+	ctx.pending--
+}
+
+// Waiting returns the number of waiting go-routines.
+func (ctx *SessionContext) Waiting() int {
+	return ctx.pending
 }
 
 // Signaller returns the working instance for the context.
