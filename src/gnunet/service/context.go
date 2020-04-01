@@ -30,28 +30,38 @@ import (
 // by a service; the session is handled by the 'ServeClient' method of a
 // service implementation.
 type SessionContext struct {
-	Id      int                   // session identifier
-	wg      *sync.WaitGroup       // wait group for the session
-	sig     *concurrent.Signaller // signaller for the session
-	pending int                   // number of pending go-routines
+	Id       int                   // session identifier
+	wg       *sync.WaitGroup       // wait group for the session
+	sig      *concurrent.Signaller // signaller for the session
+	pending  int                   // number of pending go-routines
+	active   bool                  // is the context active (un-cancelled)?
+	onCancel *sync.Mutex           // only run one Cancel() at a time
 }
 
 // NewSessionContext instantiates a new session context.
 func NewSessionContext() *SessionContext {
 	return &SessionContext{
-		Id:      util.NextID(),
-		wg:      new(sync.WaitGroup),
-		sig:     concurrent.NewSignaller(),
-		pending: 0,
+		Id:       util.NextID(),
+		wg:       new(sync.WaitGroup),
+		sig:      concurrent.NewSignaller(),
+		pending:  0,
+		active:   true,
+		onCancel: new(sync.Mutex),
 	}
 }
 
 // Cancel all go-routines associated with this context.
 func (ctx *SessionContext) Cancel() {
-	// send signal to terminate...
-	ctx.sig.Send(true)
-	// wait for session go-routines to finish
-	ctx.wg.Wait()
+	ctx.onCancel.Lock()
+	if ctx.active {
+		// we are going out-of-business
+		ctx.active = false
+		// send signal to terminate...
+		ctx.sig.Send(true)
+		// wait for session go-routines to finish
+		ctx.wg.Wait()
+	}
+	ctx.onCancel.Unlock()
 }
 
 // Add a go-routine to the wait group.
