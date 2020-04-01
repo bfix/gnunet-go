@@ -40,10 +40,6 @@ func (nc *DHTModule) Get(ctx *service.SessionContext, query *gns.Query) (*messag
 	return nil, nil
 }
 
-func (nc *DHTModule) Cancel(ctx *service.SessionContext, query *gns.Query) error {
-	return nil
-}
-
 func (nc *DHTModule) Put(ctx *service.SessionContext, block *message.GNSBlock) error {
 	return nil
 }

@@ -60,6 +60,5 @@ func init() {
 		LookupLocal:  Modules.Namecache.Get,
 		StoreLocal:   Modules.Namecache.Put,
 		LookupRemote: Modules.DHT.Get,
-		CancelRemote: Modules.DHT.Cancel,
 	}
 }

@@ -59,7 +59,6 @@ func NewGNSService() service.Service {
 	inst.LookupLocal = inst.LookupNamecache
 	inst.StoreLocal = inst.StoreNamecache
 	inst.LookupRemote = inst.LookupDHT
-	inst.CancelRemote = inst.CancelDHT
 	return inst
 }
 
@@ -269,27 +268,64 @@ func (s *GNSService) StoreNamecache(ctx *service.SessionContext, block *message.
 // LookupDHT
 func (s *GNSService) LookupDHT(ctx *service.SessionContext, query *Query) (block *message.GNSBlock, err error) {
 	logger.Printf(logger.DBG, "[gns] LookupDHT(%s)...\n", hex.EncodeToString(query.Key.Bits))
-
-	// assemble DHT request
-	req := message.NewDHTClientGetMsg(query.Key)
-	req.Id = uint64(util.NextID())
-	req.ReplLevel = uint32(enums.DHT_GNS_REPLICATION_LEVEL)
-	req.Type = uint32(enums.BLOCK_TYPE_GNS_NAMERECORD)
-	req.Options = uint32(enums.DHT_RO_DEMULTIPLEX_EVERYWHERE)
 	block = nil
 
-	// get response from DHT service
-	var resp message.Message
-	if resp, err = service.ServiceRequestResponse(ctx, "gns", "DHT", config.Cfg.DHT.Endpoint, req); err != nil {
-		return
+	// client-connect to the DHT service
+	logger.Println(logger.DBG, "[gns] Connecting to DHT service...")
+	cl, err := service.NewClient(config.Cfg.DHT.Endpoint)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		logger.Println(logger.DBG, "[gns] Closing connection to DHT service")
+		cl.Close()
+	}()
+
+	var (
+		// response received from service
+		resp message.Message
+
+		// request-response interaction with service
+		interact = func(req message.Message, withResponse bool) (err error) {
+			// send request
+			logger.Println(logger.DBG, "[gns] Sending request to DHT service")
+			if err = cl.SendRequest(ctx, req); err == nil && withResponse {
+				// wait for a single response
+				logger.Println(logger.DBG, "[gns] Waiting for response from DHT service")
+				resp, err = cl.ReceiveResponse(ctx)
+			}
+			return
+		}
+	)
+
+	// send DHT GET request and wait for response
+	reqGet := message.NewDHTClientGetMsg(query.Key)
+	reqGet.Id = uint64(util.NextID())
+	reqGet.ReplLevel = uint32(enums.DHT_GNS_REPLICATION_LEVEL)
+	reqGet.Type = uint32(enums.BLOCK_TYPE_GNS_NAMERECORD)
+	reqGet.Options = uint32(enums.DHT_RO_DEMULTIPLEX_EVERYWHERE)
+
+	if err = interact(reqGet, true); err != nil {
+		// check for aborted remote lookup: we need to cancel the query
+		if err == transport.ErrChannelInterrupted {
+			logger.Println(logger.WARN, "[gns] remote Lookup aborted -- cleaning up.")
+
+			// send DHT GET_STOP request and terminate
+			reqStop := message.NewDHTClientGetStopMsg(query.Key)
+			reqStop.Id = reqGet.Id
+			if err = interact(reqStop, false); err != nil {
+				logger.Printf(logger.ERROR, "[gns] remote Lookup abort failed: %s\n", err.Error())
+			}
+			return nil, transport.ErrChannelInterrupted
+		}
 	}
 
-	// handle message depending on its type
+	// handle response message depending on its type
 	logger.Println(logger.DBG, "[gns] Handling response from DHT service")
 	switch m := resp.(type) {
 	case *message.DHTClientResultMsg:
 		// check for matching IDs
-		if m.Id != req.Id {
+		if m.Id != reqGet.Id {
 			logger.Println(logger.ERROR, "[gns] Got response for unknown ID")
 			break
 		}
@@ -327,33 +363,6 @@ func (s *GNSService) LookupDHT(ctx *service.SessionContext, query *Query) (block
 		// so store it there now.
 		if err = s.StoreNamecache(ctx, block); err != nil {
 			logger.Printf(logger.ERROR, "[gns] can't store block in Namecache: %s\n", err.Error())
-		}
-	}
-	return
-}
-
-// CancelDHT
-func (s *GNSService) CancelDHT(ctx *service.SessionContext, query *Query) (err error) {
-	logger.Printf(logger.DBG, "[gns] CancelDHT(%s)...\n", hex.EncodeToString(query.Key.Bits))
-
-	// assemble DHT request
-	req := message.NewDHTClientGetStopMsg(query.Key)
-	req.Id = uint64(util.NextID())
-
-	// get response from DHT service
-	var resp message.Message
-	if resp, err = service.ServiceRequestResponse(ctx, "gns", "DHT", config.Cfg.DHT.Endpoint, req); err != nil {
-		return
-	}
-
-	// handle message depending on its type
-	logger.Println(logger.DBG, "[gns] Handling response from DHT service")
-	switch m := resp.(type) {
-	case *message.DHTClientResultMsg:
-		// check for matching IDs
-		if m.Id != req.Id {
-			logger.Println(logger.ERROR, "[gns] Got response for unknown ID")
-			break
 		}
 	}
 	return

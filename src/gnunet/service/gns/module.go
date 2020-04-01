@@ -27,7 +27,6 @@ import (
 	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service"
-	"gnunet/transport"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/crypto/ed25519"
@@ -115,7 +114,6 @@ type GNSModule struct {
 	LookupLocal  func(ctx *service.SessionContext, query *Query) (*message.GNSBlock, error)
 	StoreLocal   func(ctx *service.SessionContext, block *message.GNSBlock) error
 	LookupRemote func(ctx *service.SessionContext, query *Query) (*message.GNSBlock, error)
-	CancelRemote func(ctx *service.SessionContext, query *Query) error
 }
 
 // Resolve a GNS name with multiple labels. If pkey is not nil, the name
@@ -404,15 +402,7 @@ func (gns *GNSModule) Lookup(
 			// get the block from a remote lookup
 			if block, err = gns.LookupRemote(ctx, query); err != nil || block == nil {
 				if err != nil {
-					// check for aborted remote lookup: we need to cancel the query
-					if err == transport.ErrChannelInterrupted {
-						logger.Println(logger.WARN, "[gns] remote Lookup aborted -- cleaning up.")
-						if err = gns.CancelRemote(ctx, query); err != nil {
-							logger.Printf(logger.ERROR, "[gns] remote Lookup abort failed: %s\n", err.Error())
-						}
-					} else {
-						logger.Printf(logger.ERROR, "[gns] remote Lookup failed: %s\n", err.Error())
-					}
+					logger.Printf(logger.ERROR, "[gns] remote Lookup failed: %s\n", err.Error())
 					block = nil
 				} else {
 					logger.Println(logger.DBG, "[gns] remote Lookup: no block found")
