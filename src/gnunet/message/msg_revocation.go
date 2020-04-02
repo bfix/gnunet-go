@@ -105,7 +105,7 @@ func (msg *RevocationQueryResponseMsg) Header() *MessageHeader {
 // RevocationRevokeMsg
 type RevocationRevokeMsg struct {
 	MsgSize   uint16                   `order:"big"` // total size of message
-	MsgType   uint16                   `order:"big"` // REVOCATION_QUERY (636)
+	MsgType   uint16                   `order:"big"` // REVOCATION_REVOKE (638)
 	Reserved  uint32                   `order:"big"` // Reserved for future use
 	PoW       uint64                   `order:"big"` // Proof-of-work: nonce that satisfy condition
 	Signature []byte                   `size:"64"`   // Signature of the revocation.
@@ -153,8 +153,8 @@ func (msg *RevocationRevokeMsg) Header() *MessageHeader {
 // RevocationRevokeResponseMsg
 type RevocationRevokeResponseMsg struct {
 	MsgSize uint16 `order:"big"` // total size of message
-	MsgType uint16 `order:"big"` // REVOCATION_QUERY_RESPONSE (637)
-	Success uint32 `order:"big"` // Revoke successful?
+	MsgType uint16 `order:"big"` // REVOCATION_REVOKE_RESPONSE (639)
+	Success uint32 `order:"big"` // Revoke successful? (0=no, 1=yes)
 }
 
 // NewRevocationRevokeResponseMsg creates a new response for a query.
