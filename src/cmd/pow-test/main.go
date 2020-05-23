@@ -87,4 +87,5 @@ func main() {
 	}()
 
 	wg.Wait()
+	log.Printf("Verify: %d\n", rd.Verify())
 }
