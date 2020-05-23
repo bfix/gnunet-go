@@ -21,8 +21,6 @@ package message
 import (
 	"fmt"
 
-	"gnunet/crypto"
-	"gnunet/enums"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/crypto/ed25519"
@@ -104,28 +102,23 @@ func (msg *RevocationQueryResponseMsg) Header() *MessageHeader {
 
 // RevocationRevokeMsg
 type RevocationRevokeMsg struct {
-	MsgSize   uint16                   `order:"big"` // total size of message
-	MsgType   uint16                   `order:"big"` // REVOCATION_REVOKE (638)
-	Reserved  uint32                   `order:"big"` // Reserved for future use
-	PoW       uint64                   `order:"big"` // Proof-of-work: nonce that satisfy condition
-	Signature []byte                   `size:"64"`   // Signature of the revocation.
-	Purpose   *crypto.SignaturePurpose // Size and purpose of signature (8 bytes)
-	ZoneKey   []byte                   `size:"32"` // Zone key to be revoked
+	MsgSize   uint16            `order:"big"` // total size of message
+	MsgType   uint16            `order:"big"` // REVOCATION_REVOKE (638)
+	Timestamp util.AbsoluteTime // Timestamp of revocation creation
+	PoWs      []uint64          `size:"32" order:"big"` // (Sorted) list of PoW values
+	Signature []byte            `size:"64"`             // Signature (Proof-of-ownership).
+	ZoneKey   []byte            `size:"32"`             // public zone key to be revoked
 }
 
 // NewRevocationRevokeMsg creates a new message for a given zone.
-func NewRevocationRevokeMsg(pow uint64, zoneKey *ed25519.PublicKey, sig *ed25519.EcSignature) *RevocationRevokeMsg {
+func NewRevocationRevokeMsg(zoneKey *ed25519.PublicKey, sig *ed25519.EcSignature) *RevocationRevokeMsg {
 	msg := &RevocationRevokeMsg{
 		MsgSize:   120,
 		MsgType:   REVOCATION_REVOKE,
-		Reserved:  0,
-		PoW:       pow,
+		Timestamp: util.AbsoluteTimeNow(),
+		PoWs:      make([]uint64, 32),
 		Signature: make([]byte, 64),
-		Purpose: &crypto.SignaturePurpose{
-			Size:    40,
-			Purpose: enums.SIG_REVOCATION,
-		},
-		ZoneKey: make([]byte, 32),
+		ZoneKey:   make([]byte, 32),
 	}
 	if zoneKey != nil {
 		copy(msg.ZoneKey, zoneKey.Bytes())
@@ -138,7 +131,7 @@ func NewRevocationRevokeMsg(pow uint64, zoneKey *ed25519.PublicKey, sig *ed25519
 
 // String returns a human-readable representation of the message.
 func (m *RevocationRevokeMsg) String() string {
-	return fmt.Sprintf("RevocationRevokeMsg{pow=%d,zone=%s}", m.PoW, util.EncodeBinaryToString(m.ZoneKey))
+	return fmt.Sprintf("RevocationRevokeMsg{zone=%s}", util.EncodeBinaryToString(m.ZoneKey))
 }
 
 // Header returns the message header in a separate instance.
