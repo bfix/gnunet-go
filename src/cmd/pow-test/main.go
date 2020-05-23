@@ -1,51 +1,90 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
 
 	"gnunet/service/revocation"
+	"gnunet/util"
 
 	"github.com/bfix/gospel/crypto/ed25519"
-	"github.com/bfix/gospel/math"
 )
 
 func main() {
+	fmt.Println("=================================")
+	fmt.Println("Compute revocation data block")
+	fmt.Println("for a random zone key (test mode)")
+	fmt.Println("Press ^C to abort...")
+	fmt.Println("=================================")
+
 	var (
 		quiet bool
 		bits  int
 	)
-	flag.IntVar(&bits, "b", 25, "Number of leading zero bits")
+	flag.IntVar(&bits, "b", 20, "Number of leading zero bits")
 	flag.BoolVar(&quiet, "q", false, "Be quiet")
 	flag.Parse()
 
 	// pre-set difficulty
 	fmt.Printf("Leading zeros required: %d\n", bits)
-	difficulty := math.TWO.Pow(512 - bits).Sub(math.ONE)
-	fmt.Printf("==> Difficulty: %v\n", difficulty)
 
 	// generate a random key pair
-	pkey, _ := ed25519.NewKeypair()
+	pkey, skey := ed25519.NewKeypair()
+
+	// set expiration time
+	ts := util.AbsoluteTimeNow()
+	ttl := util.NewRelativeTime(2 * 365 * 24 * time.Hour)
 
 	// initialize RevData structure
-	rd := revocation.NewRevData(0, pkey)
-
-	var count uint64 = 0
-	for {
-		result, err := rd.Compute()
-		if err != nil {
-			log.Fatal(err)
-		}
-		//fmt.Printf("Nonce=%d, Result=(%d) %v\n", rd.GetNonce(), result.BitLen(), result)
-		if result.Cmp(difficulty) < 0 {
-			break
-		}
-		count++
-		rd.Next()
+	rd := revocation.NewRevData(ts, ttl, pkey)
+	if err := rd.Sign(skey); err != nil {
+		log.Fatal(err)
 	}
-	fmt.Printf("PoW found after %d iterations:\n", count)
-	fmt.Printf("--> Nonce=%d\n", rd.GetNonce())
-	fmt.Printf("    REV = %s\n", hex.EncodeToString(rd.GetBlob()))
+
+	ctx, cancelFcn := context.WithCancel(context.Background())
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if result := rd.Compute(ctx, bits); result != 32 {
+			fmt.Printf("Incomplete revocation: Only %d of 32 PoWs available!\n", result)
+		} else {
+			fmt.Printf("REVDATA = %s\n", hex.EncodeToString(rd.Blob()))
+		}
+	}()
+
+	go func() {
+		// handle OS signals
+		sigCh := make(chan os.Signal, 5)
+		signal.Notify(sigCh)
+	loop:
+		for {
+			select {
+			// handle OS signals
+			case sig := <-sigCh:
+				switch sig {
+				case syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM:
+					log.Printf("Terminating (on signal '%s')\n", sig)
+					cancelFcn()
+					break loop
+				case syscall.SIGHUP:
+					log.Println("SIGHUP")
+				case syscall.SIGURG:
+					// TODO: https://github.com/golang/go/issues/37942
+				default:
+					log.Println("Unhandled signal: " + sig.String())
+				}
+			}
+		}
+	}()
+
+	wg.Wait()
 }

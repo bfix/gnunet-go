@@ -20,71 +20,73 @@ package revocation
 
 import (
 	"bytes"
-	"crypto/cipher"
-	"crypto/sha256"
-	"crypto/sha512"
+	"context"
 	"encoding/binary"
 	"sync"
 
+	"gnunet/crypto"
+	"gnunet/enums"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/math"
-	"golang.org/x/crypto/hkdf"
-	"golang.org/x/crypto/scrypt"
-	"golang.org/x/crypto/twofish"
+	"golang.org/x/crypto/argon2"
 )
 
 //----------------------------------------------------------------------
-// Revocation data
+// Proof-of-Work data
 //----------------------------------------------------------------------
 
-// RevData is the revocation data structure (wire format)
-type RevData struct {
-	Nonce   uint64 `order:"big"` // start with this nonce value
-	ZoneKey []byte `size:"32"`   // public zone key to be revoked
+// PoWData is the proof-of-work data
+type PoWData struct {
+	PoW       uint64            `order:"big"` // start with this PoW value
+	Timestamp util.AbsoluteTime // Timestamp of creation
+	ZoneKey   []byte            `size:"32"` // public zone key to be revoked
 
 	// transient attributes (not serialized)
 	blob []byte // binary representation of serialized data
 }
 
-// NewRevData creates a RevData instance for the given arguments.
-func NewRevData(nonce uint64, zoneKey *ed25519.PublicKey) *RevData {
-	rd := &RevData{
-		Nonce:   nonce,
-		ZoneKey: make([]byte, 32),
+// NewPoWData creates a PoWData instance for the given arguments.
+func NewPoWData(pow uint64, ts util.AbsoluteTime, zoneKey []byte) *PoWData {
+	rd := &PoWData{
+		PoW:       0,
+		Timestamp: ts,
+		ZoneKey:   zoneKey,
 	}
-	copy(rd.ZoneKey, zoneKey.Bytes())
-	blob, err := data.Marshal(rd)
-	if err != nil {
+	if rd.SetPoW(pow) != nil {
 		return nil
 	}
-	rd.blob = blob
 	return rd
 }
 
-// GetNonce returns the last checked nonce value
-func (r *RevData) GetNonce() uint64 {
-	if r.blob != nil {
-		var val uint64
-		binary.Read(bytes.NewReader(r.blob[:8]), binary.BigEndian, &val)
-		r.Nonce = val
+func (rd *PoWData) SetPoW(pow uint64) error {
+	rd.PoW = pow
+	blob, err := data.Marshal(rd)
+	if err != nil {
+		return err
 	}
-	return r.Nonce
+	rd.blob = blob
+	return nil
 }
 
-// GetBlob returns the binary representation of RevData
-func (r *RevData) GetBlob() []byte {
-	return r.blob
+// GetPoW returns the last checked PoW value
+func (p *PoWData) GetPoW() uint64 {
+	if p.blob != nil {
+		var val uint64
+		binary.Read(bytes.NewReader(p.blob[:8]), binary.BigEndian, &val)
+		p.PoW = val
+	}
+	return p.PoW
 }
 
-// Next selects the next nonce to be tested.
-func (r *RevData) Next() {
+// Next selects the next PoW to be tested.
+func (p *PoWData) Next() {
 	var incr func(pos int)
 	incr = func(pos int) {
-		r.blob[pos]++
-		if r.blob[pos] != 0 || pos == 0 {
+		p.blob[pos]++
+		if p.blob[pos] != 0 || pos == 0 {
 			return
 		}
 		incr(pos - 1)
@@ -92,33 +94,148 @@ func (r *RevData) Next() {
 	incr(7)
 }
 
-// Compute calculates the current result for a RevData content.
+// Compute calculates the current result for a PoWData content.
 // The result is returned as a big integer value.
-func (r *RevData) Compute() (*math.Int, error) {
+func (p *PoWData) Compute() *math.Int {
+	key := argon2.Key(p.blob, []byte("gnunet-revocation-proof-of-work"), 3, 1024, 1, 64)
+	return math.NewIntFromBytes(key)
+}
 
-	// generate key material
-	k, err := scrypt.Key(r.blob, []byte("gnunet-revocation-proof-of-work"), 2, 8, 2, 32)
-	if err != nil {
-		return nil, err
+//----------------------------------------------------------------------
+// Revocation data
+//----------------------------------------------------------------------
+
+// RevData is the revocation data (wire format)
+type RevData struct {
+	Timestamp util.AbsoluteTime // Timestamp of creation
+	TTL       util.RelativeTime // TTL in microseconds
+	PoWs      []uint64          `size:32,order:"big"` // (Sorted) list of PoW values
+	Signature []byte            `size:"64"`           // Signature (Proof-of-ownership).
+	ZoneKey   []byte            `size:"32"`           // public zone key to be revoked
+}
+
+// SignedRevData is the block of data signed for a RevData instance.
+type SignedRevData struct {
+	Purpose   *crypto.SignaturePurpose
+	ZoneKey   []byte            `size:"32"` // public zone key to be revoked
+	Timestamp util.AbsoluteTime // Timestamp of creation
+}
+
+// NewRevData initializes a new RevData instance
+func NewRevData(ts util.AbsoluteTime, ttl util.RelativeTime, pkey *ed25519.PublicKey) *RevData {
+	rd := &RevData{
+		Timestamp: ts,
+		TTL:       ttl,
+		PoWs:      make([]uint64, 32),
+		Signature: make([]byte, 64),
+		ZoneKey:   make([]byte, 32),
 	}
+	copy(rd.ZoneKey, pkey.Bytes())
+	return rd
+}
 
-	// generate initialization vector
-	iv := make([]byte, 16)
-	prk := hkdf.Extract(sha512.New, k, []byte("gnunet-proof-of-work-iv"))
-	rdr := hkdf.Expand(sha256.New, prk, []byte("gnunet-revocation-proof-of-work"))
-	rdr.Read(iv)
-
-	// Encrypt with Twofish CFB stream cipher
-	out := make([]byte, len(r.blob))
-	tf, err := twofish.NewCipher(k)
-	if err != nil {
-		return nil, err
+// Sign the revocation data
+func (rd *RevData) Sign(skey *ed25519.PrivateKey) error {
+	sigBlock := &SignedRevData{
+		Purpose: &crypto.SignaturePurpose{
+			Size:    48,
+			Purpose: enums.SIG_REVOCATION,
+		},
+		ZoneKey:   rd.ZoneKey,
+		Timestamp: rd.Timestamp,
 	}
-	cipher.NewCFBEncrypter(tf, iv).XORKeyStream(out, r.blob)
+	sigData, err := data.Marshal(sigBlock)
+	if err != nil {
+		return err
+	}
+	sig, err := skey.EcSign(sigData)
+	if err != nil {
+		return err
+	}
+	copy(rd.Signature, sig.Bytes())
+	return nil
+}
 
-	// compute result
-	result, err := scrypt.Key(out, []byte("gnunet-revocation-proof-of-work"), 2, 8, 2, 64)
-	return math.NewIntFromBytes(result), nil
+// Verify the signature of the revocation data
+func (rd *RevData) Verify() bool {
+	sigBlock := &SignedRevData{
+		Purpose: &crypto.SignaturePurpose{
+			Size:    48,
+			Purpose: enums.SIG_REVOCATION,
+		},
+		ZoneKey:   rd.ZoneKey,
+		Timestamp: rd.Timestamp,
+	}
+	sigData, err := data.Marshal(sigBlock)
+	if err != nil {
+		return false
+	}
+	pkey := ed25519.NewPublicKeyFromBytes(rd.ZoneKey)
+	sig, err := ed25519.NewEcSignatureFromBytes(rd.Signature)
+	if err != nil {
+		return false
+	}
+	valid, err := pkey.EcVerify(sigData, sig)
+	if err != nil {
+		return false
+	}
+	return valid
+}
+
+// Compute tries to compute a valid Revocation; it returns the number of
+// solved PoWs. The computation is complete if 32 PoWs have been found.
+func (rd *RevData) Compute(ctx context.Context, bits int) int {
+	// set difficulty based on requested number of leading zero-bits
+	difficulty := math.TWO.Pow(512 - bits).Sub(math.ONE)
+
+	// initialize a new work record (single PoW computation)
+	work := NewPoWData(0, rd.Timestamp, rd.ZoneKey)
+
+	// work on all PoWs in a revocation data structure; make sure all PoWs
+	// are set to a valid value (that results in a valid compute() result
+	// below a given threshold)
+	for i, pow := range rd.PoWs {
+		// handle "new" pow value: set it to last_pow+1
+		// this ensures a correctly sorted pow list by design.
+		if pow == 0 && i > 0 {
+			pow = rd.PoWs[i-1] + 1
+		}
+		// prepare for PoW_i
+		work.SetPoW(pow)
+
+		// Find PoW value in an (interruptable) loop
+		out := make(chan bool)
+		go func() {
+			for {
+				res := work.Compute()
+				if res.Cmp(difficulty) < 0 {
+					break
+				}
+				work.Next()
+			}
+			out <- true
+		}()
+	loop:
+		for {
+			select {
+			case <-out:
+				rd.PoWs[i] = work.GetPoW()
+				break loop
+			case <-ctx.Done():
+				return i
+			}
+		}
+	}
+	// we have found all valid PoW values.
+	return 32
+}
+
+func (rd *RevData) Blob() []byte {
+	blob, err := data.Marshal(rd)
+	if err != nil {
+		return nil
+	}
+	return blob
 }
 
 //----------------------------------------------------------------------
