@@ -10,7 +10,6 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
 
 	"gnunet/service/revocation"
 	"gnunet/util"
@@ -39,12 +38,8 @@ func main() {
 	// generate a random key pair
 	pkey, skey := ed25519.NewKeypair()
 
-	// set expiration time
-	ts := util.AbsoluteTimeNow()
-	ttl := util.NewRelativeTime(2 * 365 * 24 * time.Hour)
-
 	// initialize RevData structure
-	rd := revocation.NewRevData(ts, ttl, pkey)
+	rd := revocation.NewRevData(util.AbsoluteTimeNow(), pkey)
 	if err := rd.Sign(skey); err != nil {
 		log.Fatal(err)
 	}
