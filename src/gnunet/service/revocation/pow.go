@@ -27,6 +27,7 @@ import (
 
 	"gnunet/crypto"
 	"gnunet/enums"
+	"gnunet/message"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/crypto/ed25519"
@@ -62,13 +63,13 @@ func NewPoWData(pow uint64, ts util.AbsoluteTime, zoneKey []byte) *PoWData {
 	return rd
 }
 
-func (rd *PoWData) SetPoW(pow uint64) error {
-	rd.PoW = pow
-	blob, err := data.Marshal(rd)
+func (p *PoWData) SetPoW(pow uint64) error {
+	p.PoW = pow
+	blob, err := data.Marshal(p)
 	if err != nil {
 		return err
 	}
-	rd.blob = blob
+	p.blob = blob
 	return nil
 }
 
@@ -109,10 +110,9 @@ func (p *PoWData) Compute() *math.Int {
 // RevData is the revocation data (wire format)
 type RevData struct {
 	Timestamp util.AbsoluteTime // Timestamp of creation
-	TTL       util.RelativeTime // TTL in microseconds
-	PoWs      []uint64          `size:32,order:"big"` // (Sorted) list of PoW values
-	Signature []byte            `size:"64"`           // Signature (Proof-of-ownership).
-	ZoneKey   []byte            `size:"32"`           // public zone key to be revoked
+	PoWs      []uint64          `size:"32" order:"big"` // (Sorted) list of PoW values
+	Signature []byte            `size:"64"`             // Signature (Proof-of-ownership).
+	ZoneKey   []byte            `size:"32"`             // public zone key to be revoked
 }
 
 // SignedRevData is the block of data signed for a RevData instance.
@@ -123,15 +123,27 @@ type SignedRevData struct {
 }
 
 // NewRevData initializes a new RevData instance
-func NewRevData(ts util.AbsoluteTime, ttl util.RelativeTime, pkey *ed25519.PublicKey) *RevData {
+func NewRevData(ts util.AbsoluteTime, pkey *ed25519.PublicKey) *RevData {
 	rd := &RevData{
 		Timestamp: ts,
-		TTL:       ttl,
 		PoWs:      make([]uint64, 32),
 		Signature: make([]byte, 64),
 		ZoneKey:   make([]byte, 32),
 	}
 	copy(rd.ZoneKey, pkey.Bytes())
+	return rd
+}
+
+// NewRevDataFromMsg initializes a new RevData instance from a GNUnet message
+func NewRevDataFromMsg(m *message.RevocationRevokeMsg) *RevData {
+	rd := &RevData{
+		Timestamp: m.Timestamp,
+		Signature: util.Clone(m.Signature),
+		ZoneKey:   util.Clone(m.ZoneKey),
+	}
+	for i, pow := range m.PoWs {
+		rd.PoWs[i] = pow
+	}
 	return rd
 }
 
@@ -258,113 +270,4 @@ func (rd *RevData) Blob() []byte {
 		return nil
 	}
 	return blob
-}
-
-//----------------------------------------------------------------------
-// Command types for Worker
-//----------------------------------------------------------------------
-
-// StartCmd starts the PoW calculation beginng at given nonce. If a
-// revocation is initiated the first time, the nonce is 0. If the computation
-// was interrupted (because the revocation service was shutting down), the
-// computation can resume for the next unchecked nonce value.
-// see: StartResponse
-type StartCmd struct {
-	ID   int      // Command identifier (to relate responses)
-	task *RevData // RevData instance to be started
-}
-
-// PauseCmd temporarily pauses the calculation of a PoW.
-// see: PauseResponse
-type PauseCmd struct {
-	ID     int // Command identifier (to relate responses)
-	taskID int // identifier for PoW task
-}
-
-// ResumeCmd resumes a paused PoW calculation.
-// see: ResumeResponse
-type ResumeCmd struct {
-	ID     int // Command identifier (to relate responses)
-	taskID int // identifier for PoW task
-}
-
-// BreakCmd interrupts a running PoW calculation
-type BreakCmd struct {
-	ID     int // Command identifier (to relate responses)
-	taskID int // identifier for PoW task
-}
-
-//----------------------------------------------------------------------
-// Response types for Worker
-//----------------------------------------------------------------------
-
-// StartResponse is a reply to the StartCmd message
-type StartResponse struct {
-	ID     int   // Command identifier (to relate responses)
-	taskID int   // identifier for PoW task
-	err    error // error code (nil on success)
-}
-
-// PauseResponse is a reply to the PauseCmd message
-type PauseResponse struct {
-	ID  int   // Command identifier (to relate responses)
-	err error // error code (nil on success)
-}
-
-// ResumeResponse is a reply to the ResumeCmd message
-type ResumeResponse struct {
-	ID  int   // Command identifier (to relate responses)
-	err error // error code (nil on success)
-}
-
-// BreakResponse is a reply to the BreakCmd message
-type BreakResponse struct {
-	ID    int    // Command identifier (to relate responses)
-	Nonce uint64 // last checked nonce value
-}
-
-//----------------------------------------------------------------------
-// Worker instance
-//----------------------------------------------------------------------
-
-// Task represents a currently active PoW calculation
-type Task struct {
-	ID     int
-	rev    *RevData
-	active bool
-}
-
-// Worker is the revocation worker. It is responsible to manage ad schedule
-// the proof-of-work tasks for revocations.
-type Worker struct {
-	tasks map[int]*Task
-	wg    *sync.WaitGroup
-}
-
-func NewWorker() *Worker {
-	return &Worker{
-		tasks: make(map[int]*Task),
-		wg:    new(sync.WaitGroup),
-	}
-}
-
-func (w *Worker) Run(wg *sync.WaitGroup, cmdCh chan interface{}, responseCh chan interface{}) {
-	defer wg.Done()
-	for {
-		select {
-		case cmd := <-cmdCh:
-			switch x := cmd.(type) {
-			case *StartCmd:
-				task := &Task{
-					ID:     util.NextID(),
-					rev:    x.task,
-					active: true,
-				}
-				w.tasks[task.ID] = task
-			}
-
-		default:
-			// compute a single round of currently active tasks
-		}
-	}
 }
