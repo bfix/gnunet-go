@@ -130,7 +130,7 @@ func main() {
 			log.Println("Revocation data object:")
 			log.Println("   0x" + hex.EncodeToString(revData.Rd.Blob()))
 			log.Println("Status:")
-			rc := revData.Rd.Verify()
+			rc := revData.Rd.Verify(false)
 			switch {
 			case rc == -1:
 				log.Println("    Missing/invalid signature")
@@ -144,7 +144,7 @@ func main() {
 				log.Printf("    Difficulty: %d\n", rc)
 			}
 		}
-		if last != revData.Last {
+		if !cont || last != revData.Last {
 			revData.Last = last
 			revData.T = util.AbsoluteTimeNow().Diff(startTime)
 
