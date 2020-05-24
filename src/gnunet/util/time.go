@@ -69,6 +69,18 @@ func (t AbsoluteTime) Add(d time.Duration) AbsoluteTime {
 	}
 }
 
+// Diff returns the relative time between two absolute times;
+// the ordering of the absolute times doesn't matter.
+func (t AbsoluteTime) Diff(t2 AbsoluteTime) RelativeTime {
+	var d uint64
+	if t.Compare(t2) == 1 {
+		d = t.Val - t2.Val
+	} else {
+		d = t2.Val - t.Val
+	}
+	return RelativeTime{d}
+}
+
 // Expired returns true if the timestamp is in the past.
 func (t AbsoluteTime) Expired() bool {
 	// check for "never"
