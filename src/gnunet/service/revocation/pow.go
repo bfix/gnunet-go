@@ -227,7 +227,7 @@ func (rd *RevData) Verify() int {
 
 // Compute tries to compute a valid Revocation; it returns the number of
 // solved PoWs. The computation is complete if 32 PoWs have been found.
-func (rd *RevData) Compute(ctx context.Context, bits int) int {
+func (rd *RevData) Compute(ctx context.Context, bits int, last uint64) (int, uint64) {
 	// set difficulty based on requested number of leading zero-bits
 	difficulty := math.TWO.Pow(512 - bits).Sub(math.ONE)
 
@@ -240,6 +240,9 @@ func (rd *RevData) Compute(ctx context.Context, bits int) int {
 	for i, pow := range rd.PoWs {
 		// handle "new" pow value: set it to last_pow+1
 		// this ensures a correctly sorted pow list by design.
+		if pow == 0 {
+			pow = last
+		}
 		if pow == 0 && i > 0 {
 			pow = rd.PoWs[i-1] + 1
 		}
@@ -265,12 +268,12 @@ func (rd *RevData) Compute(ctx context.Context, bits int) int {
 				rd.PoWs[i] = work.GetPoW()
 				break loop
 			case <-ctx.Done():
-				return i
+				return i, work.GetPoW() + 1
 			}
 		}
 	}
 	// we have found all valid PoW values.
-	return 32
+	return 32, 0
 }
 
 func (rd *RevData) Blob() []byte {
