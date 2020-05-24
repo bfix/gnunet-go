@@ -113,7 +113,7 @@ type RevocationRevokeMsg struct {
 // NewRevocationRevokeMsg creates a new message for a given zone.
 func NewRevocationRevokeMsg(zoneKey *ed25519.PublicKey, sig *ed25519.EcSignature) *RevocationRevokeMsg {
 	msg := &RevocationRevokeMsg{
-		MsgSize:   120,
+		MsgSize:   364,
 		MsgType:   REVOCATION_REVOKE,
 		Timestamp: util.AbsoluteTimeNow(),
 		PoWs:      make([]uint64, 32),
