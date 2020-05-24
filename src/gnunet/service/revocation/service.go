@@ -100,7 +100,7 @@ loop:
 				}()
 
 				pkey := ed25519.NewPublicKeyFromBytes(m.Zone)
-				valid, err := s.RevocationQuery(ctx, pkey)
+				valid, err := s.Query(ctx, pkey)
 				if err != nil {
 					logger.Printf(logger.ERROR, "[revocation:%d:%d] Failed to query revocation status: %s\n", ctx.Id, id, err.Error())
 					if err == transport.ErrChannelInterrupted {
@@ -131,8 +131,8 @@ loop:
 					ctx.Remove()
 				}()
 
-				pkey := ed25519.NewPublicKeyFromBytes(m.ZoneKey)
-				valid, err := s.RevocationRevoke(ctx, m.PoW, pkey)
+				rd := NewRevDataFromMsg(m)
+				valid, err := s.Revoke(ctx, rd)
 				if err != nil {
 					logger.Printf(logger.ERROR, "[revocation:%d:%d] Failed to revoke key: %s\n", ctx.Id, id, err.Error())
 					if err == transport.ErrChannelInterrupted {
