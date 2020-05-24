@@ -94,7 +94,7 @@ func (s *RevocationModule) Query(ctx *service.SessionContext, pkey *ed25519.Publ
 // Revoke
 func (s *RevocationModule) Revoke(ctx *service.SessionContext, rd *RevData) (success bool, err error) {
 	// verify the revocation data
-	rc := rd.Verify()
+	rc := rd.Verify(true)
 	switch {
 	case rc == -1:
 		logger.Println(logger.WARN, "[revocation] Revoke: Missing/invalid signature")
