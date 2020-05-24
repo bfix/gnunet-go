@@ -53,6 +53,10 @@ func main() {
 	flag.StringVar(&filename, "f", "", "Name of file to store revocation")
 	flag.Parse()
 
+	if len(filename) == 0 {
+		log.Fatal("Missing '-f' argument (filename fot revocation data)")
+	}
+
 	// define layout of persistant data
 	var revData struct {
 		Rd      *revocation.RevData // Revocation data
@@ -112,16 +116,38 @@ func main() {
 	}
 
 	// Start or continue calculation
-	startTime := util.AbsoluteTimeNow()
 	ctx, cancelFcn := context.WithCancel(context.Background())
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if result, last := revData.Rd.Compute(ctx, bits, revData.Last); result != 32 {
+
+		startTime := util.AbsoluteTimeNow()
+		result, last := revData.Rd.Compute(ctx, bits, revData.Last)
+		if result != 32 {
 			log.Printf("Incomplete revocation: Only %d of 32 PoWs available!\n", result)
+		} else {
+			log.Println("Revocation data object:")
+			log.Println("   0x" + hex.EncodeToString(revData.Rd.Blob()))
+			log.Println("Status:")
+			rc := revData.Rd.Verify()
+			switch {
+			case rc == -1:
+				log.Println("    Missing/invalid signature")
+			case rc == -2:
+				log.Println("    Expired revocation")
+			case rc == -3:
+				log.Println("    Wrong PoW sequence order")
+			case rc < 25:
+				log.Println("    Difficulty to small")
+			default:
+				log.Printf("    Difficulty: %d\n", rc)
+			}
+		}
+		if last != revData.Last {
 			revData.Last = last
 			revData.T = util.AbsoluteTimeNow().Diff(startTime)
+
 			log.Println("Writing revocation data to file...")
 			file, err := os.Create(filename)
 			if err != nil {
@@ -143,23 +169,6 @@ func main() {
 			}
 			if err = file.Close(); err != nil {
 				log.Fatal("Error closing file: " + err.Error())
-			}
-		} else {
-			log.Println("Revocation data object:")
-			log.Println("   0x" + hex.EncodeToString(revData.Rd.Blob()))
-			log.Println("Status:")
-			rc := revData.Rd.Verify()
-			switch {
-			case rc == -1:
-				log.Println("    Missing/invalid signature")
-			case rc == -2:
-				log.Println("    Expired revocation")
-			case rc == -3:
-				log.Println("    Wrong PoW sequence order")
-			case rc < 25:
-				log.Println("    Difficulty to small")
-			default:
-				log.Printf("    Difficulty: %d\n", rc)
 			}
 		}
 	}()
