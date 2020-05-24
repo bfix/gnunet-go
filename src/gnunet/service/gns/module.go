@@ -27,6 +27,7 @@ import (
 	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service"
+	"gnunet/service/revocation"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/crypto/ed25519"
@@ -111,9 +112,11 @@ func NewQuery(pkey *ed25519.PublicKey, label string) *Query {
 // GNSModule handles the resolution of GNS names to RRs bundled in a block.
 type GNSModule struct {
 	// Use function references for calls to methods in other modules:
-	LookupLocal  func(ctx *service.SessionContext, query *Query) (*message.GNSBlock, error)
-	StoreLocal   func(ctx *service.SessionContext, block *message.GNSBlock) error
-	LookupRemote func(ctx *service.SessionContext, query *Query) (*message.GNSBlock, error)
+	LookupLocal      func(ctx *service.SessionContext, query *Query) (*message.GNSBlock, error)
+	StoreLocal       func(ctx *service.SessionContext, block *message.GNSBlock) error
+	LookupRemote     func(ctx *service.SessionContext, query *Query) (*message.GNSBlock, error)
+	RevocationQuery  func(ctx *service.SessionContext, pkey *ed25519.PublicKey) (valid bool, err error)
+	RevocationRevoke func(ctx *service.SessionContext, rd *revocation.RevData) (success bool, err error)
 }
 
 // Resolve a GNS name with multiple labels. If pkey is not nil, the name
@@ -156,6 +159,12 @@ func (gns *GNSModule) ResolveAbsolute(
 	if pkey == nil {
 		// we can't resolve this TLD
 		err = ErrUnknownTLD
+		return
+	}
+	// check if zone key has been revoked
+	var valid bool
+	set = message.NewGNSRecordSet()
+	if valid, err = gns.RevocationQuery(ctx, pkey); err != nil || !valid {
 		return
 	}
 	// continue with resolution relative to a zone.
@@ -228,6 +237,12 @@ func (gns *GNSModule) ResolveRelative(
 			pkey = inst.pkey
 			if len(labels) == 1 && !kind.HasType(enums.GNS_TYPE_PKEY) {
 				labels = append(labels, "@")
+			}
+			// check if zone key has been revoked
+			if valid, err := gns.RevocationQuery(ctx, pkey); err != nil || !valid {
+				// revoked key -> no results!
+				records = make([]*message.GNSResourceRecord, 0)
+				break
 			}
 		} else if hdlr := hdlrs.GetHandler(enums.GNS_TYPE_GNS2DNS); hdlr != nil {
 			// (2) GNS2DNS records

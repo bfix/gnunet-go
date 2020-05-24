@@ -28,6 +28,7 @@ import (
 	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service"
+	"gnunet/service/revocation"
 	"gnunet/transport"
 	"gnunet/util"
 
@@ -59,6 +60,8 @@ func NewGNSService() service.Service {
 	inst.LookupLocal = inst.LookupNamecache
 	inst.StoreLocal = inst.StoreNamecache
 	inst.LookupRemote = inst.LookupDHT
+	inst.RevocationQuery = inst.QueryKeyRevocation
+	inst.RevocationRevoke = inst.RevokeKey
 	return inst
 }
 
@@ -167,6 +170,60 @@ loop:
 	ctx.Cancel()
 }
 
+//======================================================================
+
+//
+func (s *GNSService) QueryKeyRevocation(ctx *service.SessionContext, pkey *ed25519.PublicKey) (valid bool, err error) {
+	logger.Printf(logger.DBG, "[gns] QueryKeyRev(%s)...\n", util.EncodeBinaryToString(pkey.Bytes()))
+
+	// assemble request
+	req := message.NewRevocationQueryMsg(pkey)
+
+	// get response from Revocation service
+	var resp message.Message
+	if resp, err = service.ServiceRequestResponse(ctx, "gns", "Revocation", config.Cfg.Revocation.Endpoint, req); err != nil {
+		return
+	}
+
+	// handle message depending on its type
+	logger.Println(logger.DBG, "[gns] Handling response from Revocation service")
+	valid = false
+	switch m := resp.(type) {
+	case *message.RevocationQueryResponseMsg:
+		valid = (m.Valid == 1)
+	}
+	return
+}
+
+//
+func (s *GNSService) RevokeKey(ctx *service.SessionContext, rd *revocation.RevData) (success bool, err error) {
+	logger.Printf(logger.DBG, "[gns] RevokeKey(%s)...\n", util.EncodeBinaryToString(rd.ZoneKey))
+
+	// assemble request
+	req := message.NewRevocationRevokeMsg(nil, nil)
+	req.Timestamp = rd.Timestamp
+	copy(req.PoWs, rd.PoWs)
+	copy(req.Signature, rd.Signature)
+	copy(req.ZoneKey, rd.ZoneKey)
+
+	// get response from Revocation service
+	var resp message.Message
+	if resp, err = service.ServiceRequestResponse(ctx, "gns", "Revocation", config.Cfg.Revocation.Endpoint, req); err != nil {
+		return
+	}
+
+	// handle message depending on its type
+	logger.Println(logger.DBG, "[gns] Handling response from Revocation service")
+	success = false
+	switch m := resp.(type) {
+	case *message.RevocationRevokeResponseMsg:
+		success = (m.Success == 1)
+	}
+	return
+}
+
+//======================================================================
+
 // LookupNamecache
 func (s *GNSService) LookupNamecache(ctx *service.SessionContext, query *Query) (block *message.GNSBlock, err error) {
 	logger.Printf(logger.DBG, "[gns] LookupNamecache(%s)...\n", hex.EncodeToString(query.Key.Bits))
@@ -265,6 +322,8 @@ func (s *GNSService) StoreNamecache(ctx *service.SessionContext, block *message.
 	}
 	return
 }
+
+//======================================================================
 
 // LookupDHT
 func (s *GNSService) LookupDHT(ctx *service.SessionContext, query *Query) (block *message.GNSBlock, err error) {
