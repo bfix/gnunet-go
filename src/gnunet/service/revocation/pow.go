@@ -173,29 +173,31 @@ func (rd *RevData) Sign(skey *ed25519.PrivateKey) error {
 // than the minimum (25) indicates invalid PoWs; a value of -1 indicates
 // a failed signature; -2 indicates an expired revocation and -3 for a
 // "out-of-order" PoW sequence.
-func (rd *RevData) Verify() int {
+func (rd *RevData) Verify(withSig bool) int {
 
 	// (1) check signature
-	sigBlock := &SignedRevData{
-		Purpose: &crypto.SignaturePurpose{
-			Size:    48,
-			Purpose: enums.SIG_REVOCATION,
-		},
-		ZoneKey:   rd.ZoneKey,
-		Timestamp: rd.Timestamp,
-	}
-	sigData, err := data.Marshal(sigBlock)
-	if err != nil {
-		return -1
-	}
-	pkey := ed25519.NewPublicKeyFromBytes(rd.ZoneKey)
-	sig, err := ed25519.NewEcSignatureFromBytes(rd.Signature)
-	if err != nil {
-		return -1
-	}
-	valid, err := pkey.EcVerify(sigData, sig)
-	if err != nil || !valid {
-		return -1
+	if withSig {
+		sigBlock := &SignedRevData{
+			Purpose: &crypto.SignaturePurpose{
+				Size:    48,
+				Purpose: enums.SIG_REVOCATION,
+			},
+			ZoneKey:   rd.ZoneKey,
+			Timestamp: rd.Timestamp,
+		}
+		sigData, err := data.Marshal(sigBlock)
+		if err != nil {
+			return -1
+		}
+		pkey := ed25519.NewPublicKeyFromBytes(rd.ZoneKey)
+		sig, err := ed25519.NewEcSignatureFromBytes(rd.Signature)
+		if err != nil {
+			return -1
+		}
+		valid, err := pkey.EcVerify(sigData, sig)
+		if err != nil || !valid {
+			return -1
+		}
 	}
 
 	// (2) check PoWs
@@ -240,8 +242,8 @@ func (rd *RevData) Compute(ctx context.Context, bits int, last uint64) (int, uin
 	for i, pow := range rd.PoWs {
 		// handle "new" pow value: set it to last_pow+1
 		// this ensures a correctly sorted pow list by design.
-		if pow == 0 {
-			pow = last
+		if pow == 0 && last != 0 {
+			pow, last = last, 0
 		}
 		if pow == 0 && i > 0 {
 			pow = rd.PoWs[i-1] + 1
