@@ -22,7 +22,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"sync"
 	"time"
 
 	"gnunet/crypto"
@@ -172,7 +171,8 @@ func (rd *RevData) Sign(skey *ed25519.PrivateKey) error {
 // Verify a revocation object: returns the (smallest) number of leading
 // zero-bits in the PoWs of this revocation; a number > 0, but smaller
 // than the minimum (25) indicates invalid PoWs; a value of -1 indicates
-// a failed signature and -2 indicates an expired revocation.
+// a failed signature; -2 indicates an expired revocation and -3 for a
+// "out-of-order" PoW sequence.
 func (rd *RevData) Verify() int {
 
 	// (1) check signature
@@ -199,8 +199,17 @@ func (rd *RevData) Verify() int {
 	}
 
 	// (2) check PoWs
-	zbits := 512
+	var (
+		zbits int    = 512
+		last  uint64 = 0
+	)
 	for _, pow := range rd.PoWs {
+		// check sequence order
+		if pow <= last {
+			return -3
+		}
+		last = pow
+		// compute number of leading zero-bits
 		work := NewPoWData(pow, rd.Timestamp, rd.ZoneKey)
 		lzb := 512 - work.Compute().BitLen()
 		if lzb < zbits {
