@@ -55,16 +55,26 @@ type NamecacheConfig struct {
 }
 
 ///////////////////////////////////////////////////////////////////////
+// Revocation configuration
+
+// RevocationConfig
+type RevocationConfig struct {
+	Endpoint string `json:"endpoint"` // end-point of Revocation service
+	Storage  string `json:"storage"`  // persistance mechanism for revocation data
+}
+
+///////////////////////////////////////////////////////////////////////
 
 // Environment settings
 type Environ map[string]string
 
 // Config is the aggregated configuration for GNUnet.
 type Config struct {
-	Env       Environ          `json:"environ"`
-	DHT       *DHTConfig       `json:"dht"`
-	GNS       *GNSConfig       `json:"gns"`
-	Namecache *NamecacheConfig `json:"namecache"`
+	Env        Environ           `json:"environ"`
+	DHT        *DHTConfig        `json:"dht"`
+	GNS        *GNSConfig        `json:"gns"`
+	Namecache  *NamecacheConfig  `json:"namecache"`
+	Revocation *RevocationConfig `json:"revocation"`
 }
 
 var (
