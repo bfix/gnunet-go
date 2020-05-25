@@ -31,7 +31,6 @@ import (
 	"gnunet/service/revocation"
 	"gnunet/util"
 
-	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/data"
 )
 
@@ -59,12 +58,12 @@ func main() {
 
 	// define layout of persistant data
 	var revData struct {
-		Rd      *revocation.RevData // Revocation data
-		T       util.RelativeTime   // time spend in calculations
-		Last    uint64              // last value used for PoW test
-		Numbits uint8               // number of leading zero-bits
+		Rd      *revocation.RevDataCalc // Revocation data
+		T       util.RelativeTime       // time spend in calculations
+		Last    uint64                  // last value used for PoW test
+		Numbits uint8                   // number of leading zero-bits
 	}
-	dataBuf := make([]byte, 377)
+	dataBuf := make([]byte, 450)
 
 	// read revocation object from file
 	file, err := os.Open(filename)
@@ -77,8 +76,7 @@ func main() {
 		if err != nil {
 			log.Fatal("Invalid zonekey: " + err.Error())
 		}
-		pkey := ed25519.NewPublicKeyFromBytes(keyData)
-		revData.Rd = revocation.NewRevData(util.AbsoluteTimeNow(), pkey)
+		revData.Rd = revocation.NewRevDataCalc(keyData)
 		revData.Numbits = uint8(bits)
 		revData.T = util.NewRelativeTime(0)
 		cont = false
@@ -121,11 +119,14 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		cb := func(average float64, last uint64) {
+			log.Printf("Improved PoW: %f average zero bits, %d steps\n", average, last)
+		}
 
 		startTime := util.AbsoluteTimeNow()
-		result, last := revData.Rd.Compute(ctx, bits, revData.Last)
-		if result != 32 {
-			log.Printf("Incomplete revocation: Only %d of 32 PoWs available!\n", result)
+		average, last := revData.Rd.Compute(ctx, bits, revData.Last, cb)
+		if average < float64(bits) {
+			log.Printf("Incomplete revocation: Only %f zero bits on average!\n", average)
 		} else {
 			log.Println("Revocation data object:")
 			log.Println("   0x" + hex.EncodeToString(revData.Rd.Blob()))
@@ -158,7 +159,7 @@ func main() {
 				log.Fatal("Internal error: " + err.Error())
 			}
 			if len(buf) != len(dataBuf) {
-				log.Fatal("Internal error: Buffer mismatch")
+				log.Fatalf("Internal error: Buffer mismatch %d != %d", len(buf), len(dataBuf))
 			}
 			n, err := file.Write(buf)
 			if err != nil {
