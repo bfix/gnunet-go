@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"sort"
 	"time"
 
 	"gnunet/crypto"
@@ -62,6 +63,7 @@ func NewPoWData(pow uint64, ts util.AbsoluteTime, zoneKey []byte) *PoWData {
 	return rd
 }
 
+// SetPoW sets a new PoW value in the data structure
 func (p *PoWData) SetPoW(pow uint64) error {
 	p.PoW = pow
 	blob, err := data.Marshal(p)
@@ -98,7 +100,7 @@ func (p *PoWData) Next() {
 // Compute calculates the current result for a PoWData content.
 // The result is returned as a big integer value.
 func (p *PoWData) Compute() *math.Int {
-	key := argon2.Key(p.blob, []byte("gnunet-revocation-proof-of-work"), 3, 1024, 1, 64)
+	key := argon2.IDKey(p.blob, []byte("gnunet-revocation-proof-of-work"), 3, 1024, 1, 64)
 	return math.NewIntFromBytes(key)
 }
 
@@ -109,6 +111,7 @@ func (p *PoWData) Compute() *math.Int {
 // RevData is the revocation data (wire format)
 type RevData struct {
 	Timestamp util.AbsoluteTime // Timestamp of creation
+	TTL       util.RelativeTime // TTL of revocation
 	PoWs      []uint64          `size:"32" order:"big"` // (Sorted) list of PoW values
 	Signature []byte            `size:"64"`             // Signature (Proof-of-ownership).
 	ZoneKey   []byte            `size:"32"`             // public zone key to be revoked
@@ -119,18 +122,6 @@ type SignedRevData struct {
 	Purpose   *crypto.SignaturePurpose
 	ZoneKey   []byte            `size:"32"` // public zone key to be revoked
 	Timestamp util.AbsoluteTime // Timestamp of creation
-}
-
-// NewRevData initializes a new RevData instance
-func NewRevData(ts util.AbsoluteTime, pkey *ed25519.PublicKey) *RevData {
-	rd := &RevData{
-		Timestamp: ts,
-		PoWs:      make([]uint64, 32),
-		Signature: make([]byte, 64),
-		ZoneKey:   make([]byte, 32),
-	}
-	copy(rd.ZoneKey, pkey.Bytes())
-	return rd
 }
 
 // NewRevDataFromMsg initializes a new RevData instance from a GNUnet message
@@ -153,7 +144,7 @@ func (rd *RevData) Sign(skey *ed25519.PrivateKey) error {
 			Size:    48,
 			Purpose: enums.SIG_REVOCATION,
 		},
-		ZoneKey:   rd.ZoneKey,
+		ZoneKey:   util.Clone(rd.ZoneKey),
 		Timestamp: rd.Timestamp,
 	}
 	sigData, err := data.Marshal(sigBlock)
@@ -182,7 +173,7 @@ func (rd *RevData) Verify(withSig bool) int {
 				Size:    48,
 				Purpose: enums.SIG_REVOCATION,
 			},
-			ZoneKey:   rd.ZoneKey,
+			ZoneKey:   util.Clone(rd.ZoneKey),
 			Timestamp: rd.Timestamp,
 		}
 		sigData, err := data.Marshal(sigBlock)
@@ -202,8 +193,8 @@ func (rd *RevData) Verify(withSig bool) int {
 
 	// (2) check PoWs
 	var (
-		zbits int    = 512
-		last  uint64 = 0
+		zbits float64 = 0
+		last  uint64  = 0
 	)
 	for _, pow := range rd.PoWs {
 		// check sequence order
@@ -213,73 +204,144 @@ func (rd *RevData) Verify(withSig bool) int {
 		last = pow
 		// compute number of leading zero-bits
 		work := NewPoWData(pow, rd.Timestamp, rd.ZoneKey)
-		lzb := 512 - work.Compute().BitLen()
-		if lzb < zbits {
-			zbits = lzb
-		}
+		zbits += float64(512 - work.Compute().BitLen())
 	}
+	zbits /= 32.0
 
 	// (3) check expiration
-	ttl := time.Duration((zbits-24)*365*24) * time.Hour
-	if util.AbsoluteTimeNow().Add(ttl).Expired() {
-		return -2
+	if zbits > 24.0 {
+		ttl := time.Duration(int((zbits-24)*365*24)) * time.Hour
+		if util.AbsoluteTimeNow().Add(ttl).Expired() {
+			return -2
+		}
 	}
-	return zbits
+	return int(zbits)
 }
 
-// Compute tries to compute a valid Revocation; it returns the number of
-// solved PoWs. The computation is complete if 32 PoWs have been found.
-func (rd *RevData) Compute(ctx context.Context, bits int, last uint64) (int, uint64) {
-	// set difficulty based on requested number of leading zero-bits
-	difficulty := math.TWO.Pow(512 - bits).Sub(math.ONE)
+//----------------------------------------------------------------------
+// RevData structure for computation
+//----------------------------------------------------------------------
 
-	// initialize a new work record (single PoW computation)
-	work := NewPoWData(0, rd.Timestamp, rd.ZoneKey)
+// RevDataCalc is the revocation data structure used while computing
+// the revocation data object.
+type RevDataCalc struct {
+	RevData
+	Bits        []uint16 `size:"32" order:"big"` // number of leading zeros
+	SmallestIdx byte     // index of smallest number of leading zeros
+}
 
-	// work on all PoWs in a revocation data structure; make sure all PoWs
-	// are set to a valid value (that results in a valid compute() result
-	// below a given threshold)
-	for i, pow := range rd.PoWs {
-		// handle "new" pow value: set it to last_pow+1
-		// this ensures a correctly sorted pow list by design.
-		if pow == 0 && last != 0 {
-			pow, last = last, 0
+// NewRevDataCalc initializes a new RevDataCalc instance
+func NewRevDataCalc(pkey []byte) *RevDataCalc {
+	rd := &RevDataCalc{
+		RevData: RevData{
+			Timestamp: util.AbsoluteTimeNow(),
+			PoWs:      make([]uint64, 32),
+			Signature: make([]byte, 64),
+			ZoneKey:   make([]byte, 32),
+		},
+		Bits:        make([]uint16, 32),
+		SmallestIdx: 0,
+	}
+	copy(rd.ZoneKey, pkey)
+	return rd
+}
+
+// Average number of leading zero-bits in current list
+func (rdc *RevDataCalc) Average() float64 {
+	var sum uint16 = 0
+	for _, num := range rdc.Bits {
+		sum += num
+	}
+	return float64(sum) / 32.
+}
+
+// Insert a PoW that is "better than the worst" current PoW element.
+func (rdc *RevDataCalc) Insert(pow uint64, bits uint16) (float64, uint16) {
+	if bits > rdc.Bits[rdc.SmallestIdx] {
+		rdc.PoWs[rdc.SmallestIdx] = pow
+		rdc.Bits[rdc.SmallestIdx] = bits
+		rdc.sortBits()
+	}
+	return rdc.Average(), rdc.Bits[rdc.SmallestIdx]
+}
+
+// Get the smallest bit position
+func (rdc *RevDataCalc) sortBits() {
+	var (
+		min uint16 = 512
+		pos        = 0
+	)
+	for i, bits := range rdc.Bits {
+		if bits < min {
+			min = bits
+			pos = i
 		}
-		if pow == 0 && i > 0 {
-			pow = rd.PoWs[i-1] + 1
+	}
+	rdc.SmallestIdx = byte(pos)
+}
+
+// Compute tries to compute a valid Revocation; it returns the average number
+// of leading zero-bits and the last PoW value tried. The computation is
+// complete if the average above is greater or equal to 'bits'.
+func (rdc *RevDataCalc) Compute(ctx context.Context, bits int, last uint64, cb func(float64, uint64)) (float64, uint64) {
+	// find the largest PoW value in current work unit
+	work := NewPoWData(0, rdc.Timestamp, rdc.ZoneKey)
+	var max uint64 = 0
+	for i, pow := range rdc.PoWs {
+		if pow == 0 {
+			max++
+			work.SetPoW(max)
+			res := work.Compute()
+			rdc.Bits[i] = uint16(512 - res.BitLen())
+		} else if pow > max {
+			max = pow
 		}
-		// prepare for PoW_i
+	}
+	// adjust 'last' value
+	if last <= max {
+		last = max + 1
+	}
+
+	// Find PoW value in an (interruptable) loop
+	out := make(chan bool)
+	go func() {
+		work.SetPoW(last + 1)
+		smallest := rdc.Bits[rdc.SmallestIdx]
+		average := rdc.Average()
+		for average < float64(bits) {
+			res := work.Compute()
+			num := uint16(512 - res.BitLen())
+			if num > smallest {
+				pow := work.GetPoW()
+				average, smallest = rdc.Insert(pow, num)
+				cb(average, pow)
+			}
+			work.Next()
+		}
+		out <- true
+	}()
+loop:
+	for {
+		select {
+		case <-out:
+			break loop
+		case <-ctx.Done():
+			break loop
+		}
+	}
+	// re-order the PoWs for compliance
+	sort.Slice(rdc.PoWs, func(i, j int) bool { return rdc.PoWs[i] < rdc.PoWs[j] })
+	for i, pow := range rdc.PoWs {
 		work.SetPoW(pow)
-
-		// Find PoW value in an (interruptable) loop
-		out := make(chan bool)
-		go func() {
-			for {
-				res := work.Compute()
-				if res.Cmp(difficulty) < 0 {
-					break
-				}
-				work.Next()
-			}
-			out <- true
-		}()
-	loop:
-		for {
-			select {
-			case <-out:
-				rd.PoWs[i] = work.GetPoW()
-				break loop
-			case <-ctx.Done():
-				return i, work.GetPoW() + 1
-			}
-		}
+		rdc.Bits[i] = uint16(512 - work.Compute().BitLen())
 	}
-	// we have found all valid PoW values.
-	return 32, 0
+	rdc.sortBits()
+	return rdc.Average(), work.GetPoW()
 }
 
-func (rd *RevData) Blob() []byte {
-	blob, err := data.Marshal(rd)
+// Blob returns the binary data structure (wire format).
+func (rdc *RevDataCalc) Blob() []byte {
+	blob, err := data.Marshal(rdc)
 	if err != nil {
 		return nil
 	}
