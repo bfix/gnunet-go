@@ -105,6 +105,7 @@ type RevocationRevokeMsg struct {
 	MsgSize   uint16            `order:"big"` // total size of message
 	MsgType   uint16            `order:"big"` // REVOCATION_REVOKE (638)
 	Timestamp util.AbsoluteTime // Timestamp of revocation creation
+	TTL       util.RelativeTime // TTL of revocation
 	PoWs      []uint64          `size:"32" order:"big"` // (Sorted) list of PoW values
 	Signature []byte            `size:"64"`             // Signature (Proof-of-ownership).
 	ZoneKey   []byte            `size:"32"`             // public zone key to be revoked
@@ -116,6 +117,7 @@ func NewRevocationRevokeMsg(zoneKey *ed25519.PublicKey, sig *ed25519.EcSignature
 		MsgSize:   364,
 		MsgType:   REVOCATION_REVOKE,
 		Timestamp: util.AbsoluteTimeNow(),
+		TTL:       util.RelativeTime{0},
 		PoWs:      make([]uint64, 32),
 		Signature: make([]byte, 64),
 		ZoneKey:   make([]byte, 32),
