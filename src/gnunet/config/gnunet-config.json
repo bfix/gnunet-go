@@ -13,5 +13,9 @@
 	},
 	"namecache": {
 		"endpoint": "unix+${RT_SYS}/gnunet-service-namecache.sock"
+	},
+	"revocation": {
+		"endpoint": "unix+${RT_SYS}/gnunet-service-revocation-go.sock+perm=0770",
+		"storage": "redis+localhost:6397++15"
 	}
 }
