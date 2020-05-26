@@ -100,7 +100,7 @@ func (p *PoWData) Next() {
 // Compute calculates the current result for a PoWData content.
 // The result is returned as a big integer value.
 func (p *PoWData) Compute() *math.Int {
-	key := argon2.IDKey(p.blob, []byte("gnunet-revocation-proof-of-work"), 3, 1024, 1, 64)
+	key := argon2.IDKey(p.blob, []byte("GnsRevocationPow"), 3, 1024, 1, 64)
 	return math.NewIntFromBytes(key)
 }
 
