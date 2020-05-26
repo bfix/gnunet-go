@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"fmt"
 	"sort"
 	"time"
 
@@ -66,11 +67,10 @@ func NewPoWData(pow uint64, ts util.AbsoluteTime, zoneKey []byte) *PoWData {
 // SetPoW sets a new PoW value in the data structure
 func (p *PoWData) SetPoW(pow uint64) error {
 	p.PoW = pow
-	blob, err := data.Marshal(p)
-	if err != nil {
-		return err
+	p.blob = p.Blob()
+	if p.blob == nil {
+		return fmt.Errorf("Invalid PoW work unit")
 	}
-	p.blob = blob
 	return nil
 }
 
@@ -102,6 +102,15 @@ func (p *PoWData) Next() {
 func (p *PoWData) Compute() *math.Int {
 	key := argon2.IDKey(p.blob, []byte("gnunet-revocation-proof-of-work"), 3, 1024, 1, 64)
 	return math.NewIntFromBytes(key)
+}
+
+// Blob returns a serialized instance of the work unit
+func (p *PoWData) Blob() []byte {
+	blob, err := data.Marshal(p)
+	if err != nil {
+		return nil
+	}
+	return blob
 }
 
 //----------------------------------------------------------------------
