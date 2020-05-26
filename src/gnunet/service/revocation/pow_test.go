@@ -2,7 +2,6 @@ package revocation
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"testing"
@@ -15,58 +14,76 @@ import (
 )
 
 type testData struct {
-	skey      string
-	pkey      string
-	revdata   string
-	argonMode int
+	skey    string
+	pkey    string
+	revdata string
 }
 
 var (
 	test_data = []testData{
 		{
 
-			"uLZSPUmskV8SfAmwtwdw3fl74eBbaIp+35fWignx0FI=",
-			"9kuW0t6o4XuBOmhIyZJpyDD092em2eQeM3uWXnJ+ZR0=",
-			"AAWl7YHn1XMAAAAAAAAAAE1JXASakruETUlcBJqSv05NSVwEmpK/T01JXASakr+ZTUlcBJqSv6NNSVwEmpK/7U1JXASaksAETUlcBJqSwB9NSVwEmpLAIU1JXASaksCCTUlcBJqSwKpNSVwEmpLBYE1JXASaksGGTUlcBJqSwZxNSVwEmpLB3U1JXASaksIgTUlcBJqSwnVNSVwEmpLCgE1JXASaksM2TUlcBJqSw35NSVwEmpLDhE1JXASaksOqTUlcBJqSw7VNSVwEmpLDuU1JXASaksPXTUlcBJqSxKdNSVwEmpLE3k1JXASaksUTTUlcBJqSxRxNSVwEmpLFXU1JXASaksX/TUlcBJqSxuwHGX4Psd/g2X+D2xl0uli0/RTyVtZ9VfWN5nbw0ij+Cw1Ol+raxEBNIbSuZzVMGsNlBvmunFGhTezUoIaE33DA9kuW0t6o4XuBOmhIyZJpyDD092em2eQeM3uWXnJ+ZR0=",
-			2,
-		},
-		{
-			"EJJaW7UymipsU6IkFFdt/jkE/kNd22IAyqNb3sMRk2g=",
-			"fUBR/J2vCuXXv70BdSi/J0G8n+qxs7LctC34hJaQ7S4=",
-			"AAWlWugT9IoAWl4FAQAAAG40PmjcaH+LbjQ+aNxogM1uND5o3GiBPG40PmjcaIKMbjQ+aNxogzhuND5o3GiDvG40PmjcaIPLbjQ+aNxohAFuND5o3GiEVm40PmjcaIRbbjQ+aNxohF1uND5o3GiE2W40PmjcaIV1bjQ+aNxohfluND5o3GiGEG40PmjcaIY1bjQ+aNxohvRuND5o3GiHgW40PmjcaIezbjQ+aNxoiABuND5o3GiIF240PmjcaIgfbjQ+aNxoiD1uND5o3GiIVW40PmjcaIilbjQ+aNxoiLBuND5o3GiIzm40PmjcaIj/bjQ+aNxoiQduND5o3GiJgW40PmjcaIm8bjQ+aNxoidILkGuzZsdbclNZaOXvMPrCO+EHuA6+tacFI1bhURGBowFyaFZjgi3mOOdlKFnkJ0vnauZPIb12C3V6qhoHmhNyfUBR/J2vCuXXv70BdSi/J0G8n+qxs7LctC34hJaQ7S4=",
-			0,
+			"e01d304d45676849edcb36c843ad31837c9de8c7e58028a2e7c2a9894f130b6f", // private scalar D
+			"d2c825295cfd3073b6149c4393aa9483c51cfaf62731d2bf1127856913233b78", // public key
+			"" +
+				"0005a5fc192e1d2c" + // timestamp
+				"0000395d1827c000" + // TTL
+				"f74d39f9ee9a7344" + // PoW_0
+				"f74d39f9ee9a7610" +
+				"f74d39f9ee9a7677" +
+				"f74d39f9ee9a7774" +
+				"f74d39f9ee9a777d" +
+				"f74d39f9ee9a77a3" +
+				"f74d39f9ee9a77ad" +
+				"f74d39f9ee9a77b9" +
+				"f74d39f9ee9a77de" +
+				"f74d39f9ee9a7851" +
+				"f74d39f9ee9a786f" +
+				"f74d39f9ee9a78a3" +
+				"f74d39f9ee9a78ba" +
+				"f74d39f9ee9a78ca" +
+				"f74d39f9ee9a7916" +
+				"f74d39f9ee9a79a9" +
+				"f74d39f9ee9a7a37" +
+				"f74d39f9ee9a7a57" +
+				"f74d39f9ee9a7a5c" +
+				"f74d39f9ee9a7a9e" +
+				"f74d39f9ee9a7ad3" +
+				"f74d39f9ee9a7b1b" +
+				"f74d39f9ee9a7b7b" +
+				"f74d39f9ee9a7b83" +
+				"f74d39f9ee9a7b8b" +
+				"f74d39f9ee9a7bbe" +
+				"f74d39f9ee9a7bcc" +
+				"f74d39f9ee9a7be6" +
+				"f74d39f9ee9a7c2b" +
+				"f74d39f9ee9a7c5b" +
+				"f74d39f9ee9a7c5f" +
+				"f74d39f9ee9a7c83" + // PoW_31
+				"05b94e2ad6496a8938aaf122f91edbacf2401cce8ec02e551e2a4433e0a76256" + // Sig.R
+				"09195bbe7636e9fd9076f8f20bc62467cc8371c487e7809efeaeb6ef7178b623" + // Sig.S
+				"d2c825295cfd3073b6149c4393aa9483c51cfaf62731d2bf1127856913233b78", // PKEY
 		},
 	}
 )
 
-func blob(w *PoWData) []byte {
-	blob, err := data.Marshal(w)
-	if err != nil {
-		return nil
-	}
-	return blob
-}
-
 func TestRevocationRFC(t *testing.T) {
 
 	for i, td := range test_data {
-		fmt.Println("---------------------------------")
-		fmt.Printf("Test case #%d\n", i+1)
-		fmt.Println("---------------------------------")
-		fmt.Printf("Test data: %v\n", td)
-		if td.argonMode != 2 {
-			fmt.Println("Only argon2id supported -- skipping test case")
-			continue
+		if testing.Verbose() {
+			fmt.Println("---------------------------------")
+			fmt.Printf("Test case #%d\n", i+1)
+			fmt.Println("---------------------------------")
 		}
 
 		// construct private/public key pair from test data
-		skey_d, err := base64.StdEncoding.DecodeString(td.skey)
+		skey_d, err := hex.DecodeString(td.skey)
 		if err != nil {
 			t.Fatal(err)
 		}
 		d := math.NewIntFromBytes(util.Reverse(skey_d))
 		skey := ed25519.NewPrivateKeyFromD(d)
-		pkey_d, err := base64.StdEncoding.DecodeString(td.pkey)
+		pkey_d, err := hex.DecodeString(td.pkey)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -75,7 +92,7 @@ func TestRevocationRFC(t *testing.T) {
 		}
 
 		// assemble revocation data object
-		rev_d, err := base64.StdEncoding.DecodeString(td.revdata)
+		rev_d, err := hex.DecodeString(td.revdata)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -97,7 +114,7 @@ func TestRevocationRFC(t *testing.T) {
 			for i, pow := range revData.PoWs {
 				fmt.Printf("    PoW #%d: %d\n", i, pow)
 				work.SetPoW(pow)
-				buf := blob(work)
+				buf := work.Blob()
 				fmt.Printf("        P: %s\n", hex.EncodeToString(buf))
 				v := work.Compute()
 				fmt.Printf("        H: %s\n", hex.EncodeToString(v.Bytes()))
