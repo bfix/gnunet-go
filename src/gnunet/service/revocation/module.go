@@ -22,6 +22,7 @@ import (
 	"gnunet/config"
 	"gnunet/service"
 	"gnunet/util"
+	"net/http"
 
 	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/data"
@@ -69,6 +70,12 @@ func NewModule() *Module {
 		return nil
 	}
 	return m
+}
+
+// HandleRPC request: Decode JSON request, perform GNS action
+// and encode JSON response
+func (m *Module) HandleRPC(wrt http.ResponseWriter, req *http.Request) {
+	wrt.Write([]byte(`{"msg": "This is REVOCATION" }`))
 }
 
 // Query return true if the pkey is valid (not revoked) and false

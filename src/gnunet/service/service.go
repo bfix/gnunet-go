@@ -20,6 +20,7 @@ package service
 
 import (
 	"fmt"
+	"net/http"
 	"sync"
 
 	"gnunet/transport"
@@ -34,11 +35,12 @@ import (
 type Service interface {
 	Start(spec string) error
 	ServeClient(ctx *SessionContext, ch *transport.MsgChannel)
+	HandleRPC(wrt http.ResponseWriter, req *http.Request)
 	Stop() error
 }
 
-// ServiceImpl is an implementation of generic service functionality.
-type ServiceImpl struct {
+// Impl is an implementation of generic service functionality.
+type Impl struct {
 	impl    Service                 // Specific service implementation
 	hdlr    chan transport.Channel  // Channel from listener
 	ctrl    chan bool               // Control channel
@@ -51,8 +53,8 @@ type ServiceImpl struct {
 }
 
 // NewServiceImpl instantiates a new ServiceImpl object.
-func NewServiceImpl(name string, srv Service) *ServiceImpl {
-	return &ServiceImpl{
+func NewServiceImpl(name string, srv Service) *Impl {
+	return &Impl{
 		impl:    srv,
 		hdlr:    make(chan transport.Channel),
 		ctrl:    make(chan bool),
@@ -66,7 +68,7 @@ func NewServiceImpl(name string, srv Service) *ServiceImpl {
 }
 
 // Start a service
-func (si *ServiceImpl) Start(spec string) (err error) {
+func (si *Impl) Start(spec string) (err error) {
 	// check if we are already running
 	if si.running {
 		logger.Printf(logger.ERROR, "Service '%s' already running.\n", si.name)
@@ -98,22 +100,22 @@ func (si *ServiceImpl) Start(spec string) (err error) {
 				case transport.Channel:
 					// run a new session with context
 					ctx := NewSessionContext()
-					sessId := ctx.Id
-					si.pending[sessId] = ctx
-					logger.Printf(logger.INFO, "[%s] Session '%d' started.\n", si.name, sessId)
+					sessID := ctx.ID
+					si.pending[sessID] = ctx
+					logger.Printf(logger.INFO, "[%s] Session '%d' started.\n", si.name, sessID)
 
 					go func() {
 						// serve client on the message channel
 						si.impl.ServeClient(ctx, transport.NewMsgChannel(ch))
 						// session is done now.
-						logger.Printf(logger.INFO, "[%s] Session with client '%d' ended.\n", si.name, sessId)
-						si.drop <- sessId
+						logger.Printf(logger.INFO, "[%s] Session with client '%d' ended.\n", si.name, sessID)
+						si.drop <- sessID
 					}()
 				}
 
 			// handle session removal
-			case sessId := <-si.drop:
-				delete(si.pending, sessId)
+			case sessID := <-si.drop:
+				delete(si.pending, sessID)
 
 			// handle cancelation signal on listener.
 			case <-si.ctrl:
@@ -123,7 +125,7 @@ func (si *ServiceImpl) Start(spec string) (err error) {
 
 		// terminate pending sessions
 		for _, ctx := range si.pending {
-			logger.Printf(logger.DBG, "[%s] Session '%d' closing...\n", si.name, ctx.Id)
+			logger.Printf(logger.DBG, "[%s] Session '%d' closing...\n", si.name, ctx.ID)
 			ctx.Cancel()
 		}
 
@@ -137,7 +139,7 @@ func (si *ServiceImpl) Start(spec string) (err error) {
 }
 
 // Stop a service
-func (si *ServiceImpl) Stop() error {
+func (si *Impl) Stop() error {
 	if !si.running {
 		logger.Printf(logger.WARN, "Service '%s' not running.\n", si.name)
 		return fmt.Errorf("service not running")

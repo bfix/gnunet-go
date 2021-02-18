@@ -62,19 +62,19 @@ loop:
 	for {
 		// receive next message from client
 		reqID++
-		logger.Printf(logger.DBG, "[revocation:%d:%d] Waiting for client request...\n", ctx.Id, reqID)
+		logger.Printf(logger.DBG, "[revocation:%d:%d] Waiting for client request...\n", ctx.ID, reqID)
 		msg, err := mc.Receive(ctx.Signaller())
 		if err != nil {
 			if err == io.EOF {
-				logger.Printf(logger.INFO, "[revocation:%d:%d] Client channel closed.\n", ctx.Id, reqID)
+				logger.Printf(logger.INFO, "[revocation:%d:%d] Client channel closed.\n", ctx.ID, reqID)
 			} else if err == transport.ErrChannelInterrupted {
-				logger.Printf(logger.INFO, "[revocation:%d:%d] Service operation interrupted.\n", ctx.Id, reqID)
+				logger.Printf(logger.INFO, "[revocation:%d:%d] Service operation interrupted.\n", ctx.ID, reqID)
 			} else {
-				logger.Printf(logger.ERROR, "[revocation:%d:%d] Message-receive failed: %s\n", ctx.Id, reqID, err.Error())
+				logger.Printf(logger.ERROR, "[revocation:%d:%d] Message-receive failed: %s\n", ctx.ID, reqID, err.Error())
 			}
 			break loop
 		}
-		logger.Printf(logger.INFO, "[revocation:%d:%d] Received request: %v\n", ctx.Id, reqID, msg)
+		logger.Printf(logger.INFO, "[revocation:%d:%d] Received request: %v\n", ctx.ID, reqID, msg)
 
 		// handle request
 		switch m := msg.(type) {
@@ -83,25 +83,25 @@ loop:
 			// REVOCATION_QUERY
 			//----------------------------------------------------------
 			go func(id int, m *message.RevocationQueryMsg) {
-				logger.Printf(logger.INFO, "[revocation:%d:%d] Query request received.\n", ctx.Id, id)
+				logger.Printf(logger.INFO, "[revocation:%d:%d] Query request received.\n", ctx.ID, id)
 				var resp *message.RevocationQueryResponseMsg
 				ctx.Add()
 				defer func() {
 					// send response
 					if resp != nil {
 						if err := mc.Send(resp, ctx.Signaller()); err != nil {
-							logger.Printf(logger.ERROR, "[revocation:%d:%d] Failed to send response: %s\n", ctx.Id, id, err.Error())
+							logger.Printf(logger.ERROR, "[revocation:%d:%d] Failed to send response: %s\n", ctx.ID, id, err.Error())
 						}
 					}
 					// go-routine finished
-					logger.Printf(logger.DBG, "[revocation:%d:%d] Query request finished.\n", ctx.Id, id)
+					logger.Printf(logger.DBG, "[revocation:%d:%d] Query request finished.\n", ctx.ID, id)
 					ctx.Remove()
 				}()
 
 				pkey := ed25519.NewPublicKeyFromBytes(m.Zone)
 				valid, err := s.Query(ctx, pkey)
 				if err != nil {
-					logger.Printf(logger.ERROR, "[revocation:%d:%d] Failed to query revocation status: %s\n", ctx.Id, id, err.Error())
+					logger.Printf(logger.ERROR, "[revocation:%d:%d] Failed to query revocation status: %s\n", ctx.ID, id, err.Error())
 					if err == transport.ErrChannelInterrupted {
 						resp = nil
 					}
@@ -115,25 +115,25 @@ loop:
 			// REVOCATION_REVOKE
 			//----------------------------------------------------------
 			go func(id int, m *message.RevocationRevokeMsg) {
-				logger.Printf(logger.INFO, "[revocation:%d:%d] Revoke request received.\n", ctx.Id, id)
+				logger.Printf(logger.INFO, "[revocation:%d:%d] Revoke request received.\n", ctx.ID, id)
 				var resp *message.RevocationRevokeResponseMsg
 				ctx.Add()
 				defer func() {
 					// send response
 					if resp != nil {
 						if err := mc.Send(resp, ctx.Signaller()); err != nil {
-							logger.Printf(logger.ERROR, "[revocation:%d:%d] Failed to send response: %s\n", ctx.Id, id, err.Error())
+							logger.Printf(logger.ERROR, "[revocation:%d:%d] Failed to send response: %s\n", ctx.ID, id, err.Error())
 						}
 					}
 					// go-routine finished
-					logger.Printf(logger.DBG, "[revocation:%d:%d] Revoke request finished.\n", ctx.Id, id)
+					logger.Printf(logger.DBG, "[revocation:%d:%d] Revoke request finished.\n", ctx.ID, id)
 					ctx.Remove()
 				}()
 
 				rd := NewRevDataFromMsg(m)
 				valid, err := s.Revoke(ctx, rd)
 				if err != nil {
-					logger.Printf(logger.ERROR, "[revocation:%d:%d] Failed to revoke key: %s\n", ctx.Id, id, err.Error())
+					logger.Printf(logger.ERROR, "[revocation:%d:%d] Failed to revoke key: %s\n", ctx.ID, id, err.Error())
 					if err == transport.ErrChannelInterrupted {
 						resp = nil
 					}
@@ -146,7 +146,7 @@ loop:
 			//----------------------------------------------------------
 			// UNKNOWN message type received
 			//----------------------------------------------------------
-			logger.Printf(logger.ERROR, "[revocation:%d:%d] Unhandled message of type (%d)\n", ctx.Id, reqID, msg.Header().MsgType)
+			logger.Printf(logger.ERROR, "[revocation:%d:%d] Unhandled message of type (%d)\n", ctx.ID, reqID, msg.Header().MsgType)
 			break loop
 		}
 	}
@@ -154,6 +154,6 @@ loop:
 	mc.Close()
 
 	// cancel all tasks running for this session/connection
-	logger.Printf(logger.INFO, "[revocation:%d] Start closing session... [%d]\n", ctx.Id, ctx.Waiting())
+	logger.Printf(logger.INFO, "[revocation:%d] Start closing session... [%d]\n", ctx.ID, ctx.Waiting())
 	ctx.Cancel()
 }

@@ -19,16 +19,20 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
-	"github.com/bfix/gospel/logger"
 	"gnunet/config"
+	"gnunet/rpc"
 	"gnunet/service"
 	"gnunet/service/gns"
+
+	"github.com/bfix/gospel/logger"
 )
 
 func main() {
@@ -44,11 +48,13 @@ func main() {
 		srvEndp  string
 		err      error
 		logLevel int
+		rpcEndp  string
 	)
 	// handle command line arguments
 	flag.StringVar(&cfgFile, "c", "gnunet-config.json", "GNUnet configuration file")
 	flag.StringVar(&srvEndp, "s", "", "GNS service end-point")
 	flag.IntVar(&logLevel, "L", logger.INFO, "GNS log level (default: INFO)")
+	flag.StringVar(&rpcEndp, "R", "", "JSON-RPC endpoint (default: none)")
 	flag.Parse()
 
 	// read configuration file and set missing arguments.
@@ -64,11 +70,29 @@ func main() {
 	}
 
 	// start a new GNS service
-	gns := gns.NewGNSService()
+	gns := gns.NewService()
 	srv := service.NewServiceImpl("gns", gns)
 	if err = srv.Start(srvEndp); err != nil {
-		logger.Printf(logger.ERROR, "[gns] Error: '%s'\n", err.Error())
+		logger.Printf(logger.ERROR, "[gns] Error: '%s'", err.Error())
 		return
+	}
+
+	// start JSON-RPC server on request
+	var cancel func() = func() {}
+	if len(rpcEndp) > 0 {
+		var ctx context.Context
+		ctx, cancel = context.WithCancel(context.Background())
+		parts := strings.Split(rpcEndp, "+")
+		if parts[0] != "tcp" {
+			logger.Println(logger.ERROR, "[gns] RPC must have a TCP/IP endpoint")
+			return
+		}
+		config.Cfg.RPC.Endpoint = parts[1]
+		if err = rpc.Start(ctx); err != nil {
+			logger.Printf(logger.ERROR, "[gns] RPC failed to start: %s", err.Error())
+			return
+		}
+		rpc.Handle("/gns", gns.HandleRPC)
 	}
 
 	// handle OS signals
@@ -101,5 +125,6 @@ loop:
 	}
 
 	// terminating service
+	cancel()
 	srv.Stop()
 }

@@ -29,9 +29,17 @@ import (
 )
 
 ///////////////////////////////////////////////////////////////////////
+// RPC configuration
+
+// RPCConfig contains parameters for the JSON-RPC service
+type RPCConfig struct {
+	Endpoint string `json:"endpoint"` // end-point of JSON-RPC service
+}
+
+///////////////////////////////////////////////////////////////////////
 // GNS configuration
 
-// GNSConfig
+// GNSConfig contains parameters for the GNU Name System service
 type GNSConfig struct {
 	Endpoint     string `json:"endpoint"`     // end-point of GNS service
 	DHTReplLevel int    `json:"dhtReplLevel"` // DHT replication level
@@ -41,7 +49,7 @@ type GNSConfig struct {
 ///////////////////////////////////////////////////////////////////////
 // DHT configuration
 
-// DHTConfig
+// DHTConfig contains parameters for the distributed hash table (DHT)
 type DHTConfig struct {
 	Endpoint string `json:"endpoint"` // end-point of DHT service
 }
@@ -49,7 +57,7 @@ type DHTConfig struct {
 ///////////////////////////////////////////////////////////////////////
 // Namecache configuration
 
-// NamecacheConfig
+// NamecacheConfig contains parameters for the local name cache
 type NamecacheConfig struct {
 	Endpoint string `json:"endpoint"` // end-point of Namecache service
 }
@@ -57,7 +65,7 @@ type NamecacheConfig struct {
 ///////////////////////////////////////////////////////////////////////
 // Revocation configuration
 
-// RevocationConfig
+// RevocationConfig contains parameters for the key revocation service
 type RevocationConfig struct {
 	Endpoint string `json:"endpoint"` // end-point of Revocation service
 	Storage  string `json:"storage"`  // persistance mechanism for revocation data
@@ -66,11 +74,12 @@ type RevocationConfig struct {
 ///////////////////////////////////////////////////////////////////////
 
 // Environment settings
-type Environ map[string]string
+type Environment map[string]string
 
 // Config is the aggregated configuration for GNUnet.
 type Config struct {
-	Env        Environ           `json:"environ"`
+	Env        Environment       `json:"environ"`
+	RPC        *RPCConfig        `json:"rpc"`
 	DHT        *DHTConfig        `json:"dht"`
 	GNS        *GNSConfig        `json:"gns"`
 	Namecache  *NamecacheConfig  `json:"namecache"`
@@ -82,7 +91,8 @@ var (
 	Cfg *Config
 )
 
-// Parse a JSON-encoded configuration file map it to the Config data structure.
+// ParseConfig converts a JSON-encoded configuration file and maps it to
+// the Config data structure.
 func ParseConfig(fileName string) (err error) {
 	// parse configuration file
 	file, err := ioutil.ReadFile(fileName)

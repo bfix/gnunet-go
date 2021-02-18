@@ -20,6 +20,7 @@ package gns
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 
 	"gnunet/config"
@@ -117,6 +118,12 @@ type Module struct {
 	LookupRemote     func(ctx *service.SessionContext, query *Query) (*message.Block, error)
 	RevocationQuery  func(ctx *service.SessionContext, pkey *ed25519.PublicKey) (valid bool, err error)
 	RevocationRevoke func(ctx *service.SessionContext, rd *revocation.RevData) (success bool, err error)
+}
+
+// HandleRPC request: Decode JSON request, perform GNS action
+// and encode JSON response
+func (gns *Module) HandleRPC(wrt http.ResponseWriter, req *http.Request) {
+	wrt.Write([]byte(`{"msg": "This is GNS" }`))
 }
 
 // Resolve a GNS name with multiple labels. If pkey is not nil, the name

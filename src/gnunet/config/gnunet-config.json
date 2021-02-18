@@ -17,5 +17,8 @@
 	"revocation": {
 		"endpoint": "unix+${RT_SYS}/gnunet-service-revocation-go.sock+perm=0770",
 		"storage": "redis+localhost:6397++15"
+	},
+	"rpc": {
+		"endpoint": "tcp+127.0.0.1:80"
 	}
 }

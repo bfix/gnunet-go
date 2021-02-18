@@ -59,9 +59,9 @@ func (c *Client) Close() error {
 	return c.ch.Close()
 }
 
-// ServiceRequestResponse is a helper method for a one request - one response
+// RequestResponse is a helper method for a one request - one response
 // secenarios of client/serice interactions.
-func ServiceRequestResponse(
+func RequestResponse(
 	ctx *SessionContext,
 	caller string,
 	callee string,

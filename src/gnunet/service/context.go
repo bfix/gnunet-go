@@ -30,7 +30,7 @@ import (
 // by a service; the session is handled by the 'ServeClient' method of a
 // service implementation.
 type SessionContext struct {
-	Id       int                   // session identifier
+	ID       int                   // session identifier
 	wg       *sync.WaitGroup       // wait group for the session
 	sig      *concurrent.Signaller // signaller for the session
 	pending  int                   // number of pending go-routines
@@ -41,7 +41,7 @@ type SessionContext struct {
 // NewSessionContext instantiates a new session context.
 func NewSessionContext() *SessionContext {
 	return &SessionContext{
-		Id:       util.NextID(),
+		ID:       util.NextID(),
 		wg:       new(sync.WaitGroup),
 		sig:      concurrent.NewSignaller(),
 		pending:  0,
