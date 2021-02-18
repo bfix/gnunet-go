@@ -22,9 +22,10 @@ import (
 	"strings"
 )
 
-// CounterMap
+// CounterMap is a metric with single key
 type CounterMap map[interface{}]int
 
+// Add one to themetric for a given key and return current value
 func (cm CounterMap) Add(i interface{}) int {
 	count, ok := cm[i]
 	if !ok {
@@ -36,6 +37,7 @@ func (cm CounterMap) Add(i interface{}) int {
 	return count
 }
 
+// Num returns the metric for a given key
 func (cm CounterMap) Num(i interface{}) int {
 	count, ok := cm[i]
 	if !ok {
@@ -44,6 +46,8 @@ func (cm CounterMap) Num(i interface{}) int {
 	return count
 }
 
+// StripPathRight returns a dot-separated path without
+// its last (right-most) element.
 func StripPathRight(s string) string {
 	if idx := strings.LastIndex(s, "."); idx != -1 {
 		return s[:idx]

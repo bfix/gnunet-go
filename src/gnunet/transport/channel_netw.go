@@ -42,7 +42,7 @@ func NewChannelResult(n int, err error) *ChannelResult {
 	}
 }
 
-// Values() returns the attributes of a result instance (for passing up the
+// Values returns the attributes of a result instance (for passing up the
 // call stack).
 func (cr *ChannelResult) Values() (int, error) {
 	return cr.count, cr.err
@@ -51,7 +51,7 @@ func (cr *ChannelResult) Values() (int, error) {
 ////////////////////////////////////////////////////////////////////////
 // Generic network-based Channel
 
-// NetworkChannel
+// NetworkChannel represents a network-based channel
 type NetworkChannel struct {
 	network string   // network protocol identifier ("tcp", "unix", ...)
 	conn    net.Conn // associated connection
@@ -167,13 +167,13 @@ func (c *NetworkChannel) Write(buf []byte, sig *concurrent.Signaller) (int, erro
 ////////////////////////////////////////////////////////////////////////
 // Generic network-based ChannelServer
 
-// NetworkChannelServer
+// NetworkChannelServer represents a network-based channel server
 type NetworkChannelServer struct {
 	network  string       // network protocol to listen on
 	listener net.Listener // reference to listener object
 }
 
-// NewNetworkChannelServer
+// NewNetworkChannelServer creates a new network-based channel server
 func NewNetworkChannelServer(netw string) ChannelServer {
 	return &NetworkChannelServer{
 		network:  netw,
@@ -254,32 +254,32 @@ func (s *NetworkChannelServer) Close() error {
 // helper functions to instantiate network channels and servers for
 // common network protocols
 
-// NewSocketChannel: Unix Domain Socket connection
+// NewSocketChannel implements a Unix Domain Socket connection
 func NewSocketChannel() Channel {
 	return NewNetworkChannel("unix")
 }
 
-// NewTCPChannel: TCP connection
+// NewTCPChannel implements a: TCP connection
 func NewTCPChannel() Channel {
 	return NewNetworkChannel("tcp")
 }
 
-// NewUDPChannel: UDP connection
+// NewUDPChannel implements an UDP connection
 func NewUDPChannel() Channel {
 	return NewNetworkChannel("udp")
 }
 
-// NewSocketChannelServer: Unix Domain Socket listener
+// NewSocketChannelServer implements an Unix Domain Socket listener
 func NewSocketChannelServer() ChannelServer {
 	return NewNetworkChannelServer("unix")
 }
 
-// NewTCPChannelServer: TCP listener
+// NewTCPChannelServer implements a TCP listener
 func NewTCPChannelServer() ChannelServer {
 	return NewNetworkChannelServer("tcp")
 }
 
-// NewUDPChannelServer: UDP listener
+// NewUDPChannelServer implements an UDP listener
 func NewUDPChannelServer() ChannelServer {
 	return NewNetworkChannelServer("udp")
 }

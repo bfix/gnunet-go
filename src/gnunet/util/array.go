@@ -87,7 +87,7 @@ func Fill(b []byte, val byte) {
 // String list helpers
 //----------------------------------------------------------------------
 
-// Reverse StringList reverse an array of strings
+// ReverseStringList reverse an array of strings
 func ReverseStringList(s []string) []string {
 	sl := len(s)
 	r := make([]string, sl)
@@ -97,9 +97,9 @@ func ReverseStringList(s []string) []string {
 	return r
 }
 
-// Convert a binary representation of a string list. Each string is '\0'-
-// terminated. The whole byte array is parsed; if the final string is not
-// terminated, it is skipped.
+// StringList converts a binary representation of a string list. Each string
+// is '\0'-terminated. The whole byte array is parsed; if the final string is
+// not terminated, it is skipped.
 func StringList(b []byte) []string {
 	res := make([]string, 0)
 	str := ""

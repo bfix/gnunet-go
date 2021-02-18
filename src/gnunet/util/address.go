@@ -61,7 +61,7 @@ func AddressString(transport string, addr []byte) string {
 
 //----------------------------------------------------------------------
 
-// IP address (can be IPv4 or IPv6 or a DNS name)
+// IPAddress (can be IPv4 or IPv6 or a DNS name)
 type IPAddress struct {
 	Host []byte `size:"*-2"`
 	Port uint16 `order:"big"`

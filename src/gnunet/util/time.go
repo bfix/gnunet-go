@@ -113,7 +113,7 @@ func (t AbsoluteTime) Compare(t2 AbsoluteTime) int {
 // Relative time
 //----------------------------------------------------------------------
 
-// Relative time is a timestamp defined relative to the current time.
+// RelativeTime is a timestamp defined relative to the current time.
 // It actually is more like a duration than a time...
 type RelativeTime struct {
 	Val uint64 `order:"big"`

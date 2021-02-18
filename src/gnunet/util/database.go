@@ -24,17 +24,17 @@ import (
 	"os"
 	"strings"
 
-	_ "github.com/go-sql-driver/mysql"
-	_ "github.com/mattn/go-sqlite3"
+	_ "github.com/go-sql-driver/mysql" // init MySQL driver
+	_ "github.com/mattn/go-sqlite3"    // init SQLite3 driver
 )
 
 // Error messages related to databases
 var (
-	ErrSqlInvalidDatabaseSpec = fmt.Errorf("Invalid database specification")
-	ErrSqlNoDatabase          = fmt.Errorf("Database not found")
+	ErrSQLInvalidDatabaseSpec = fmt.Errorf("Invalid database specification")
+	ErrSQLNoDatabase          = fmt.Errorf("Database not found")
 )
 
-// ConnectSqlDatabase connects to an SQL database (various types and flavors):
+// ConnectSQLDatabase connects to an SQL database (various types and flavors):
 // The 'spec' option defines the arguments required to connect to a database;
 // the meaning and format of the arguments depends on the specific SQL database.
 // The arguments are seperated by the '+' character; the first (and mandatory)
@@ -46,21 +46,21 @@ var (
 // * 'mysql':   A MySQL-compatible database; the second argument specifies the
 //              information required to log into the database (e.g.
 //              "[user[:passwd]@][proto[(addr)]]/dbname[?param1=value1&...]").
-func ConnectSqlDatabase(spec string) (db *sql.DB, err error) {
+func ConnectSQLDatabase(spec string) (db *sql.DB, err error) {
 	// split spec string into segments
 	specs := strings.Split(spec, ":")
 	if len(specs) < 2 {
-		return nil, ErrSqlInvalidDatabaseSpec
+		return nil, ErrSQLInvalidDatabaseSpec
 	}
 	switch specs[0] {
 	case "sqlite3":
 		// check if the database file exists
 		var fi os.FileInfo
 		if fi, err = os.Stat(specs[1]); err != nil {
-			return nil, ErrSqlNoDatabase
+			return nil, ErrSQLNoDatabase
 		}
 		if fi.IsDir() {
-			return nil, ErrSqlNoDatabase
+			return nil, ErrSQLNoDatabase
 		}
 		// open the database file
 		return sql.Open("sqlite3", specs[1])
@@ -68,5 +68,5 @@ func ConnectSqlDatabase(spec string) (db *sql.DB, err error) {
 		// just connect to the database
 		return sql.Open("mysql", specs[1])
 	}
-	return nil, ErrSqlInvalidDatabaseSpec
+	return nil, ErrSQLInvalidDatabaseSpec
 }

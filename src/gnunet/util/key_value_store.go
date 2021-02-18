@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/go-redis/redis"
+	redis "github.com/go-redis/redis/v8"
 )
 
 // Error messages related to the key/value-store implementations
@@ -88,11 +88,11 @@ func OpenKVStore(spec string) (KeyValueStore, error) {
 		//--------------------------------------------------------------
 		// SQL-based persistance
 		//--------------------------------------------------------------
-		kvs := new(KvsSql)
+		kvs := new(KvsSQL)
 		var err error
 
 		// connect to SQL database
-		kvs.db, err = ConnectSqlDatabase(spec)
+		kvs.db, err = ConnectSQLDatabase(spec)
 		if err != nil {
 			return nil, err
 		}
@@ -111,7 +111,7 @@ func OpenKVStore(spec string) (KeyValueStore, error) {
 // NoSQL-based key-value-stores
 //======================================================================
 
-// Redis-based key/value store
+// KvsRedis represents a redis-based key/value store
 type KvsRedis struct {
 	client *redis.Client // client connection
 	db     int           // index to database
@@ -127,7 +127,7 @@ func (kvs *KvsRedis) Get(key string) (value string, err error) {
 	return kvs.client.Get(context.TODO(), key).Result()
 }
 
-// Get a list of all keys in store
+// List all keys in store
 func (kvs *KvsRedis) List() (keys []string, err error) {
 	var (
 		crs  uint64
@@ -151,26 +151,26 @@ func (kvs *KvsRedis) List() (keys []string, err error) {
 // SQL-based key-value-store
 //======================================================================
 
-// SQL-based key/value store
-type KvsSql struct {
+// KvsSQL represents a SQL-based key/value store
+type KvsSQL struct {
 	db *sql.DB
 }
 
 // Put a key/value pair into the store
-func (kvs *KvsSql) Put(key string, value string) error {
+func (kvs *KvsSQL) Put(key string, value string) error {
 	_, err := kvs.db.Exec("insert into store(key,value) values(?,?)", key, value)
 	return err
 }
 
 // Get a value for a given key from store
-func (kvs *KvsSql) Get(key string) (value string, err error) {
+func (kvs *KvsSQL) Get(key string) (value string, err error) {
 	row := kvs.db.QueryRow("select value from store where key=?", key)
 	err = row.Scan(&value)
 	return
 }
 
-// Get a list of all keys in store
-func (kvs *KvsSql) List() (keys []string, err error) {
+// List all keys in store
+func (kvs *KvsSQL) List() (keys []string, err error) {
 	var (
 		rows *sql.Rows
 		key  string

@@ -102,7 +102,7 @@ var channelServerImpl = map[string]ChannelServerFactory{
 	"udp":  NewUDPChannelServer,
 }
 
-// NewChannelServer
+// NewChannelServer creates a new channel server instance
 func NewChannelServer(spec string, hdlr chan<- Channel) (cs ChannelServer, err error) {
 	parts := strings.Split(spec, "+")
 
@@ -202,7 +202,7 @@ func (c *MsgChannel) Receive(sig *concurrent.Signaller) (message.Message, error)
 		return nil, err
 	}
 	if msg == nil {
-		return nil, fmt.Errorf("Message{%d} is nil!\n", mh.MsgType)
+		return nil, fmt.Errorf("Message{%d} is nil", mh.MsgType)
 	}
 	if err = data.Unmarshal(msg, c.buf[:mh.MsgSize]); err != nil {
 		return nil, err
