@@ -28,14 +28,23 @@ import (
 	"github.com/bfix/gospel/logger"
 )
 
+// Module is an interface for GNUnet service modules (workers).
+type Module interface {
+	// RPC returns the route and handler for JSON-RPC requests
+	RPC() (string, func(http.ResponseWriter, *http.Request))
+}
+
 // Service is an interface for GNUnet services. Every service has one channel
 // end-point it listens to for incoming channel requests (network-based
 // channels established by service clients). The end-point is specified in
 // Channel semantics in the specification string.
 type Service interface {
+	Module
+	// Start a service on the given endpoint
 	Start(spec string) error
+	// Serve a client session
 	ServeClient(ctx *SessionContext, ch *transport.MsgChannel)
-	HandleRPC(wrt http.ResponseWriter, req *http.Request)
+	// Stop the service
 	Stop() error
 }
 

@@ -21,6 +21,7 @@ package rpc
 import (
 	"context"
 	"gnunet/config"
+	"gnunet/service"
 	"net/http"
 	"time"
 
@@ -58,7 +59,8 @@ func Start(ctx context.Context) error {
 	return nil
 }
 
-// Handle a JSON-RPC path in a service-specific processor
-func Handle(path string, hdlr func(http.ResponseWriter, *http.Request)) {
+// Register a JSON-RPC path in a service-specific processor
+func Register(m service.Module) {
+	path, hdlr := m.RPC()
 	Router.HandleFunc(path, hdlr)
 }

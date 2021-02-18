@@ -120,15 +120,16 @@ type Module struct {
 	RevocationRevoke func(ctx *service.SessionContext, rd *revocation.RevData) (success bool, err error)
 }
 
-// HandleRPC request: Decode JSON request, perform GNS action
-// and encode JSON response
-func (gns *Module) HandleRPC(wrt http.ResponseWriter, req *http.Request) {
-	wrt.Write([]byte(`{"msg": "This is GNS" }`))
+// RPC returns the route and handler function for a JSON-RPC request
+func (m *Module) RPC() (string, func(http.ResponseWriter, *http.Request)) {
+	return "/gns/", func(wrt http.ResponseWriter, req *http.Request) {
+		wrt.Write([]byte(`{"msg": "This is GNS" }`))
+	}
 }
 
 // Resolve a GNS name with multiple labels. If pkey is not nil, the name
 // is interpreted as "relative to current zone".
-func (gns *Module) Resolve(
+func (m *Module) Resolve(
 	ctx *service.SessionContext,
 	path string,
 	pkey *ed25519.PublicKey,
@@ -147,15 +148,15 @@ func (gns *Module) Resolve(
 	// check for relative path
 	if pkey != nil {
 		//resolve relative path
-		return gns.ResolveRelative(ctx, names, pkey, kind, mode, depth)
+		return m.ResolveRelative(ctx, names, pkey, kind, mode, depth)
 	}
 	// resolve absolute path
-	return gns.ResolveAbsolute(ctx, names, kind, mode, depth)
+	return m.ResolveAbsolute(ctx, names, kind, mode, depth)
 }
 
 // ResolveAbsolute resolves a fully qualified GNS absolute name
 // (with multiple labels).
-func (gns *Module) ResolveAbsolute(
+func (m *Module) ResolveAbsolute(
 	ctx *service.SessionContext,
 	labels []string,
 	kind RRTypeList,
@@ -163,7 +164,7 @@ func (gns *Module) ResolveAbsolute(
 	depth int) (set *message.RecordSet, err error) {
 
 	// get the zone key for the TLD
-	pkey := gns.GetZoneKey(labels[0])
+	pkey := m.GetZoneKey(labels[0])
 	if pkey == nil {
 		// we can't resolve this TLD
 		err = ErrUnknownTLD
@@ -172,17 +173,17 @@ func (gns *Module) ResolveAbsolute(
 	// check if zone key has been revoked
 	var valid bool
 	set = message.NewRecordSet()
-	if valid, err = gns.RevocationQuery(ctx, pkey); err != nil || !valid {
+	if valid, err = m.RevocationQuery(ctx, pkey); err != nil || !valid {
 		return
 	}
 	// continue with resolution relative to a zone.
-	return gns.ResolveRelative(ctx, labels[1:], pkey, kind, mode, depth)
+	return m.ResolveRelative(ctx, labels[1:], pkey, kind, mode, depth)
 }
 
 // ResolveRelative resolves a relative path (to a given zone) recursively by
 // processing simple (PKEY,Label) lookups in sequence and handle intermediate
 // GNS record types
-func (gns *Module) ResolveRelative(
+func (m *Module) ResolveRelative(
 	ctx *service.SessionContext,
 	labels []string,
 	pkey *ed25519.PublicKey,
@@ -200,7 +201,7 @@ func (gns *Module) ResolveRelative(
 
 		// resolve next level
 		var block *message.Block
-		if block, err = gns.Lookup(ctx, pkey, labels[0], mode); err != nil {
+		if block, err = m.Lookup(ctx, pkey, labels[0], mode); err != nil {
 			// failed to resolve name
 			return
 		}
@@ -248,7 +249,7 @@ func (gns *Module) ResolveRelative(
 				labels = append(labels, "@")
 			}
 			// check if zone key has been revoked
-			if valid, err := gns.RevocationQuery(ctx, pkey); err != nil || !valid {
+			if valid, err := m.RevocationQuery(ctx, pkey); err != nil || !valid {
 				// revoked key -> no results!
 				records = make([]*message.ResourceRecord, 0)
 				break
@@ -269,7 +270,7 @@ func (gns *Module) ResolveRelative(
 				lbls += "."
 			}
 			fqdn := lbls + inst.Query
-			if set, err = gns.ResolveDNS(ctx, fqdn, inst.Servers, kind, pkey, depth); err != nil {
+			if set, err = m.ResolveDNS(ctx, fqdn, inst.Servers, kind, pkey, depth); err != nil {
 				logger.Println(logger.ERROR, "[gns] GNS2DNS resolution failed.")
 				return
 			}
@@ -284,7 +285,7 @@ func (gns *Module) ResolveRelative(
 						expires = rec.Expires
 					}
 				}
-				set.Records = append(set.Records, gns.newLEHORecord(inst.Query, expires))
+				set.Records = append(set.Records, m.newLEHORecord(inst.Query, expires))
 			}
 			// we are done with resolution; pass on records to caller
 			records = set.Records
@@ -307,7 +308,7 @@ func (gns *Module) ResolveRelative(
 				break
 			}
 			logger.Println(logger.DBG, "[gns] CNAME resolution required.")
-			if set, err = gns.ResolveUnknown(ctx, inst.name, labels, pkey, kind, depth+1); err != nil {
+			if set, err = m.ResolveUnknown(ctx, inst.name, labels, pkey, kind, depth+1); err != nil {
 				logger.Println(logger.ERROR, "[gns] CNAME resolution failed.")
 				return
 			}
@@ -357,7 +358,7 @@ func (gns *Module) ResolveRelative(
 // relative to the zone PKEY. If the name is an absolute GNS name (ending in
 // a PKEY TLD), it is also resolved with GNS. All other names are resolved
 // via DNS queries.
-func (gns *Module) ResolveUnknown(
+func (m *Module) ResolveUnknown(
 	ctx *service.SessionContext,
 	name string,
 	labels []string,
@@ -372,14 +373,14 @@ func (gns *Module) ResolveUnknown(
 		for _, label := range util.ReverseStringList(labels) {
 			name += "." + label
 		}
-		if set, err = gns.Resolve(ctx, name, pkey, kind, enums.GNS_LO_DEFAULT, depth+1); err != nil {
+		if set, err = m.Resolve(ctx, name, pkey, kind, enums.GNS_LO_DEFAULT, depth+1); err != nil {
 			return
 		}
 	} else {
 		// check for absolute GNS name (with PKEY as TLD)
-		if zk := gns.GetZoneKey(name); zk != nil {
+		if zk := m.GetZoneKey(name); zk != nil {
 			// resolve absolute GNS name (name ends in a PKEY)
-			if set, err = gns.Resolve(ctx, util.StripPathRight(name), zk, kind, enums.GNS_LO_DEFAULT, depth+1); err != nil {
+			if set, err = m.Resolve(ctx, util.StripPathRight(name), zk, kind, enums.GNS_LO_DEFAULT, depth+1); err != nil {
 				return
 			}
 		} else {
@@ -393,7 +394,7 @@ func (gns *Module) ResolveUnknown(
 }
 
 // GetZoneKey returns the PKEY (or nil) from an absolute GNS path.
-func (gns *Module) GetZoneKey(path string) *ed25519.PublicKey {
+func (m *Module) GetZoneKey(path string) *ed25519.PublicKey {
 	labels := util.ReverseStringList(strings.Split(path, "."))
 	if len(labels[0]) == 52 {
 		if data, err := util.DecodeStringToBinary(labels[0], 32); err == nil {
@@ -406,7 +407,7 @@ func (gns *Module) GetZoneKey(path string) *ed25519.PublicKey {
 }
 
 // Lookup name in GNS.
-func (gns *Module) Lookup(
+func (m *Module) Lookup(
 	ctx *service.SessionContext,
 	pkey *ed25519.PublicKey,
 	label string,
@@ -416,7 +417,7 @@ func (gns *Module) Lookup(
 	query := NewQuery(pkey, label)
 
 	// try local lookup first
-	if block, err = gns.LookupLocal(ctx, query); err != nil {
+	if block, err = m.LookupLocal(ctx, query); err != nil {
 		logger.Printf(logger.ERROR, "[gns] local Lookup: %s\n", err.Error())
 		block = nil
 		return
@@ -424,7 +425,7 @@ func (gns *Module) Lookup(
 	if block == nil {
 		if mode == enums.GNS_LO_DEFAULT {
 			// get the block from a remote lookup
-			if block, err = gns.LookupRemote(ctx, query); err != nil || block == nil {
+			if block, err = m.LookupRemote(ctx, query); err != nil || block == nil {
 				if err != nil {
 					logger.Printf(logger.ERROR, "[gns] remote Lookup failed: %s\n", err.Error())
 					block = nil
@@ -435,14 +436,14 @@ func (gns *Module) Lookup(
 				return
 			}
 			// store RRs from remote locally.
-			gns.StoreLocal(ctx, block)
+			m.StoreLocal(ctx, block)
 		}
 	}
 	return
 }
 
 // newLEHORecord creates a new supplemental GNS record of type LEHO.
-func (gns *Module) newLEHORecord(name string, expires util.AbsoluteTime) *message.ResourceRecord {
+func (m *Module) newLEHORecord(name string, expires util.AbsoluteTime) *message.ResourceRecord {
 	rr := new(message.ResourceRecord)
 	rr.Expires = expires
 	rr.Flags = uint32(enums.GNS_FLAG_SUPPL)

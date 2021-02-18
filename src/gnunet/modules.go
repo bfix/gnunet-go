@@ -33,6 +33,7 @@ import (
 	"gnunet/service/gns"
 	"gnunet/service/namecache"
 	"gnunet/service/revocation"
+	"net/rpc"
 )
 
 // Instances holds a list of all GNUnet service modules
@@ -41,6 +42,14 @@ type Instances struct {
 	Namecache  *namecache.NamecacheModule
 	DHT        *dht.Module
 	Revocation *revocation.Module
+}
+
+// Register modules for JSON-RPC
+func (inst Instances) Register() {
+	rpc.Register(inst.GNS)
+	rpc.Register(inst.Namecache)
+	rpc.Register(inst.DHT)
+	rpc.Register(inst.Revocation)
 }
 
 // Local reference to instance list

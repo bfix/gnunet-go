@@ -72,10 +72,11 @@ func NewModule() *Module {
 	return m
 }
 
-// HandleRPC request: Decode JSON request, perform GNS action
-// and encode JSON response
-func (m *Module) HandleRPC(wrt http.ResponseWriter, req *http.Request) {
-	wrt.Write([]byte(`{"msg": "This is REVOCATION" }`))
+// RPC returns the route and handler function for a JSON-RPC request
+func (m *Module) RPC() (string, func(http.ResponseWriter, *http.Request)) {
+	return "/revocation/", func(wrt http.ResponseWriter, req *http.Request) {
+		wrt.Write([]byte(`{"msg": "This is REVOCATION" }`))
+	}
 }
 
 // Query return true if the pkey is valid (not revoked) and false

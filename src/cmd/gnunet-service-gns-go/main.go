@@ -92,7 +92,7 @@ func main() {
 			logger.Printf(logger.ERROR, "[gns] RPC failed to start: %s", err.Error())
 			return
 		}
-		rpc.Handle("/gns", gns.HandleRPC)
+		rpc.Register(gns)
 	}
 
 	// handle OS signals
