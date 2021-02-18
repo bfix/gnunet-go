@@ -48,15 +48,15 @@ var (
 // "GNUnet Name System" service implementation
 //----------------------------------------------------------------------
 
-// GNSService
-type GNSService struct {
-	GNSModule
+// Service implements a GNS service
+type Service struct {
+	Module
 }
 
-// NewGNSService
-func NewGNSService() service.Service {
+// NewService creates a new GNS service instance
+func NewService() service.Service {
 	// instantiate service and assemble a new GNS handler.
-	inst := new(GNSService)
+	inst := new(Service)
 	inst.LookupLocal = inst.LookupNamecache
 	inst.StoreLocal = inst.StoreNamecache
 	inst.LookupRemote = inst.LookupDHT
@@ -66,48 +66,47 @@ func NewGNSService() service.Service {
 }
 
 // Start the GNS service
-func (s *GNSService) Start(spec string) error {
+func (s *Service) Start(spec string) error {
 	return nil
 }
 
 // Stop the GNS service
-func (s *GNSService) Stop() error {
+func (s *Service) Stop() error {
 	return nil
 }
 
-// Serve a client channel.
-func (s *GNSService) ServeClient(ctx *service.SessionContext, mc *transport.MsgChannel) {
-
-	reqId := 0
+// ServeClient processes a client channel.
+func (s *Service) ServeClient(ctx *service.SessionContext, mc *transport.MsgChannel) {
+	reqID := 0
 loop:
 	for {
 		// receive next message from client
-		reqId++
-		logger.Printf(logger.DBG, "[gns:%d:%d] Waiting for client request...\n", ctx.Id, reqId)
+		reqID++
+		logger.Printf(logger.DBG, "[gns:%d:%d] Waiting for client request...\n", ctx.Id, reqID)
 		msg, err := mc.Receive(ctx.Signaller())
 		if err != nil {
 			if err == io.EOF {
-				logger.Printf(logger.INFO, "[gns:%d:%d] Client channel closed.\n", ctx.Id, reqId)
+				logger.Printf(logger.INFO, "[gns:%d:%d] Client channel closed.\n", ctx.Id, reqID)
 			} else if err == transport.ErrChannelInterrupted {
-				logger.Printf(logger.INFO, "[gns:%d:%d] Service operation interrupted.\n", ctx.Id, reqId)
+				logger.Printf(logger.INFO, "[gns:%d:%d] Service operation interrupted.\n", ctx.Id, reqID)
 			} else {
-				logger.Printf(logger.ERROR, "[gns:%d:%d] Message-receive failed: %s\n", ctx.Id, reqId, err.Error())
+				logger.Printf(logger.ERROR, "[gns:%d:%d] Message-receive failed: %s\n", ctx.Id, reqID, err.Error())
 			}
 			break loop
 		}
-		logger.Printf(logger.INFO, "[gns:%d:%d] Received request: %v\n", ctx.Id, reqId, msg)
+		logger.Printf(logger.INFO, "[gns:%d:%d] Received request: %v\n", ctx.Id, reqID, msg)
 
 		// perform lookup
 		switch m := msg.(type) {
-		case *message.GNSLookupMsg:
+		case *message.LookupMsg:
 			//----------------------------------------------------------
 			// GNS_LOOKUP
 			//----------------------------------------------------------
 
 			// perform lookup on block (locally and remote)
-			go func(id int, m *message.GNSLookupMsg) {
+			go func(id int, m *message.LookupMsg) {
 				logger.Printf(logger.INFO, "[gns:%d:%d] Lookup request received.\n", ctx.Id, id)
-				resp := message.NewGNSLookupResultMsg(m.Id)
+				resp := message.NewGNSLookupResultMsg(m.ID)
 				ctx.Add()
 				defer func() {
 					// send response
@@ -152,13 +151,13 @@ loop:
 						}
 					}
 				}
-			}(reqId, m)
+			}(reqID, m)
 
 		default:
 			//----------------------------------------------------------
 			// UNKNOWN message type received
 			//----------------------------------------------------------
-			logger.Printf(logger.ERROR, "[gns:%d:%d] Unhandled message of type (%d)\n", ctx.Id, reqId, msg.Header().MsgType)
+			logger.Printf(logger.ERROR, "[gns:%d:%d] Unhandled message of type (%d)\n", ctx.Id, reqID, msg.Header().MsgType)
 			break loop
 		}
 	}
@@ -171,9 +170,11 @@ loop:
 }
 
 //======================================================================
+// Revocationrelated methods
+//======================================================================
 
-//
-func (s *GNSService) QueryKeyRevocation(ctx *service.SessionContext, pkey *ed25519.PublicKey) (valid bool, err error) {
+// QueryKeyRevocation checks if a key has been revoked
+func (s *Service) QueryKeyRevocation(ctx *service.SessionContext, pkey *ed25519.PublicKey) (valid bool, err error) {
 	logger.Printf(logger.DBG, "[gns] QueryKeyRev(%s)...\n", util.EncodeBinaryToString(pkey.Bytes()))
 
 	// assemble request
@@ -195,8 +196,8 @@ func (s *GNSService) QueryKeyRevocation(ctx *service.SessionContext, pkey *ed255
 	return
 }
 
-//
-func (s *GNSService) RevokeKey(ctx *service.SessionContext, rd *revocation.RevData) (success bool, err error) {
+// RevokeKey revokes a key with given revocation data
+func (s *Service) RevokeKey(ctx *service.SessionContext, rd *revocation.RevData) (success bool, err error) {
 	logger.Printf(logger.DBG, "[gns] RevokeKey(%s)...\n", util.EncodeBinaryToString(rd.ZoneKey))
 
 	// assemble request
@@ -223,14 +224,16 @@ func (s *GNSService) RevokeKey(ctx *service.SessionContext, rd *revocation.RevDa
 }
 
 //======================================================================
+// Namecache-related methods
+//======================================================================
 
-// LookupNamecache
-func (s *GNSService) LookupNamecache(ctx *service.SessionContext, query *Query) (block *message.GNSBlock, err error) {
+// LookupNamecache returns a cached lookup (if available)
+func (s *Service) LookupNamecache(ctx *service.SessionContext, query *Query) (block *message.Block, err error) {
 	logger.Printf(logger.DBG, "[gns] LookupNamecache(%s)...\n", hex.EncodeToString(query.Key.Bits))
 
 	// assemble Namecache request
 	req := message.NewNamecacheLookupMsg(query.Key)
-	req.Id = uint32(util.NextID())
+	req.ID = uint32(util.NextID())
 	block = nil
 
 	// get response from Namecache service
@@ -244,7 +247,7 @@ func (s *GNSService) LookupNamecache(ctx *service.SessionContext, query *Query) 
 	switch m := resp.(type) {
 	case *message.NamecacheLookupResultMsg:
 		// check for matching IDs
-		if m.Id != req.Id {
+		if m.ID != req.ID {
 			logger.Println(logger.ERROR, "[gns] Got response for unknown ID")
 			err = ErrInvalidID
 			break
@@ -262,7 +265,7 @@ func (s *GNSService) LookupNamecache(ctx *service.SessionContext, query *Query) 
 		}
 
 		// assemble GNSBlock from message
-		block = new(message.GNSBlock)
+		block = new(message.Block)
 		block.Signature = m.Signature
 		block.DerivedKey = m.DerivedKey
 		sb := new(message.SignedBlockData)
@@ -287,13 +290,13 @@ func (s *GNSService) LookupNamecache(ctx *service.SessionContext, query *Query) 
 	return
 }
 
-// StoreNamecache
-func (s *GNSService) StoreNamecache(ctx *service.SessionContext, block *message.GNSBlock) (err error) {
+// StoreNamecache stores a lookup in the local namecache.
+func (s *Service) StoreNamecache(ctx *service.SessionContext, block *message.Block) (err error) {
 	logger.Println(logger.DBG, "[gns] StoreNamecache()...")
 
 	// assemble Namecache request
 	req := message.NewNamecacheCacheMsg(block)
-	req.Id = uint32(util.NextID())
+	req.ID = uint32(util.NextID())
 
 	// get response from Namecache service
 	var resp message.Message
@@ -306,7 +309,7 @@ func (s *GNSService) StoreNamecache(ctx *service.SessionContext, block *message.
 	switch m := resp.(type) {
 	case *message.NamecacheCacheResponseMsg:
 		// check for matching IDs
-		if m.Id != req.Id {
+		if m.ID != req.ID {
 			logger.Println(logger.ERROR, "[gns] Got response for unknown ID")
 			err = ErrInvalidID
 			break
@@ -324,9 +327,11 @@ func (s *GNSService) StoreNamecache(ctx *service.SessionContext, block *message.
 }
 
 //======================================================================
+// DHT-related methods
+//======================================================================
 
-// LookupDHT
-func (s *GNSService) LookupDHT(ctx *service.SessionContext, query *Query) (block *message.GNSBlock, err error) {
+// LookupDHT gets a GNS block from the DHT for the given query key.
+func (s *Service) LookupDHT(ctx *service.SessionContext, query *Query) (block *message.Block, err error) {
 	logger.Printf(logger.DBG, "[gns] LookupDHT(%s)...\n", hex.EncodeToString(query.Key.Bits))
 	block = nil
 
@@ -360,7 +365,7 @@ func (s *GNSService) LookupDHT(ctx *service.SessionContext, query *Query) (block
 
 	// send DHT GET request and wait for response
 	reqGet := message.NewDHTClientGetMsg(query.Key)
-	reqGet.Id = uint64(util.NextID())
+	reqGet.ID = uint64(util.NextID())
 	reqGet.ReplLevel = uint32(enums.DHT_GNS_REPLICATION_LEVEL)
 	reqGet.Type = uint32(enums.BLOCK_TYPE_GNS_NAMERECORD)
 	reqGet.Options = uint32(enums.DHT_RO_DEMULTIPLEX_EVERYWHERE)
@@ -372,7 +377,7 @@ func (s *GNSService) LookupDHT(ctx *service.SessionContext, query *Query) (block
 
 			// send DHT GET_STOP request and terminate
 			reqStop := message.NewDHTClientGetStopMsg(query.Key)
-			reqStop.Id = reqGet.Id
+			reqStop.ID = reqGet.ID
 			if err = interact(reqStop, false); err != nil {
 				logger.Printf(logger.ERROR, "[gns] remote Lookup abort failed: %s\n", err.Error())
 			}
@@ -385,7 +390,7 @@ func (s *GNSService) LookupDHT(ctx *service.SessionContext, query *Query) (block
 	switch m := resp.(type) {
 	case *message.DHTClientResultMsg:
 		// check for matching IDs
-		if m.Id != reqGet.Id {
+		if m.ID != reqGet.ID {
 			logger.Println(logger.ERROR, "[gns] Got response for unknown ID")
 			break
 		}
@@ -406,7 +411,7 @@ func (s *GNSService) LookupDHT(ctx *service.SessionContext, query *Query) (block
 		}
 
 		// get GNSBlock from message
-		block = message.NewGNSBlock()
+		block = message.NewBlock()
 		if err = data.Unmarshal(block, m.Data); err != nil {
 			logger.Printf(logger.ERROR, "[gns] can't read GNS block: %s\n", err.Error())
 			break

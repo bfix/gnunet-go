@@ -37,12 +37,12 @@ type Box struct {
 	RR    []byte `size:"*"`    // embedded RR
 
 	// transient attributes (not serialized)
-	key string                     // map key for box instance
-	rec *message.GNSResourceRecord // originating RR
+	key string                  // map key for box instance
+	rec *message.ResourceRecord // originating RR
 }
 
 // NewBox creates a new box instance from a BOX resource record.
-func NewBox(rec *message.GNSResourceRecord) *Box {
+func NewBox(rec *message.ResourceRecord) *Box {
 	b := new(Box)
 	if err := data.Unmarshal(b, rec.Data); err != nil {
 		logger.Printf(logger.ERROR, "[gns] Can't unmarshal BOX")

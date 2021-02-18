@@ -32,14 +32,16 @@ import (
 // Put and get blocks into/from a DHT.
 //----------------------------------------------------------------------
 
-// DHT handles the permanent storage of blocks under the query key.
-type DHTModule struct {
+// Module handles the permanent storage of blocks under the query key.
+type Module struct {
 }
 
-func (nc *DHTModule) Get(ctx *service.SessionContext, query *gns.Query) (*message.GNSBlock, error) {
+// Get a GNS block from the DHT
+func (nc *Module) Get(ctx *service.SessionContext, query *gns.Query) (*message.Block, error) {
 	return nil, nil
 }
 
-func (nc *DHTModule) Put(ctx *service.SessionContext, block *message.GNSBlock) error {
+// Put a GNS block into the DHT
+func (nc *Module) Put(ctx *service.SessionContext, block *message.Block) error {
 	return nil
 }

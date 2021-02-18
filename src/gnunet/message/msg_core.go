@@ -80,8 +80,8 @@ func (m *EphemeralKeyMsg) String() string {
 }
 
 // Header returns the message header in a separate instance.
-func (msg *EphemeralKeyMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *EphemeralKeyMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }
 
 // Public extracts the public key of an announcing peer.
@@ -105,9 +105,9 @@ func (m *EphemeralKeyMsg) Verify(pub *ed25519.PublicKey) (bool, error) {
 
 // NewEphemeralKey creates a new ephemeral key signed by a long-term private
 // key and the corresponding GNUnet message to announce the new key.
-func NewEphemeralKey(peerId []byte, ltPrv *ed25519.PrivateKey) (*ed25519.PrivateKey, *EphemeralKeyMsg, error) {
+func NewEphemeralKey(peerID []byte, ltPrv *ed25519.PrivateKey) (*ed25519.PrivateKey, *EphemeralKeyMsg, error) {
 	msg := NewEphemeralKeyMsg()
-	copy(msg.SignedBlock.PeerID.Key, peerId)
+	copy(msg.SignedBlock.PeerID.Key, peerID)
 	seed := util.NewRndArray(32)
 	prv := ed25519.NewPrivateKeyFromSeed(seed)
 	copy(msg.SignedBlock.EphemeralKey, prv.Public().Bytes())

@@ -30,11 +30,11 @@ import (
 // NAMECACHE_LOOKUP_BLOCK
 //----------------------------------------------------------------------
 
-// NamecacheLookupMsg
+// NamecacheLookupMsg is request message for lookups in local namecache
 type NamecacheLookupMsg struct {
 	MsgSize uint16           `order:"big"` // total size of message
 	MsgType uint16           `order:"big"` // NAMECACHE_LOOKUP_BLOCK (431)
-	Id      uint32           `order:"big"` // Request Id
+	ID      uint32           `order:"big"` // Request Id
 	Query   *crypto.HashCode // Query data
 }
 
@@ -46,7 +46,7 @@ func NewNamecacheLookupMsg(query *crypto.HashCode) *NamecacheLookupMsg {
 	return &NamecacheLookupMsg{
 		MsgSize: 72,
 		MsgType: NAMECACHE_LOOKUP_BLOCK,
-		Id:      0,
+		ID:      0,
 		Query:   query,
 	}
 }
@@ -54,23 +54,23 @@ func NewNamecacheLookupMsg(query *crypto.HashCode) *NamecacheLookupMsg {
 // String returns a human-readable representation of the message.
 func (m *NamecacheLookupMsg) String() string {
 	return fmt.Sprintf("NamecacheLookupMsg{Id=%d,Query=%s}",
-		m.Id, hex.EncodeToString(m.Query.Bits))
+		m.ID, hex.EncodeToString(m.Query.Bits))
 }
 
 // Header returns the message header in a separate instance.
-func (msg *NamecacheLookupMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *NamecacheLookupMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }
 
 //----------------------------------------------------------------------
 // NAMECACHE_LOOKUP_BLOCK_RESPONSE
 //----------------------------------------------------------------------
 
-// NamecacheLookupResultMsg
+// NamecacheLookupResultMsg is the response message for namecache lookups.
 type NamecacheLookupResultMsg struct {
 	MsgSize    uint16            `order:"big"` // total size of message
 	MsgType    uint16            `order:"big"` // NAMECACHE_LOOKUP_BLOCK_RESPONSE (432)
-	Id         uint32            `order:"big"` // Request Id
+	ID         uint32            `order:"big"` // Request Id
 	Expire     util.AbsoluteTime // Expiration time
 	Signature  []byte            `size:"64"` // ECDSA signature
 	DerivedKey []byte            `size:"32"` // Derived public key
@@ -82,7 +82,7 @@ func NewNamecacheLookupResultMsg() *NamecacheLookupResultMsg {
 	return &NamecacheLookupResultMsg{
 		MsgSize:    112,
 		MsgType:    NAMECACHE_LOOKUP_BLOCK_RESPONSE,
-		Id:         0,
+		ID:         0,
 		Expire:     *new(util.AbsoluteTime),
 		Signature:  make([]byte, 64),
 		DerivedKey: make([]byte, 32),
@@ -93,35 +93,35 @@ func NewNamecacheLookupResultMsg() *NamecacheLookupResultMsg {
 // String returns a human-readable representation of the message.
 func (m *NamecacheLookupResultMsg) String() string {
 	return fmt.Sprintf("NamecacheLookupResultMsg{id=%d,expire=%s}",
-		m.Id, m.Expire)
+		m.ID, m.Expire)
 }
 
 // Header returns the message header in a separate instance.
-func (msg *NamecacheLookupResultMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *NamecacheLookupResultMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }
 
 //----------------------------------------------------------------------
 // NAMECACHE_CACHE_BLOCK
 //----------------------------------------------------------------------
 
-// NamecacheCacheMsg
+// NamecacheCacheMsg is the request message to put a name into the local cache.
 type NamecacheCacheMsg struct {
 	MsgSize    uint16            `order:"big"` // total size of message
 	MsgType    uint16            `order:"big"` // NAMECACHE_CACHE_BLOCK (433)
-	Id         uint32            `order:"big"` // Request Id
+	ID         uint32            `order:"big"` // Request Id
 	Expire     util.AbsoluteTime // Expiration time
 	Signature  []byte            `size:"64"` // ECDSA signature
 	DerivedKey []byte            `size:"32"` // Derived public key
 	EncData    []byte            `size:"*"`  // Encrypted block data
 }
 
-// NewNamecacheLookupMsg creates a new default message.
-func NewNamecacheCacheMsg(block *GNSBlock) *NamecacheCacheMsg {
+// NewNamecacheCacheMsg creates a new default message.
+func NewNamecacheCacheMsg(block *Block) *NamecacheCacheMsg {
 	msg := &NamecacheCacheMsg{
 		MsgSize:    108,
 		MsgType:    NAMECACHE_BLOCK_CACHE,
-		Id:         0,
+		ID:         0,
 		Expire:     *new(util.AbsoluteTime),
 		Signature:  make([]byte, 64),
 		DerivedKey: make([]byte, 32),
@@ -142,23 +142,23 @@ func NewNamecacheCacheMsg(block *GNSBlock) *NamecacheCacheMsg {
 // String returns a human-readable representation of the message.
 func (m *NamecacheCacheMsg) String() string {
 	return fmt.Sprintf("NewNamecacheCacheMsg{id=%d,expire=%s}",
-		m.Id, m.Expire)
+		m.ID, m.Expire)
 }
 
 // Header returns the message header in a separate instance.
-func (msg *NamecacheCacheMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *NamecacheCacheMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }
 
 //----------------------------------------------------------------------
 // NAMECACHE_BLOCK_CACHE_RESPONSE
 //----------------------------------------------------------------------
 
-// NamecacheCacheResponseMsg
+// NamecacheCacheResponseMsg is the reponse message for a put request
 type NamecacheCacheResponseMsg struct {
 	MsgSize uint16 `order:"big"` // total size of message
 	MsgType uint16 `order:"big"` // NAMECACHE_LOOKUP_BLOCK_RESPONSE (432)
-	Id      uint32 `order:"big"` // Request Id
+	ID      uint32 `order:"big"` // Request Id
 	Result  int32  `order:"big"` // Result code
 }
 
@@ -167,7 +167,7 @@ func NewNamecacheCacheResponseMsg() *NamecacheCacheResponseMsg {
 	return &NamecacheCacheResponseMsg{
 		MsgSize: 12,
 		MsgType: NAMECACHE_BLOCK_CACHE_RESPONSE,
-		Id:      0,
+		ID:      0,
 		Result:  0,
 	}
 }
@@ -175,10 +175,10 @@ func NewNamecacheCacheResponseMsg() *NamecacheCacheResponseMsg {
 // String returns a human-readable representation of the message.
 func (m *NamecacheCacheResponseMsg) String() string {
 	return fmt.Sprintf("NamecacheCacheResponseMsg{id=%d,result=%d}",
-		m.Id, m.Result)
+		m.ID, m.Result)
 }
 
 // Header returns the message header in a separate instance.
-func (msg *NamecacheCacheResponseMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *NamecacheCacheResponseMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }

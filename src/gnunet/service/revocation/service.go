@@ -33,49 +33,48 @@ import (
 // "GNUnet Revocation" service implementation
 //----------------------------------------------------------------------
 
-// RevocationService
-type RevocationService struct {
-	RevocationModule
+// Service implements a revocation service
+type Service struct {
+	Module
 }
 
-// NewRevocationService
-func NewRevocationService() service.Service {
+// NewService creates a new revocation service instance
+func NewService() service.Service {
 	// instantiate service and assemble a new Revocation handler.
-	inst := new(RevocationService)
+	inst := new(Service)
 	return inst
 }
 
 // Start the Revocation service
-func (s *RevocationService) Start(spec string) error {
+func (s *Service) Start(spec string) error {
 	return nil
 }
 
 // Stop the Revocation service
-func (s *RevocationService) Stop() error {
+func (s *Service) Stop() error {
 	return nil
 }
 
-// Serve a client channel.
-func (s *RevocationService) ServeClient(ctx *service.SessionContext, mc *transport.MsgChannel) {
-
-	reqId := 0
+// ServeClient processes a client channel.
+func (s *Service) ServeClient(ctx *service.SessionContext, mc *transport.MsgChannel) {
+	reqID := 0
 loop:
 	for {
 		// receive next message from client
-		reqId++
-		logger.Printf(logger.DBG, "[revocation:%d:%d] Waiting for client request...\n", ctx.Id, reqId)
+		reqID++
+		logger.Printf(logger.DBG, "[revocation:%d:%d] Waiting for client request...\n", ctx.Id, reqID)
 		msg, err := mc.Receive(ctx.Signaller())
 		if err != nil {
 			if err == io.EOF {
-				logger.Printf(logger.INFO, "[revocation:%d:%d] Client channel closed.\n", ctx.Id, reqId)
+				logger.Printf(logger.INFO, "[revocation:%d:%d] Client channel closed.\n", ctx.Id, reqID)
 			} else if err == transport.ErrChannelInterrupted {
-				logger.Printf(logger.INFO, "[revocation:%d:%d] Service operation interrupted.\n", ctx.Id, reqId)
+				logger.Printf(logger.INFO, "[revocation:%d:%d] Service operation interrupted.\n", ctx.Id, reqID)
 			} else {
-				logger.Printf(logger.ERROR, "[revocation:%d:%d] Message-receive failed: %s\n", ctx.Id, reqId, err.Error())
+				logger.Printf(logger.ERROR, "[revocation:%d:%d] Message-receive failed: %s\n", ctx.Id, reqID, err.Error())
 			}
 			break loop
 		}
-		logger.Printf(logger.INFO, "[revocation:%d:%d] Received request: %v\n", ctx.Id, reqId, msg)
+		logger.Printf(logger.INFO, "[revocation:%d:%d] Received request: %v\n", ctx.Id, reqID, msg)
 
 		// handle request
 		switch m := msg.(type) {
@@ -109,7 +108,7 @@ loop:
 					return
 				}
 				resp = message.NewRevocationQueryResponseMsg(valid)
-			}(reqId, m)
+			}(reqID, m)
 
 		case *message.RevocationRevokeMsg:
 			//----------------------------------------------------------
@@ -141,13 +140,13 @@ loop:
 					return
 				}
 				resp = message.NewRevocationRevokeResponseMsg(valid)
-			}(reqId, m)
+			}(reqID, m)
 
 		default:
 			//----------------------------------------------------------
 			// UNKNOWN message type received
 			//----------------------------------------------------------
-			logger.Printf(logger.ERROR, "[revocation:%d:%d] Unhandled message of type (%d)\n", ctx.Id, reqId, msg.Header().MsgType)
+			logger.Printf(logger.ERROR, "[revocation:%d:%d] Unhandled message of type (%d)\n", ctx.Id, reqID, msg.Header().MsgType)
 			break loop
 		}
 	}

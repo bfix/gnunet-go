@@ -34,19 +34,19 @@ import (
 // TRANSPORT_TCP_WELCOME
 //----------------------------------------------------------------------
 
-// TransportTcpWelcomeMsg
-type TransportTcpWelcomeMsg struct {
+// TransportTCPWelcomeMsg is a welcome message for new TCP connections.
+type TransportTCPWelcomeMsg struct {
 	MsgSize uint16       `order:"big"` // total size of message
 	MsgType uint16       `order:"big"` // TRANSPORT_TCP_WELCOME (61)
 	PeerID  *util.PeerID // Peer identity (EdDSA public key)
 }
 
-// NewTransportTcpWelcomeMsg creates a new message for a given peer.
-func NewTransportTcpWelcomeMsg(peerid *util.PeerID) *TransportTcpWelcomeMsg {
+// NewTransportTCPWelcomeMsg creates a new message for a given peer.
+func NewTransportTCPWelcomeMsg(peerid *util.PeerID) *TransportTCPWelcomeMsg {
 	if peerid == nil {
 		peerid = util.NewPeerID(nil)
 	}
-	return &TransportTcpWelcomeMsg{
+	return &TransportTCPWelcomeMsg{
 		MsgSize: 36,
 		MsgType: TRANSPORT_TCP_WELCOME,
 		PeerID:  peerid,
@@ -54,13 +54,13 @@ func NewTransportTcpWelcomeMsg(peerid *util.PeerID) *TransportTcpWelcomeMsg {
 }
 
 // String returns a human-readable representation of the message.
-func (m *TransportTcpWelcomeMsg) String() string {
+func (m *TransportTCPWelcomeMsg) String() string {
 	return fmt.Sprintf("TransportTcpWelcomeMsg{peer=%s}", m.PeerID)
 }
 
 // Header returns the message header in a separate instance.
-func (msg *TransportTcpWelcomeMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *TransportTCPWelcomeMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }
 
 //----------------------------------------------------------------------
@@ -72,7 +72,7 @@ func (msg *TransportTcpWelcomeMsg) Header() *MessageHeader {
 // connection which the receiver (of the PING) initiated is still valid.
 //----------------------------------------------------------------------
 
-// TransportPingMsg
+// TransportPingMsg is a PING request message
 type TransportPingMsg struct {
 	MsgSize   uint16       `order:"big"` // total size of message
 	MsgType   uint16       `order:"big"` // TRANSPORT_PING (372)
@@ -81,7 +81,7 @@ type TransportPingMsg struct {
 	Address   []byte       `size:"*"` // encoded address
 }
 
-// TransportPingMsg creates a new message for given peer with an address to
+// NewTransportPingMsg creates a new message for given peer with an address to
 // be validated.
 func NewTransportPingMsg(target *util.PeerID, a *util.Address) *TransportPingMsg {
 	if target == nil {
@@ -112,8 +112,8 @@ func (m *TransportPingMsg) String() string {
 }
 
 // Header returns the message header in a separate instance.
-func (msg *TransportPingMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *TransportPingMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }
 
 //----------------------------------------------------------------------
@@ -155,7 +155,7 @@ func NewSignedAddress(a *util.Address) *SignedAddress {
 	return addr
 }
 
-// TransportPongMsg
+// TransportPongMsg is a reponse message for a PING request
 type TransportPongMsg struct {
 	MsgSize     uint16         `order:"big"` // total size of message
 	MsgType     uint16         `order:"big"` // TRANSPORT_PING (372)
@@ -193,8 +193,8 @@ func (m *TransportPongMsg) String() string {
 }
 
 // Header returns the message header in a separate instance.
-func (msg *TransportPongMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *TransportPongMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }
 
 // Sign the address block of a pong message.
@@ -238,7 +238,7 @@ func (m *TransportPongMsg) Verify(pub *ed25519.PublicKey) (bool, error) {
 // 4) address (address-length bytes)
 //----------------------------------------------------------------------
 
-// HelloAddress
+// HelloAddress represents a (generic) peer address with expiration date
 type HelloAddress struct {
 	Transport string            // Name of transport
 	AddrSize  uint16            `order:"big"` // Size of address entry
@@ -247,7 +247,7 @@ type HelloAddress struct {
 }
 
 // NewHelloAddress create a new HELLO address from the given address
-func NewAddress(a *util.Address) *HelloAddress {
+func NewHelloAddress(a *util.Address) *HelloAddress {
 	addr := &HelloAddress{
 		Transport: a.Transport,
 		AddrSize:  uint16(len(a.Address)),
@@ -264,7 +264,7 @@ func (a *HelloAddress) String() string {
 		util.AddressString(a.Transport, a.Address), a.ExpireOn)
 }
 
-// HelloMsg
+// HelloMsg is a message send by peers to announce their presence
 type HelloMsg struct {
 	MsgSize    uint16          `order:"big"` // total size of message
 	MsgType    uint16          `order:"big"` // HELLO (17)
@@ -300,15 +300,15 @@ func (m *HelloMsg) AddAddress(a *HelloAddress) {
 }
 
 // Header returns the message header in a separate instance.
-func (msg *HelloMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *HelloMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }
 
 //----------------------------------------------------------------------
 // TRANSPORT_SESSION_ACK
 //----------------------------------------------------------------------
 
-// SessionAckMsg
+// SessionAckMsg is a message to acknowlege a session request
 type SessionAckMsg struct {
 	MsgSize uint16 `order:"big"` // total size of message
 	MsgType uint16 `order:"big"` // TRANSPORT_SESSION_ACK (377)
@@ -328,15 +328,15 @@ func (m *SessionAckMsg) String() string {
 }
 
 // Header returns the message header in a separate instance.
-func (msg *SessionAckMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *SessionAckMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }
 
 //----------------------------------------------------------------------
 // TRANSPORT_SESSION_SYN
 //----------------------------------------------------------------------
 
-// SessionSynMsg
+// SessionSynMsg is a synchronization request message for sessions
 type SessionSynMsg struct {
 	MsgSize   uint16            `order:"big"` // total size of message
 	MsgType   uint16            `order:"big"` // TRANSPORT_SESSION_SYN (375)
@@ -360,15 +360,15 @@ func (m *SessionSynMsg) String() string {
 }
 
 // Header returns the message header in a separate instance.
-func (msg *SessionSynMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *SessionSynMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }
 
 //----------------------------------------------------------------------
 // TRANSPORT_SESSION_SYN_ACK
 //----------------------------------------------------------------------
 
-// SessionSynAckMsg
+// SessionSynAckMsg responds to a SYN request message
 type SessionSynAckMsg struct {
 	MsgSize   uint16            `order:"big"` // total size of message
 	MsgType   uint16            `order:"big"` // TRANSPORT_SESSION_SYN_ACK (376)
@@ -392,15 +392,15 @@ func (m *SessionSynAckMsg) String() string {
 }
 
 // Header returns the message header in a separate instance.
-func (msg *SessionSynAckMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *SessionSynAckMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }
 
 //----------------------------------------------------------------------
 // TRANSPORT_SESSION_QUOTA
 //----------------------------------------------------------------------
 
-// SessionQuotaMsg
+// SessionQuotaMsg is a message to announce quotas for a session
 type SessionQuotaMsg struct {
 	MsgSize uint16 `order:"big"` // total size of message
 	MsgType uint16 `order:"big"` // TRANSPORT_SESSION_QUOTA (379)
@@ -424,15 +424,15 @@ func (m *SessionQuotaMsg) String() string {
 }
 
 // Header returns the message header in a separate instance.
-func (msg *SessionQuotaMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *SessionQuotaMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }
 
 //----------------------------------------------------------------------
 // TRANSPORT_SESSION_KEEPALIVE
 //----------------------------------------------------------------------
 
-// SessionKeepAliveMsg
+// SessionKeepAliveMsg is a message send by peers to keep a session alive.
 type SessionKeepAliveMsg struct {
 	MsgSize uint16 `order:"big"` // total size of message
 	MsgType uint16 `order:"big"` // TRANSPORT_SESSION_KEEPALIVE (381)
@@ -455,15 +455,15 @@ func (m *SessionKeepAliveMsg) String() string {
 }
 
 // Header returns the message header in a separate instance.
-func (msg *SessionKeepAliveMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *SessionKeepAliveMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }
 
 //----------------------------------------------------------------------
 // TRANSPORT_SESSION_KEEPALIVE_RESPONSE
 //----------------------------------------------------------------------
 
-// SessionKeepAliveRespMsg
+// SessionKeepAliveRespMsg is a response for a peer to a "keep-alive" request.
 type SessionKeepAliveRespMsg struct {
 	MsgSize uint16 `order:"big"` // total size of message
 	MsgType uint16 `order:"big"` // TRANSPORT_SESSION_KEEPALIVE_RESPONSE (382)
@@ -486,6 +486,6 @@ func (m *SessionKeepAliveRespMsg) String() string {
 }
 
 // Header returns the message header in a separate instance.
-func (msg *SessionKeepAliveRespMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *SessionKeepAliveRespMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }

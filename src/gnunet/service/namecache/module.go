@@ -36,10 +36,10 @@ import (
 type NamecacheModule struct {
 }
 
-func (nc *NamecacheModule) Get(ctx *service.SessionContext, query *gns.Query) (*message.GNSBlock, error) {
+func (nc *NamecacheModule) Get(ctx *service.SessionContext, query *gns.Query) (*message.Block, error) {
 	return nil, nil
 }
 
-func (nc *NamecacheModule) Put(ctx *service.SessionContext, block *message.GNSBlock) error {
+func (nc *NamecacheModule) Put(ctx *service.SessionContext, block *message.Block) error {
 	return nil
 }

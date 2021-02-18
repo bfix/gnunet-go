@@ -30,7 +30,7 @@ import (
 // REVOCATION_QUERY
 //----------------------------------------------------------------------
 
-// RevocationQueryMsg
+// RevocationQueryMsg is a request message to check if a key is revoked
 type RevocationQueryMsg struct {
 	MsgSize  uint16 `order:"big"` // total size of message
 	MsgType  uint16 `order:"big"` // REVOCATION_QUERY (636)
@@ -58,15 +58,15 @@ func (m *RevocationQueryMsg) String() string {
 }
 
 // Header returns the message header in a separate instance.
-func (msg *RevocationQueryMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *RevocationQueryMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }
 
 //----------------------------------------------------------------------
 // REVOCATION_QUERY_RESPONSE
 //----------------------------------------------------------------------
 
-// RevocationQueryResponseMsg
+// RevocationQueryResponseMsg is a response message for revocation checks.
 type RevocationQueryResponseMsg struct {
 	MsgSize uint16 `order:"big"` // total size of message
 	MsgType uint16 `order:"big"` // REVOCATION_QUERY_RESPONSE (637)
@@ -92,15 +92,15 @@ func (m *RevocationQueryResponseMsg) String() string {
 }
 
 // Header returns the message header in a separate instance.
-func (msg *RevocationQueryResponseMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *RevocationQueryResponseMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }
 
 //----------------------------------------------------------------------
 // REVOCATION_REVOKE
 //----------------------------------------------------------------------
 
-// RevocationRevokeMsg
+// RevocationRevokeMsg is a request to revoke a given key with PoW data
 type RevocationRevokeMsg struct {
 	MsgSize   uint16            `order:"big"` // total size of message
 	MsgType   uint16            `order:"big"` // REVOCATION_REVOKE (638)
@@ -117,7 +117,7 @@ func NewRevocationRevokeMsg(zoneKey *ed25519.PublicKey, sig *ed25519.EcSignature
 		MsgSize:   364,
 		MsgType:   REVOCATION_REVOKE,
 		Timestamp: util.AbsoluteTimeNow(),
-		TTL:       util.RelativeTime{0},
+		TTL:       util.RelativeTime{},
 		PoWs:      make([]uint64, 32),
 		Signature: make([]byte, 64),
 		ZoneKey:   make([]byte, 32),
@@ -137,15 +137,15 @@ func (m *RevocationRevokeMsg) String() string {
 }
 
 // Header returns the message header in a separate instance.
-func (msg *RevocationRevokeMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *RevocationRevokeMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }
 
 //----------------------------------------------------------------------
 // REVOCATION_REVOKE_RESPONSE
 //----------------------------------------------------------------------
 
-// RevocationRevokeResponseMsg
+// RevocationRevokeResponseMsg is a response message for a revocation request
 type RevocationRevokeResponseMsg struct {
 	MsgSize uint16 `order:"big"` // total size of message
 	MsgType uint16 `order:"big"` // REVOCATION_REVOKE_RESPONSE (639)
@@ -171,6 +171,6 @@ func (m *RevocationRevokeResponseMsg) String() string {
 }
 
 // Header returns the message header in a separate instance.
-func (msg *RevocationRevokeResponseMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *RevocationRevokeResponseMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }

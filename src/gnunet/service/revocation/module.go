@@ -32,14 +32,14 @@ import (
 // "GNUnet Revocation" implementation
 //======================================================================
 
-// RevocationModule handles the revocation-related calls to other modules.
-type RevocationModule struct {
+// Module handles the revocation-related calls to other modules.
+type Module struct {
 	bloomf *data.BloomFilter  // bloomfilter for fast revocation check
 	kvs    util.KeyValueStore // storage for known revocations
 }
 
 // Init a revocation module
-func (m *RevocationModule) Init() error {
+func (m *Module) Init() error {
 	// Initialize access to revocation data storage
 	var err error
 	if m.kvs, err = util.OpenKVStore(config.Cfg.Revocation.Storage); err != nil {
@@ -61,9 +61,9 @@ func (m *RevocationModule) Init() error {
 	return nil
 }
 
-// NewRevocationModule returns an initialized revocation module
-func NewRevocationModule() *RevocationModule {
-	m := new(RevocationModule)
+// NewModule returns an initialized revocation module
+func NewModule() *Module {
+	m := new(Module)
 	if err := m.Init(); err != nil {
 		logger.Printf(logger.ERROR, "[revocation] Failed to initialize module: %s\n", err.Error())
 		return nil
@@ -73,16 +73,16 @@ func NewRevocationModule() *RevocationModule {
 
 // Query return true if the pkey is valid (not revoked) and false
 // if the pkey has been revoked.
-func (s *RevocationModule) Query(ctx *service.SessionContext, pkey *ed25519.PublicKey) (valid bool, err error) {
+func (m *Module) Query(ctx *service.SessionContext, pkey *ed25519.PublicKey) (valid bool, err error) {
 	// fast check first: is the key in the bloomfilter?
 	data := pkey.Bytes()
-	if !s.bloomf.Contains(data) {
+	if !m.bloomf.Contains(data) {
 		// no: it is valid (not revoked)
 		return true, nil
 	}
 	// check in store to detect false-positives
 	key := util.EncodeBinaryToString(data)
-	if _, err = s.kvs.Get(key); err != nil {
+	if _, err = m.kvs.Get(key); err != nil {
 		logger.Printf(logger.ERROR, "[revocation] Failed to locate key '%s' in store: %s\n", key, err.Error())
 		// assume not revoked...
 		return true, err
@@ -91,8 +91,8 @@ func (s *RevocationModule) Query(ctx *service.SessionContext, pkey *ed25519.Publ
 	return false, nil
 }
 
-// Revoke
-func (s *RevocationModule) Revoke(ctx *service.SessionContext, rd *RevData) (success bool, err error) {
+// Revoke a key with given revocation data
+func (m *Module) Revoke(ctx *service.SessionContext, rd *RevData) (success bool, err error) {
 	// verify the revocation data
 	rc := rd.Verify(true)
 	switch {
@@ -111,7 +111,7 @@ func (s *RevocationModule) Revoke(ctx *service.SessionContext, rd *RevData) (suc
 	}
 	// store the revocation data
 	// (1) add it to the bloomfilter
-	s.bloomf.Add(rd.ZoneKey)
+	m.bloomf.Add(rd.ZoneKey)
 	// (2) add it to the store
 	var buf []byte
 	key := util.EncodeBinaryToString(rd.ZoneKey)
@@ -119,6 +119,6 @@ func (s *RevocationModule) Revoke(ctx *service.SessionContext, rd *RevData) (suc
 		return false, err
 	}
 	value := util.EncodeBinaryToString(buf)
-	err = s.kvs.Put(key, value)
+	err = m.kvs.Put(key, value)
 	return true, err
 }

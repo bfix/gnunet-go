@@ -30,6 +30,7 @@ import (
 	"github.com/bfix/gospel/logger"
 )
 
+// Error messages
 var (
 	ErrBlockNotDecrypted = fmt.Errorf("GNS block not decrypted")
 )
@@ -38,11 +39,11 @@ var (
 // GNS_LOOKUP
 //----------------------------------------------------------------------
 
-// GNSLookupMsg
-type GNSLookupMsg struct {
+// LookupMsg is a request message for a GNS name lookup
+type LookupMsg struct {
 	MsgSize  uint16 `order:"big"` // total size of message
 	MsgType  uint16 `order:"big"` // GNS_LOOKUP (500)
-	Id       uint32 `order:"big"` // Unique identifier for this request (for key collisions).
+	ID       uint32 `order:"big"` // Unique identifier for this request (for key collisions).
 	Zone     []byte `size:"32"`   // Zone that is to be used for lookup
 	Options  uint16 `order:"big"` // Local options for where to look for results
 	Reserved uint16 `order:"big"` // Always 0
@@ -51,11 +52,11 @@ type GNSLookupMsg struct {
 }
 
 // NewGNSLookupMsg creates a new default message.
-func NewGNSLookupMsg() *GNSLookupMsg {
-	return &GNSLookupMsg{
+func NewGNSLookupMsg() *LookupMsg {
+	return &LookupMsg{
 		MsgSize:  48, // record size with no name
 		MsgType:  GNS_LOOKUP,
-		Id:       0,
+		ID:       0,
 		Zone:     make([]byte, 32),
 		Options:  uint16(enums.GNS_LO_DEFAULT),
 		Reserved: 0,
@@ -65,65 +66,65 @@ func NewGNSLookupMsg() *GNSLookupMsg {
 }
 
 // SetName appends the name to lookup to the message
-func (m *GNSLookupMsg) SetName(name string) {
+func (m *LookupMsg) SetName(name string) {
 	m.Name = util.Clone(append([]byte(name), 0))
 	m.MsgSize = uint16(48 + len(m.Name))
 }
 
 // GetName returns the name to lookup from the message
-func (m *GNSLookupMsg) GetName() string {
+func (m *LookupMsg) GetName() string {
 	size := len(m.Name)
 	if m.Name[size-1] != 0 {
 		logger.Println(logger.WARN, "GNS_LOOKUP name not NULL-terminated")
 	} else {
-		size -= 1
+		size--
 	}
 	return string(m.Name[:size])
 }
 
 // String returns a human-readable representation of the message.
-func (m *GNSLookupMsg) String() string {
+func (m *LookupMsg) String() string {
 	return fmt.Sprintf(
 		"GNSLookupMsg{Id=%d,Zone=%s,Options=%d,Type=%d,Name=%s}",
-		m.Id, util.EncodeBinaryToString(m.Zone),
+		m.ID, util.EncodeBinaryToString(m.Zone),
 		m.Options, m.Type, m.GetName())
 }
 
 // Header returns the message header in a separate instance.
-func (msg *GNSLookupMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *LookupMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }
 
 //----------------------------------------------------------------------
 // GNS_LOOKUP_RESULT
 //----------------------------------------------------------------------
 
-// GNSRecordSet ist the GNUnet data structure for a list of resource records
+// RecordSet ist the GNUnet data structure for a list of resource records
 // in a GNSBlock. As part of GNUnet messages, the record set is padded so that
 // the binary size of (records||padding) is the smallest power of two.
-type GNSRecordSet struct {
-	Count   uint32               `order:"big"`  // number of resource records
-	Records []*GNSResourceRecord `size:"Count"` // list of resource records
-	Padding []byte               `size:"*"`     // padding
+type RecordSet struct {
+	Count   uint32            `order:"big"`  // number of resource records
+	Records []*ResourceRecord `size:"Count"` // list of resource records
+	Padding []byte            `size:"*"`     // padding
 }
 
-// NewGNSRecordSet returns an empty resource record set.
-func NewGNSRecordSet() *GNSRecordSet {
-	return &GNSRecordSet{
+// NewRecordSet returns an empty resource record set.
+func NewRecordSet() *RecordSet {
+	return &RecordSet{
 		Count:   0,
-		Records: make([]*GNSResourceRecord, 0),
+		Records: make([]*ResourceRecord, 0),
 		Padding: make([]byte, 0),
 	}
 }
 
 // AddRecord to append a resource record to the set.
-func (rs *GNSRecordSet) AddRecord(rec *GNSResourceRecord) {
+func (rs *RecordSet) AddRecord(rec *ResourceRecord) {
 	rs.Count++
 	rs.Records = append(rs.Records, rec)
 }
 
-// SignedBlockData: signed and encrypted list of resource records stored
-// in a GNSRecordSet
+// SignedBlockData represents the signed and encrypted list of resource
+// records stored in a GNSRecordSet
 type SignedBlockData struct {
 	Purpose *crypto.SignaturePurpose // Size and purpose of signature (8 bytes)
 	Expire  util.AbsoluteTime        // Expiration time of the block.
@@ -133,10 +134,10 @@ type SignedBlockData struct {
 	data []byte // decrypted GNSRecord set
 }
 
-// GNSBlock is the result of GNS lookups for a given label in a zone.
+// Block is the result of GNS lookups for a given label in a zone.
 // An encrypted and signed container for GNS resource records that represents
 // the "atomic" data structure associated with a GNS label in a given zone.
-type GNSBlock struct {
+type Block struct {
 	Signature  []byte `size:"64"` // Signature of the block.
 	DerivedKey []byte `size:"32"` // Derived key used for signing
 	Block      *SignedBlockData
@@ -148,19 +149,19 @@ type GNSBlock struct {
 }
 
 // String returns the human-readable representation of a GNSBlock
-func (b *GNSBlock) String() string {
+func (b *Block) String() string {
 	return fmt.Sprintf("GNSBlock{Verified=%v,Decrypted=%v,data=[%d]}",
 		b.verified, b.decrypted, len(b.Block.EncData))
 }
 
 // Records returns the list of resource records in a block.
-func (b *GNSBlock) Records() ([]*GNSResourceRecord, error) {
+func (b *Block) Records() ([]*ResourceRecord, error) {
 	// check if block is decrypted
 	if !b.decrypted {
 		return nil, ErrBlockNotDecrypted
 	}
 	// parse block data into record set
-	rs := NewGNSRecordSet()
+	rs := NewRecordSet()
 	if err := data.Unmarshal(rs, b.Block.data); err != nil {
 		return nil, err
 	}
@@ -168,7 +169,7 @@ func (b *GNSBlock) Records() ([]*GNSResourceRecord, error) {
 }
 
 // Verify the integrity of the block data from a signature.
-func (b *GNSBlock) Verify(zoneKey *ed25519.PublicKey, label string) (err error) {
+func (b *Block) Verify(zoneKey *ed25519.PublicKey, label string) (err error) {
 	// Integrity check performed
 	b.checked = true
 
@@ -198,16 +199,16 @@ func (b *GNSBlock) Verify(zoneKey *ed25519.PublicKey, label string) (err error) 
 }
 
 // Decrypt block data with a key/iv combination derived from (PKEY,label)
-func (b *GNSBlock) Decrypt(zoneKey *ed25519.PublicKey, label string) (err error) {
+func (b *Block) Decrypt(zoneKey *ed25519.PublicKey, label string) (err error) {
 	// decrypt payload
 	b.Block.data, err = crypto.DecryptBlock(b.Block.EncData, zoneKey, label)
 	b.decrypted = true
 	return
 }
 
-// NewGNSBlock instantiates an empty GNS block
-func NewGNSBlock() *GNSBlock {
-	return &GNSBlock{
+// NewBlock instantiates an empty GNS block
+func NewBlock() *Block {
+	return &Block{
 		Signature:  make([]byte, 64),
 		DerivedKey: make([]byte, 32),
 		Block: &SignedBlockData{
@@ -222,9 +223,9 @@ func NewGNSBlock() *GNSBlock {
 	}
 }
 
-// GNSResourceRecord is the GNUnet-specific representation of resource
+// ResourceRecord is the GNUnet-specific representation of resource
 // records (not to be confused with DNS resource records).
-type GNSResourceRecord struct {
+type ResourceRecord struct {
 	Expires util.AbsoluteTime // Expiration time for the record
 	Size    uint32            `order:"big"` // Number of bytes in 'Data'
 	Type    uint32            `order:"big"` // Type of the GNS/DNS record
@@ -233,33 +234,33 @@ type GNSResourceRecord struct {
 }
 
 // String returns a human-readable representation of the message.
-func (r *GNSResourceRecord) String() string {
+func (r *ResourceRecord) String() string {
 	return fmt.Sprintf("GNSResourceRecord{type=%s,expire=%s,flags=%d,size=%d}",
 		enums.GNS_TYPE[int(r.Type)], r.Expires, r.Flags, r.Size)
 }
 
-// GNSLookupResultMsg
-type GNSLookupResultMsg struct {
-	MsgSize uint16               `order:"big"`  // total size of message
-	MsgType uint16               `order:"big"`  // GNS_LOOKUP_RESULT (501)
-	Id      uint32               `order:"big"`  // Unique identifier for this request (for key collisions).
-	Count   uint32               `order:"big"`  // The number of records contained in response
-	Records []*GNSResourceRecord `size:"Count"` // GNS resource records
+// LookupResultMsg is a response message for a GNS name lookup request
+type LookupResultMsg struct {
+	MsgSize uint16            `order:"big"`  // total size of message
+	MsgType uint16            `order:"big"`  // GNS_LOOKUP_RESULT (501)
+	ID      uint32            `order:"big"`  // Unique identifier for this request (for key collisions).
+	Count   uint32            `order:"big"`  // The number of records contained in response
+	Records []*ResourceRecord `size:"Count"` // GNS resource records
 }
 
-// NewGNSLookupResultMsg
-func NewGNSLookupResultMsg(id uint32) *GNSLookupResultMsg {
-	return &GNSLookupResultMsg{
+// NewGNSLookupResultMsg returns a new lookup result message
+func NewGNSLookupResultMsg(id uint32) *LookupResultMsg {
+	return &LookupResultMsg{
 		MsgSize: 12, // Empty result (no records)
 		MsgType: GNS_LOOKUP_RESULT,
-		Id:      id,
+		ID:      id,
 		Count:   0,
-		Records: make([]*GNSResourceRecord, 0),
+		Records: make([]*ResourceRecord, 0),
 	}
 }
 
 // AddRecord adds a GNS resource recordto the response message.
-func (m *GNSLookupResultMsg) AddRecord(rec *GNSResourceRecord) error {
+func (m *LookupResultMsg) AddRecord(rec *ResourceRecord) error {
 	recSize := 20 + int(rec.Size)
 	if int(m.MsgSize)+recSize > enums.GNS_MAX_BLOCK_SIZE {
 		return fmt.Errorf("gns.AddRecord(): MAX_BLOCK_SIZE reached")
@@ -271,11 +272,11 @@ func (m *GNSLookupResultMsg) AddRecord(rec *GNSResourceRecord) error {
 }
 
 // String returns a human-readable representation of the message.
-func (m *GNSLookupResultMsg) String() string {
-	return fmt.Sprintf("GNSLookupResultMsg{Id=%d,Count=%d}", m.Id, m.Count)
+func (m *LookupResultMsg) String() string {
+	return fmt.Sprintf("GNSLookupResultMsg{Id=%d,Count=%d}", m.ID, m.Count)
 }
 
 // Header returns the message header in a separate instance.
-func (msg *GNSLookupResultMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *LookupResultMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }

@@ -31,7 +31,7 @@ import (
 // DHT_CLIENT_GET
 //----------------------------------------------------------------------
 
-// DHTClientGetMsg
+// DHTClientGetMsg is the message for getting values from the DHT
 type DHTClientGetMsg struct {
 	MsgSize   uint16           `order:"big"` // total size of message
 	MsgType   uint16           `order:"big"` // DHT_CLIENT_GET (143)
@@ -39,7 +39,7 @@ type DHTClientGetMsg struct {
 	ReplLevel uint32           `order:"big"` // Replication level for this message
 	Type      uint32           `order:"big"` // The type for the data for the GET request (BLOCK_TYPE_???)
 	Key       *crypto.HashCode // The key to search for
-	Id        uint64           `order:"big"` // Unique ID identifying this request
+	ID        uint64           `order:"big"` // Unique ID identifying this request
 	XQuery    []byte           `size:"*"`    // Optional xquery
 }
 
@@ -55,12 +55,12 @@ func NewDHTClientGetMsg(key *crypto.HashCode) *DHTClientGetMsg {
 		ReplLevel: 1,
 		Type:      uint32(enums.BLOCK_TYPE_ANY),
 		Key:       key,
-		Id:        0,
+		ID:        0,
 		XQuery:    nil,
 	}
 }
 
-// Set a (new) XQuery in this message and return previous XQuery.
+// SetXQuery sets a (new) XQuery in this message and return previous XQuery.
 func (m *DHTClientGetMsg) SetXQuery(xq []byte) []byte {
 	prev := m.XQuery
 	m.MsgSize -= uint16(len(prev))
@@ -72,26 +72,26 @@ func (m *DHTClientGetMsg) SetXQuery(xq []byte) []byte {
 // String returns a human-readable representation of the message.
 func (m *DHTClientGetMsg) String() string {
 	return fmt.Sprintf("DHTClientGetMsg{Id:%d,Type=%d,Options=%d,Repl=%d,Key=%s}",
-		m.Id, m.Type, m.Options, m.ReplLevel, hex.EncodeToString(m.Key.Bits))
+		m.ID, m.Type, m.Options, m.ReplLevel, hex.EncodeToString(m.Key.Bits))
 }
 
 // Header returns the message header in a separate instance.
-func (msg *DHTClientGetMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *DHTClientGetMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }
 
 //----------------------------------------------------------------------
 // DHT_CLIENT_RESULT
 //----------------------------------------------------------------------
 
-// DHTClientResultMsg
+// DHTClientResultMsg is a message for DHT results
 type DHTClientResultMsg struct {
 	MsgSize    uint16            `order:"big"` // total size of message
 	MsgType    uint16            `order:"big"` // DHT_CLIENT_RESULT (145)
 	Type       uint32            `order:"big"` // The type for the data
 	PutPathLen uint32            `order:"big"` // Number of peers recorded in outgoing path
 	GetPathLen uint32            `order:"big"` // Number of peers recorded from storage location
-	Id         uint64            `order:"big"` // Unique ID of the matching GET request
+	ID         uint64            `order:"big"` // Unique ID of the matching GET request
 	Expire     util.AbsoluteTime // Expiration time
 	Key        *crypto.HashCode  // The key that was searched for
 	PutPath    []*util.PeerID    `size:"PutPathLen"` // put path
@@ -110,7 +110,7 @@ func NewDHTClientResultMsg(key *crypto.HashCode) *DHTClientResultMsg {
 		Type:       0,
 		PutPathLen: 0,
 		GetPathLen: 0,
-		Id:         0,
+		ID:         0,
 		Expire:     *new(util.AbsoluteTime),
 		Key:        key,
 		Data:       make([]byte, 0),
@@ -119,24 +119,24 @@ func NewDHTClientResultMsg(key *crypto.HashCode) *DHTClientResultMsg {
 
 // String returns a human-readable representation of the message.
 func (m *DHTClientResultMsg) String() string {
-	return fmt.Sprintf("DHTClientResultMsg{id:%d,expire=%s}", m.Id, m.Expire)
+	return fmt.Sprintf("DHTClientResultMsg{id:%d,expire=%s}", m.ID, m.Expire)
 }
 
 // Header returns the message header in a separate instance.
-func (msg *DHTClientResultMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *DHTClientResultMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }
 
 //----------------------------------------------------------------------
 // DHT_CLIENT_GET_STOP
 //----------------------------------------------------------------------
 
-// DHTClientGetStopMsg
+// DHTClientGetStopMsg stops a pending DHT operation
 type DHTClientGetStopMsg struct {
 	MsgSize  uint16           `order:"big"` // total size of message
 	MsgType  uint16           `order:"big"` // DHT_CLIENT_GET_STOP (144)
 	Reserved uint32           `order:"big"` // Reserved (0)
-	Id       uint64           `order:"big"` // Unique ID identifying this request
+	ID       uint64           `order:"big"` // Unique ID identifying this request
 	Key      *crypto.HashCode // The key to search for
 }
 
@@ -149,17 +149,17 @@ func NewDHTClientGetStopMsg(key *crypto.HashCode) *DHTClientGetStopMsg {
 		MsgSize:  80,
 		MsgType:  DHT_CLIENT_GET_STOP,
 		Reserved: 0, // mandatory
-		Id:       0,
+		ID:       0,
 		Key:      key,
 	}
 }
 
 // String returns a human-readable representation of the message.
 func (m *DHTClientGetStopMsg) String() string {
-	return fmt.Sprintf("DHTClientGetStopMsg{Id:%d,Key=%s}", m.Id, hex.EncodeToString(m.Key.Bits))
+	return fmt.Sprintf("DHTClientGetStopMsg{Id:%d,Key=%s}", m.ID, hex.EncodeToString(m.Key.Bits))
 }
 
 // Header returns the message header in a separate instance.
-func (msg *DHTClientGetStopMsg) Header() *MessageHeader {
-	return &MessageHeader{msg.MsgSize, msg.MsgType}
+func (m *DHTClientGetStopMsg) Header() *Header {
+	return &Header{m.MsgSize, m.MsgType}
 }

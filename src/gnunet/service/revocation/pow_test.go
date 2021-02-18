@@ -20,7 +20,7 @@ type testData struct {
 }
 
 var (
-	test_data = []testData{
+	tstData = []testData{
 		{
 
 			"90ea2a95cb9ef482b45817dc45b805cae00f387022a065a3674f41ad15173c63", // private scalar D
@@ -69,7 +69,7 @@ var (
 
 func TestRevocationRFC(t *testing.T) {
 
-	for i, td := range test_data {
+	for i, td := range tstData {
 		if testing.Verbose() {
 			fmt.Println("---------------------------------")
 			fmt.Printf("Test case #%d\n", i+1)
@@ -77,30 +77,30 @@ func TestRevocationRFC(t *testing.T) {
 		}
 
 		// construct private/public key pair from test data
-		skey_d, err := hex.DecodeString(td.skey)
+		skeyD, err := hex.DecodeString(td.skey)
 		if err != nil {
 			t.Fatal(err)
 		}
-		d := math.NewIntFromBytes(util.Reverse(skey_d))
+		d := math.NewIntFromBytes(util.Reverse(skeyD))
 		skey := ed25519.NewPrivateKeyFromD(d)
-		pkey_d, err := hex.DecodeString(td.pkey)
+		pkeyD, err := hex.DecodeString(td.pkey)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if bytes.Compare(skey.Public().Bytes(), pkey_d) != 0 {
+		if bytes.Compare(skey.Public().Bytes(), pkeyD) != 0 {
 			t.Fatal("Private/Public key mismatch")
 		}
 
 		// assemble revocation data object
-		rev_d, err := hex.DecodeString(td.revdata)
+		revD, err := hex.DecodeString(td.revdata)
 		if err != nil {
 			t.Fatal(err)
 		}
 		revData := new(RevData)
-		if err = data.Unmarshal(revData, rev_d); err != nil {
+		if err = data.Unmarshal(revData, revD); err != nil {
 			t.Fatal(err)
 		}
-		if bytes.Compare(revData.ZoneKey, pkey_d) != 0 {
+		if bytes.Compare(revData.ZoneKey, pkeyD) != 0 {
 			t.Fatal("Wrong zone key in test revocation")
 		}
 

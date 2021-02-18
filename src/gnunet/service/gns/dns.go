@@ -48,7 +48,7 @@ var (
 // RRTypeList is a list of integers representing RR types.
 type RRTypeList []int
 
-// Initialize a new type list with given type values
+// NewRRTypeList initializes a new type list with given type values
 func NewRRTypeList(args ...int) (res RRTypeList) {
 	for _, val := range args {
 		// if GNS_TYPE_ANY is encountered, it becomes the sole type
@@ -92,7 +92,7 @@ func (tl RRTypeList) HasType(t int) bool {
 // Helper functions
 //----------------------------------------------------------------------
 
-// Convert DNS name from its binary representation [RFC1034]:
+// DNSNameFromBytes converts DNS name from its binary representation [RFC1034]:
 // A string is a sequence of a (len,chars...) tupels terminated by a (len=0,).
 // The name parts are concatenated with "." as separator.
 // The parsing starts at offset in the byte array; the function returns the
@@ -115,7 +115,8 @@ func DNSNameFromBytes(b []byte, offset int) (int, string) {
 	return pos + 1, str
 }
 
-func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *message.GNSRecordSet {
+// QueryDNS queries the specified DNS server for a given name and expected result types.
+func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *message.RecordSet {
 	// get default nameserver if not defined.
 	if server == nil {
 		server = net.IPv4(8, 8, 8, 8)
@@ -134,9 +135,9 @@ func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *message.GNSR
 		Question: make([]dns.Question, 1),
 	}
 	m.Question[0] = dns.Question{
-		dns.Fqdn(name),
-		dns.TypeANY,
-		dns.ClassINET,
+		Name:   dns.Fqdn(name),
+		Qtype:  dns.TypeANY,
+		Qclass: dns.ClassINET,
 	}
 
 	// perform query in retry-loop
@@ -160,7 +161,7 @@ func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *message.GNSR
 			logger.Printf(logger.ERROR, "[dns][%d] No results\n", id)
 			return nil
 		}
-		set := message.NewGNSRecordSet()
+		set := message.NewRecordSet()
 		for _, record := range in.Answer {
 			// check if answer record is of requested type
 			if kind.HasType(int(record.Header().Rrtype)) {
@@ -173,7 +174,7 @@ func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *message.GNSR
 				}
 
 				// create a new GNS resource record
-				rr := new(message.GNSResourceRecord)
+				rr := new(message.ResourceRecord)
 				expires := time.Now().Add(time.Duration(record.Header().Ttl) * time.Second)
 				rr.Expires = util.NewAbsoluteTime(expires)
 				rr.Flags = 0
@@ -203,17 +204,17 @@ func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *message.GNSR
 // ResolveDNS resolves a name in DNS. Multiple DNS servers are queried in
 // parallel; the first result delivered by any of the servers is returned
 // as the result list of matching resource records.
-func (gns *GNSModule) ResolveDNS(
+func (gns *Module) ResolveDNS(
 	ctx *service.SessionContext,
 	name string,
 	servers []string,
 	kind RRTypeList,
 	pkey *ed25519.PublicKey,
-	depth int) (set *message.GNSRecordSet, err error) {
+	depth int) (set *message.RecordSet, err error) {
 
 	// start DNS queries concurrently
 	logger.Printf(logger.DBG, "[dns] Resolution of '%s' starting...\n", name)
-	res := make(chan *message.GNSRecordSet)
+	res := make(chan *message.RecordSet)
 	running := 0
 	for _, srv := range servers {
 		// check if srv is an IPv4/IPv6 address

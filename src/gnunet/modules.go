@@ -35,12 +35,12 @@ import (
 	"gnunet/service/revocation"
 )
 
-// List of all GNUnet service module instances
+// Instances holds a list of all GNUnet service modules
 type Instances struct {
-	GNS        *gns.GNSModule
+	GNS        *gns.Module
 	Namecache  *namecache.NamecacheModule
-	DHT        *dht.DHTModule
-	Revocation *revocation.RevocationModule
+	DHT        *dht.Module
+	Revocation *revocation.Module
 }
 
 // Local reference to instance list
@@ -55,13 +55,13 @@ func init() {
 	Modules.Namecache = new(namecache.NamecacheModule)
 
 	// DHT (no calls to other modules)
-	Modules.DHT = new(dht.DHTModule)
+	Modules.DHT = new(dht.Module)
 
 	// Revocation (no calls to other modules)
-	Modules.Revocation = revocation.NewRevocationModule()
+	Modules.Revocation = revocation.NewModule()
 
 	// GNS (calls Namecache, DHT and Identity)
-	Modules.GNS = &gns.GNSModule{
+	Modules.GNS = &gns.Module{
 		LookupLocal:      Modules.Namecache.Get,
 		StoreLocal:       Modules.Namecache.Put,
 		LookupRemote:     Modules.DHT.Get,

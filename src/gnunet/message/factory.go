@@ -19,7 +19,6 @@
 package message
 
 import (
-	"errors"
 	"fmt"
 )
 
@@ -30,7 +29,7 @@ func NewEmptyMessage(msgType uint16) (Message, error) {
 	// Transport
 	//------------------------------------------------------------------
 	case TRANSPORT_TCP_WELCOME:
-		return NewTransportTcpWelcomeMsg(nil), nil
+		return NewTransportTCPWelcomeMsg(nil), nil
 	case HELLO:
 		return NewHelloMsg(nil), nil
 	case TRANSPORT_SESSION_QUOTA:
@@ -96,5 +95,5 @@ func NewEmptyMessage(msgType uint16) (Message, error) {
 	case REVOCATION_REVOKE_RESPONSE:
 		return NewRevocationRevokeResponseMsg(false), nil
 	}
-	return nil, errors.New(fmt.Sprintf("Unknown message type %d", msgType))
+	return nil, fmt.Errorf("Unknown message type %d", msgType)
 }
