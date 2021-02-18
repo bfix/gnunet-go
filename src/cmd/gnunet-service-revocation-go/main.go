@@ -84,12 +84,12 @@ func main() {
 		ctx, cancel = context.WithCancel(context.Background())
 		parts := strings.Split(rpcEndp, "+")
 		if parts[0] != "tcp" {
-			logger.Println(logger.ERROR, "[gns] RPC must have a TCP/IP endpoint")
+			logger.Println(logger.ERROR, "[revocation] RPC must have a TCP/IP endpoint")
 			return
 		}
 		config.Cfg.RPC.Endpoint = parts[1]
 		if err = rpc.Start(ctx); err != nil {
-			logger.Printf(logger.ERROR, "[gns] RPC failed to start: %s", err.Error())
+			logger.Printf(logger.ERROR, "[revocation] RPC failed to start: %s", err.Error())
 			return
 		}
 		rpc.Register(rvc)
