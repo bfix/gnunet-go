@@ -51,3 +51,11 @@ func DecryptBlock(data []byte, zoneKey *ed25519.PublicKey, label string) (out []
 	// perform decryption
 	return SymmetricDecrypt(data, skey, iv)
 }
+
+// EncryptBlock for a given zone and label.
+func EncryptBlock(data []byte, zoneKey *ed25519.PublicKey, label string) (out []byte, err error) {
+	// derive key material for decryption
+	iv, skey := DeriveBlockKey(label, zoneKey)
+	// perform encryption
+	return SymmetricEncrypt(data, skey, iv)
+}
