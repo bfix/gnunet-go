@@ -123,6 +123,19 @@ func (rs *RecordSet) AddRecord(rec *ResourceRecord) {
 	rs.Records = append(rs.Records, rec)
 }
 
+// SetPadding (re-)calculates and allocates the padding.
+func (rs *RecordSet) SetPadding() {
+	size := 0
+	for _, rr := range rs.Records {
+		size += int(rr.Size) + 20
+	}
+	n := 1
+	for n < size {
+		n <<= 1
+	}
+	rs.Padding = make([]byte, n-size)
+}
+
 // SignedBlockData represents the signed and encrypted list of resource
 // records stored in a GNSRecordSet
 type SignedBlockData struct {
@@ -177,7 +190,7 @@ func (b *Block) Verify(zoneKey *ed25519.PublicKey, label string) (err error) {
 	dkey := ed25519.NewPublicKeyFromBytes(b.DerivedKey)
 	dkey2 := crypto.DerivePublicKey(zoneKey, label, "gns")
 	if !dkey.Q.Equals(dkey2.Q) {
-		return fmt.Errorf("Invalid signature key for GNS Block")
+		return fmt.Errorf("invalid signature key for GNS Block")
 	}
 	// verify signature
 	var (
@@ -192,7 +205,7 @@ func (b *Block) Verify(zoneKey *ed25519.PublicKey, label string) (err error) {
 		return
 	}
 	if ok, err = dkey.EcVerify(buf, sig); err == nil && !ok {
-		err = fmt.Errorf("Signature verification failed for GNS block")
+		err = fmt.Errorf("signature verification failed for GNS block")
 	}
 	b.verified = true
 	return
