@@ -95,5 +95,5 @@ func NewEmptyMessage(msgType uint16) (Message, error) {
 	case REVOCATION_REVOKE_RESPONSE:
 		return NewRevocationRevokeResponseMsg(false), nil
 	}
-	return nil, fmt.Errorf("Unknown message type %d", msgType)
+	return nil, fmt.Errorf("unknown message type %d", msgType)
 }

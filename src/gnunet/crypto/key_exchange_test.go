@@ -67,7 +67,7 @@ func calcSharedSecret() bool {
 	// compute shared secret
 	ss_1 = calc(prv_1, pub_2)
 	ss_2 = calc(prv_2, pub_1)
-	return bytes.Compare(ss_1, ss_2) == 0
+	return bytes.Equal(ss_1, ss_2)
 }
 
 func TestDHE(t *testing.T) {
@@ -85,12 +85,11 @@ func TestDHE(t *testing.T) {
 		t.Logf("SS_2 = %s\n", hex.EncodeToString(ss_2))
 	}
 
-	if bytes.Compare(ss_1[:], ss) != 0 {
+	if !bytes.Equal(ss_1[:], ss) {
 		t.Logf("SS(expected) = %s\n", hex.EncodeToString(ss))
 		t.Logf("SS(computed) = %s\n", hex.EncodeToString(ss_1[:]))
 		t.Fatal("Wrong shared secret:")
 	}
-
 }
 
 func TestDHERandom(t *testing.T) {

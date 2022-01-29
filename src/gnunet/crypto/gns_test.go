@@ -60,23 +60,23 @@ func TestDeriveBlockKey(t *testing.T) {
 
 	iv, skey := DeriveBlockKey(LABEL, ed25519.NewPublicKeyFromBytes(PUB))
 
-	if bytes.Compare(IV[:16], iv.AESIv) != 0 {
+	if !bytes.Equal(IV[:16], iv.AESIv) {
 		t.Logf("AES_IV(computed) = %s\n", hex.EncodeToString(iv.AESIv))
 		t.Logf("AES_IV(expected) = %s\n", hex.EncodeToString(IV[:16]))
 		t.Fatal("AES IV mismatch")
 	}
-	if bytes.Compare(IV[16:], iv.TwofishIv) != 0 {
+	if !bytes.Equal(IV[16:], iv.TwofishIv) {
 		t.Logf("Twofish_IV(computed) = %s\n", hex.EncodeToString(iv.TwofishIv))
 		t.Logf("Twofish_IV(expected) = %s\n", hex.EncodeToString(IV[16:]))
 		t.Fatal("Twofish IV mismatch")
 	}
 
-	if bytes.Compare(SKEY[:32], skey.AESKey) != 0 {
+	if !bytes.Equal(SKEY[:32], skey.AESKey) {
 		t.Logf("AES_KEY(computed) = %s\n", hex.EncodeToString(skey.AESKey))
 		t.Logf("AES_KEY(expected) = %s\n", hex.EncodeToString(SKEY[:32]))
 		t.Fatal("AES KEY mismatch")
 	}
-	if bytes.Compare(SKEY[32:], skey.TwofishKey) != 0 {
+	if !bytes.Equal(SKEY[32:], skey.TwofishKey) {
 		t.Logf("Twofish_KEY(computed) = %s\n", hex.EncodeToString(skey.TwofishKey))
 		t.Logf("Twofish_KEY(expected) = %s\n", hex.EncodeToString(SKEY[32:]))
 		t.Fatal("Twofish KEY mismatch")
@@ -113,7 +113,7 @@ func TestDecryptBlock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(out, OUT) != 0 {
+	if !bytes.Equal(out, OUT) {
 		t.Logf("Decrypt(computed) = %s\n", hex.EncodeToString(out))
 		t.Logf("Decrypt(expected) = %s\n", hex.EncodeToString(OUT))
 		t.Fatal("Decryptions failed")

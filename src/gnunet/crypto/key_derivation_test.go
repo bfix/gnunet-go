@@ -25,9 +25,10 @@ import (
 	"encoding/hex"
 	"testing"
 
+	"gnunet/util"
+
 	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/math"
-	"gnunet/util"
 	"golang.org/x/crypto/hkdf"
 )
 
@@ -68,10 +69,10 @@ func TestDeriveH(t *testing.T) {
 		}
 	)
 
-	// compute keypair from seed
+	// compute keypair from private scalar
 	prv := ed25519.NewPrivateKeyFromD(math.NewIntFromBytes(D))
 	pub := prv.Public()
-	if bytes.Compare(pub.Bytes(), PUB) != 0 {
+	if !bytes.Equal(pub.Bytes(), PUB) {
 		t.Fatal("Wrong public key")
 	}
 	ego := util.EncodeBinaryToString(pub.Bytes())
@@ -84,7 +85,7 @@ func TestDeriveH(t *testing.T) {
 	hFull := DeriveH(pub, LABEL, CONTEXT)
 	h := hFull.Mod(ED25519_N)
 	util.CopyBlock(hBuf, h.Bytes())
-	if bytes.Compare(hBuf, H) != 0 {
+	if !bytes.Equal(hBuf, H) {
 		if testing.Verbose() {
 			t.Logf("H(computed) = %s\n", hex.EncodeToString(hBuf))
 			t.Logf("H(expected) = %s\n", hex.EncodeToString(H))
@@ -99,7 +100,7 @@ func TestDeriveH(t *testing.T) {
 	}
 
 	q := dpub.Q.Bytes()
-	if bytes.Compare(q, Q) != 0 {
+	if !bytes.Equal(q, Q) {
 		if testing.Verbose() {
 			t.Logf("derived_x(computed) = %s\n", hex.EncodeToString(q))
 			t.Logf("derived_x(expected) = %s\n", hex.EncodeToString(Q))
@@ -108,7 +109,7 @@ func TestDeriveH(t *testing.T) {
 	}
 	pk1 := dpub.Bytes()
 	pk2 := DerivePublicKey(pub, LABEL, CONTEXT).Bytes()
-	if bytes.Compare(pk1, pk2) != 0 {
+	if !bytes.Equal(pk1, pk2) {
 		if testing.Verbose() {
 			t.Logf("derived(1) = %s\n", hex.EncodeToString(pk1))
 			t.Logf("derived(2) = %s\n", hex.EncodeToString(pk2))
@@ -117,7 +118,7 @@ func TestDeriveH(t *testing.T) {
 	}
 
 	out := sha512.Sum512(pk1)
-	if bytes.Compare(out[:], QUERY) != 0 {
+	if !bytes.Equal(out[:], QUERY) {
 		if testing.Verbose() {
 			t.Log("query(expected) = " + hex.EncodeToString(QUERY))
 			t.Log("query(computed) = " + hex.EncodeToString(out[:]))
@@ -155,7 +156,7 @@ func TestHKDF_gnunet(t *testing.T) {
 	if testing.Verbose() {
 		t.Log("PRK(computed) = " + hex.EncodeToString(prk))
 	}
-	if bytes.Compare(prk, PRK) != 0 {
+	if !bytes.Equal(prk, PRK) {
 		t.Log("PRK(expected) = " + hex.EncodeToString(PRK))
 		t.Fatal("PRK mismatch")
 	}
@@ -166,7 +167,7 @@ func TestHKDF_gnunet(t *testing.T) {
 	if testing.Verbose() {
 		t.Log("OKM(computed) = " + hex.EncodeToString(okm))
 	}
-	if bytes.Compare(okm, OKM) != 0 {
+	if !bytes.Equal(okm, OKM) {
 		t.Log("OKM(expected) = " + hex.EncodeToString(OKM))
 		t.Fatal("OKM mismatch")
 	}
@@ -210,7 +211,7 @@ func TestHDKF(t *testing.T) {
 	if testing.Verbose() {
 		t.Log("PRK(computed) = " + hex.EncodeToString(prk))
 	}
-	if bytes.Compare(prk, PRK) != 0 {
+	if !bytes.Equal(prk, PRK) {
 		t.Log("PRK(expected) = " + hex.EncodeToString(PRK))
 		t.Fatal("PRK mismatch")
 	}
@@ -221,7 +222,7 @@ func TestHDKF(t *testing.T) {
 	if testing.Verbose() {
 		t.Log("OKM(computed) = " + hex.EncodeToString(okm))
 	}
-	if bytes.Compare(okm, OKM) != 0 {
+	if !bytes.Equal(okm, OKM) {
 		t.Log("OKM(expected) = " + hex.EncodeToString(OKM))
 		t.Fatal("OKM mismatch")
 	}
