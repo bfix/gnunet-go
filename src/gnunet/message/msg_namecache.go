@@ -68,25 +68,23 @@ func (m *NamecacheLookupMsg) Header() *Header {
 
 // NamecacheLookupResultMsg is the response message for namecache lookups.
 type NamecacheLookupResultMsg struct {
-	MsgSize    uint16            `order:"big"` // total size of message
-	MsgType    uint16            `order:"big"` // NAMECACHE_LOOKUP_BLOCK_RESPONSE (432)
-	ID         uint32            `order:"big"` // Request Id
-	Expire     util.AbsoluteTime // Expiration time
-	Signature  []byte            `size:"64"` // ECDSA signature
-	DerivedKey []byte            `size:"32"` // Derived public key
-	EncData    []byte            `size:"*"`  // Encrypted block data
+	MsgSize       uint16                `order:"big"` // total size of message
+	MsgType       uint16                `order:"big"` // NAMECACHE_LOOKUP_BLOCK_RESPONSE (432)
+	ID            uint32                `order:"big"` // Request Id
+	Expire        util.AbsoluteTime     ``            // Expiration time
+	DerivedKeySig *crypto.ZoneSignature ``            // Derived public key
+	EncData       []byte                `size:"*"`    // Encrypted block data
 }
 
 // NewNamecacheLookupResultMsg creates a new default message.
 func NewNamecacheLookupResultMsg() *NamecacheLookupResultMsg {
 	return &NamecacheLookupResultMsg{
-		MsgSize:    112,
-		MsgType:    NAMECACHE_LOOKUP_BLOCK_RESPONSE,
-		ID:         0,
-		Expire:     *new(util.AbsoluteTime),
-		Signature:  make([]byte, 64),
-		DerivedKey: make([]byte, 32),
-		EncData:    make([]byte, 0),
+		MsgSize:       112,
+		MsgType:       NAMECACHE_LOOKUP_BLOCK_RESPONSE,
+		ID:            0,
+		Expire:        *new(util.AbsoluteTime),
+		DerivedKeySig: nil,
+		EncData:       nil,
 	}
 }
 
@@ -107,30 +105,27 @@ func (m *NamecacheLookupResultMsg) Header() *Header {
 
 // NamecacheCacheMsg is the request message to put a name into the local cache.
 type NamecacheCacheMsg struct {
-	MsgSize    uint16            `order:"big"` // total size of message
-	MsgType    uint16            `order:"big"` // NAMECACHE_CACHE_BLOCK (433)
-	ID         uint32            `order:"big"` // Request Id
-	Expire     util.AbsoluteTime // Expiration time
-	Signature  []byte            `size:"64"` // ECDSA signature
-	DerivedKey []byte            `size:"32"` // Derived public key
-	EncData    []byte            `size:"*"`  // Encrypted block data
+	MsgSize       uint16                `order:"big"` // total size of message
+	MsgType       uint16                `order:"big"` // NAMECACHE_CACHE_BLOCK (433)
+	ID            uint32                `order:"big"` // Request Id
+	Expire        util.AbsoluteTime     ``            // Expiration time
+	DerivedKeySig *crypto.ZoneSignature ``            // Derived public key and signature
+	EncData       []byte                `size:"*"`    // Encrypted block data
 }
 
 // NewNamecacheCacheMsg creates a new default message.
 func NewNamecacheCacheMsg(block *Block) *NamecacheCacheMsg {
 	msg := &NamecacheCacheMsg{
-		MsgSize:    108,
-		MsgType:    NAMECACHE_BLOCK_CACHE,
-		ID:         0,
-		Expire:     *new(util.AbsoluteTime),
-		Signature:  make([]byte, 64),
-		DerivedKey: make([]byte, 32),
-		EncData:    make([]byte, 0),
+		MsgSize:       108,
+		MsgType:       NAMECACHE_BLOCK_CACHE,
+		ID:            0,
+		Expire:        *new(util.AbsoluteTime),
+		DerivedKeySig: nil,
+		EncData:       make([]byte, 0),
 	}
 	if block != nil {
+		msg.DerivedKeySig = block.DerivedKeySig
 		msg.Expire = block.Block.Expire
-		copy(msg.Signature, block.Signature)
-		copy(msg.DerivedKey, block.DerivedKey)
 		size := len(block.Block.EncData)
 		msg.EncData = make([]byte, size)
 		copy(msg.EncData, block.Block.EncData)

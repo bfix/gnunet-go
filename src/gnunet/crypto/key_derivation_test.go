@@ -82,7 +82,8 @@ func TestDeriveH(t *testing.T) {
 	}
 
 	hBuf := make([]byte, 32)
-	hFull := DeriveH(pub, LABEL, CONTEXT)
+	zk := NewZoneKey(ZONE_PKEY, pub)
+	hFull := DeriveH(zk, LABEL, CONTEXT)
 	h := hFull.Mod(ED25519_N)
 	util.CopyBlock(hBuf, h.Bytes())
 	if !bytes.Equal(hBuf, H) {
@@ -94,7 +95,7 @@ func TestDeriveH(t *testing.T) {
 	}
 
 	dpub := pub.Mult(h)
-	dpub2 := DerivePublicKey(pub, LABEL, CONTEXT)
+	dpub2 := DerivePublicKey(zk, LABEL, CONTEXT).Key().(*ed25519.PublicKey)
 	if !dpub.Q.Equals(dpub2.Q) {
 		t.Fatal("Q mismatch")
 	}
@@ -108,7 +109,7 @@ func TestDeriveH(t *testing.T) {
 		t.Fatal("x-coordinate mismatch")
 	}
 	pk1 := dpub.Bytes()
-	pk2 := DerivePublicKey(pub, LABEL, CONTEXT).Bytes()
+	pk2 := DerivePublicKey(zk, LABEL, CONTEXT).Bytes()
 	if !bytes.Equal(pk1, pk2) {
 		if testing.Verbose() {
 			t.Logf("derived(1) = %s\n", hex.EncodeToString(pk1))

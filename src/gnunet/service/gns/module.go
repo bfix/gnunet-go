@@ -41,8 +41,8 @@ import (
 
 // Error codes
 var (
-	ErrUnknownTLD           = fmt.Errorf("Unknown TLD in name")
-	ErrGNSRecursionExceeded = fmt.Errorf("GNS recursion depth exceeded")
+	ErrUnknownTLD           = fmt.Errorf("unknown TLD in name")
+	ErrGNSRecursionExceeded = fmt.Errorf("recursion depth exceeded")
 )
 
 //----------------------------------------------------------------------
@@ -52,20 +52,20 @@ var (
 // Query specifies the context for a basic GNS name lookup of an (atomic)
 // label in a given zone identified by its public key.
 type Query struct {
-	Zone    *ed25519.PublicKey // Public zone key
-	Label   string             // Atomic label
-	Derived *ed25519.PublicKey // Derived key from (pkey,label)
-	Key     *crypto.HashCode   // Key for repository queries (local/remote)
+	Zone    *crypto.ZoneKey  // Public zone key
+	Label   string           // Atomic label
+	Derived *crypto.ZoneKey  // Derived key from (pkey,label)
+	Key     *crypto.HashCode // Key for repository queries (local/remote)
 }
 
 // NewQuery assembles a new Query object for the given zone and label.
-func NewQuery(pkey *ed25519.PublicKey, label string) *Query {
+func NewQuery(zkey *crypto.ZoneKey, label string) *Query {
 	// derive a public key from (pkey,label) and set the repository
 	// key as the SHA512 hash of the binary key representation.
-	pd := crypto.DerivePublicKey(pkey, label, "gns")
+	pd := crypto.DerivePublicKey(zkey, label, "gns")
 	key := crypto.Hash(pd.Bytes())
 	return &Query{
-		Zone:    pkey,
+		Zone:    zkey,
 		Label:   label,
 		Derived: pd,
 		Key:     key,
@@ -116,7 +116,7 @@ type Module struct {
 	LookupLocal      func(ctx *service.SessionContext, query *Query) (*message.Block, error)
 	StoreLocal       func(ctx *service.SessionContext, block *message.Block) error
 	LookupRemote     func(ctx *service.SessionContext, query *Query) (*message.Block, error)
-	RevocationQuery  func(ctx *service.SessionContext, pkey *ed25519.PublicKey) (valid bool, err error)
+	RevocationQuery  func(ctx *service.SessionContext, zkey *crypto.ZoneKey) (valid bool, err error)
 	RevocationRevoke func(ctx *service.SessionContext, rd *revocation.RevData) (success bool, err error)
 }
 
@@ -132,7 +132,7 @@ func (m *Module) RPC() (string, func(http.ResponseWriter, *http.Request)) {
 func (m *Module) Resolve(
 	ctx *service.SessionContext,
 	path string,
-	pkey *ed25519.PublicKey,
+	zkey *crypto.ZoneKey,
 	kind RRTypeList,
 	mode int,
 	depth int) (set *message.RecordSet, err error) {
@@ -146,9 +146,9 @@ func (m *Module) Resolve(
 	logger.Printf(logger.DBG, "[gns] Resolver called for %v\n", names)
 
 	// check for relative path
-	if pkey != nil {
+	if zkey != nil {
 		//resolve relative path
-		return m.ResolveRelative(ctx, names, pkey, kind, mode, depth)
+		return m.ResolveRelative(ctx, names, zkey, kind, mode, depth)
 	}
 	// resolve absolute path
 	return m.ResolveAbsolute(ctx, names, kind, mode, depth)
@@ -164,8 +164,8 @@ func (m *Module) ResolveAbsolute(
 	depth int) (set *message.RecordSet, err error) {
 
 	// get the zone key for the TLD
-	pkey := m.GetZoneKey(labels[0])
-	if pkey == nil {
+	zkey := m.GetZoneKey(labels[0])
+	if zkey == nil {
 		// we can't resolve this TLD
 		err = ErrUnknownTLD
 		return
@@ -173,11 +173,11 @@ func (m *Module) ResolveAbsolute(
 	// check if zone key has been revoked
 	var valid bool
 	set = message.NewRecordSet()
-	if valid, err = m.RevocationQuery(ctx, pkey); err != nil || !valid {
+	if valid, err = m.RevocationQuery(ctx, zkey); err != nil || !valid {
 		return
 	}
 	// continue with resolution relative to a zone.
-	return m.ResolveRelative(ctx, labels[1:], pkey, kind, mode, depth)
+	return m.ResolveRelative(ctx, labels[1:], zkey, kind, mode, depth)
 }
 
 // ResolveRelative resolves a relative path (to a given zone) recursively by
@@ -186,7 +186,7 @@ func (m *Module) ResolveAbsolute(
 func (m *Module) ResolveRelative(
 	ctx *service.SessionContext,
 	labels []string,
-	pkey *ed25519.PublicKey,
+	zkey *crypto.ZoneKey,
 	kind RRTypeList,
 	mode int,
 	depth int) (set *message.RecordSet, err error) {
@@ -197,11 +197,11 @@ func (m *Module) ResolveRelative(
 		hdlrs   *BlockHandlerList         // list of block handlers in final step
 	)
 	for ; len(labels) > 0; labels = labels[1:] {
-		logger.Printf(logger.DBG, "[gns] ResolveRelative '%s' in '%s'\n", labels[0], util.EncodeBinaryToString(pkey.Bytes()))
+		logger.Printf(logger.DBG, "[gns] ResolveRelative '%s' in '%s'\n", labels[0], util.EncodeBinaryToString(zkey.Bytes()))
 
 		// resolve next level
 		var block *message.Block
-		if block, err = m.Lookup(ctx, pkey, labels[0], mode); err != nil {
+		if block, err = m.Lookup(ctx, zkey, labels[0], mode); err != nil {
 			// failed to resolve name
 			return
 		}
@@ -244,12 +244,12 @@ func (m *Module) ResolveRelative(
 			// if labels are pending, set new zone and continue resolution;
 			// otherwise resolve "@" label for the zone if no PKEY record
 			// was requested.
-			pkey = inst.pkey
+			zkey = crypto.NewZoneKey(crypto.ZONE_PKEY, inst.pkey)
 			if len(labels) == 1 && !kind.HasType(enums.GNS_TYPE_PKEY) {
 				labels = append(labels, "@")
 			}
 			// check if zone key has been revoked
-			if valid, err := m.RevocationQuery(ctx, pkey); err != nil || !valid {
+			if valid, err := m.RevocationQuery(ctx, zkey); err != nil || !valid {
 				// revoked key -> no results!
 				records = make([]*message.ResourceRecord, 0)
 				break
@@ -270,7 +270,7 @@ func (m *Module) ResolveRelative(
 				lbls += "."
 			}
 			fqdn := lbls + inst.Query
-			if set, err = m.ResolveDNS(ctx, fqdn, inst.Servers, kind, pkey, depth); err != nil {
+			if set, err = m.ResolveDNS(ctx, fqdn, inst.Servers, kind, zkey, depth); err != nil {
 				logger.Println(logger.ERROR, "[gns] GNS2DNS resolution failed.")
 				return
 			}
@@ -308,7 +308,7 @@ func (m *Module) ResolveRelative(
 				break
 			}
 			logger.Println(logger.DBG, "[gns] CNAME resolution required.")
-			if set, err = m.ResolveUnknown(ctx, inst.name, labels, pkey, kind, depth+1); err != nil {
+			if set, err = m.ResolveUnknown(ctx, inst.name, labels, zkey, kind, depth+1); err != nil {
 				logger.Println(logger.ERROR, "[gns] CNAME resolution failed.")
 				return
 			}
@@ -362,7 +362,7 @@ func (m *Module) ResolveUnknown(
 	ctx *service.SessionContext,
 	name string,
 	labels []string,
-	pkey *ed25519.PublicKey,
+	zkey *crypto.ZoneKey,
 	kind RRTypeList,
 	depth int) (set *message.RecordSet, err error) {
 
@@ -373,7 +373,7 @@ func (m *Module) ResolveUnknown(
 		for _, label := range util.ReverseStringList(labels) {
 			name += "." + label
 		}
-		if set, err = m.Resolve(ctx, name, pkey, kind, enums.GNS_LO_DEFAULT, depth+1); err != nil {
+		if set, err = m.Resolve(ctx, name, zkey, kind, enums.GNS_LO_DEFAULT, depth+1); err != nil {
 			return
 		}
 	} else {
@@ -394,12 +394,12 @@ func (m *Module) ResolveUnknown(
 }
 
 // GetZoneKey returns the PKEY (or nil) from an absolute GNS path.
-func (m *Module) GetZoneKey(path string) *ed25519.PublicKey {
+func (m *Module) GetZoneKey(path string) *crypto.ZoneKey {
 	labels := util.ReverseStringList(strings.Split(path, "."))
 	if len(labels[0]) == 52 {
 		if data, err := util.DecodeStringToBinary(labels[0], 32); err == nil {
 			if pkey := ed25519.NewPublicKeyFromBytes(data); pkey != nil {
-				return pkey
+				return crypto.NewZoneKey(crypto.ZONE_PKEY, pkey)
 			}
 		}
 	}
@@ -409,12 +409,12 @@ func (m *Module) GetZoneKey(path string) *ed25519.PublicKey {
 // Lookup name in GNS.
 func (m *Module) Lookup(
 	ctx *service.SessionContext,
-	pkey *ed25519.PublicKey,
+	zkey *crypto.ZoneKey,
 	label string,
 	mode int) (block *message.Block, err error) {
 
 	// create query (lookup key)
-	query := NewQuery(pkey, label)
+	query := NewQuery(zkey, label)
 
 	// try local lookup first
 	if block, err = m.LookupLocal(ctx, query); err != nil {

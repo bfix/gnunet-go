@@ -127,7 +127,8 @@ func TestRecordset(t *testing.T) {
 		t.Logf("RDATA = %s\n", hex.EncodeToString(RDATA))
 		t.Fatal("RDATA mismatch")
 	}
-	bdata, err := crypto.EncryptBlock(rdata, pub, LABEL)
+	zk := crypto.NewZoneKey(crypto.ZONE_PKEY, pub)
+	bdata, err := crypto.CipherData(rdata, zk, LABEL)
 	if err != nil {
 		t.Fatal(err)
 	}

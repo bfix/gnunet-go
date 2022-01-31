@@ -87,7 +87,7 @@ func TestRevocationRFC(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if bytes.Compare(skey.Public().Bytes(), pkeyD) != 0 {
+		if !bytes.Equal(skey.Public().Bytes(), pkeyD) {
 			t.Fatal("Private/Public key mismatch")
 		}
 
@@ -100,7 +100,7 @@ func TestRevocationRFC(t *testing.T) {
 		if err = data.Unmarshal(revData, revD); err != nil {
 			t.Fatal(err)
 		}
-		if bytes.Compare(revData.ZoneKey, pkeyD) != 0 {
+		if !bytes.Equal(revData.ZoneKeySig.KeyData, pkeyD) {
 			t.Fatal("Wrong zone key in test revocation")
 		}
 
@@ -110,7 +110,7 @@ func TestRevocationRFC(t *testing.T) {
 			fmt.Printf("    Timestamp: %s\n", revData.Timestamp.String())
 			fmt.Printf("    TTL: %s\n", revData.TTL.String())
 
-			work := NewPoWData(0, revData.Timestamp, revData.ZoneKey)
+			work := NewPoWData(0, revData.Timestamp, &revData.ZoneKeySig.ZoneKey)
 			for i, pow := range revData.PoWs {
 				fmt.Printf("    PoW #%d: %d\n", i, pow)
 				work.SetPoW(pow)
@@ -121,8 +121,8 @@ func TestRevocationRFC(t *testing.T) {
 				num := 512 - v.BitLen()
 				fmt.Printf("        --> %d leading zeros\n", num)
 			}
-			fmt.Printf("    Signature: %s\n", hex.EncodeToString(revData.Signature))
-			fmt.Printf("    ZoneKey: %s\n", hex.EncodeToString(revData.ZoneKey))
+			fmt.Printf("    Signature: %s\n", hex.EncodeToString(revData.ZoneKeySig.Signature))
+			fmt.Printf("    ZoneKey: %s\n", hex.EncodeToString(revData.ZoneKeySig.KeyData))
 		}
 
 		// verify revocation data object

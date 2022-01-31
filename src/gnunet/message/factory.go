@@ -91,7 +91,7 @@ func NewEmptyMessage(msgType uint16) (Message, error) {
 	case REVOCATION_QUERY_RESPONSE:
 		return NewRevocationQueryResponseMsg(true), nil
 	case REVOCATION_REVOKE:
-		return NewRevocationRevokeMsg(nil, nil), nil
+		return NewRevocationRevokeMsg(nil), nil
 	case REVOCATION_REVOKE_RESPONSE:
 		return NewRevocationRevokeResponseMsg(false), nil
 	}

@@ -43,43 +43,25 @@ func TestDeriveBlockKey(t *testing.T) {
 			0x3d, 0x14, 0xf4, 0x9b, 0x09, 0x6c, 0x52, 0xb6,
 			0xb3, 0xf5, 0x06, 0x68, 0x98, 0x26, 0xa5, 0xea,
 			0x06, 0x93, 0xfd, 0x4d, 0x80, 0xab, 0xf0, 0x44,
-
-			0xa7, 0x6c, 0xc7, 0x81, 0x07, 0x3b, 0x94, 0x49,
-			0x91, 0x8e, 0xe0, 0x4c, 0x3a, 0x07, 0x56, 0x22,
-			0xe6, 0x95, 0xc3, 0xc7, 0x31, 0xc0, 0xfe, 0x62,
-			0xc3, 0x07, 0xe5, 0x9f, 0x96, 0xa2, 0xd0, 0x48,
 		}
 		IV = []byte{
 			0x04, 0x41, 0xfc, 0xfc, 0x96, 0x5f, 0x2e, 0xa7,
 			0x35, 0xea, 0x59, 0xd8, 0x16, 0xd2, 0xfb, 0xc8,
-
-			0x6e, 0xdc, 0xb3, 0xdf, 0x0c, 0x28, 0xbb, 0x14,
-			0xc4, 0x51, 0x1c, 0x89, 0x9f, 0xb6, 0xdd, 0xfc,
 		}
 	)
 
-	iv, skey := DeriveBlockKey(LABEL, ed25519.NewPublicKeyFromBytes(PUB))
+	zkey := NewZoneKey(ZONE_PKEY, ed25519.NewPublicKeyFromBytes(PUB))
+	skey := DeriveKey(LABEL, zkey)
 
-	if !bytes.Equal(IV[:16], iv.AESIv) {
-		t.Logf("AES_IV(computed) = %s\n", hex.EncodeToString(iv.AESIv))
-		t.Logf("AES_IV(expected) = %s\n", hex.EncodeToString(IV[:16]))
+	if !bytes.Equal(IV, skey[32:]) {
+		t.Logf("AES_IV(computed) = %s\n", hex.EncodeToString(skey[32:]))
+		t.Logf("AES_IV(expected) = %s\n", hex.EncodeToString(IV))
 		t.Fatal("AES IV mismatch")
 	}
-	if !bytes.Equal(IV[16:], iv.TwofishIv) {
-		t.Logf("Twofish_IV(computed) = %s\n", hex.EncodeToString(iv.TwofishIv))
-		t.Logf("Twofish_IV(expected) = %s\n", hex.EncodeToString(IV[16:]))
-		t.Fatal("Twofish IV mismatch")
-	}
-
-	if !bytes.Equal(SKEY[:32], skey.AESKey) {
-		t.Logf("AES_KEY(computed) = %s\n", hex.EncodeToString(skey.AESKey))
-		t.Logf("AES_KEY(expected) = %s\n", hex.EncodeToString(SKEY[:32]))
+	if !bytes.Equal(SKEY, skey[:32]) {
+		t.Logf("AES_KEY(computed) = %s\n", hex.EncodeToString(skey[:32]))
+		t.Logf("AES_KEY(expected) = %s\n", hex.EncodeToString(SKEY))
 		t.Fatal("AES KEY mismatch")
-	}
-	if !bytes.Equal(SKEY[32:], skey.TwofishKey) {
-		t.Logf("Twofish_KEY(computed) = %s\n", hex.EncodeToString(skey.TwofishKey))
-		t.Logf("Twofish_KEY(expected) = %s\n", hex.EncodeToString(SKEY[32:]))
-		t.Fatal("Twofish KEY mismatch")
 	}
 }
 
@@ -109,7 +91,8 @@ func TestDecryptBlock(t *testing.T) {
 		}
 	)
 
-	out, err := DecryptBlock(DATA, ed25519.NewPublicKeyFromBytes(PUB), LABEL)
+	zkey := NewZoneKey(ZONE_PKEY, ed25519.NewPublicKeyFromBytes(PUB))
+	out, err := CipherData(DATA, zkey, LABEL)
 	if err != nil {
 		t.Fatal(err)
 	}

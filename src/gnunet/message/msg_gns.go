@@ -25,7 +25,6 @@ import (
 	"gnunet/enums"
 	"gnunet/util"
 
-	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
 )
@@ -41,14 +40,14 @@ var (
 
 // LookupMsg is a request message for a GNS name lookup
 type LookupMsg struct {
-	MsgSize  uint16 `order:"big"` // total size of message
-	MsgType  uint16 `order:"big"` // GNS_LOOKUP (500)
-	ID       uint32 `order:"big"` // Unique identifier for this request (for key collisions).
-	Zone     []byte `size:"32"`   // Zone that is to be used for lookup
-	Options  uint16 `order:"big"` // Local options for where to look for results
-	Reserved uint16 `order:"big"` // Always 0
-	Type     uint32 `order:"big"` // the type of record to look up
-	Name     []byte `size:"*"`    // zero-terminated name to look up
+	MsgSize  uint16          `order:"big"` // total size of message
+	MsgType  uint16          `order:"big"` // GNS_LOOKUP (500)
+	ID       uint32          `order:"big"` // Unique identifier for this request (for key collisions).
+	Zone     *crypto.ZoneKey ``            // Zone that is to be used for lookup
+	Options  uint16          `order:"big"` // Local options for where to look for results
+	Reserved uint16          `order:"big"` // Always 0
+	Type     uint32          `order:"big"` // the type of record to look up
+	Name     []byte          `size:"*"`    // zero-terminated name to look up
 }
 
 // NewGNSLookupMsg creates a new default message.
@@ -57,7 +56,7 @@ func NewGNSLookupMsg() *LookupMsg {
 		MsgSize:  48, // record size with no name
 		MsgType:  GNS_LOOKUP,
 		ID:       0,
-		Zone:     make([]byte, 32),
+		Zone:     nil,
 		Options:  uint16(enums.GNS_LO_DEFAULT),
 		Reserved: 0,
 		Type:     uint32(enums.GNS_TYPE_ANY),
@@ -86,8 +85,7 @@ func (m *LookupMsg) GetName() string {
 func (m *LookupMsg) String() string {
 	return fmt.Sprintf(
 		"GNSLookupMsg{Id=%d,Zone=%s,Options=%d,Type=%d,Name=%s}",
-		m.ID, util.EncodeBinaryToString(m.Zone),
-		m.Options, m.Type, m.GetName())
+		m.ID, m.Zone.ID(), m.Options, m.Type, m.GetName())
 }
 
 // Header returns the message header in a separate instance.
@@ -139,8 +137,8 @@ func (rs *RecordSet) SetPadding() {
 // SignedBlockData represents the signed and encrypted list of resource
 // records stored in a GNSRecordSet
 type SignedBlockData struct {
-	Purpose *crypto.SignaturePurpose // Size and purpose of signature (8 bytes)
-	Expire  util.AbsoluteTime        // Expiration time of the block.
+	Purpose *crypto.SignaturePurpose ``         // Size and purpose of signature (8 bytes)
+	Expire  util.AbsoluteTime        ``         // Expiration time of the block.
 	EncData []byte                   `size:"*"` // encrypted GNSRecordSet
 
 	// transient data (not serialized)
@@ -151,9 +149,8 @@ type SignedBlockData struct {
 // An encrypted and signed container for GNS resource records that represents
 // the "atomic" data structure associated with a GNS label in a given zone.
 type Block struct {
-	Signature  []byte `size:"64"` // Signature of the block.
-	DerivedKey []byte `size:"32"` // Derived key used for signing
-	Block      *SignedBlockData
+	DerivedKeySig *crypto.ZoneSignature // Derived key used for signing
+	Block         *SignedBlockData
 
 	// transient data (not serialized)
 	checked   bool // block integrity checked
@@ -182,39 +179,29 @@ func (b *Block) Records() ([]*ResourceRecord, error) {
 }
 
 // Verify the integrity of the block data from a signature.
-func (b *Block) Verify(zoneKey *ed25519.PublicKey, label string) (err error) {
+func (b *Block) Verify(zkey *crypto.ZoneKey, label string) (err error) {
 	// Integrity check performed
 	b.checked = true
 
 	// verify derived key
-	dkey := ed25519.NewPublicKeyFromBytes(b.DerivedKey)
-	dkey2 := crypto.DerivePublicKey(zoneKey, label, "gns")
-	if !dkey.Q.Equals(dkey2.Q) {
+	dkey := b.DerivedKeySig.ZoneKey
+	dkey2 := crypto.DerivePublicKey(zkey, label, "gns")
+	if !dkey.Equal(dkey2) {
 		return fmt.Errorf("invalid signature key for GNS Block")
 	}
 	// verify signature
-	var (
-		sig *ed25519.EcSignature
-		buf []byte
-		ok  bool
-	)
-	if sig, err = ed25519.NewEcSignatureFromBytes(b.Signature); err != nil {
-		return
-	}
+	var buf []byte
 	if buf, err = data.Marshal(b.Block); err != nil {
 		return
 	}
-	if ok, err = dkey.EcVerify(buf, sig); err == nil && !ok {
-		err = fmt.Errorf("signature verification failed for GNS block")
-	}
-	b.verified = true
+	b.verified, err = b.DerivedKeySig.Verify(buf)
 	return
 }
 
-// Decrypt block data with a key/iv combination derived from (PKEY,label)
-func (b *Block) Decrypt(zoneKey *ed25519.PublicKey, label string) (err error) {
+// Decrypt block data with a key derived from zone key and label.
+func (b *Block) Decrypt(zkey *crypto.ZoneKey, label string) (err error) {
 	// decrypt payload
-	b.Block.data, err = crypto.DecryptBlock(b.Block.EncData, zoneKey, label)
+	b.Block.data, err = crypto.CipherData(b.Block.EncData, zkey, label)
 	b.decrypted = true
 	return
 }
@@ -222,8 +209,7 @@ func (b *Block) Decrypt(zoneKey *ed25519.PublicKey, label string) (err error) {
 // NewBlock instantiates an empty GNS block
 func NewBlock() *Block {
 	return &Block{
-		Signature:  make([]byte, 64),
-		DerivedKey: make([]byte, 32),
+		DerivedKeySig: nil,
 		Block: &SignedBlockData{
 			Purpose: new(crypto.SignaturePurpose),
 			Expire:  *new(util.AbsoluteTime),

@@ -27,24 +27,29 @@ import (
 	"golang.org/x/crypto/hkdf"
 )
 
-// Curve parameters
-var (
-	ED25519_N = ed25519.GetCurve().N
-)
-
 // DeriveH derives an integer 'h' from the arguments.
-func DeriveH(pub *ed25519.PublicKey, label, context string) *math.Int {
-	prk := hkdf.Extract(sha512.New, pub.Bytes(), []byte("key-derivation"))
+func DeriveH(zkey *ZoneKey, label, context string) *math.Int {
+	prk := hkdf.Extract(sha512.New, zkey.KeyData, []byte("key-derivation"))
 	data := append([]byte(label), []byte(context)...)
 	rdr := hkdf.Expand(sha256.New, prk, data)
 	b := make([]byte, 64)
 	rdr.Read(b)
-	return math.NewIntFromBytes(b).Mod(ED25519_N)
+	h := math.NewIntFromBytes(b)
+	switch zkey.Type {
+	case ZONE_PKEY, ZONE_EDKEY:
+		return h.Mod(ed25519.GetCurve().N)
+	}
+	return nil
 }
 
 // DerivePublicKey "shifts" a public key 'Q' to a new point 'P' where
 // P = h*Q with 'h' being a factor derived from the arguments.
-func DerivePublicKey(pub *ed25519.PublicKey, label string, context string) *ed25519.PublicKey {
-	h := DeriveH(pub, label, context)
-	return pub.Mult(h)
+func DerivePublicKey(zkey *ZoneKey, label string, context string) *ZoneKey {
+	h := DeriveH(zkey, label, context)
+	switch zkey.Type {
+	case ZONE_PKEY, ZONE_EDKEY:
+		k := zkey.Key().(*ed25519.PublicKey)
+		return NewZoneKey(zkey.Type, k.Mult(h))
+	}
+	return nil
 }

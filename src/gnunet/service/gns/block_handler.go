@@ -35,13 +35,13 @@ type HdlrInst func(*message.ResourceRecord, []string) (BlockHandler, error)
 
 // Error codes
 var (
-	ErrInvalidRecordType = fmt.Errorf("Invalid resource record type")
-	ErrInvalidRecordBody = fmt.Errorf("Invalid resource record body")
-	ErrInvalidPKEY       = fmt.Errorf("Invalid PKEY resource record")
-	ErrInvalidCNAME      = fmt.Errorf("Invalid CNAME resource record")
-	ErrInvalidVPN        = fmt.Errorf("Invalid VPN resource record")
-	ErrInvalidRecordMix  = fmt.Errorf("Invalid mix of RR types in block")
-	ErrBlockHandler      = fmt.Errorf("Internal block handler failure")
+	ErrInvalidRecordType = fmt.Errorf("invalid resource record type")
+	ErrInvalidRecordBody = fmt.Errorf("invalid resource record body")
+	ErrInvalidPKEY       = fmt.Errorf("invalid PKEY resource record")
+	ErrInvalidCNAME      = fmt.Errorf("invalid CNAME resource record")
+	ErrInvalidVPN        = fmt.Errorf("invalid VPN resource record")
+	ErrInvalidRecordMix  = fmt.Errorf("invalid mix of RR types in block")
+	ErrBlockHandler      = fmt.Errorf("internal block handler failure")
 )
 
 // Mapping of RR types to BlockHandler instanciation functions

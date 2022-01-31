@@ -20,11 +20,11 @@ package revocation
 
 import (
 	"gnunet/config"
+	"gnunet/crypto"
 	"gnunet/service"
 	"gnunet/util"
 	"net/http"
 
-	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
 )
@@ -81,9 +81,9 @@ func (m *Module) RPC() (string, func(http.ResponseWriter, *http.Request)) {
 
 // Query return true if the pkey is valid (not revoked) and false
 // if the pkey has been revoked.
-func (m *Module) Query(ctx *service.SessionContext, pkey *ed25519.PublicKey) (valid bool, err error) {
+func (m *Module) Query(ctx *service.SessionContext, zkey *crypto.ZoneKey) (valid bool, err error) {
 	// fast check first: is the key in the bloomfilter?
-	data := pkey.Bytes()
+	data := zkey.Bytes()
 	if !m.bloomf.Contains(data) {
 		// no: it is valid (not revoked)
 		return true, nil
@@ -119,14 +119,13 @@ func (m *Module) Revoke(ctx *service.SessionContext, rd *RevData) (success bool,
 	}
 	// store the revocation data
 	// (1) add it to the bloomfilter
-	m.bloomf.Add(rd.ZoneKey)
+	m.bloomf.Add(rd.ZoneKeySig.KeyData)
 	// (2) add it to the store
 	var buf []byte
-	key := util.EncodeBinaryToString(rd.ZoneKey)
 	if buf, err = data.Marshal(rd); err != nil {
 		return false, err
 	}
 	value := util.EncodeBinaryToString(buf)
-	err = m.kvs.Put(key, value)
+	err = m.kvs.Put(rd.ZoneKeySig.ID(), value)
 	return true, err
 }

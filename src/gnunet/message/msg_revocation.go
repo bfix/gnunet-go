@@ -21,9 +21,8 @@ package message
 import (
 	"fmt"
 
+	"gnunet/crypto"
 	"gnunet/util"
-
-	"github.com/bfix/gospel/crypto/ed25519"
 )
 
 //----------------------------------------------------------------------
@@ -32,29 +31,25 @@ import (
 
 // RevocationQueryMsg is a request message to check if a key is revoked
 type RevocationQueryMsg struct {
-	MsgSize  uint16 `order:"big"` // total size of message
-	MsgType  uint16 `order:"big"` // REVOCATION_QUERY (636)
-	Reserved uint32 `order:"big"` // Reserved for future use
-	Zone     []byte `size:"32"`   // Zone that is to be checked for revocation
+	MsgSize  uint16          `order:"big"` // total size of message
+	MsgType  uint16          `order:"big"` // REVOCATION_QUERY (636)
+	Reserved uint32          `order:"big"` // Reserved for future use
+	Zone     *crypto.ZoneKey // Zone that is to be checked for revocation
 }
 
 // NewRevocationQueryMsg creates a new message for a given zone.
-func NewRevocationQueryMsg(zone *ed25519.PublicKey) *RevocationQueryMsg {
-	msg := &RevocationQueryMsg{
+func NewRevocationQueryMsg(zkey *crypto.ZoneKey) *RevocationQueryMsg {
+	return &RevocationQueryMsg{
 		MsgSize:  40,
 		MsgType:  REVOCATION_QUERY,
 		Reserved: 0,
-		Zone:     make([]byte, 32),
+		Zone:     zkey,
 	}
-	if zone != nil {
-		copy(msg.Zone, zone.Bytes())
-	}
-	return msg
 }
 
 // String returns a human-readable representation of the message.
 func (m *RevocationQueryMsg) String() string {
-	return fmt.Sprintf("RevocationQueryMsg{zone=%s}", util.EncodeBinaryToString(m.Zone))
+	return fmt.Sprintf("RevocationQueryMsg{zone=%s}", m.Zone.ID())
 }
 
 // Header returns the message header in a separate instance.
@@ -102,38 +97,29 @@ func (m *RevocationQueryResponseMsg) Header() *Header {
 
 // RevocationRevokeMsg is a request to revoke a given key with PoW data
 type RevocationRevokeMsg struct {
-	MsgSize   uint16            `order:"big"` // total size of message
-	MsgType   uint16            `order:"big"` // REVOCATION_REVOKE (638)
-	Timestamp util.AbsoluteTime // Timestamp of revocation creation
-	TTL       util.RelativeTime // TTL of revocation
-	PoWs      []uint64          `size:"32" order:"big"` // (Sorted) list of PoW values
-	Signature []byte            `size:"64"`             // Signature (Proof-of-ownership).
-	ZoneKey   []byte            `size:"32"`             // public zone key to be revoked
+	MsgSize    uint16                `order:"big"`           // total size of message
+	MsgType    uint16                `order:"big"`           // REVOCATION_REVOKE (638)
+	Timestamp  util.AbsoluteTime     ``                      // Timestamp of revocation creation
+	TTL        util.RelativeTime     ``                      // TTL of revocation
+	PoWs       []uint64              `size:"32" order:"big"` // (Sorted) list of PoW values
+	ZoneKeySig *crypto.ZoneSignature ``                      // public zone key (with signature) to be revoked
 }
 
 // NewRevocationRevokeMsg creates a new message for a given zone.
-func NewRevocationRevokeMsg(zoneKey *ed25519.PublicKey, sig *ed25519.EcSignature) *RevocationRevokeMsg {
-	msg := &RevocationRevokeMsg{
-		MsgSize:   364,
-		MsgType:   REVOCATION_REVOKE,
-		Timestamp: util.AbsoluteTimeNow(),
-		TTL:       util.RelativeTime{},
-		PoWs:      make([]uint64, 32),
-		Signature: make([]byte, 64),
-		ZoneKey:   make([]byte, 32),
+func NewRevocationRevokeMsg(zsig *crypto.ZoneSignature) *RevocationRevokeMsg {
+	return &RevocationRevokeMsg{
+		MsgSize:    364,
+		MsgType:    REVOCATION_REVOKE,
+		Timestamp:  util.AbsoluteTimeNow(),
+		TTL:        util.RelativeTime{},
+		PoWs:       make([]uint64, 32),
+		ZoneKeySig: zsig,
 	}
-	if zoneKey != nil {
-		copy(msg.ZoneKey, zoneKey.Bytes())
-	}
-	if sig != nil {
-		copy(msg.Signature, sig.Bytes())
-	}
-	return msg
 }
 
 // String returns a human-readable representation of the message.
 func (m *RevocationRevokeMsg) String() string {
-	return fmt.Sprintf("RevocationRevokeMsg{zone=%s}", util.EncodeBinaryToString(m.ZoneKey))
+	return fmt.Sprintf("RevocationRevokeMsg{zone=%s}", m.ZoneKeySig.ID())
 }
 
 // Header returns the message header in a separate instance.

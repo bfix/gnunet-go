@@ -24,21 +24,21 @@ import (
 	"strings"
 	"time"
 
+	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service"
 	"gnunet/util"
 
-	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/logger"
 	"github.com/miekg/dns"
 )
 
 // Error codes
 var (
-	ErrDNSTimedOut  = fmt.Errorf("DNS query timed out")
-	ErrNoDNSQueries = fmt.Errorf("No valid DNS queries")
-	ErrNoDNSResults = fmt.Errorf("No valid DNS results")
+	ErrDNSTimedOut  = fmt.Errorf("query timed out (DNS)")
+	ErrNoDNSQueries = fmt.Errorf("no valid DNS queries")
+	ErrNoDNSResults = fmt.Errorf("no valid DNS results")
 )
 
 //----------------------------------------------------------------------
@@ -209,7 +209,7 @@ func (gns *Module) ResolveDNS(
 	name string,
 	servers []string,
 	kind RRTypeList,
-	pkey *ed25519.PublicKey,
+	zkey *crypto.ZoneKey,
 	depth int) (set *message.RecordSet, err error) {
 
 	// start DNS queries concurrently
@@ -223,7 +223,7 @@ func (gns *Module) ResolveDNS(
 		if addr == nil {
 			// no, it is a name... try to resolve an IP address from the name
 			query := NewRRTypeList(enums.GNS_TYPE_DNS_A, enums.GNS_TYPE_DNS_AAAA)
-			if set, err = gns.ResolveUnknown(ctx, srv, nil, pkey, query, depth+1); err != nil {
+			if set, err = gns.ResolveUnknown(ctx, srv, nil, zkey, query, depth+1); err != nil {
 				logger.Printf(logger.ERROR, "[dns] Can't resolve NS server '%s': %s\n", srv, err.Error())
 				continue
 			}
@@ -256,7 +256,7 @@ func (gns *Module) ResolveDNS(
 		return nil, ErrNoDNSQueries
 	}
 	// wait for query results
-	timeout := time.Tick(10 * time.Second)
+	timeout := time.NewTicker(10 * time.Second)
 	for {
 		select {
 		case set = <-res:
@@ -272,7 +272,7 @@ func (gns *Module) ResolveDNS(
 				return nil, ErrNoDNSResults
 			}
 
-		case <-timeout:
+		case <-timeout.C:
 			// no results
 			logger.Println(logger.WARN, "[dns] Queries timed out.")
 			return nil, ErrNoDNSResults

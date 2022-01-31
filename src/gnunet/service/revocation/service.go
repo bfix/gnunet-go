@@ -25,7 +25,6 @@ import (
 	"gnunet/service"
 	"gnunet/transport"
 
-	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/logger"
 )
 
@@ -98,8 +97,7 @@ loop:
 					ctx.Remove()
 				}()
 
-				pkey := ed25519.NewPublicKeyFromBytes(m.Zone)
-				valid, err := s.Query(ctx, pkey)
+				valid, err := s.Query(ctx, m.Zone)
 				if err != nil {
 					logger.Printf(logger.ERROR, "[revocation:%d:%d] Failed to query revocation status: %s\n", ctx.ID, id, err.Error())
 					if err == transport.ErrChannelInterrupted {

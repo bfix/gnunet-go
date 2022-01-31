@@ -32,16 +32,15 @@ import (
 	"gnunet/transport"
 	"gnunet/util"
 
-	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
 )
 
 // Error codes
 var (
-	ErrInvalidID           = fmt.Errorf("Invalid/unassociated ID")
-	ErrBlockExpired        = fmt.Errorf("Block expired")
-	ErrInvalidResponseType = fmt.Errorf("Invald response type")
+	ErrInvalidID           = fmt.Errorf("invalid/unassociated ID")
+	ErrBlockExpired        = fmt.Errorf("block expired")
+	ErrInvalidResponseType = fmt.Errorf("invald response type")
 )
 
 //----------------------------------------------------------------------
@@ -120,10 +119,9 @@ loop:
 					ctx.Remove()
 				}()
 
-				pkey := ed25519.NewPublicKeyFromBytes(m.Zone)
 				label := m.GetName()
 				kind := NewRRTypeList(int(m.Type))
-				recset, err := s.Resolve(ctx, label, pkey, kind, int(m.Options), 0)
+				recset, err := s.Resolve(ctx, label, m.Zone, kind, int(m.Options), 0)
 				if err != nil {
 					logger.Printf(logger.ERROR, "[gns:%d:%d] Failed to lookup block: %s\n", ctx.ID, id, err.Error())
 					if err == transport.ErrChannelInterrupted {
@@ -174,11 +172,11 @@ loop:
 //======================================================================
 
 // QueryKeyRevocation checks if a key has been revoked
-func (s *Service) QueryKeyRevocation(ctx *service.SessionContext, pkey *ed25519.PublicKey) (valid bool, err error) {
-	logger.Printf(logger.DBG, "[gns] QueryKeyRev(%s)...\n", util.EncodeBinaryToString(pkey.Bytes()))
+func (s *Service) QueryKeyRevocation(ctx *service.SessionContext, zkey *crypto.ZoneKey) (valid bool, err error) {
+	logger.Printf(logger.DBG, "[gns] QueryKeyRev(%s)...\n", util.EncodeBinaryToString(zkey.Bytes()))
 
 	// assemble request
-	req := message.NewRevocationQueryMsg(pkey)
+	req := message.NewRevocationQueryMsg(zkey)
 
 	// get response from Revocation service
 	var resp message.Message
@@ -198,14 +196,13 @@ func (s *Service) QueryKeyRevocation(ctx *service.SessionContext, pkey *ed25519.
 
 // RevokeKey revokes a key with given revocation data
 func (s *Service) RevokeKey(ctx *service.SessionContext, rd *revocation.RevData) (success bool, err error) {
-	logger.Printf(logger.DBG, "[gns] RevokeKey(%s)...\n", util.EncodeBinaryToString(rd.ZoneKey))
+	logger.Printf(logger.DBG, "[gns] RevokeKey(%s)...\n", rd.ZoneKeySig.ID())
 
 	// assemble request
-	req := message.NewRevocationRevokeMsg(nil, nil)
+	req := message.NewRevocationRevokeMsg(nil)
 	req.Timestamp = rd.Timestamp
 	copy(req.PoWs, rd.PoWs)
-	copy(req.Signature, rd.Signature)
-	copy(req.ZoneKey, rd.ZoneKey)
+	req.ZoneKeySig = rd.ZoneKeySig
 
 	// get response from Revocation service
 	var resp message.Message
@@ -266,8 +263,7 @@ func (s *Service) LookupNamecache(ctx *service.SessionContext, query *Query) (bl
 
 		// assemble GNSBlock from message
 		block = new(message.Block)
-		block.Signature = m.Signature
-		block.DerivedKey = m.DerivedKey
+		block.DerivedKeySig = m.DerivedKeySig
 		sb := new(message.SignedBlockData)
 		sb.Purpose = new(crypto.SignaturePurpose)
 		sb.Purpose.Purpose = enums.SIG_GNS_RECORD_SIGN
@@ -318,7 +314,7 @@ func (s *Service) StoreNamecache(ctx *service.SessionContext, block *message.Blo
 		if m.Result == 0 {
 			return nil
 		}
-		return fmt.Errorf("Failed with rc=%d", m.Result)
+		return fmt.Errorf("failed with rc=%d", m.Result)
 	default:
 		logger.Printf(logger.ERROR, "[gns] Got invalid response type (%d)\n", m.Header().MsgType)
 		err = ErrInvalidResponseType

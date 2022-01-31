@@ -57,6 +57,8 @@ var (
 	prv_1, prv_2 *ed25519.PrivateKey
 	pub_1, pub_2 *ed25519.PublicKey
 	ss_1, ss_2   []byte
+
+	ED25519_N = ed25519.GetCurve().N
 )
 
 func calcSharedSecret() bool {

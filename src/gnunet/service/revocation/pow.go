@@ -31,7 +31,6 @@ import (
 	"gnunet/message"
 	"gnunet/util"
 
-	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/math"
 	"golang.org/x/crypto/argon2"
@@ -44,15 +43,15 @@ import (
 // PoWData is the proof-of-work data
 type PoWData struct {
 	PoW       uint64            `order:"big"` // start with this PoW value
-	Timestamp util.AbsoluteTime // Timestamp of creation
-	ZoneKey   []byte            `size:"32"` // public zone key to be revoked
+	Timestamp util.AbsoluteTime ``            // Timestamp of creation
+	ZoneKey   *crypto.ZoneKey   ``            // public zone key to be revoked
 
 	// transient attributes (not serialized)
 	blob []byte // binary representation of serialized data
 }
 
 // NewPoWData creates a PoWData instance for the given arguments.
-func NewPoWData(pow uint64, ts util.AbsoluteTime, zoneKey []byte) *PoWData {
+func NewPoWData(pow uint64, ts util.AbsoluteTime, zoneKey *crypto.ZoneKey) *PoWData {
 	rd := &PoWData{
 		PoW:       0,
 		Timestamp: ts,
@@ -69,7 +68,7 @@ func (p *PoWData) SetPoW(pow uint64) error {
 	p.PoW = pow
 	p.blob = p.Blob()
 	if p.blob == nil {
-		return fmt.Errorf("Invalid PoW work unit")
+		return fmt.Errorf("invalid PoW work unit")
 	}
 	return nil
 }
@@ -119,26 +118,24 @@ func (p *PoWData) Blob() []byte {
 
 // RevData is the revocation data (wire format)
 type RevData struct {
-	Timestamp util.AbsoluteTime // Timestamp of creation
-	TTL       util.RelativeTime // TTL of revocation
-	PoWs      []uint64          `size:"32" order:"big"` // (Sorted) list of PoW values
-	Signature []byte            `size:"64"`             // Signature (Proof-of-ownership).
-	ZoneKey   []byte            `size:"32"`             // public zone key to be revoked
+	Timestamp  util.AbsoluteTime     ``                      // Timestamp of creation
+	TTL        util.RelativeTime     ``                      // TTL of revocation
+	PoWs       []uint64              `size:"32" order:"big"` // (Sorted) list of PoW values
+	ZoneKeySig *crypto.ZoneSignature ``                      // public zone key to be revoked
 }
 
 // SignedRevData is the block of data signed for a RevData instance.
 type SignedRevData struct {
-	Purpose   *crypto.SignaturePurpose
-	ZoneKey   []byte            `size:"32"` // public zone key to be revoked
-	Timestamp util.AbsoluteTime // Timestamp of creation
+	Purpose   *crypto.SignaturePurpose // signature purpose
+	ZoneKey   *crypto.ZoneKey          // public zone key to be revoked
+	Timestamp util.AbsoluteTime        // Timestamp of creation
 }
 
 // NewRevDataFromMsg initializes a new RevData instance from a GNUnet message
 func NewRevDataFromMsg(m *message.RevocationRevokeMsg) *RevData {
 	rd := &RevData{
-		Timestamp: m.Timestamp,
-		Signature: util.Clone(m.Signature),
-		ZoneKey:   util.Clone(m.ZoneKey),
+		Timestamp:  m.Timestamp,
+		ZoneKeySig: m.ZoneKeySig,
 	}
 	for i, pow := range m.PoWs {
 		rd.PoWs[i] = pow
@@ -147,25 +144,20 @@ func NewRevDataFromMsg(m *message.RevocationRevokeMsg) *RevData {
 }
 
 // Sign the revocation data
-func (rd *RevData) Sign(skey *ed25519.PrivateKey) error {
+func (rd *RevData) Sign(skey *crypto.ZonePrivate) (err error) {
 	sigBlock := &SignedRevData{
 		Purpose: &crypto.SignaturePurpose{
 			Size:    48,
 			Purpose: enums.SIG_REVOCATION,
 		},
-		ZoneKey:   util.Clone(rd.ZoneKey),
+		ZoneKey:   &rd.ZoneKeySig.ZoneKey,
 		Timestamp: rd.Timestamp,
 	}
 	sigData, err := data.Marshal(sigBlock)
-	if err != nil {
-		return err
+	if err == nil {
+		rd.ZoneKeySig, err = crypto.ZoneSign(sigData, skey)
 	}
-	sig, err := skey.EcSign(sigData)
-	if err != nil {
-		return err
-	}
-	copy(rd.Signature, sig.Bytes())
-	return nil
+	return
 }
 
 // Verify a revocation object: returns the (smallest) number of leading
@@ -182,19 +174,14 @@ func (rd *RevData) Verify(withSig bool) int {
 				Size:    48,
 				Purpose: enums.SIG_REVOCATION,
 			},
-			ZoneKey:   util.Clone(rd.ZoneKey),
+			ZoneKey:   &rd.ZoneKeySig.ZoneKey,
 			Timestamp: rd.Timestamp,
 		}
 		sigData, err := data.Marshal(sigBlock)
 		if err != nil {
 			return -1
 		}
-		pkey := ed25519.NewPublicKeyFromBytes(rd.ZoneKey)
-		sig, err := ed25519.NewEcSignatureFromBytes(rd.Signature)
-		if err != nil {
-			return -1
-		}
-		valid, err := pkey.EcVerify(sigData, sig)
+		valid, err := rd.ZoneKeySig.Verify(sigData)
 		if err != nil || !valid {
 			return -1
 		}
@@ -212,7 +199,7 @@ func (rd *RevData) Verify(withSig bool) int {
 		}
 		last = pow
 		// compute number of leading zero-bits
-		work := NewPoWData(pow, rd.Timestamp, rd.ZoneKey)
+		work := NewPoWData(pow, rd.Timestamp, &rd.ZoneKeySig.ZoneKey)
 		zbits += float64(512 - work.Compute().BitLen())
 	}
 	zbits /= 32.0
@@ -240,18 +227,16 @@ type RevDataCalc struct {
 }
 
 // NewRevDataCalc initializes a new RevDataCalc instance
-func NewRevDataCalc(pkey []byte) *RevDataCalc {
+func NewRevDataCalc(zkey *crypto.ZoneKey) *RevDataCalc {
 	rd := &RevDataCalc{
 		RevData: RevData{
-			Timestamp: util.AbsoluteTimeNow(),
-			PoWs:      make([]uint64, 32),
-			Signature: make([]byte, 64),
-			ZoneKey:   make([]byte, 32),
+			Timestamp:  util.AbsoluteTimeNow(),
+			PoWs:       make([]uint64, 32),
+			ZoneKeySig: nil,
 		},
 		Bits:        make([]uint16, 32),
 		SmallestIdx: 0,
 	}
-	copy(rd.ZoneKey, pkey)
 	return rd
 }
 
@@ -294,7 +279,7 @@ func (rdc *RevDataCalc) sortBits() {
 // complete if the average above is greater or equal to 'bits'.
 func (rdc *RevDataCalc) Compute(ctx context.Context, bits int, last uint64, cb func(float64, uint64)) (float64, uint64) {
 	// find the largest PoW value in current work unit
-	work := NewPoWData(0, rdc.Timestamp, rdc.ZoneKey)
+	work := NewPoWData(0, rdc.Timestamp, &rdc.ZoneKeySig.ZoneKey)
 	var max uint64 = 0
 	for i, pow := range rdc.PoWs {
 		if pow == 0 {

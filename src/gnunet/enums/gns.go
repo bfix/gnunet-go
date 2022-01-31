@@ -85,6 +85,7 @@ var (
 	GNS_TYPE_RECLAIM_MASTER        = 65551 // Record type for RECLAIM master
 	GNS_TYPE_RECLAIM_OIDC_CLIENT   = 65552 // Record type for reclaim OIDC clients
 	GNS_TYPE_RECLAIM_OIDC_REDIRECT = 65553 // Record type for reclaim OIDC redirect URIs
+	GNS_TYPE_EDKEY                 = 65556 // Record type for GNS zone transfer ("EDKEY").
 
 	GNS_TYPE = map[int]string{
 		GNS_TYPE_ANY:                   "GNS_TYPE_ANY",
