@@ -303,6 +303,11 @@ func CipherData(encrypt bool, data []byte, zkey *ZoneKey, label string, expires 
 		copy(nonce[:], skey[32:])
 		if encrypt {
 			out = secretbox.Seal(nil, data, &nonce, &key)
+			// append tag (instead of prepend)
+			swap := make([]byte, len(out))
+			copy(swap[len(data):], out[:secretbox.Overhead])
+			copy(swap[:len(data)], out[secretbox.Overhead:])
+			out = swap
 		} else {
 			if out, ok = secretbox.Open(nil, data, &nonce, &key); !ok {
 				err = errors.New("XSalsa20-Poly1305 open failed")
