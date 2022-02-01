@@ -134,6 +134,19 @@ func (rs *RecordSet) SetPadding() {
 	rs.Padding = make([]byte, n-size)
 }
 
+// Expires returns the earliest expiration timestamp for the records.
+func (rs *RecordSet) Expires() util.AbsoluteTime {
+	var expires util.AbsoluteTime
+	for i, rr := range rs.Records {
+		if i == 0 {
+			expires = rr.Expires
+		} else if rr.Expires.Compare(expires) < 0 {
+			expires = rr.Expires
+		}
+	}
+	return expires
+}
+
 // SignedBlockData represents the signed and encrypted list of resource
 // records stored in a GNSRecordSet
 type SignedBlockData struct {
@@ -201,7 +214,7 @@ func (b *Block) Verify(zkey *crypto.ZoneKey, label string) (err error) {
 // Decrypt block data with a key derived from zone key and label.
 func (b *Block) Decrypt(zkey *crypto.ZoneKey, label string) (err error) {
 	// decrypt payload
-	b.Block.data, err = crypto.CipherData(b.Block.EncData, zkey, label)
+	b.Block.data, err = crypto.CipherData(b.Block.EncData, zkey, label, b.Block.Expire, 1)
 	b.decrypted = true
 	return
 }

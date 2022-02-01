@@ -147,11 +147,11 @@ func NewRevDataFromMsg(m *message.RevocationRevokeMsg) *RevData {
 func (rd *RevData) Sign(skey *crypto.ZonePrivate) (err error) {
 	sigBlock := &SignedRevData{
 		Purpose: &crypto.SignaturePurpose{
-			Size:    48,
+			Size:    uint32(20 + rd.ZoneKeySig.KeySize()),
 			Purpose: enums.SIG_REVOCATION,
 		},
-		ZoneKey:   &rd.ZoneKeySig.ZoneKey,
 		Timestamp: rd.Timestamp,
+		ZoneKey:   &rd.ZoneKeySig.ZoneKey,
 	}
 	sigData, err := data.Marshal(sigBlock)
 	if err == nil {
@@ -171,11 +171,11 @@ func (rd *RevData) Verify(withSig bool) int {
 	if withSig {
 		sigBlock := &SignedRevData{
 			Purpose: &crypto.SignaturePurpose{
-				Size:    48,
+				Size:    uint32(20 + rd.ZoneKeySig.KeySize()),
 				Purpose: enums.SIG_REVOCATION,
 			},
-			ZoneKey:   &rd.ZoneKeySig.ZoneKey,
 			Timestamp: rd.Timestamp,
+			ZoneKey:   &rd.ZoneKeySig.ZoneKey,
 		}
 		sigData, err := data.Marshal(sigBlock)
 		if err != nil {

@@ -83,7 +83,7 @@ func (zp *ZonePrivate) KeySize() uint {
 
 // ZoneKey represents the possible types of zone keys (PKEY, EDKEY,...)
 type ZoneKey struct {
-	Type    uint32 `json:"type"`
+	Type    uint32 `json:"type" order:"big"`
 	KeyData []byte `json:"key" size:"(KeySize)"`
 }
 
@@ -168,6 +168,14 @@ func (zs *ZoneSignature) Verify(data []byte) (ok bool, err error) {
 		}
 		key := zs.Key().(*ed25519.PublicKey)
 		return key.EcVerify(data, sig)
+
+	case ZONE_EDKEY:
+		var sig *ed25519.EdSignature
+		if sig, err = ed25519.NewEdSignatureFromBytes(zs.Signature); err != nil {
+			return
+		}
+		key := zs.Key().(*ed25519.PublicKey)
+		return key.EdVerify(data, sig)
 	}
 	err = errors.New("unknown zone type")
 	return
@@ -188,6 +196,19 @@ func ZoneSign(data []byte, sk *ZonePrivate) (sig *ZoneSignature, err error) {
 				s.Bytes(),
 			}
 		}
+
+	case ZONE_EDKEY:
+		key := sk.Key.(*ed25519.PrivateKey)
+		var s *ed25519.EdSignature
+		if s, err = key.EdSign(data); err == nil {
+			sig = &ZoneSignature{
+				ZoneKey{
+					Type:    sk.Type,
+					KeyData: key.Public().Bytes(),
+				},
+				s.Bytes(),
+			}
+		}
 	}
 	return
 }
@@ -198,24 +219,67 @@ func ZoneSign(data []byte, sk *ZonePrivate) (sig *ZoneSignature, err error) {
 // SymmetricKey for symmetric en-/decryption
 type SymmetricKey []byte
 
+type IVPKEY struct {
+	Nonce      []byte            `size:"4"`    // 32 bit Nonce
+	Expiration util.AbsoluteTime ``            // Expiration time of block
+	Counter    uint32            `order:"big"` // Block counter
+}
+
+type IVEDKEY struct {
+	Nonce      []byte            `size:"16"` // Nonce
+	Expiration util.AbsoluteTime ``          // Expiration time of block
+}
+
 // DeriveKey returns a key and initialization vector to en-/decrypt data
 // using a symmetric cipher.
-func DeriveKey(label string, zkey *ZoneKey) (skey SymmetricKey) {
-	// generate symmetric key and initialization vector
-	skey = make([]byte, 48)
-	prk := hkdf.Extract(sha512.New, zkey.KeyData, []byte("gns-aes-ctx-key"))
-	rdr := hkdf.Expand(sha256.New, prk, []byte(label))
-	rdr.Read(skey[:32])
-	prk = hkdf.Extract(sha512.New, zkey.KeyData, []byte("gns-aes-ctx-iv"))
-	rdr = hkdf.Expand(sha256.New, prk, []byte(label))
-	rdr.Read(skey[32:])
-	return
+func DeriveKey(label string, zkey *ZoneKey, expires util.AbsoluteTime, blkcnt int) (skey SymmetricKey) {
+	switch zkey.Type {
+	case ZONE_PKEY:
+		// generate symmetric key
+		skey = make([]byte, 48)
+		prk := hkdf.Extract(sha512.New, zkey.KeyData, []byte("gns-aes-ctx-key"))
+		rdr := hkdf.Expand(sha256.New, prk, []byte(label))
+		rdr.Read(skey[:32])
+
+		// assemble initialization vector
+		iv := &IVPKEY{
+			Nonce:      make([]byte, 4),
+			Expiration: expires,
+			Counter:    uint32(blkcnt),
+		}
+		prk = hkdf.Extract(sha512.New, zkey.KeyData, []byte("gns-aes-ctx-iv"))
+		rdr = hkdf.Expand(sha256.New, prk, []byte(label))
+		rdr.Read(iv.Nonce)
+		buf, _ := data.Marshal(iv)
+		copy(skey[32:], buf)
+		return
+
+	case ZONE_EDKEY:
+		// generate symmetric key
+		skey = make([]byte, 56)
+		prk := hkdf.Extract(sha512.New, zkey.KeyData, []byte("gns-aes-ctx-key"))
+		rdr := hkdf.Expand(sha256.New, prk, []byte(label))
+		rdr.Read(skey[:32])
+
+		// assemble initialization vector
+		iv := &IVEDKEY{
+			Nonce:      make([]byte, 16),
+			Expiration: expires,
+		}
+		prk = hkdf.Extract(sha512.New, zkey.KeyData, []byte("gns-aes-ctx-iv"))
+		rdr = hkdf.Expand(sha256.New, prk, []byte(label))
+		rdr.Read(iv.Nonce)
+		buf, _ := data.Marshal(iv)
+		copy(skey[32:], buf)
+		return
+	}
+	return nil
 }
 
 // CipherData (en-/decryption) for a given zone and label.
-func CipherData(data []byte, zkey *ZoneKey, label string) (out []byte, err error) {
+func CipherData(data []byte, zkey *ZoneKey, label string, expires util.AbsoluteTime, blkcnt int) (out []byte, err error) {
 	// derive key material for decryption
-	skey := DeriveKey(label, zkey)
+	skey := DeriveKey(label, zkey, expires, blkcnt)
 	// perform decryption
 	switch zkey.Type {
 	case ZONE_PKEY:
@@ -227,6 +291,7 @@ func CipherData(data []byte, zkey *ZoneKey, label string) (out []byte, err error
 		stream := cipher.NewCTR(blk, skey[32:])
 		out = make([]byte, len(data))
 		stream.XORKeyStream(out, data)
+
 	case ZONE_EDKEY:
 		// En-/decrypt with XSalsa20-Poly1305 cipher
 		n := len(data) + poly1305.TagSize
