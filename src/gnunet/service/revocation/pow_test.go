@@ -20,44 +20,43 @@ func TestRevocationRFC(t *testing.T) {
 		ZKEY  = "000100002ca223e879ecc4bbdeb5da17319281d63b2e3b6955f1c3775c804a98d5f8ddaa"
 		DIFF  = 7
 		PROOF = "" +
-			"0005d6692d2c961d" +
+			"0005d66da3598127" +
 			"0000395d1827c000" +
-			"611d2612c23a4e10" +
-			"611d2612c23a5281" +
-			"611d2612c23a53b5" +
-			"611d2612c23a5492" +
-			"611d2612c23a54c8" +
-			"611d2612c23a5557" +
-			"611d2612c23a5569" +
-			"611d2612c23a55cb" +
-			"611d2612c23a55db" +
-			"611d2612c23a55ed" +
-			"611d2612c23a560c" +
-			"611d2612c23a563c" +
-			"611d2612c23a5641" +
-			"611d2612c23a565d" +
-			"611d2612c23a5671" +
-			"611d2612c23a5682" +
-			"611d2612c23a56e0" +
-			"611d2612c23a56fb" +
-			"611d2612c23a570d" +
-			"611d2612c23a5722" +
-			"611d2612c23a574a" +
-			"611d2612c23a57a0" +
-			"611d2612c23a57be" +
-			"611d2612c23a5817" +
-			"611d2612c23a5859" +
-			"611d2612c23a585a" +
-			"611d2612c23a5887" +
-			"611d2612c23a58a0" +
-			"611d2612c23a58ad" +
-			"611d2612c23a58b8" +
-			"611d2612c23a5912" +
-			"611d2612c23a5977" +
+			"3ab877d07570f2b8" +
+			"3ab877d07570f332" +
+			"3ab877d07570f4f5" +
+			"3ab877d07570f50f" +
+			"3ab877d07570f537" +
+			"3ab877d07570f599" +
+			"3ab877d07570f5cd" +
+			"3ab877d07570f5d9" +
+			"3ab877d07570f66a" +
+			"3ab877d07570f69b" +
+			"3ab877d07570f72f" +
+			"3ab877d07570f7c3" +
+			"3ab877d07570f843" +
+			"3ab877d07570f8d8" +
+			"3ab877d07570f91b" +
+			"3ab877d07570f93a" +
+			"3ab877d07570f944" +
+			"3ab877d07570f98a" +
+			"3ab877d07570f9a7" +
+			"3ab877d07570f9b0" +
+			"3ab877d07570f9df" +
+			"3ab877d07570fa05" +
+			"3ab877d07570fa3e" +
+			"3ab877d07570fa63" +
+			"3ab877d07570fa84" +
+			"3ab877d07570fa8f" +
+			"3ab877d07570fa91" +
+			"3ab877d07570fad6" +
+			"3ab877d07570fb0a" +
+			"3ab877d07570fc0f" +
+			"3ab877d07570fc43" +
+			"3ab877d07570fca5" +
 			"00010000" +
 			"2ca223e879ecc4bbdeb5da17319281d63b2e3b6955f1c3775c804a98d5f8ddaa" +
-			"0e93d092b597e41282c883d77091cb2b3724a86f6762dbbcd1ae40dd81347ea106444446886cc5acaf9c809dc78eec88177d1f7d382943b1521f61080b7f645f"
-		//"099b850835038c1bc05367c089fbc2d1438390e674dfbe3d7b8532dfaa5e14300cbcee7301c634fdbe13dbffd3d672c2782d54020dc0731abc13e66d64264cc4"
+			"053b0259700039187d1da4613531502bc4a4eeccc69900d24f8aac5430f28fc5092701331f178e290fe06e82ce2498ce7b23a34058e3d6a2f247e92bc9d7b9ab"
 	)
 
 	// construct private/public key pair from test data
@@ -124,14 +123,19 @@ func TestRevocationRFC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("SigData = %s\n", hex.EncodeToString(sigData))
+	if testing.Verbose() {
+		t.Logf("SigData = %s\n", hex.EncodeToString(sigData))
+	}
 
 	sk := crypto.NewZonePrivate(crypto.ZONE_PKEY, skey)
 	sigOut, err := crypto.ZoneSign(sigData, sk)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("Signature = %s\n", hex.EncodeToString(sigOut.Signature))
+	if testing.Verbose() {
+		t.Logf("Signature = %s\n", hex.EncodeToString(sigOut.Signature))
+		t.Logf("         ?= %s\n", hex.EncodeToString(revData.ZoneKeySig.Signature))
+	}
 
 	// verify revocation data object
 	rc := revData.Verify(true)
