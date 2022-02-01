@@ -256,7 +256,7 @@ func DeriveKey(label string, zkey *ZoneKey, expires util.AbsoluteTime, blkcnt in
 	case ZONE_EDKEY:
 		// generate symmetric key
 		skey = make([]byte, 56)
-		prk := hkdf.Extract(sha512.New, zkey.KeyData, []byte("gns-aes-ctx-key"))
+		prk := hkdf.Extract(sha512.New, zkey.KeyData, []byte("gns-xsalsa-ctx-key"))
 		rdr := hkdf.Expand(sha256.New, prk, []byte(label))
 		rdr.Read(skey[:32])
 
@@ -265,7 +265,7 @@ func DeriveKey(label string, zkey *ZoneKey, expires util.AbsoluteTime, blkcnt in
 			Nonce:      make([]byte, 16),
 			Expiration: expires,
 		}
-		prk = hkdf.Extract(sha512.New, zkey.KeyData, []byte("gns-aes-ctx-iv"))
+		prk = hkdf.Extract(sha512.New, zkey.KeyData, []byte("gns-xsalsa-ctx-iv"))
 		rdr = hkdf.Expand(sha256.New, prk, []byte(label))
 		rdr.Read(iv.Nonce)
 		buf, _ := data.Marshal(iv)
@@ -279,6 +279,7 @@ func DeriveKey(label string, zkey *ZoneKey, expires util.AbsoluteTime, blkcnt in
 func CipherData(encrypt bool, data []byte, zkey *ZoneKey, label string, expires util.AbsoluteTime, blkcnt int) (out []byte, err error) {
 	// derive key material for decryption
 	skey := DeriveKey(label, zkey, expires, blkcnt)
+
 	// perform decryption
 	switch zkey.Type {
 	case ZONE_PKEY:
