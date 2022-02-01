@@ -214,7 +214,7 @@ func (b *Block) Verify(zkey *crypto.ZoneKey, label string) (err error) {
 // Decrypt block data with a key derived from zone key and label.
 func (b *Block) Decrypt(zkey *crypto.ZoneKey, label string) (err error) {
 	// decrypt payload
-	b.Block.data, err = crypto.CipherData(b.Block.EncData, zkey, label, b.Block.Expire, 1)
+	b.Block.data, err = crypto.CipherData(false, b.Block.EncData, zkey, label, b.Block.Expire, 1)
 	b.decrypted = true
 	return
 }

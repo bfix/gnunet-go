@@ -32,8 +32,7 @@ import (
 	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/data"
 	"golang.org/x/crypto/hkdf"
-	"golang.org/x/crypto/poly1305"
-	"golang.org/x/crypto/salsa20/salsa"
+	"golang.org/x/crypto/nacl/secretbox"
 )
 
 // Zone types
@@ -230,7 +229,7 @@ type IVEDKEY struct {
 	Expiration util.AbsoluteTime ``          // Expiration time of block
 }
 
-// DeriveKey returns a key and initialization vector to en-/decrypt data
+// DeriveKey returns a key and initialization vector to en-/decrypt block data
 // using a symmetric cipher.
 func DeriveKey(label string, zkey *ZoneKey, expires util.AbsoluteTime, blkcnt int) (skey SymmetricKey) {
 	switch zkey.Type {
@@ -277,7 +276,7 @@ func DeriveKey(label string, zkey *ZoneKey, expires util.AbsoluteTime, blkcnt in
 }
 
 // CipherData (en-/decryption) for a given zone and label.
-func CipherData(data []byte, zkey *ZoneKey, label string, expires util.AbsoluteTime, blkcnt int) (out []byte, err error) {
+func CipherData(encrypt bool, data []byte, zkey *ZoneKey, label string, expires util.AbsoluteTime, blkcnt int) (out []byte, err error) {
 	// derive key material for decryption
 	skey := DeriveKey(label, zkey, expires, blkcnt)
 	// perform decryption
@@ -294,13 +293,21 @@ func CipherData(data []byte, zkey *ZoneKey, label string, expires util.AbsoluteT
 
 	case ZONE_EDKEY:
 		// En-/decrypt with XSalsa20-Poly1305 cipher
-		n := len(data) + poly1305.TagSize
-		out = make([]byte, n)
-		var counter [16]byte
-		var key [32]byte
-		copy(counter[:], skey[32:])
+		var (
+			key   [32]byte
+			nonce [24]byte
+			ok    bool
+		)
 		copy(key[:], skey[:32])
-		salsa.XORKeyStream(out, data, &counter, &key)
+		copy(nonce[:], skey[32:])
+		if encrypt {
+			out = secretbox.Seal(nil, data, &nonce, &key)
+		} else {
+			if out, ok = secretbox.Open(nil, data, &nonce, &key); !ok {
+				err = errors.New("XSalsa20-Poly1305 open failed")
+			}
+		}
+
 	default:
 		err = fmt.Errorf("unknown zone type for block decryption")
 	}

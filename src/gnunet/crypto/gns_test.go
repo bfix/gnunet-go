@@ -123,7 +123,7 @@ func TestDecryptBlock(t *testing.T) {
 	//t.Logf("skey = %s\n", hex.EncodeToString(skey[:32]))
 	//t.Logf("nonce = %s\n", hex.EncodeToString(skey[32:]))
 
-	out, err := CipherData(DATA, zkey, LABEL, EXPIRE, 1)
+	out, err := CipherData(true, DATA, zkey, LABEL, EXPIRE, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
