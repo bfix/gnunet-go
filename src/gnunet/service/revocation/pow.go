@@ -127,8 +127,8 @@ type RevData struct {
 // SignedRevData is the block of data signed for a RevData instance.
 type SignedRevData struct {
 	Purpose   *crypto.SignaturePurpose // signature purpose
-	ZoneKey   *crypto.ZoneKey          // public zone key to be revoked
 	Timestamp util.AbsoluteTime        // Timestamp of creation
+	ZoneKey   *crypto.ZoneKey          // public zone key to be revoked
 }
 
 // NewRevDataFromMsg initializes a new RevData instance from a GNUnet message
