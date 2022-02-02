@@ -98,12 +98,6 @@ func (pk *EDKEYPublicImpl) Encrypt(data []byte, label string, expires util.Absol
 	copy(key[:], skey[:32])
 	copy(nonce[:], skey[32:])
 	out = secretbox.Seal(nil, data, &nonce, &key)
-
-	// append tag (instead of prepend)
-	swap := make([]byte, len(out))
-	copy(swap[len(data):], out[:secretbox.Overhead])
-	copy(swap[:len(data)], out[secretbox.Overhead:])
-	out = swap
 	return
 }
 
@@ -111,13 +105,6 @@ func (pk *EDKEYPublicImpl) Encrypt(data []byte, label string, expires util.Absol
 func (pk *EDKEYPublicImpl) Decrypt(data []byte, label string, expires util.AbsoluteTime) (out []byte, err error) {
 	// derive key material for decryption
 	skey := pk.BlockKey(label, expires)
-
-	// swap tag (from end to start)
-	n := len(data)
-	swap := make([]byte, n)
-	copy(swap[:secretbox.Overhead], data[n-secretbox.Overhead:])
-	copy(swap[secretbox.Overhead:], data[:n-secretbox.Overhead])
-	data = swap
 
 	// En-/decrypt with XSalsa20-Poly1305 cipher
 	var (
