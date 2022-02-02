@@ -238,10 +238,7 @@ func (m *Module) ResolveRelative(
 		// handle special block cases in priority order:
 		//--------------------------------------------------------------
 
-		if hdlr := hdlrs.GetHandler(
-			enums.GNS_TYPE_PKEY,
-			enums.GNS_TYPE_EDKEY,
-		); hdlr != nil {
+		if hdlr := hdlrs.GetHandler(crypto.ZoneTypes...); hdlr != nil {
 			// (1) zone key record:
 			inst := hdlr.(*ZoneKeyHandler)
 			// if labels are pending, set new zone and continue resolution;

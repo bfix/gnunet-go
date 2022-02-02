@@ -58,7 +58,8 @@ import (
 // example the RSA crypto scheme is outlined:
 //
 //   (1) Register/define a new GNS_TYPE_RSAKEY
-//   (2) Add ZONE_RSAKEY to the "Zone types" declarations below.
+//   (2) Add ZONE_RSAKEY and GNS_TYPE_RSAKEY to the "Zone types"
+//       declarations in this file.
 //   (3) Code the implementation in a file named `gns_rsakey.go`:
 //       You have to implement three interfaces (ZonePrivateImpl,
 //       ZoneKeyImpl and ZoneSigImpl) in three separate custom types.
@@ -145,6 +146,12 @@ type ZoneSigImpl interface {
 var (
 	ZONE_PKEY  = uint32(enums.GNS_TYPE_PKEY)
 	ZONE_EDKEY = uint32(enums.GNS_TYPE_EDKEY)
+
+	// register available zone types for BlockHandler
+	ZoneTypes = []int{
+		enums.GNS_TYPE_PKEY,
+		enums.GNS_TYPE_EDKEY,
+	}
 )
 
 //----------------------------------------------------------------------
