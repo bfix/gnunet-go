@@ -26,9 +26,7 @@ import (
 	"gnunet/util"
 	"testing"
 
-	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/data"
-	"github.com/bfix/gospel/math"
 )
 
 // TestRecordsetPKEY implements the test case as defined in the GNS draft
@@ -36,13 +34,16 @@ import (
 func TestRecordsetPKEY(t *testing.T) {
 	var (
 		D = []byte{
+			// PKEY private scalar
 			0x50, 0xd7, 0xb6, 0x52, 0xa4, 0xef, 0xea, 0xdf,
 			0xf3, 0x73, 0x96, 0x90, 0x97, 0x85, 0xe5, 0x95,
 			0x21, 0x71, 0xa0, 0x21, 0x78, 0xc8, 0xe7, 0xd4,
 			0x50, 0xfa, 0x90, 0x79, 0x25, 0xfa, 0xfd, 0x98,
 		}
-		ZTYPE = []byte{0x00, 0x01, 0x00, 0x00}
-		ZKEY  = []byte{
+		ZKEY = []byte{
+			// zone type
+			0x00, 0x01, 0x00, 0x00,
+			// PKEY public key
 			0x67, 0x7c, 0x47, 0x7d, 0x2d, 0x93, 0x09, 0x7c,
 			0x85, 0xb1, 0x95, 0xc6, 0xf9, 0x6d, 0x84, 0xff,
 			0x61, 0xf5, 0x98, 0x2c, 0x2c, 0x4f, 0xe0, 0x2d,
@@ -133,17 +134,20 @@ func TestRecordsetPKEY(t *testing.T) {
 	)
 
 	// check zone key pair
-	prv := ed25519.NewPrivateKeyFromD(math.NewIntFromBytes(D))
-	pub := prv.Public()
-	zkey := pub.Bytes()
-	if !bytes.Equal(zkey, ZKEY) {
-		t.Logf("pub = %s\n", hex.EncodeToString(zkey))
+	prv, err := crypto.NewZonePrivate(crypto.ZONE_PKEY, D)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zk := prv.Public()
+	if !bytes.Equal(zk.Bytes(), ZKEY) {
+		t.Logf("pub = %s\n", hex.EncodeToString(zk.Bytes()))
 		t.Logf("   != %s\n", hex.EncodeToString(ZKEY))
 		t.Fatal("zone key mismatch")
 	}
-	buf := append(ZTYPE, ZKEY...)
-	zid := util.EncodeBinaryToString(buf)
+	zid := zk.ID()
 	if zid != ZID {
+		t.Logf("id = %s\n", zid)
+		t.Logf("ID = %s\n", ZID)
 		t.Fatal("Zone ID mismatch")
 	}
 
@@ -160,9 +164,8 @@ func TestRecordsetPKEY(t *testing.T) {
 	}
 
 	// check symmetric keys and nonce
-	zk := crypto.NewZoneKey(crypto.ZONE_PKEY, pub)
 	expires := RECSET.Expires()
-	skey := crypto.DeriveKey(LABEL, zk, expires, 1)
+	skey := zk.BlockKey(LABEL, expires)
 	if !bytes.Equal(skey[32:], NONCE) {
 		t.Logf("nonce = %s\n", hex.EncodeToString(skey[32:]))
 		t.Logf("NONCE = %s\n", hex.EncodeToString(NONCE))
@@ -175,7 +178,7 @@ func TestRecordsetPKEY(t *testing.T) {
 	}
 
 	// check block encryption
-	bdata, err := crypto.CipherData(true, rdata, zk, LABEL, expires, 1)
+	bdata, err := zk.Encrypt(rdata, LABEL, expires)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -191,13 +194,16 @@ func TestRecordsetPKEY(t *testing.T) {
 func TestRecordsetEDKEY(t *testing.T) {
 	var (
 		SEED = []byte{
+			// EDKEY private key (seed)
 			0x5a, 0xf7, 0x02, 0x0e, 0xe1, 0x91, 0x60, 0x32,
 			0x88, 0x32, 0x35, 0x2b, 0xbc, 0x6a, 0x68, 0xa8,
 			0xd7, 0x1a, 0x7c, 0xbe, 0x1b, 0x92, 0x99, 0x69,
 			0xa7, 0xc6, 0x6d, 0x41, 0x5a, 0x0d, 0x8f, 0x65,
 		}
-		ZTYPE = []byte{0x00, 0x01, 0x00, 0x14}
-		ZKEY  = []byte{
+		ZKEY = []byte{
+			// zone type
+			0x00, 0x01, 0x00, 0x14,
+			// EDKEY public key data
 			0x3c, 0xf4, 0xb9, 0x24, 0x03, 0x20, 0x22, 0xf0,
 			0xdc, 0x50, 0x58, 0x14, 0x53, 0xb8, 0x5d, 0x93,
 			0xb0, 0x47, 0xb6, 0x3d, 0x44, 0x6c, 0x58, 0x45,
@@ -291,17 +297,20 @@ func TestRecordsetEDKEY(t *testing.T) {
 	)
 
 	// check zone key pair
-	prv := ed25519.NewPrivateKeyFromSeed(SEED)
-	pub := prv.Public()
-	zkey := pub.Bytes()
-	if !bytes.Equal(zkey, ZKEY) {
-		t.Logf("pub = %s\n", hex.EncodeToString(zkey))
-		t.Logf("   != %s\n", hex.EncodeToString(ZKEY))
+	prv, err := crypto.NewZonePrivate(crypto.ZONE_EDKEY, SEED)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zk := prv.Public()
+	if !bytes.Equal(zk.Bytes(), ZKEY) {
+		t.Logf("zkey = %s\n", hex.EncodeToString(zk.Bytes()))
+		t.Logf("    != %s\n", hex.EncodeToString(ZKEY))
 		t.Fatal("zone key mismatch")
 	}
-	buf := append(ZTYPE, ZKEY...)
-	zid := util.EncodeBinaryToString(buf)
+	zid := zk.ID()
 	if zid != ZID {
+		t.Logf("id = %s\n", zid)
+		t.Logf("ID = %s\n", ZID)
 		t.Fatal("Zone ID mismatch")
 	}
 
@@ -318,9 +327,8 @@ func TestRecordsetEDKEY(t *testing.T) {
 	}
 
 	// check symmetric keys and nonce
-	zk := crypto.NewZoneKey(crypto.ZONE_EDKEY, pub)
 	expires := RECSET.Expires()
-	skey := crypto.DeriveKey(LABEL, zk, expires, 1)
+	skey := zk.BlockKey(LABEL, expires)
 	if !bytes.Equal(skey[32:], NONCE) {
 		t.Logf("nonce = %s\n", hex.EncodeToString(skey[32:]))
 		t.Logf("NONCE = %s\n", hex.EncodeToString(NONCE))
@@ -333,7 +341,7 @@ func TestRecordsetEDKEY(t *testing.T) {
 	}
 
 	// check block encryption
-	bdata, err := crypto.CipherData(true, rdata, zk, LABEL, expires, 1)
+	bdata, err := zk.Encrypt(rdata, LABEL, expires)
 	if err != nil {
 		t.Fatal(err)
 	}

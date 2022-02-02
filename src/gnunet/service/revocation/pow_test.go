@@ -7,9 +7,7 @@ import (
 	"gnunet/enums"
 	"testing"
 
-	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/data"
-	"github.com/bfix/gospel/math"
 )
 
 // Test revocation with test vector defined in the RFC draft.
@@ -60,17 +58,24 @@ func TestRevocationRFC(t *testing.T) {
 	)
 
 	// construct private/public key pair from test data
-	skeyD, err := hex.DecodeString(D)
+	d, err := hex.DecodeString(D)
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := math.NewIntFromBytes(skeyD)
-	skey := ed25519.NewPrivateKeyFromD(d)
-	pkeyD, err := hex.DecodeString(ZKEY)
+	prv, err := crypto.NewZonePrivate(crypto.ZONE_PKEY, d)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(skey.Public().Bytes(), pkeyD[4:]) {
+	zk := prv.Public()
+
+	// check
+	zkey, err := hex.DecodeString(ZKEY)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(zk.Bytes(), zkey) {
+		t.Logf("zkey = %s\n", hex.EncodeToString(zk.Bytes()))
+		t.Logf("ZKEY = %s\n", hex.EncodeToString(zkey))
 		t.Fatal("Private/Public key mismatch")
 	}
 
@@ -83,9 +88,9 @@ func TestRevocationRFC(t *testing.T) {
 	if err = data.Unmarshal(revData, revD); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(revData.ZoneKeySig.KeyData, pkeyD[4:]) {
-		t.Logf("keydata  = %s\n", hex.EncodeToString(revData.ZoneKeySig.KeyData))
-		t.Logf("KEYDATA  = %s\n", hex.EncodeToString(pkeyD[4:]))
+	if !bytes.Equal(revData.ZoneKeySig.Bytes(), zkey) {
+		t.Logf("zkey  = %s\n", hex.EncodeToString(revData.ZoneKeySig.Bytes()))
+		t.Logf("ZKEY  = %s\n", hex.EncodeToString(zkey))
 		t.Fatal("Wrong zone key in test revocation")
 	}
 
@@ -127,8 +132,7 @@ func TestRevocationRFC(t *testing.T) {
 		t.Logf("SigData = %s\n", hex.EncodeToString(sigData))
 	}
 
-	sk := crypto.NewZonePrivate(crypto.ZONE_PKEY, skey)
-	sigOut, err := crypto.ZoneSign(sigData, sk)
+	sigOut, err := prv.Sign(sigData)
 	if err != nil {
 		t.Fatal(err)
 	}

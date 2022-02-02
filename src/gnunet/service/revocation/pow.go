@@ -155,7 +155,7 @@ func (rd *RevData) Sign(skey *crypto.ZonePrivate) (err error) {
 	}
 	sigData, err := data.Marshal(sigBlock)
 	if err == nil {
-		rd.ZoneKeySig, err = crypto.ZoneSign(sigData, skey)
+		rd.ZoneKeySig, err = skey.Sign(sigData)
 	}
 	return
 }

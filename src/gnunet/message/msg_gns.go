@@ -198,7 +198,7 @@ func (b *Block) Verify(zkey *crypto.ZoneKey, label string) (err error) {
 
 	// verify derived key
 	dkey := b.DerivedKeySig.ZoneKey
-	dkey2 := crypto.DerivePublicKey(zkey, label, "gns")
+	dkey2, _ := zkey.Derive(label, "gns")
 	if !dkey.Equal(dkey2) {
 		return fmt.Errorf("invalid signature key for GNS Block")
 	}
@@ -214,7 +214,7 @@ func (b *Block) Verify(zkey *crypto.ZoneKey, label string) (err error) {
 // Decrypt block data with a key derived from zone key and label.
 func (b *Block) Decrypt(zkey *crypto.ZoneKey, label string) (err error) {
 	// decrypt payload
-	b.Block.data, err = crypto.CipherData(false, b.Block.EncData, zkey, label, b.Block.Expire, 1)
+	b.Block.data, err = zkey.Decrypt(b.Block.EncData, label, b.Block.Expire)
 	b.decrypted = true
 	return
 }

@@ -31,7 +31,6 @@ import (
 	"gnunet/service/revocation"
 	"gnunet/util"
 
-	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/logger"
 )
 
@@ -62,7 +61,8 @@ type Query struct {
 func NewQuery(zkey *crypto.ZoneKey, label string) *Query {
 	// derive a public key from (pkey,label) and set the repository
 	// key as the SHA512 hash of the binary key representation.
-	pd := crypto.DerivePublicKey(zkey, label, "gns")
+	// (key blinding)
+	pd, _ := zkey.Derive(label, "gns")
 	key := crypto.Hash(pd.Bytes())
 	return &Query{
 		Zone:    zkey,
@@ -238,18 +238,20 @@ func (m *Module) ResolveRelative(
 		// handle special block cases in priority order:
 		//--------------------------------------------------------------
 
-		if hdlr := hdlrs.GetHandler(enums.GNS_TYPE_PKEY); hdlr != nil {
-			// (1) PKEY record:
-			inst := hdlr.(*PkeyHandler)
+		if hdlr := hdlrs.GetHandler(
+			enums.GNS_TYPE_PKEY,
+			enums.GNS_TYPE_EDKEY,
+		); hdlr != nil {
+			// (1) zone key record:
+			inst := hdlr.(*ZoneKeyHandler)
 			// if labels are pending, set new zone and continue resolution;
-			// otherwise resolve "@" label for the zone if no PKEY record
+			// otherwise resolve "@" label for the zone if no zone key record
 			// was requested.
-			zkey = crypto.NewZoneKey(crypto.ZONE_PKEY, inst.pkey)
 			if len(labels) == 1 && !kind.HasType(enums.GNS_TYPE_PKEY) {
 				labels = append(labels, "@")
 			}
 			// check if zone key has been revoked
-			if valid, err := m.RevocationQuery(ctx, zkey); err != nil || !valid {
+			if valid, err := m.RevocationQuery(ctx, inst.zkey); err != nil || !valid {
 				// revoked key -> no results!
 				records = make([]*message.ResourceRecord, 0)
 				break
@@ -393,13 +395,13 @@ func (m *Module) ResolveUnknown(
 	return
 }
 
-// GetZoneKey returns the PKEY (or nil) from an absolute GNS path.
+// GetZoneKey returns the zone key (or nil) from an absolute GNS path.
 func (m *Module) GetZoneKey(path string) *crypto.ZoneKey {
 	labels := util.ReverseStringList(strings.Split(path, "."))
 	if len(labels[0]) == 52 {
 		if data, err := util.DecodeStringToBinary(labels[0], 32); err == nil {
-			if pkey := ed25519.NewPublicKeyFromBytes(data); pkey != nil {
-				return crypto.NewZoneKey(crypto.ZONE_PKEY, pkey)
+			if zkey, err := crypto.NewZoneKey(data); err == nil {
+				return zkey
 			}
 		}
 	}

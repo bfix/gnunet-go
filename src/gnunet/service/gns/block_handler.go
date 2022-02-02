@@ -22,11 +22,11 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/util"
 
-	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/logger"
 )
 
@@ -37,7 +37,7 @@ type HdlrInst func(*message.ResourceRecord, []string) (BlockHandler, error)
 var (
 	ErrInvalidRecordType = fmt.Errorf("invalid resource record type")
 	ErrInvalidRecordBody = fmt.Errorf("invalid resource record body")
-	ErrInvalidPKEY       = fmt.Errorf("invalid PKEY resource record")
+	ErrInvalidZoneKey    = fmt.Errorf("invalid zone key resource record")
 	ErrInvalidCNAME      = fmt.Errorf("invalid CNAME resource record")
 	ErrInvalidVPN        = fmt.Errorf("invalid VPN resource record")
 	ErrInvalidRecordMix  = fmt.Errorf("invalid mix of RR types in block")
@@ -47,7 +47,8 @@ var (
 // Mapping of RR types to BlockHandler instanciation functions
 var (
 	customHandler = map[int]HdlrInst{
-		enums.GNS_TYPE_PKEY:      NewPkeyHandler,
+		enums.GNS_TYPE_PKEY:      NewZoneHandler,
+		enums.GNS_TYPE_EDKEY:     NewZoneHandler,
 		enums.GNS_TYPE_GNS2DNS:   NewGns2DnsHandler,
 		enums.GNS_TYPE_BOX:       NewBoxHandler,
 		enums.GNS_TYPE_LEHO:      NewLehoHandler,
@@ -190,13 +191,15 @@ func NewBlockHandlerList(records []*message.ResourceRecord, labels []string) (*B
 	return hl, active, nil
 }
 
-// GetHandler returns a BlockHandler for the given key. If no block handler exists
-// under the given name, a new one is created and stored in the list. The type of
-// the new block handler is derived from the key value.
-func (hl *BlockHandlerList) GetHandler(t int) BlockHandler {
-	// return handler for given key if it exists
-	if hdlr, ok := hl.list[t]; ok {
-		return hdlr
+// GetHandler returns a BlockHandler for the given GNS block type.
+// If more than one type is given, the first matching hanlder is
+// returned.
+func (hl *BlockHandlerList) GetHandler(types ...int) BlockHandler {
+	for _, t := range types {
+		// return handler for given type if it exists
+		if hdlr, ok := hl.list[t]; ok {
+			return hdlr
+		}
 	}
 	return nil
 }
@@ -208,23 +211,28 @@ func (hl *BlockHandlerList) FinalizeRecord(rec *message.ResourceRecord) *message
 }
 
 //----------------------------------------------------------------------
-// PKEY handler: Only one PKEY as sole record in a block
+// Zone key handler: Only one zone key as sole record in a block
 //----------------------------------------------------------------------
 
-// PkeyHandler implementing the BlockHandler interface
-type PkeyHandler struct {
-	pkey *ed25519.PublicKey      // Zone key
-	rec  *message.ResourceRecord // associated recource record
+// ZoneKeyHandler implementing the BlockHandler interface
+type ZoneKeyHandler struct {
+	ztype uint32                  // zone type
+	zkey  *crypto.ZoneKey         // Zone key
+	rec   *message.ResourceRecord // associated recource record
 }
 
-// NewPkeyHandler returns a new BlockHandler instance
-func NewPkeyHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, error) {
-	if int(rec.Type) != enums.GNS_TYPE_PKEY {
+// NewZoneHandler returns a new BlockHandler instance
+func NewZoneHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, error) {
+	// check if we have an implementation for the zone type
+	if crypto.GetImplementation(rec.Type) == nil {
 		return nil, ErrInvalidRecordType
 	}
-	h := &PkeyHandler{
-		pkey: nil,
+	// assemble handler
+	h := &ZoneKeyHandler{
+		ztype: rec.Type,
+		zkey:  nil,
 	}
+	// add the record to the handler
 	if err := h.AddRecord(rec, labels); err != nil {
 		return nil, err
 	}
@@ -232,33 +240,33 @@ func NewPkeyHandler(rec *message.ResourceRecord, labels []string) (BlockHandler,
 }
 
 // AddRecord inserts a PKEY record into the handler.
-func (h *PkeyHandler) AddRecord(rec *message.ResourceRecord, labels []string) error {
-	if int(rec.Type) != enums.GNS_TYPE_PKEY {
+func (h *ZoneKeyHandler) AddRecord(rec *message.ResourceRecord, labels []string) (err error) {
+	// check record type
+	if rec.Type != h.ztype {
 		return ErrInvalidRecordType
 	}
-	// check for sole PKEY record in block
-	if h.pkey != nil {
-		return ErrInvalidPKEY
+	// check for sole zone key record in block
+	if h.zkey != nil {
+		return ErrInvalidZoneKey
 	}
-	// check for sane key data
-	if len(rec.Data) != 32 {
-		return ErrInvalidPKEY
+	// set zone key
+	h.zkey, err = crypto.NewZoneKey(rec.Data)
+	if err != nil {
+		return
 	}
-	// set a PKEY handler
-	h.pkey = ed25519.NewPublicKeyFromBytes(rec.Data)
 	h.rec = rec
-	return nil
+	return
 }
 
 // Coexist return a flag indicating how a resource record of a given type
 // is to be treated (see BlockHandler interface)
-func (h *PkeyHandler) Coexist(cm util.CounterMap) bool {
+func (h *ZoneKeyHandler) Coexist(cm util.CounterMap) bool {
 	// only one type (GNS_TYPE_PKEY) is present
 	return len(cm) == 1 && cm.Num(enums.GNS_TYPE_PKEY) == 1
 }
 
 // Records returns a list of RR of the given type associated with this handler
-func (h *PkeyHandler) Records(kind RRTypeList) *message.RecordSet {
+func (h *ZoneKeyHandler) Records(kind RRTypeList) *message.RecordSet {
 	rs := message.NewRecordSet()
 	if kind.HasType(enums.GNS_TYPE_PKEY) {
 		rs.AddRecord(h.rec)
@@ -267,7 +275,7 @@ func (h *PkeyHandler) Records(kind RRTypeList) *message.RecordSet {
 }
 
 // Name returns the human-readable name of the handler.
-func (h *PkeyHandler) Name() string {
+func (h *ZoneKeyHandler) Name() string {
 	return "PKEY_Handler"
 }
 
