@@ -27,10 +27,13 @@ import (
 	"github.com/bfix/gospel/concurrent"
 )
 
+// TODO: These test cases fail from time to time for no obvious reason.
+// This needs to be investigated.
+
 const (
 	SockAddr      = "/tmp/gnunet-go-test.sock"
 	TCPAddrClient = "gnunet.org:80"
-	TCPAddrServer = "127.0.0.1:12086"
+	TCPAddrServer = "127.0.0.1:9876"
 )
 
 type TestChannelServer struct {
@@ -78,15 +81,13 @@ func (s *TestChannelServer) Start(spec string) (err error) {
 	sig := concurrent.NewSignaller()
 	go func() {
 		for s.running {
-			select {
-			case in := <-s.hdlr:
-				if in == nil {
-					break
-				}
-				switch x := in.(type) {
-				case Channel:
-					go s.handle(x, sig)
-				}
+			in := <-s.hdlr
+			if in == nil {
+				break
+			}
+			switch x := in.(type) {
+			case Channel:
+				go s.handle(x, sig)
 			}
 		}
 		s.srvc.Close()
@@ -102,23 +103,28 @@ func (s *TestChannelServer) Stop() {
 func TestChannelServerTCPSingle(t *testing.T) {
 	time.Sleep(time.Second)
 	s := NewTestChannelServer()
-	if err := s.Start("tcp+" + TCPAddrServer); err != nil {
+	err := s.Start("tcp+" + TCPAddrServer)
+	defer s.Stop()
+	if err != nil {
 		t.Fatal(err)
 	}
-	s.Stop()
 }
 
 func TestChannelServerTCPTwice(t *testing.T) {
 	time.Sleep(time.Second)
 	s1 := NewTestChannelServer()
-	if err := s1.Start("tcp+" + TCPAddrServer); err != nil {
+	err := s1.Start("tcp+" + TCPAddrServer)
+	defer s1.Stop()
+	if err != nil {
 		t.Fatal(err)
 	}
+	time.Sleep(time.Second)
 	s2 := NewTestChannelServer()
-	if err := s2.Start("tcp+" + TCPAddrServer); err == nil {
+	err = s2.Start("tcp+" + TCPAddrServer)
+	defer s2.Stop()
+	if err == nil {
 		t.Fatal("SocketServer started twice!!")
 	}
-	s1.Stop()
 }
 
 func TestChannelClientTCP(t *testing.T) {
@@ -127,6 +133,8 @@ func TestChannelClientTCP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ch.Close()
+
 	sig := concurrent.NewSignaller()
 	msg := []byte("GET /\n\n")
 	n, err := ch.Write(msg, sig)
@@ -144,16 +152,15 @@ func TestChannelClientTCP(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err = ch.Close(); err != nil {
-		t.Fatal(err)
-	}
 	t.Logf("'%s' [%d]\n", string(buf[:n]), n)
 }
 
 func TestChannelClientServerTCP(t *testing.T) {
 	time.Sleep(time.Second)
 	s := NewTestChannelServer()
-	if err := s.Start("tcp+" + TCPAddrServer); err != nil {
+	err := s.Start("tcp+" + TCPAddrServer)
+	defer s.Stop()
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -181,11 +188,9 @@ func TestChannelClientServerTCP(t *testing.T) {
 	if err = ch.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(buf[:n], msg) != 0 {
+	if !bytes.Equal(buf[:n], msg) {
 		t.Fatal("message send/receive mismatch")
 	}
-
-	s.Stop()
 }
 
 func TestChannelClientServerSock(t *testing.T) {
@@ -219,7 +224,7 @@ func TestChannelClientServerSock(t *testing.T) {
 	if err = ch.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Compare(buf[:n], msg) != 0 {
+	if !bytes.Equal(buf[:n], msg) {
 		t.Fatal("message send/receive mismatch")
 	}
 

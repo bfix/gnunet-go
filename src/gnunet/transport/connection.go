@@ -29,9 +29,7 @@ import (
 type Connection struct {
 	from, to  *core.Peer
 	ch        *MsgChannel
-	buf       []byte
 	bandwidth uint32
-	init      bool
 	state     int
 	shared    []byte
 }

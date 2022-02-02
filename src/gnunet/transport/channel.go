@@ -35,9 +35,9 @@ import (
 
 // Error codes
 var (
-	ErrChannelNotImplemented = fmt.Errorf("Protocol not implemented")
-	ErrChannelNotOpened      = fmt.Errorf("Channel not opened")
-	ErrChannelInterrupted    = fmt.Errorf("Channel interrupted")
+	ErrChannelNotImplemented = fmt.Errorf("protocol not implemented")
+	ErrChannelNotOpened      = fmt.Errorf("channel not opened")
+	ErrChannelInterrupted    = fmt.Errorf("channel interrupted")
 )
 
 ////////////////////////////////////////////////////////////////////////
@@ -158,7 +158,7 @@ func (c *MsgChannel) Send(msg message.Message, sig *concurrent.Signaller) error 
 		return err
 	}
 	if len(data) != int(mh.MsgSize) {
-		return errors.New("Send: message size mismatch")
+		return errors.New("send: message size mismatch")
 	}
 
 	// send packet
@@ -167,7 +167,7 @@ func (c *MsgChannel) Send(msg message.Message, sig *concurrent.Signaller) error 
 		return err
 	}
 	if n != len(data) {
-		return errors.New("Incomplete send")
+		return errors.New("incomplete send")
 	}
 	return nil
 }
@@ -202,7 +202,7 @@ func (c *MsgChannel) Receive(sig *concurrent.Signaller) (message.Message, error)
 		return nil, err
 	}
 	if msg == nil {
-		return nil, fmt.Errorf("Message{%d} is nil", mh.MsgType)
+		return nil, fmt.Errorf("message{%d} is nil", mh.MsgType)
 	}
 	if err = data.Unmarshal(msg, c.buf[:mh.MsgSize]); err != nil {
 		return nil, err
