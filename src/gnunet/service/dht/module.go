@@ -22,6 +22,7 @@ import (
 	"gnunet/message"
 	"gnunet/service"
 	"gnunet/service/gns"
+	"net/http"
 )
 
 //======================================================================
@@ -32,16 +33,23 @@ import (
 // Put and get blocks into/from a DHT.
 //----------------------------------------------------------------------
 
-// Module handles the permanent storage of blocks under the query key.
+// Module handles the permanent storage of blocks under a query key.
 type Module struct {
 }
 
-// Get a GNS block from the DHT
+// RPC returns the route and handler function for a JSON-RPC request
+func (m *Module) RPC() (string, func(http.ResponseWriter, *http.Request)) {
+	return "/gns/", func(wrt http.ResponseWriter, req *http.Request) {
+		wrt.Write([]byte(`{"msg": "This is DHT" }`))
+	}
+}
+
+// Get a block from the DHT
 func (nc *Module) Get(ctx *service.SessionContext, query *gns.Query) (*message.Block, error) {
 	return nil, nil
 }
 
-// Put a GNS block into the DHT
+// Put a block into the DHT
 func (nc *Module) Put(ctx *service.SessionContext, block *message.Block) error {
 	return nil
 }
