@@ -56,12 +56,16 @@ func NewEmptyMessage(msgType uint16) (Message, error) {
 	//------------------------------------------------------------------
 	// DHT
 	//------------------------------------------------------------------
+	case DHT_CLIENT_PUT:
+		return NewDHTClientPutMsg(nil), nil
 	case DHT_CLIENT_GET:
 		return NewDHTClientGetMsg(nil), nil
 	case DHT_CLIENT_GET_STOP:
 		return NewDHTClientGetStopMsg(nil), nil
 	case DHT_CLIENT_RESULT:
 		return NewDHTClientResultMsg(nil), nil
+	case DHT_CLIENT_GET_RESULTS_KNOWN:
+		return NewDHTClientGetResultsKnownMsg(nil), nil
 
 	//------------------------------------------------------------------
 	// GNS
