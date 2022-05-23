@@ -27,6 +27,8 @@ import (
 	"github.com/bfix/gospel/crypto/ed25519"
 )
 
+type PeerID [32]byte
+
 // Peer represents a node in the GNUnet P2P network.
 type Peer struct {
 	prv      *ed25519.PrivateKey      // node private key (long-term signing key)
@@ -84,8 +86,10 @@ func (p *Peer) PubKey() *ed25519.PublicKey {
 }
 
 // GetID returns the node ID (public key) in binary format
-func (p *Peer) GetID() []byte {
-	return p.pub.Bytes()
+func (p *Peer) GetID() PeerID {
+	var id PeerID
+	copy(id[:], p.pub.Bytes())
+	return id
 }
 
 // GetIDString returns the string representation of the public key of the node.
