@@ -19,6 +19,7 @@
 package crypto
 
 import (
+	"bytes"
 	"crypto/sha512"
 
 	"gnunet/util"
@@ -27,6 +28,11 @@ import (
 // HashCode is the result of a 512-bit hash function (SHA-512)
 type HashCode struct {
 	Bits []byte `size:"64"`
+}
+
+// Equals tests if two hash results are equal.
+func (hc *HashCode) Equals(n *HashCode) bool {
+	return bytes.Equal(hc.Bits, n.Bits)
 }
 
 // NewHashCode creates a new, uninitalized hash value
