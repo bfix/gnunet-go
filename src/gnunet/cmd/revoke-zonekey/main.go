@@ -28,6 +28,7 @@ import (
 	"sync"
 	"syscall"
 
+	"gnunet/crypto"
 	"gnunet/service/revocation"
 	"gnunet/util"
 
@@ -76,7 +77,8 @@ func main() {
 		if err != nil {
 			log.Fatal("Invalid zonekey: " + err.Error())
 		}
-		revData.Rd = revocation.NewRevDataCalc(keyData)
+		zk, _ := crypto.NewZoneKey(keyData)
+		revData.Rd = revocation.NewRevDataCalc(zk)
 		revData.Numbits = uint8(bits)
 		revData.T = util.NewRelativeTime(0)
 		cont = false
