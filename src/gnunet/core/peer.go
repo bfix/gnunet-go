@@ -84,8 +84,8 @@ func (p *Peer) PubKey() *ed25519.PublicKey {
 }
 
 // GetID returns the node ID (public key) in binary format
-func (p *Peer) GetID() util.PeerID {
-	var id util.PeerID
+func (p *Peer) GetID() *util.PeerID {
+	id := new(util.PeerID)
 	copy(id.Key, p.pub.Bytes())
 	return id
 }
