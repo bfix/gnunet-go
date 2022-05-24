@@ -1,5 +1,5 @@
 // This file is part of gnunet-go, a GNUnet-implementation in Golang.
-// Copyright (C) 2019, 2020 Bernd Fix  >Y<
+// Copyright (C) 2019-2022 Bernd Fix  >Y<
 //
 // gnunet-go is free software: you can redistribute it and/or modify it
 // under the terms of the GNU Affero General Public License as published
@@ -26,8 +26,6 @@ import (
 
 	"github.com/bfix/gospel/crypto/ed25519"
 )
-
-type PeerID [32]byte
 
 // Peer represents a node in the GNUnet P2P network.
 type Peer struct {
@@ -86,9 +84,9 @@ func (p *Peer) PubKey() *ed25519.PublicKey {
 }
 
 // GetID returns the node ID (public key) in binary format
-func (p *Peer) GetID() PeerID {
-	var id PeerID
-	copy(id[:], p.pub.Bytes())
+func (p *Peer) GetID() util.PeerID {
+	var id util.PeerID
+	copy(id.Key, p.pub.Bytes())
 	return id
 }
 
