@@ -53,7 +53,7 @@ type PeerAddress struct {
 }
 
 // NewPeerAddress returns the DHT address of a peer.
-func NewPeerAddress(peer util.PeerID) *PeerAddress {
+func NewPeerAddress(peer *util.PeerID) *PeerAddress {
 	r := new(PeerAddress)
 	h := rtHash()
 	h.Write(peer.Key)
@@ -68,7 +68,7 @@ func (addr *PeerAddress) String() string {
 
 // Equals returns true if two peer addresses are the same.
 func (addr *PeerAddress) Equals(p *PeerAddress) bool {
-	return bytes.Compare(addr.addr[:], p.addr[:]) == 0
+	return bytes.Equal(addr.addr[:], p.addr[:])
 }
 
 // Distance between two addresses: returns a distance value and a
