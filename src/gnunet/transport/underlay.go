@@ -20,8 +20,9 @@ package transport
 
 import (
 	"fmt"
-	"gnunet/core"
+	"gnunet/message"
 	"gnunet/util"
+	"sync"
 
 	"github.com/bfix/gospel/concurrent"
 )
@@ -33,13 +34,13 @@ type Transport interface {
 	// establishment of a connection to another peer N using an address A.
 	// When the connection attempt is successful, information on the new
 	// peer is offered through the PEER_CONNECTED signal.
-	TryConnect(peer core.PeerID, addr util.Address)
+	TryConnect(peer *util.PeerID, addr *util.Address)
 
 	// Hold is a function which tells the underlay to keep a hold on to a
 	// connection to a peer P. Underlays are usually limited in the number
 	// of active connections. With this function the DHT can indicate to the
 	// underlay which connections should preferably be preserved.
-	Hold(peer core.PeerID)
+	Hold(peer *util.PeerID)
 
 	// Drop is a function which tells the underlay to drop the connection to a
 	// peer P. This function is only there for symmetry and used during the
@@ -50,11 +51,11 @@ type Transport interface {
 	// DROP() also does not imply that the underlay must close the connection:
 	// it merely removes the preference to preserve the connection that was
 	// established by HOLD().
-	Drop(peer core.PeerID)
+	Drop(peer *util.PeerID)
 
 	// Send is a function that allows the local peer to send a protocol
 	// message M to a peer P.
-	Send(peer core.PeerID, msg []byte)
+	Send(peer *util.PeerID, msg message.Message)
 
 	// L2NSE is ESTIMATE_NETWORK_SIZE(), a procedure that provides estimates
 	// on the base-2 logarithm of the network size L2NSE, that is the base-2
@@ -71,44 +72,43 @@ type Transport interface {
 // Implementation of a simple transport mechanism (testing-only).
 //======================================================================
 
+// Session for peer connection
+type Session struct {
+	OnHold bool        // don't drop this session
+	Ch     *MsgChannel // message exchange
+}
+
 // TestTransport is a simple UDP-based transport layer
 type TestTransport struct {
-	hdlr    chan Channel
-	sig     <-chan interface{}
-	srvc    ChannelServer
-	running bool
+	ctx      *concurrent.Signaller // service context
+	hdlr     chan Channel          // handler for incoming traffic
+	sig      chan interface{}      // signal channel
+	srvc     ChannelServer         // connection manager
+	running  bool                  // transport running?
+	sessions map[string]*Session   // list of open sessions
+	rwlock   sync.RWMutex          // lock for sessions map
 }
 
+// NewTestTransport instantiates a simple UDP-based transport layer
 func NewTestTransport() *TestTransport {
 	return &TestTransport{
-		hdlr:    make(chan Channel),
-		sig:     make(<-chan interface{}),
-		srvc:    nil,
-		running: false,
+		hdlr:     make(chan Channel),
+		sig:      make(chan interface{}),
+		srvc:     nil,
+		running:  false,
+		sessions: make(map[string]*Session),
 	}
 }
 
-func (t *TestTransport) handle(ch Channel, sig *concurrent.Signaller) {
-	buf := make([]byte, 4096)
-	for {
-		n, err := ch.Read(buf, sig)
-		if err != nil {
-			break
-		}
-		_, err = ch.Write(buf[:n], sig)
-		if err != nil {
-			break
-		}
-	}
-	ch.Close()
-}
-
+// Start a transport service for given spec:
+//     "unix+/tmp/test.sock" -- for UDS channels
+//     "tcp+1.2.3.4:5"       -- for TCP channels
+//     "udp+1.2.3.4:5"       -- for UDP channels
 func (s *TestTransport) Start(spec string) (err error) {
 	// check if we are already running
 	if s.running {
 		return fmt.Errorf("Server already running")
 	}
-
 	// start channel server
 	if s.srvc, err = NewChannelServer(spec, s.hdlr); err != nil {
 		return
@@ -116,16 +116,18 @@ func (s *TestTransport) Start(spec string) (err error) {
 	s.running = true
 
 	// handle clients
-	sig := concurrent.NewSignaller()
+	s.ctx = concurrent.NewSignaller()
 	go func() {
 		for s.running {
+			// wait for next request
 			in := <-s.hdlr
 			if in == nil {
 				break
 			}
 			switch x := in.(type) {
+			// new connection established
 			case Channel:
-				go s.handle(x, sig)
+				go s.handle(x)
 			}
 		}
 		s.srvc.Close()
@@ -134,26 +136,121 @@ func (s *TestTransport) Start(spec string) (err error) {
 	return nil
 }
 
+// Stop a transport service
 func (s *TestTransport) Stop() {
 	s.running = false
 }
 
-func (t *TestTransport) TryConnect(peer core.PeerID, addr util.Address) {
+// TryConnect is a function which allows the local peer to attempt the
+// establishment of a connection to another peer using an address.
+// When the connection attempt is successful, information on the new
+// peer is offered through the PEER_CONNECTED signal.
+func (t *TestTransport) TryConnect(peer *util.PeerID, addr util.Address) {}
 
+// Hold is a function which tells the underlay to keep a hold on to a
+// connection to a peer P. Underlays are usually limited in the number
+// of active connections. With this function the DHT can indicate to the
+// underlay which connections should preferably be preserved.
+func (t *TestTransport) Hold(peer *util.PeerID) {
+	// one map writer at a time
+	t.rwlock.Lock()
+	defer t.rwlock.Unlock()
+
+	// if the session is known, it is put on hold.
+	if sess, ok := t.sessions[peer.String()]; ok {
+		sess.OnHold = true
+	}
 }
 
-func (t *TestTransport) Hold(peer core.PeerID) {
+// Drop is a function which tells the underlay to drop the connection to a
+// peer P. This function is only there for symmetry and used during the
+// peer's shutdown to release all of the remaining HOLDs. As R5N always
+// prefers the longest-lived connections, it would never drop an active
+// connection that it has called HOLD() on before. Nevertheless, underlay
+// implementations should not rely on this always being true. A call to
+// DROP() also does not imply that the underlay must close the connection:
+// it merely removes the preference to preserve the connection that was
+// established by HOLD().
+func (t *TestTransport) Drop(peer *util.PeerID) {
+	// one map writer at a time
+	t.rwlock.Lock()
+	defer t.rwlock.Unlock()
 
+	// if the session is known, unhold it.
+	if sess, ok := t.sessions[peer.String()]; ok {
+		sess.OnHold = false
+	}
 }
 
-func (t *TestTransport) Drop(peer core.PeerID) {}
+// Send is a function that allows the local peer to send a protocol
+// message M to a peer P.
+func (t *TestTransport) Send(peer *util.PeerID, msg message.Message) {
+	// reader-only
+	t.rwlock.RLock()
+	defer t.rwlock.RUnlock()
 
-func (t *TestTransport) Send(peer core.PeerID, msg []byte) {}
+	// if the session is known, send message to peer
+	if sess, ok := t.sessions[peer.String()]; ok {
+		sess.Ch.Send(msg, t.ctx)
+	}
+}
 
+// L2NSE is ESTIMATE_NETWORK_SIZE(), a procedure that provides estimates
+// on the base-2 logarithm of the network size L2NSE, that is the base-2
+// logarithm number of peers in the network, for use by the routing
+// algorithm.
 func (t *TestTransport) L2NSE() float64 {
 	return 0
 }
 
+// Signal returns a channel for transport signals (send by the transport
+// to communicate connect and disconnect events and others)
 func (t *TestTransport) Signal() <-chan interface{} {
-	return nil
+	return t.sig
+}
+
+//----------------------------------------------------------------------
+//----------------------------------------------------------------------
+
+// Incoming associates an incoming message (request/response) with
+// the transport channel (for optional replies).
+type Incoming struct {
+	Msg message.Message
+	Ch  *MsgChannel
+}
+
+// handle incoming traffic
+func (t *TestTransport) handle(ch Channel) {
+	msgCh := NewMsgChannel(ch)
+	for {
+		// receive next message
+		msg, err := msgCh.Receive(t.ctx)
+		if err != nil {
+			panic(err)
+		}
+		// inspect message for peer state events
+		switch x := msg.(type) {
+		case *message.HelloMsg:
+			// start session
+			t.rwlock.Lock()
+			id := x.PeerID.String()
+			t.sessions[id] = &Session{
+				OnHold: false,
+				Ch:     msgCh,
+			}
+			t.rwlock.Unlock()
+			/*
+				case *message.HangupMsg:
+					// quit session
+					t.rwlock.Lock()
+					delete(t.sessions, x.PeerID.String())
+					t.rwlock.Unlock()
+			*/
+		}
+		// forward message
+		t.sig <- &Incoming{
+			Msg: msg,
+			Ch:  msgCh,
+		}
+	}
 }
