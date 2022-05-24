@@ -87,7 +87,7 @@ func TestRT(t *testing.T) {
 	connected := func(task *Entry, e int64, msg string) {
 		ch <- &RTCommand{
 			Cmd:  RtcConnect,
-			Peer: task.addr,
+			Data: task.addr,
 		}
 		task.online = true
 		task.last = e
@@ -96,7 +96,7 @@ func TestRT(t *testing.T) {
 	disconnected := func(task *Entry, e int64, msg string) {
 		ch <- &RTCommand{
 			Cmd:  RtcDisconnect,
-			Peer: task.addr,
+			Data: task.addr,
 		}
 		task.online = false
 		task.last = e
@@ -135,7 +135,7 @@ func TestRT(t *testing.T) {
 
 	// execute some routing functions on remaining table
 	k := genPeer(false)
-	bf := new(BloomFilter)
+	bf := NewPeerBloomFilter()
 	n := rt.SelectClosestPeer(k, bf)
 	t.Logf("Closest: %s -> %s\n", k, n)
 

@@ -52,7 +52,7 @@ type PeerAddress struct {
 	addr [sizeAddr]byte
 }
 
-// NewPeerAddress returns the DHT address of a peer
+// NewPeerAddress returns the DHT address of a peer.
 func NewPeerAddress(peer core.PeerID) *PeerAddress {
 	r := new(PeerAddress)
 	h := rtHash()
@@ -61,10 +61,12 @@ func NewPeerAddress(peer core.PeerID) *PeerAddress {
 	return r
 }
 
+// String returns a human-readble representation of an address.
 func (addr *PeerAddress) String() string {
 	return hex.EncodeToString(addr.addr[:])
 }
 
+// Equals returns true if two peer addresses are the same.
 func (addr *PeerAddress) Equals(p *PeerAddress) bool {
 	return bytes.Compare(addr.addr[:], p.addr[:]) == 0
 }
@@ -81,19 +83,21 @@ func (addr *PeerAddress) Distance(p *PeerAddress) (*math.Int, int) {
 }
 
 //======================================================================
+// Routing table implementation
 //======================================================================
 
 // RT command codes:
 const (
 	RtcConnect    = iota // PEER_CONNECTED
 	RtcDisconnect        // PEER_DISCONNECTED
+	RtcL2NSE             // new network size estimation (log2) available
 )
 
 // RTCommand is a command sent by the transport layer to keep the
 // routing table up-to-date.
 type RTCommand struct {
-	Cmd  int          // command identifier ("Rtc???")
-	Peer *PeerAddress // address of peer involved
+	Cmd  int         // command identifier ("Rtc???")
+	Data interface{} // command parameter
 }
 
 // RoutingTable holds the (local) routing table for a node.
@@ -105,6 +109,7 @@ type RoutingTable struct {
 	buckets []*Bucket             // list of buckets
 	list    map[*PeerAddress]bool // keep list of peers
 	rwlock  sync.RWMutex          // lock for write operations
+	l2nse   float64               // log2 of estimated network size
 }
 
 // NewRoutingTable creates a new routing table for the reference address.
@@ -130,11 +135,15 @@ func (rt *RoutingTable) Run(ctx context.Context) chan *RTCommand {
 				// signal: peer connected
 				case RtcConnect:
 					// add peer to routing table
-					go rt.Add(cmd.Peer, true)
+					go rt.Add(cmd.Data.(*PeerAddress), true)
 
 				// signal: peer disconnected
 				case RtcDisconnect:
-					go rt.Remove(cmd.Peer)
+					go rt.Remove(cmd.Data.(*PeerAddress))
+
+				// signal: new NSE available
+				case RtcL2NSE:
+					rt.l2nse = cmd.Data.(float64)
 				}
 			// terminate signal received
 			case <-ctx.Done():
@@ -159,10 +168,7 @@ func (rt *RoutingTable) Add(p *PeerAddress, connected bool) bool {
 		rt.list[p] = true
 		return true
 	}
-
-	// Full bucket: try to apply eviction strategy...
-
-	// we did not add the address to the routing table
+	// Full bucket: we did not add the address to the routing table.
 	return false
 }
 
@@ -175,11 +181,11 @@ func (rt *RoutingTable) Remove(p *PeerAddress) bool {
 
 	// compute distance (bucket index) and remove entry from bucket
 	_, idx := p.Distance(rt.ref)
-	rc := rt.buckets[idx].Remove(p)
-	if rc {
+	if rt.buckets[idx].Remove(p) {
 		delete(rt.list, p)
+		return true
 	}
-	return rc
+	return false
 }
 
 //----------------------------------------------------------------------
@@ -187,7 +193,7 @@ func (rt *RoutingTable) Remove(p *PeerAddress) bool {
 //----------------------------------------------------------------------
 
 // SelectClosestPeer for a given peer address and bloomfilter.
-func (rt *RoutingTable) SelectClosestPeer(p *PeerAddress, bf *BloomFilter) (n *PeerAddress) {
+func (rt *RoutingTable) SelectClosestPeer(p *PeerAddress, bf *PeerBloomFilter) (n *PeerAddress) {
 	// no writer allowed
 	rt.rwlock.RLock()
 	defer rt.rwlock.RUnlock()
@@ -205,24 +211,64 @@ func (rt *RoutingTable) SelectClosestPeer(p *PeerAddress, bf *BloomFilter) (n *P
 
 // SelectRandomPeer returns a random address from table (that is not
 // included in the bloomfilter)
-func (rt *RoutingTable) SelectRandomPeer(bf *BloomFilter) (n *PeerAddress) {
+func (rt *RoutingTable) SelectRandomPeer(bf *PeerBloomFilter) *PeerAddress {
 	// no writer allowed
 	rt.rwlock.RLock()
 	defer rt.rwlock.RUnlock()
 
-	// check for entries
+	// select random entry from list
 	if size := len(rt.list); size > 0 {
 		idx := rand.Intn(size)
-		addrs := make([]*PeerAddress, 0, size)
 		for k := range rt.list {
-			addrs = append(addrs, k)
+			if idx == 0 {
+				return k
+			}
+			idx--
 		}
-		return addrs[idx]
 	}
-	return
+	return nil
+}
+
+// SelectPeer selects a neighbor depending on the number of hops parameter.
+// If hops < NSE this function MUST return SelectRandomPeer() and
+// SelectClosestpeer() otherwise.
+func (rt *RoutingTable) SelectPeer(p *PeerAddress, hops int, bf *PeerBloomFilter) *PeerAddress {
+	if float64(hops) < rt.l2nse {
+		return rt.SelectRandomPeer(bf)
+	}
+	return rt.SelectClosestPeer(p, bf)
+}
+
+// IsClosestPeer returns true if p is the closest peer for k. Peers with a
+// positive test in the Bloom filter  are not considered.
+func (rt *RoutingTable) IsClosestPeer(p, k *PeerAddress, bf *PeerBloomFilter) bool {
+	n := rt.SelectClosestPeer(k, bf)
+	return n.Equals(p)
+}
+
+// ComputeOutDegree computes the number of neighbors that a message should be forwarded to.
+// The arguments are the desired replication level, the hop count of the message so far,
+// and the base-2 logarithm of the current network size estimate (L2NSE) as provided by the
+// underlay. The result is the non-negative number of next hops to select.
+func (rt *RoutingTable) ComputeOutDegree(repl, hop int) int {
+	hf := float64(hop)
+	if hf > 4*rt.l2nse {
+		return 0
+	}
+	if hf > 2*rt.l2nse {
+		return 1
+	}
+	if repl == 0 {
+		repl = 1
+	} else if repl > 16 {
+		repl = 16
+	}
+	rm1 := float64(repl - 1)
+	return 1 + int(rm1/(rt.l2nse+rm1*hf))
 }
 
 //======================================================================
+// Routing table buckets
 //======================================================================
 
 // PeerEntry in a k-Bucket: use routing specific attributes
@@ -231,9 +277,6 @@ type PeerEntry struct {
 	addr      *PeerAddress // peer address
 	connected bool         // is peer connected?
 }
-
-//======================================================================
-//======================================================================
 
 // Bucket holds peer entries with approx. same distance from node
 type Bucket struct {
@@ -285,7 +328,9 @@ func (b *Bucket) Remove(p *PeerAddress) bool {
 	return false
 }
 
-func (b *Bucket) SelectClosestPeer(p *PeerAddress, bf *BloomFilter) (n *PeerAddress, dist *math.Int) {
+// SelectClosestPeer returns the entry with minimal distance to the given
+// peer address; entries included in the bloom flter are ignored.
+func (b *Bucket) SelectClosestPeer(p *PeerAddress, bf *PeerBloomFilter) (n *PeerAddress, dist *math.Int) {
 	// no writer allowed
 	b.rwlock.RLock()
 	defer b.rwlock.RUnlock()
