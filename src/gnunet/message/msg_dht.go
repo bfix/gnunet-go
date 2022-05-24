@@ -33,35 +33,41 @@ import (
 
 // DHTClientPutMsg is the message for putting values into the DHT
 type DHTClientPutMsg struct {
-	MsgSize   uint16           `order:"big"` // total size of message
-	MsgType   uint16           `order:"big"` // DHT_CLIENT_PUT (142)
-	Options   uint32           `order:"big"` // Message options (DHT_RO_???)
-	ReplLevel uint32           `order:"big"` // Replication level for this message
-	Type      uint32           `order:"big"` // The type for the data for the GET request (BLOCK_TYPE_???)
-	Key       *crypto.HashCode // The key to search for
-	ID        uint64           `order:"big"` // Unique ID identifying this request
+	MsgSize   uint16            `order:"big"` // total size of message
+	MsgType   uint16            `order:"big"` // DHT_CLIENT_PUT (142)
+	Type      uint32            `order:"big"` // The type of the data (BLOCK_TYPE_???)
+	Options   uint32            `order:"big"` // Message options (DHT_RO_???)
+	ReplLevel uint32            `order:"big"` // Replication level for this message
+	Expire    util.AbsoluteTime // Expiration time
+	Key       *crypto.HashCode  // The key to be used
+	Data      []byte            `size:"*"` // Block data
 }
 
 // NewDHTClientPutMsg creates a new default DHTClientPutMsg object.
-func NewDHTClientPutMsg(key *crypto.HashCode) *DHTClientPutMsg {
+func NewDHTClientPutMsg(key *crypto.HashCode, btype int, data []byte) *DHTClientPutMsg {
 	if key == nil {
 		key = new(crypto.HashCode)
 	}
+	var size uint16 = 88
+	if data != nil {
+		size += uint16(len(data))
+	}
 	return &DHTClientPutMsg{
-		MsgSize:   88,
+		MsgSize:   size,
 		MsgType:   DHT_CLIENT_PUT,
+		Type:      uint32(btype),
 		Options:   uint32(enums.DHT_RO_NONE),
 		ReplLevel: 1,
-		Type:      uint32(enums.BLOCK_TYPE_ANY),
+		Expire:    util.AbsoluteTimeNever(),
 		Key:       key,
-		ID:        0,
+		Data:      data,
 	}
 }
 
 // String returns a human-readable representation of the message.
 func (m *DHTClientPutMsg) String() string {
-	return fmt.Sprintf("DHTClientPutMsg{Id:%d,Type=%d,Options=%d,Repl=%d,Key=%s}",
-		m.ID, m.Type, m.Options, m.ReplLevel, hex.EncodeToString(m.Key.Bits))
+	return fmt.Sprintf("DHTClientPutMsg{Type=%d,Expire=%s,Options=%d,Repl=%d,Key=%s}",
+		m.Type, m.Expire, m.Options, m.ReplLevel, hex.EncodeToString(m.Key.Bits))
 }
 
 // Header returns the message header in a separate instance.
@@ -212,13 +218,12 @@ func (m *DHTClientGetStopMsg) Header() *Header {
 
 // DHTClientGetResultsKnownMsg is the message for putting values into the DHT
 type DHTClientGetResultsKnownMsg struct {
-	MsgSize   uint16           `order:"big"` // total size of message
-	MsgType   uint16           `order:"big"` // DHT_CLIENT_GET_RESULTS_KNOWN (156)
-	Options   uint32           `order:"big"` // Message options (DHT_RO_???)
-	ReplLevel uint32           `order:"big"` // Replication level for this message
-	Type      uint32           `order:"big"` // The type for the data for the GET request (BLOCK_TYPE_???)
-	Key       *crypto.HashCode // The key to search for
-	ID        uint64           `order:"big"` // Unique ID identifying this request
+	MsgSize  uint16             `order:"big"` // total size of message
+	MsgType  uint16             `order:"big"` // DHT_CLIENT_GET_RESULTS_KNOWN (156)
+	Reserved uint32             `order:"big"` // Reserved for further use
+	Key      *crypto.HashCode   // The key to search for
+	ID       uint64             `order:"big"` // Unique ID identifying this request
+	Known    []*crypto.HashCode `size:"*"`    // list of known results
 }
 
 // NewDHTClientPutMsg creates a new default DHTClientPutMsg object.
@@ -227,20 +232,24 @@ func NewDHTClientGetResultsKnownMsg(key *crypto.HashCode) *DHTClientGetResultsKn
 		key = new(crypto.HashCode)
 	}
 	return &DHTClientGetResultsKnownMsg{
-		MsgSize:   88,
-		MsgType:   DHT_CLIENT_GET_RESULTS_KNOWN,
-		Options:   uint32(enums.DHT_RO_NONE),
-		ReplLevel: 1,
-		Type:      uint32(enums.BLOCK_TYPE_ANY),
-		Key:       key,
-		ID:        0,
+		MsgSize: 80,
+		MsgType: DHT_CLIENT_GET_RESULTS_KNOWN,
+		Key:     key,
+		ID:      0,
+		Known:   make([]*crypto.HashCode, 0),
 	}
+}
+
+// AddKnown adds a known result to the list
+func (m *DHTClientGetResultsKnownMsg) AddKnown(hc *crypto.HashCode) {
+	m.Known = append(m.Known, hc)
+	m.MsgSize += 64
 }
 
 // String returns a human-readable representation of the message.
 func (m *DHTClientGetResultsKnownMsg) String() string {
-	return fmt.Sprintf("DHTClientGetResultsKnownMsg{Id:%d,Type=%d,Options=%d,Repl=%d,Key=%s}",
-		m.ID, m.Type, m.Options, m.ReplLevel, hex.EncodeToString(m.Key.Bits))
+	return fmt.Sprintf("DHTClientGetResultsKnownMsg{Id:%d,Key=%s,Num=%d}",
+		m.ID, hex.EncodeToString(m.Key.Bits), len(m.Known))
 }
 
 // Header returns the message header in a separate instance.
