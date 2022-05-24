@@ -1,10 +1,16 @@
 {
+	"bootstrap": {
+		"nodes": [
+			"udp+boot.gnunet.org:8765"
+		]
+	},
 	"environ": {
 		"TMP": "/tmp",
 		"RT_SYS": "${TMP}/gnunet-system-runtime"
 	},
 	"dht": {
-		"endpoint": "unix+${RT_SYS}/gnunet-service-dht.sock"
+		"endpoint": "unix+${RT_SYS}/gnunet-service-dht.sock",
+		"storage": "file+/var/lib/gnunet/dht/store"
 	},
 	"gns": {
 		"endpoint": "unix+${RT_SYS}/gnunet-service-gns-go.sock+perm=0770",

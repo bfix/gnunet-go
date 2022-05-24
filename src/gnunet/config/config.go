@@ -28,16 +28,18 @@ import (
 	"github.com/bfix/gospel/logger"
 )
 
-///////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------
 // RPC configuration
+//----------------------------------------------------------------------
 
 // RPCConfig contains parameters for the JSON-RPC service
 type RPCConfig struct {
 	Endpoint string `json:"endpoint"` // end-point of JSON-RPC service
 }
 
-///////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------
 // GNS configuration
+//----------------------------------------------------------------------
 
 // GNSConfig contains parameters for the GNU Name System service
 type GNSConfig struct {
@@ -46,24 +48,28 @@ type GNSConfig struct {
 	MaxDepth     int    `json:"maxDepth"`     // maximum recursion depth in resolution
 }
 
-///////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------
 // DHT configuration
+//----------------------------------------------------------------------
 
 // DHTConfig contains parameters for the distributed hash table (DHT)
 type DHTConfig struct {
 	Endpoint string `json:"endpoint"` // end-point of DHT service
+	Storage  string `jsom:"storage"`  // filesystem storage location
 }
 
-///////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------
 // Namecache configuration
+//----------------------------------------------------------------------
 
 // NamecacheConfig contains parameters for the local name cache
 type NamecacheConfig struct {
 	Endpoint string `json:"endpoint"` // end-point of Namecache service
 }
 
-///////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------
 // Revocation configuration
+//----------------------------------------------------------------------
 
 // RevocationConfig contains parameters for the key revocation service
 type RevocationConfig struct {
@@ -71,7 +77,18 @@ type RevocationConfig struct {
 	Storage  string `json:"storage"`  // persistance mechanism for revocation data
 }
 
-///////////////////////////////////////////////////////////////////////
+//----------------------------------------------------------------------
+// Bootstrap configuration
+//----------------------------------------------------------------------
+
+// BootstrapConfig holds parameters for the initial connection to the network.
+type BootstrapConfig struct {
+	Nodes []string `json:"nodes"` // bootstrap nodes
+}
+
+//----------------------------------------------------------------------
+// Combined configuration
+//----------------------------------------------------------------------
 
 // Environment settings
 type Environment map[string]string
@@ -84,6 +101,7 @@ type Config struct {
 	GNS        *GNSConfig        `json:"gns"`
 	Namecache  *NamecacheConfig  `json:"namecache"`
 	Revocation *RevocationConfig `json:"revocation"`
+	Bootstrap  *BootstrapConfig  `json:"bootstrap"`
 }
 
 var (
