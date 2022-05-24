@@ -23,7 +23,7 @@ import (
 	"context"
 	"crypto/sha512"
 	"encoding/hex"
-	"gnunet/core"
+	"gnunet/util"
 	"math/rand"
 	"sync"
 
@@ -53,10 +53,10 @@ type PeerAddress struct {
 }
 
 // NewPeerAddress returns the DHT address of a peer.
-func NewPeerAddress(peer core.PeerID) *PeerAddress {
+func NewPeerAddress(peer util.PeerID) *PeerAddress {
 	r := new(PeerAddress)
 	h := rtHash()
-	h.Write(peer[:])
+	h.Write(peer.Key)
 	copy(r.addr[:], h.Sum(nil))
 	return r
 }

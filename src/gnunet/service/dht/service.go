@@ -47,7 +47,7 @@ type Service struct {
 
 // NewService creates a new DHT service instance
 func NewService() service.Service {
-	// instantiate service and assemble a new GNS handler.
+	// instantiate service and assemble a new DHT handler.
 	inst := new(Service)
 	return inst
 }
@@ -84,33 +84,7 @@ loop:
 		logger.Printf(logger.INFO, "[dht:%d:%d] Received request: %v\n", ctx.ID, reqID, msg)
 
 		// handle message
-		switch msg.(type) {
-		case *message.DHTClientPutMsg:
-			//----------------------------------------------------------
-			// DHT PUT
-			//----------------------------------------------------------
-
-		case *message.DHTClientGetMsg:
-			//----------------------------------------------------------
-			// DHT GET
-			//----------------------------------------------------------
-
-		case *message.DHTClientGetResultsKnownMsg:
-			//----------------------------------------------------------
-			// DHT GET-RESULTS-KNOWN
-			//----------------------------------------------------------
-
-		case *message.DHTClientGetStopMsg:
-			//----------------------------------------------------------
-			// DHT GET-STOP
-			//----------------------------------------------------------
-
-		case *message.DHTClientResultMsg:
-			//----------------------------------------------------------
-			// DHT RESULT
-			//----------------------------------------------------------
-
-		default:
+		if !s.HandleMessage(msg, mc) {
 			//----------------------------------------------------------
 			// UNKNOWN message type received
 			//----------------------------------------------------------
@@ -124,4 +98,37 @@ loop:
 	// cancel all tasks running for this session/connection
 	logger.Printf(logger.INFO, "[dht:%d] Start closing session... [%d]\n", ctx.ID, ctx.Waiting())
 	ctx.Cancel()
+}
+
+func (s *Service) HandleMessage(msg message.Message, mc *transport.MsgChannel) bool {
+
+	// handle message
+	switch msg.(type) {
+	case *message.DHTClientPutMsg:
+		//----------------------------------------------------------
+		// DHT PUT
+		//----------------------------------------------------------
+
+	case *message.DHTClientGetMsg:
+		//----------------------------------------------------------
+		// DHT GET
+		//----------------------------------------------------------
+
+	case *message.DHTClientGetResultsKnownMsg:
+		//----------------------------------------------------------
+		// DHT GET-RESULTS-KNOWN
+		//----------------------------------------------------------
+
+	case *message.DHTClientGetStopMsg:
+		//----------------------------------------------------------
+		// DHT GET-STOP
+		//----------------------------------------------------------
+
+	case *message.DHTClientResultMsg:
+		//----------------------------------------------------------
+		// DHT RESULT
+		//----------------------------------------------------------
+	}
+	// message not handled
+	return false
 }
