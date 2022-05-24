@@ -31,6 +31,7 @@ import (
 	"gnunet/rpc"
 	"gnunet/service"
 	"gnunet/service/dht"
+	"gnunet/transport"
 
 	"github.com/bfix/gospel/logger"
 )
@@ -70,10 +71,17 @@ func main() {
 	}
 
 	// start a new DHT service
-	dht := dht.NewService()
+	dht := dht.NewService().(*dht.Service)
 	srv := service.NewServiceImpl("dht", dht)
 	if err = srv.Start(srvEndp); err != nil {
-		logger.Printf(logger.ERROR, "[dht] Error: '%s'", err.Error())
+		logger.Printf(logger.ERROR, "[dht] Failed to start DHT service: '%s'", err.Error())
+		return
+	}
+
+	// start test transport service
+	trans := transport.NewTestTransport()
+	if err = trans.Start("udp+127.0.0.1:8765"); err != nil {
+		logger.Printf(logger.ERROR, "[dht] Failed to start transport: '%s'", err.Error())
 		return
 	}
 
@@ -105,6 +113,13 @@ func main() {
 loop:
 	for {
 		select {
+		// handle transport events
+		case act := <-trans.Signal():
+			switch x := act.(type) {
+			// forward message to DHT
+			case *transport.Incoming:
+				dht.HandleMessage(x.Msg, x.Ch)
+			}
 		// handle OS signals
 		case sig := <-sigCh:
 			switch sig {
