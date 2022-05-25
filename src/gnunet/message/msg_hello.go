@@ -19,156 +19,9 @@
 package message
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
 	"gnunet/util"
-	"net/url"
-	"strconv"
-	"strings"
-	"time"
-
-	"github.com/bfix/gospel/crypto/ed25519"
 )
-
-//----------------------------------------------------------------------
-// HELLO URLs are used for bootstrapping a node and for adding nodes
-// outside of GNUnet message exchange (e.g. command-line tools)
-//----------------------------------------------------------------------
-
-const helloPrefix = "gnunet://hello/"
-
-// HelloData is the information used to create and parse HELLO URLs.
-// All addresses expire at the same time /this different from HELLO
-// messages (see below).
-type HelloData struct {
-	PeerID    *util.PeerID         // peer identifier
-	Signature *ed25519.EdSignature // signature
-	Expire    uint64               // expiration timestamp (Unix epoch)
-	Addrs     []*util.Address      // list of addresses for peer
-}
-
-// ParseHelloURL parses a HELLO URL of the following form:
-//     gnunet://hello/<PeerID>/<signature>/<expire>?<addrs>
-// The addresses are encoded.
-func ParseHelloURL(u string) (h *HelloData, err error) {
-	// check and trim prefix
-	if !strings.HasPrefix(u, helloPrefix) {
-		err = fmt.Errorf("invalid HELLO-URL prefix: '%s'", u)
-		return
-	}
-	u = u[len(helloPrefix):]
-
-	// split remainder into parts
-	p := strings.Split(u, "/")
-	if len(p) != 3 {
-		err = fmt.Errorf("invalid HELLO-URL: '%s'", u)
-		return
-	}
-
-	// assemble HELLO data
-	h = new(HelloData)
-
-	// (1) parse peer public key (peer ID)
-	var buf []byte
-	if buf, err = util.DecodeStringToBinary(p[0], 32); err != nil {
-		return
-	}
-	h.PeerID = util.NewPeerID(buf)
-
-	// (2) parse signature
-	if buf, err = util.DecodeStringToBinary(p[1], 64); err != nil {
-		return
-	}
-	if h.Signature, err = ed25519.NewEdSignatureFromBytes(buf); err != nil {
-		return
-	}
-
-	// (3) split last element into parts
-	q := strings.SplitN(p[2], "?", 2)
-
-	// (4) parse expiration date
-	if h.Expire, err = strconv.ParseUint(q[0], 10, 64); err != nil {
-		return
-	}
-
-	// (5) process addresses.
-	h.Addrs = make([]*util.Address, 0)
-	var ua string
-	for _, a := range strings.Split(q[1], "&") {
-		// unescape URL query
-		if ua, err = url.QueryUnescape(a); err != nil {
-			return
-		}
-		// parse address and append it to list
-		var addr *util.Address
-		if addr, err = util.ParseAddress(ua); err != nil {
-			return
-		}
-		h.Addrs = append(h.Addrs, addr)
-	}
-	return
-}
-
-// URL returns the HELLO URL for the data.
-func (h *HelloData) URL() string {
-	u := fmt.Sprintf("%s%s/%s/%d?",
-		helloPrefix,
-		h.PeerID.String(),
-		util.EncodeBinaryToString(h.Signature.Bytes()),
-		h.Expire,
-	)
-	for i, a := range h.Addrs {
-		if i > 0 {
-			u += "&"
-		}
-		u += url.QueryEscape(a.String())
-	}
-	return u
-}
-
-// Equals returns true if two HELLOs are the same
-func (h *HelloData) Equals(g *HelloData) bool {
-	if !h.PeerID.Equals(g.PeerID) ||
-		!util.Equals(h.Signature.Bytes(), g.Signature.Bytes()) ||
-		h.Expire != g.Expire ||
-		len(h.Addrs) != len(g.Addrs) {
-		return false
-	}
-	for i, a := range h.Addrs {
-		if !a.Equals(g.Addrs[i]) {
-			return false
-		}
-	}
-	return true
-}
-
-// Verify the integrity of the HELLO data
-func (h *HelloData) Verify() (bool, error) {
-	// assemble signed data and public key
-	sd := h.signedData()
-	pub := ed25519.NewPublicKeyFromBytes(h.PeerID.Key)
-	return pub.EdVerify(sd, h.Signature)
-}
-
-// Sign the HELLO data with private key
-func (h *HelloData) Sign(prv *ed25519.PrivateKey) (err error) {
-	// assemble signed data
-	sd := h.signedData()
-	h.Signature, err = prv.EdSign(sd)
-	return
-}
-
-// signedData assembles a data block for sign and verify operations.
-func (h *HelloData) signedData() []byte {
-	buf := new(bytes.Buffer)
-	buf.Write(h.PeerID.Key)
-	binary.Write(buf, binary.BigEndian, h.Expire)
-	for _, a := range h.Addrs {
-		buf.Write(a.Address)
-	}
-	return buf.Bytes()
-}
 
 //----------------------------------------------------------------------
 // HELLO
@@ -192,11 +45,11 @@ type HelloAddress struct {
 }
 
 // NewHelloAddress create a new HELLO address from the given address
-func NewHelloAddress(a *util.Address) *HelloAddress {
+func NewHelloAddress(a *util.Address, expire util.AbsoluteTime) *HelloAddress {
 	addr := &HelloAddress{
 		Transport: a.Transport,
 		AddrSize:  uint16(len(a.Address)),
-		ExpireOn:  util.AbsoluteTimeNow().Add(12 * time.Hour),
+		ExpireOn:  expire,
 		Address:   make([]byte, len(a.Address)),
 	}
 	copy(addr.Address, a.Address)
