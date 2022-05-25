@@ -22,7 +22,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"gnunet/crypto"
-	"gnunet/message"
+	blocks "gnunet/service/dht/blocks"
 	"io/ioutil"
 	"os"
 	"strings"
@@ -38,10 +38,10 @@ import (
 // hash result and value is a DHT block.
 type Store interface {
 	// Put block into storage under given key
-	Put(key *crypto.HashCode, val *message.Block) error
+	Put(key blocks.Query, val blocks.Block) error
 
 	// Get block with given key from storage
-	Get(key *crypto.HashCode) (*message.Block, error)
+	Get(key blocks.Query) (blocks.Block, error)
 }
 
 // NewStore creates a new storage handler with given spec
@@ -72,9 +72,9 @@ func NewFileStore(path string) *FileStore {
 }
 
 // Put block into storage under given key
-func (s *FileStore) Put(key *crypto.HashCode, val *message.Block) (err error) {
+func (s *FileStore) Put(key blocks.Query, val blocks.Block) (err error) {
 	// get path and filename from key
-	path, fname := s.expandPath(key)
+	path, fname := s.expandPath(key.Key())
 	// make sure the path exists
 	if err = os.MkdirAll(path, 0755); err != nil {
 		return
@@ -93,17 +93,16 @@ func (s *FileStore) Put(key *crypto.HashCode, val *message.Block) (err error) {
 }
 
 // Get block with given key from storage
-func (s *FileStore) Get(key *crypto.HashCode) (val *message.Block, err error) {
+func (s *FileStore) Get(key blocks.Query) (val blocks.Block, err error) {
 	// get path and filename from key
-	path, fname := s.expandPath(key)
+	path, fname := s.expandPath(key.Key())
 	// read file content (block data)
 	var buf []byte
 	if buf, err = ioutil.ReadFile(path + "/" + fname); err != nil {
 		return
 	}
 	// assemble Block object
-	val = new(message.Block)
-	err = data.Unmarshal(val, buf)
+	val = blocks.NewGenericBlock(buf)
 	return
 }
 

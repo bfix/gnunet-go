@@ -21,8 +21,8 @@ package message
 import (
 	"encoding/hex"
 	"fmt"
-
 	"gnunet/crypto"
+	"gnunet/service/dht/blocks"
 	"gnunet/util"
 )
 
@@ -114,7 +114,7 @@ type NamecacheCacheMsg struct {
 }
 
 // NewNamecacheCacheMsg creates a new default message.
-func NewNamecacheCacheMsg(block *Block) *NamecacheCacheMsg {
+func NewNamecacheCacheMsg(block *blocks.GNSBlock) *NamecacheCacheMsg {
 	msg := &NamecacheCacheMsg{
 		MsgSize:       108,
 		MsgType:       NAMECACHE_BLOCK_CACHE,
@@ -125,10 +125,10 @@ func NewNamecacheCacheMsg(block *Block) *NamecacheCacheMsg {
 	}
 	if block != nil {
 		msg.DerivedKeySig = block.DerivedKeySig
-		msg.Expire = block.Block.Expire
-		size := len(block.Block.EncData)
+		msg.Expire = block.Body.Expire
+		size := len(block.Body.Data)
 		msg.EncData = make([]byte, size)
-		copy(msg.EncData, block.Block.EncData)
+		copy(msg.EncData, block.Body.Data)
 		msg.MsgSize += uint16(size)
 	}
 	return msg

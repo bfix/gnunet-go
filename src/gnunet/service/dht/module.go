@@ -19,9 +19,8 @@
 package dht
 
 import (
-	"gnunet/message"
 	"gnunet/service"
-	"gnunet/service/gns"
+	"gnunet/service/dht/blocks"
 	"net/http"
 )
 
@@ -45,11 +44,11 @@ func (m *Module) RPC() (string, func(http.ResponseWriter, *http.Request)) {
 }
 
 // Get a block from the DHT
-func (nc *Module) Get(ctx *service.SessionContext, query *gns.Query) (*message.Block, error) {
+func (nc *Module) Get(ctx *service.SessionContext, key blocks.Query) (blocks.Block, error) {
 	return nil, nil
 }
 
 // Put a block into the DHT
-func (nc *Module) Put(ctx *service.SessionContext, block *message.Block) error {
+func (nc *Module) Put(ctx *service.SessionContext, key blocks.Query, block blocks.Block) error {
 	return nil
 }

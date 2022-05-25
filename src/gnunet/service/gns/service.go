@@ -28,6 +28,7 @@ import (
 	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service"
+	"gnunet/service/dht/blocks"
 	"gnunet/service/revocation"
 	"gnunet/transport"
 	"gnunet/util"
@@ -225,11 +226,11 @@ func (s *Service) RevokeKey(ctx *service.SessionContext, rd *revocation.RevData)
 //======================================================================
 
 // LookupNamecache returns a cached lookup (if available)
-func (s *Service) LookupNamecache(ctx *service.SessionContext, query *Query) (block *message.Block, err error) {
-	logger.Printf(logger.DBG, "[gns] LookupNamecache(%s)...\n", hex.EncodeToString(query.Key.Bits))
+func (s *Service) LookupNamecache(ctx *service.SessionContext, query *blocks.GNSQuery) (block *blocks.GNSBlock, err error) {
+	logger.Printf(logger.DBG, "[gns] LookupNamecache(%s)...\n", hex.EncodeToString(query.Key().Bits))
 
 	// assemble Namecache request
-	req := message.NewNamecacheLookupMsg(query.Key)
+	req := message.NewNamecacheLookupMsg(query.Key())
 	req.ID = uint32(util.NextID())
 	block = nil
 
@@ -262,21 +263,21 @@ func (s *Service) LookupNamecache(ctx *service.SessionContext, query *Query) (bl
 		}
 
 		// assemble GNSBlock from message
-		block = new(message.Block)
+		block = new(blocks.GNSBlock)
 		block.DerivedKeySig = m.DerivedKeySig
-		sb := new(message.SignedBlockData)
+		sb := new(blocks.SignedGNSBlockData)
 		sb.Purpose = new(crypto.SignaturePurpose)
 		sb.Purpose.Purpose = enums.SIG_GNS_RECORD_SIGN
 		sb.Purpose.Size = uint32(16 + len(m.EncData))
 		sb.Expire = m.Expire
-		sb.EncData = m.EncData
-		block.Block = sb
+		sb.Data = m.EncData
+		block.Body = sb
 
 		// verify and decrypt block
-		if err = block.Verify(query.Zone, query.Label); err != nil {
+		if err = query.Verify(block); err != nil {
 			break
 		}
-		if err = block.Decrypt(query.Zone, query.Label); err != nil {
+		if err = query.Decrypt(block); err != nil {
 			break
 		}
 	default:
@@ -287,7 +288,7 @@ func (s *Service) LookupNamecache(ctx *service.SessionContext, query *Query) (bl
 }
 
 // StoreNamecache stores a lookup in the local namecache.
-func (s *Service) StoreNamecache(ctx *service.SessionContext, block *message.Block) (err error) {
+func (s *Service) StoreNamecache(ctx *service.SessionContext, block *blocks.GNSBlock) (err error) {
 	logger.Println(logger.DBG, "[gns] StoreNamecache()...")
 
 	// assemble Namecache request
@@ -327,8 +328,8 @@ func (s *Service) StoreNamecache(ctx *service.SessionContext, block *message.Blo
 //======================================================================
 
 // LookupDHT gets a GNS block from the DHT for the given query key.
-func (s *Service) LookupDHT(ctx *service.SessionContext, query *Query) (block *message.Block, err error) {
-	logger.Printf(logger.DBG, "[gns] LookupDHT(%s)...\n", hex.EncodeToString(query.Key.Bits))
+func (s *Service) LookupDHT(ctx *service.SessionContext, query blocks.Query) (block blocks.Block, err error) {
+	logger.Printf(logger.DBG, "[gns] LookupDHT(%s)...\n", hex.EncodeToString(query.Key().Bits))
 	block = nil
 
 	// client-connect to the DHT service
@@ -360,7 +361,7 @@ func (s *Service) LookupDHT(ctx *service.SessionContext, query *Query) (block *m
 	)
 
 	// send DHT GET request and wait for response
-	reqGet := message.NewDHTClientGetMsg(query.Key)
+	reqGet := message.NewDHTClientGetMsg(query.Key())
 	reqGet.ID = uint64(util.NextID())
 	reqGet.ReplLevel = uint32(enums.DHT_GNS_REPLICATION_LEVEL)
 	reqGet.Type = uint32(enums.BLOCK_TYPE_GNS_NAMERECORD)
@@ -372,7 +373,7 @@ func (s *Service) LookupDHT(ctx *service.SessionContext, query *Query) (block *m
 			logger.Println(logger.WARN, "[gns] remote Lookup aborted -- cleaning up.")
 
 			// send DHT GET_STOP request and terminate
-			reqStop := message.NewDHTClientGetStopMsg(query.Key)
+			reqStop := message.NewDHTClientGetStopMsg(query.Key())
 			reqStop.ID = reqGet.ID
 			if err = interact(reqStop, false); err != nil {
 				logger.Printf(logger.ERROR, "[gns] remote Lookup abort failed: %s\n", err.Error())
@@ -407,22 +408,24 @@ func (s *Service) LookupDHT(ctx *service.SessionContext, query *Query) (block *m
 		}
 
 		// get GNSBlock from message
-		block = message.NewBlock()
+		qGNS := query.(*blocks.GNSQuery)
+		block = new(blocks.GNSBlock)
 		if err = data.Unmarshal(block, m.Data); err != nil {
 			logger.Printf(logger.ERROR, "[gns] can't read GNS block: %s\n", err.Error())
 			break
 		}
+
 		// verify and decrypt block
-		if err = block.Verify(query.Zone, query.Label); err != nil {
+		if err = qGNS.Verify(block); err != nil {
 			break
 		}
-		if err = block.Decrypt(query.Zone, query.Label); err != nil {
+		if err = qGNS.Decrypt(block); err != nil {
 			break
 		}
 
 		// we got a result from DHT that was not in the namecache,
 		// so store it there now.
-		if err = s.StoreNamecache(ctx, block); err != nil {
+		if err = s.StoreNamecache(ctx, block.(*blocks.GNSBlock)); err != nil {
 			logger.Printf(logger.ERROR, "[gns] can't store block in Namecache: %s\n", err.Error())
 		}
 	}

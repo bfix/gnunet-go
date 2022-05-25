@@ -20,7 +20,7 @@ package dht
 
 import (
 	"gnunet/crypto"
-	"gnunet/message"
+	blocks "gnunet/service/dht/blocks"
 	"math/rand"
 	"testing"
 
@@ -38,7 +38,7 @@ const (
 func TestFileStore(t *testing.T) {
 	fs := NewFileStore("/var/lib/gnunet/dht/store")
 
-	keys := make([]*crypto.HashCode, 0, fsNumBlocks)
+	keys := make([]blocks.Query, 0, fsNumBlocks)
 
 	// First round: save blocks
 	for i := 0; i < fsNumBlocks; i++ {
@@ -46,12 +46,9 @@ func TestFileStore(t *testing.T) {
 		size := 1024 + rand.Intn(62000)
 		buf := make([]byte, size)
 		rand.Read(buf)
-		val := new(message.Block)
-		if err := data.Unmarshal(val, buf); err != nil {
-			t.Fatal(err)
-		}
+		val := blocks.NewGenericBlock(buf)
 		// generate associated key
-		key := crypto.Hash(buf)
+		key := blocks.NewGenericQuery(crypto.Hash(buf))
 
 		// store block
 		if err := fs.Put(key, val); err != nil {
@@ -77,7 +74,7 @@ func TestFileStore(t *testing.T) {
 		k := crypto.Hash(buf)
 
 		// do the keys match?
-		if !k.Equals(key) {
+		if !k.Equals(key.Key()) {
 			t.Fatal("key/value mismatch")
 		}
 	}

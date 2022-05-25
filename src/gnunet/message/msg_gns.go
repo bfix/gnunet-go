@@ -25,13 +25,7 @@ import (
 	"gnunet/enums"
 	"gnunet/util"
 
-	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
-)
-
-// Error messages
-var (
-	ErrBlockNotDecrypted = fmt.Errorf("GNS block not decrypted")
 )
 
 //----------------------------------------------------------------------
@@ -145,94 +139,6 @@ func (rs *RecordSet) Expires() util.AbsoluteTime {
 		}
 	}
 	return expires
-}
-
-// SignedBlockData represents the signed and encrypted list of resource
-// records stored in a GNSRecordSet
-type SignedBlockData struct {
-	Purpose *crypto.SignaturePurpose ``         // Size and purpose of signature (8 bytes)
-	Expire  util.AbsoluteTime        ``         // Expiration time of the block.
-	EncData []byte                   `size:"*"` // encrypted GNSRecordSet
-
-	// transient data (not serialized)
-	data []byte // decrypted GNSRecord set
-}
-
-// Block is the result of GNS lookups for a given label in a zone.
-// An encrypted and signed container for GNS resource records that represents
-// the "atomic" data structure associated with a GNS label in a given zone.
-type Block struct {
-	DerivedKeySig *crypto.ZoneSignature // Derived key used for signing
-	Block         *SignedBlockData
-
-	// transient data (not serialized)
-	checked   bool // block integrity checked
-	verified  bool // block signature verified (internal)
-	decrypted bool // block data decrypted (internal)
-}
-
-// String returns the human-readable representation of a GNSBlock
-func (b *Block) String() string {
-	return fmt.Sprintf("GNSBlock{Verified=%v,Decrypted=%v,data=[%d]}",
-		b.verified, b.decrypted, len(b.Block.EncData))
-}
-
-// Records returns the list of resource records in a block.
-func (b *Block) Records() ([]*ResourceRecord, error) {
-	// check if block is decrypted
-	if !b.decrypted {
-		return nil, ErrBlockNotDecrypted
-	}
-	// parse block data into record set
-	rs := NewRecordSet()
-	if err := data.Unmarshal(rs, b.Block.data); err != nil {
-		return nil, err
-	}
-	return rs.Records, nil
-}
-
-// Verify the integrity of the block data from a signature.
-func (b *Block) Verify(zkey *crypto.ZoneKey, label string) (err error) {
-	// Integrity check performed
-	b.checked = true
-
-	// verify derived key
-	dkey := b.DerivedKeySig.ZoneKey
-	dkey2, _ := zkey.Derive(label, "gns")
-	if !dkey.Equal(dkey2) {
-		return fmt.Errorf("invalid signature key for GNS Block")
-	}
-	// verify signature
-	var buf []byte
-	if buf, err = data.Marshal(b.Block); err != nil {
-		return
-	}
-	b.verified, err = b.DerivedKeySig.Verify(buf)
-	return
-}
-
-// Decrypt block data with a key derived from zone key and label.
-func (b *Block) Decrypt(zkey *crypto.ZoneKey, label string) (err error) {
-	// decrypt payload
-	b.Block.data, err = zkey.Decrypt(b.Block.EncData, label, b.Block.Expire)
-	b.decrypted = true
-	return
-}
-
-// NewBlock instantiates an empty GNS block
-func NewBlock() *Block {
-	return &Block{
-		DerivedKeySig: nil,
-		Block: &SignedBlockData{
-			Purpose: new(crypto.SignaturePurpose),
-			Expire:  *new(util.AbsoluteTime),
-			EncData: nil,
-			data:    nil,
-		},
-		checked:   false,
-		verified:  false,
-		decrypted: false,
-	}
 }
 
 // ResourceRecord is the GNUnet-specific representation of resource

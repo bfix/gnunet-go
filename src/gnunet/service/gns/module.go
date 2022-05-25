@@ -28,9 +28,11 @@ import (
 	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service"
+	"gnunet/service/dht/blocks"
 	"gnunet/service/revocation"
 	"gnunet/util"
 
+	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
 )
 
@@ -43,34 +45,6 @@ var (
 	ErrUnknownTLD           = fmt.Errorf("unknown TLD in name")
 	ErrGNSRecursionExceeded = fmt.Errorf("recursion depth exceeded")
 )
-
-//----------------------------------------------------------------------
-// Query for simple GNS lookups
-//----------------------------------------------------------------------
-
-// Query specifies the context for a basic GNS name lookup of an (atomic)
-// label in a given zone identified by its public key.
-type Query struct {
-	Zone    *crypto.ZoneKey  // Public zone key
-	Label   string           // Atomic label
-	Derived *crypto.ZoneKey  // Derived key from (pkey,label)
-	Key     *crypto.HashCode // Key for repository queries (local/remote)
-}
-
-// NewQuery assembles a new Query object for the given zone and label.
-func NewQuery(zkey *crypto.ZoneKey, label string) *Query {
-	// derive a public key from (pkey,label) and set the repository
-	// key as the SHA512 hash of the binary key representation.
-	// (key blinding)
-	pd, _ := zkey.Derive(label, "gns")
-	key := crypto.Hash(pd.Bytes())
-	return &Query{
-		Zone:    zkey,
-		Label:   label,
-		Derived: pd,
-		Key:     key,
-	}
-}
 
 //----------------------------------------------------------------------
 // The GNS module (recursively) resolves GNS names:
@@ -113,9 +87,9 @@ func NewQuery(zkey *crypto.ZoneKey, label string) *Query {
 // Module handles the resolution of GNS names to RRs bundled in a block.
 type Module struct {
 	// Use function references for calls to methods in other modules:
-	LookupLocal      func(ctx *service.SessionContext, query *Query) (*message.Block, error)
-	StoreLocal       func(ctx *service.SessionContext, block *message.Block) error
-	LookupRemote     func(ctx *service.SessionContext, query *Query) (*message.Block, error)
+	LookupLocal      func(ctx *service.SessionContext, query *blocks.GNSQuery) (*blocks.GNSBlock, error)
+	StoreLocal       func(ctx *service.SessionContext, block *blocks.GNSBlock) error
+	LookupRemote     func(ctx *service.SessionContext, query blocks.Query) (blocks.Block, error)
 	RevocationQuery  func(ctx *service.SessionContext, zkey *crypto.ZoneKey) (valid bool, err error)
 	RevocationRevoke func(ctx *service.SessionContext, rd *revocation.RevData) (success bool, err error)
 }
@@ -200,7 +174,7 @@ func (m *Module) ResolveRelative(
 		logger.Printf(logger.DBG, "[gns] ResolveRelative '%s' in '%s'\n", labels[0], util.EncodeBinaryToString(zkey.Bytes()))
 
 		// resolve next level
-		var block *message.Block
+		var block *blocks.GNSBlock
 		if block, err = m.Lookup(ctx, zkey, labels[0], mode); err != nil {
 			// failed to resolve name
 			return
@@ -221,7 +195,7 @@ func (m *Module) ResolveRelative(
 		}
 		// post-process block by inspecting contained resource records for
 		// special GNS types
-		if records, err = block.Records(); err != nil {
+		if records, err = m.records(block.Body.Data); err != nil {
 			return
 		}
 		// assemble a list of block handlers for this block: if multiple
@@ -410,10 +384,10 @@ func (m *Module) Lookup(
 	ctx *service.SessionContext,
 	zkey *crypto.ZoneKey,
 	label string,
-	mode int) (block *message.Block, err error) {
+	mode int) (block *blocks.GNSBlock, err error) {
 
 	// create query (lookup key)
-	query := NewQuery(zkey, label)
+	query := blocks.NewGNSQuery(zkey, label)
 
 	// try local lookup first
 	if block, err = m.LookupLocal(ctx, query); err != nil {
@@ -424,7 +398,8 @@ func (m *Module) Lookup(
 	if block == nil {
 		if mode == enums.GNS_LO_DEFAULT {
 			// get the block from a remote lookup
-			if block, err = m.LookupRemote(ctx, query); err != nil || block == nil {
+			var blk blocks.Block
+			if blk, err = m.LookupRemote(ctx, query); err != nil || blk == nil {
 				if err != nil {
 					logger.Printf(logger.ERROR, "[gns] remote Lookup failed: %s\n", err.Error())
 					block = nil
@@ -432,6 +407,11 @@ func (m *Module) Lookup(
 					logger.Println(logger.DBG, "[gns] remote Lookup: no block found")
 				}
 				// lookup fails completely -- no result
+				return
+			}
+			// convert to GNSBlock
+			if err = blocks.Unwrap(blk, &block); err != nil {
+				logger.Println(logger.DBG, "[gns] remote Lookup: GNS unwrap failed")
 				return
 			}
 			// store RRs from remote locally.
@@ -452,4 +432,14 @@ func (m *Module) newLEHORecord(name string, expires util.AbsoluteTime) *message.
 	copy(rr.Data, []byte(name))
 	rr.Data[len(name)] = 0
 	return rr
+}
+
+// Records returns the list of resource records from binary data.
+func (m *Module) records(buf []byte) ([]*message.ResourceRecord, error) {
+	// parse  data into record set
+	rs := message.NewRecordSet()
+	if err := data.Unmarshal(rs, buf); err != nil {
+		return nil, err
+	}
+	return rs.Records, nil
 }
