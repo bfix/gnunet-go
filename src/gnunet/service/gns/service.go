@@ -250,7 +250,7 @@ func (s *Service) LookupNamecache(ctx *service.SessionContext, query *Query) (bl
 			break
 		}
 		// check if block was found
-		if len(m.EncData) == 0 || util.IsNull(m.EncData) {
+		if len(m.EncData) == 0 || util.IsAll(m.EncData, 0) {
 			logger.Println(logger.DBG, "[gns] block not found in namecache")
 			break
 		}

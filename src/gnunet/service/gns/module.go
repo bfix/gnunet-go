@@ -142,7 +142,7 @@ func (m *Module) Resolve(
 		return nil, ErrGNSRecursionExceeded
 	}
 	// get the labels in reverse order
-	names := util.ReverseStringList(strings.Split(path, "."))
+	names := util.Reverse(strings.Split(path, "."))
 	logger.Printf(logger.DBG, "[gns] Resolver called for %v\n", names)
 
 	// check for relative path
@@ -264,7 +264,7 @@ func (m *Module) ResolveRelative(
 			}
 			// ... otherwise we need to handle delegation to DNS: returns a
 			// list of found resource records in DNS (filter by 'kind')
-			lbls := strings.Join(util.ReverseStringList(labels[1:]), ".")
+			lbls := strings.Join(util.Reverse(labels[1:]), ".")
 			if len(lbls) > 0 {
 				lbls += "."
 			}
@@ -369,7 +369,7 @@ func (m *Module) ResolveUnknown(
 	if strings.HasSuffix(name, ".+") {
 		// resolve server name relative to current zone
 		name = strings.TrimSuffix(name, ".+")
-		for _, label := range util.ReverseStringList(labels) {
+		for _, label := range util.Reverse(labels) {
 			name += "." + label
 		}
 		if set, err = m.Resolve(ctx, name, zkey, kind, enums.GNS_LO_DEFAULT, depth+1); err != nil {
@@ -394,7 +394,7 @@ func (m *Module) ResolveUnknown(
 
 // GetZoneKey returns the zone key (or nil) from an absolute GNS path.
 func (m *Module) GetZoneKey(path string) *crypto.ZoneKey {
-	labels := util.ReverseStringList(strings.Split(path, "."))
+	labels := util.Reverse(strings.Split(path, "."))
 	if len(labels[0]) == 52 {
 		if data, err := util.DecodeStringToBinary(labels[0], 32); err == nil {
 			if zkey, err := crypto.NewZoneKey(data); err == nil {
