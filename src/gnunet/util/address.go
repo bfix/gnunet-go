@@ -19,9 +19,11 @@
 package util
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"net"
+	"strings"
 )
 
 // Address specifies how a peer is reachable on the network.
@@ -33,18 +35,35 @@ type Address struct {
 
 // NewAddress returns a new Address for the given transport and specs
 func NewAddress(transport string, addr []byte) *Address {
-	a := &Address{
+	return &Address{
 		Transport: transport,
 		Options:   0,
-		Address:   make([]byte, len(addr)),
+		Address:   Clone(addr),
 	}
-	copy(a.Address, addr)
-	return a
+}
+
+// ParseAddress translates a GNUnet address string like
+// "r5n+ip+udp://1.2.3.4:6789" or "gnunet+tcp://12.3.4.5/"
+func ParseAddress(s string) (addr *Address, err error) {
+	p := strings.SplitN(s, ":", 2)
+	if len(p) != 2 {
+		err = fmt.Errorf("invalid address format: '%s'", s)
+		return
+	}
+	addr = NewAddress(p[0], []byte(strings.Trim(p[1], "/")))
+	return
+}
+
+// Equals return true if two addresses match.
+func (a *Address) Equals(b *Address) bool {
+	return a.Transport == b.Transport &&
+		a.Options == b.Options &&
+		bytes.Equal(a.Address, b.Address)
 }
 
 // String returns a human-readable representation of an address.
 func (a *Address) String() string {
-	return fmt.Sprintf("Address{%s}", AddressString(a.Transport, a.Address))
+	return fmt.Sprintf("%s:%s", a.Transport, a.Address)
 }
 
 //----------------------------------------------------------------------
