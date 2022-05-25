@@ -20,6 +20,7 @@ package core
 
 import (
 	"fmt"
+	"time"
 
 	"gnunet/message"
 	"gnunet/util"
@@ -58,6 +59,18 @@ func NewPeer(data []byte, local bool) (p *Peer, err error) {
 	return
 }
 
+// HelloData returns the current HELLO data for the peer
+func (p *Peer) HelloData(ttl time.Duration) (h *message.HelloData, err error) {
+	// assemble HELLO data
+	h = new(message.HelloData)
+	h.PeerID = p.GetID()
+	h.Expire = uint64(time.Now().Add(ttl).Unix())
+	h.Addrs = util.Clone(p.addrList)
+	// sign data
+	err = h.Sign(p.prv)
+	return
+}
+
 // EphKeyMsg returns a new initialized message to negotiate session keys.
 func (p *Peer) EphKeyMsg() *message.EphemeralKeyMsg {
 	return p.ephMsg
@@ -85,9 +98,9 @@ func (p *Peer) PubKey() *ed25519.PublicKey {
 
 // GetID returns the node ID (public key) in binary format
 func (p *Peer) GetID() *util.PeerID {
-	id := new(util.PeerID)
-	copy(id.Key, p.pub.Bytes())
-	return id
+	return &util.PeerID{
+		Key: util.Clone(p.pub.Bytes()),
+	}
 }
 
 // GetIDString returns the string representation of the public key of the node.
