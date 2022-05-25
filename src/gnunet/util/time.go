@@ -43,6 +43,13 @@ func NewAbsoluteTime(t time.Time) AbsoluteTime {
 	}
 }
 
+// NewAbsoluteTimeEpoch set the point in time to the given time value
+func NewAbsoluteTimeEpoch(secs uint64) AbsoluteTime {
+	return AbsoluteTime{
+		Val: uint64(secs * 1000000),
+	}
+}
+
 // AbsoluteTimeNow returns the current point in time.
 func AbsoluteTimeNow() AbsoluteTime {
 	return NewAbsoluteTime(time.Now())
@@ -51,6 +58,11 @@ func AbsoluteTimeNow() AbsoluteTime {
 // AbsoluteTimeNever returns the time defined as "never"
 func AbsoluteTimeNever() AbsoluteTime {
 	return AbsoluteTime{math.MaxUint64}
+}
+
+// Epoch returns the seconds since Unix epoch.
+func (t AbsoluteTime) Epoch() uint64 {
+	return t.Val / 1000000
 }
 
 // String returns a human-readable notation of an absolute time.
