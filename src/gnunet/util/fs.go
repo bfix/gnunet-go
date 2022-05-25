@@ -25,7 +25,7 @@ import (
 	"github.com/bfix/gospel/logger"
 )
 
-// EnforceDirExists make sure that the path
+// EnforceDirExists make sure that the path is created
 func EnforceDirExists(path string) error {
 	logger.Printf(logger.DBG, "[util] Checking directory '%s'...\n", path)
 	fi, err := os.Lstat(path)
