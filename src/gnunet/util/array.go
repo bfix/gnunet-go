@@ -24,44 +24,68 @@ import (
 
 // Error variables
 var (
-	ErrUtilArrayTooSmall = fmt.Errorf("Array to small")
+	ErrUtilArrayTooSmall = fmt.Errorf("array to small")
 )
 
 //----------------------------------------------------------------------
-// Byte array helpers
+// generic array helpers
 //----------------------------------------------------------------------
 
 // Clone creates a new array of same content as the argument.
-func Clone(d []byte) []byte {
-	r := make([]byte, len(d))
+func Clone[T []E, E any](d T) T {
+	r := make(T, len(d))
 	copy(r, d)
 	return r
 }
 
-// Reverse the content of a byte array
-func Reverse(b []byte) []byte {
-	bl := len(b)
-	r := make([]byte, bl)
-	for i := 0; i < bl; i++ {
-		r[bl-i-1] = b[i]
+// Equals returns true if two arrays match.
+func Equals[T []E, E comparable](a, b T) bool {
+	if len(a) != len(b) {
+		return false
 	}
-	return r
-}
-
-// IsNull returns true if all bytes in an array are set to 0.
-func IsNull(b []byte) bool {
-	for _, v := range b {
-		if v != 0 {
+	for i, e := range a {
+		if e != b[i] {
 			return false
 		}
 	}
 	return true
 }
 
-// CopyBlock copies 'in' to 'out' so that 'out' is filled completely.
+// Reverse the content of an array
+func Reverse[T []E, E any](b T) T {
+	bl := len(b)
+	r := make(T, bl)
+	for i := 0; i < bl; i++ {
+		r[bl-i-1] = b[i]
+	}
+	return r
+}
+
+// IsAll returns true if all elements in an array are set to null.
+func IsAll[T []E, E comparable](b T, null E) bool {
+	for _, v := range b {
+		if v != null {
+			return false
+		}
+	}
+	return true
+}
+
+// Fill an array with a value
+func Fill[T []E, E any](b T, val E) {
+	for i := range b {
+		b[i] = val
+	}
+}
+
+//----------------------------------------------------------------------
+// byte array helpers
+//----------------------------------------------------------------------
+
+// CopyAlignedBlock copies 'in' to 'out' so that 'out' is filled completely.
 // - If 'in' is larger than 'out', it is left-truncated before copy
 // - If 'in' is smaller than 'out', it is left-padded with 0 before copy
-func CopyBlock(out, in []byte) {
+func CopyAlignedBlock(out, in []byte) {
 	count := len(in)
 	size := len(out)
 	from, to := 0, 0
@@ -76,26 +100,9 @@ func CopyBlock(out, in []byte) {
 	copy(out[to:], in[from:])
 }
 
-// Fill an array with a value
-func Fill(b []byte, val byte) {
-	for i := 0; i < len(b); i++ {
-		b[i] = val
-	}
-}
-
 //----------------------------------------------------------------------
 // String list helpers
 //----------------------------------------------------------------------
-
-// ReverseStringList reverse an array of strings
-func ReverseStringList(s []string) []string {
-	sl := len(s)
-	r := make([]string, sl)
-	for i := 0; i < sl; i++ {
-		r[sl-i-1] = s[i]
-	}
-	return r
-}
 
 // StringList converts a binary representation of a string list. Each string
 // is '\0'-terminated. The whole byte array is parsed; if the final string is
