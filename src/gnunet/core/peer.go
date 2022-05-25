@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"gnunet/message"
+	"gnunet/service/dht/blocks"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/crypto/ed25519"
@@ -60,12 +61,13 @@ func NewPeer(data []byte, local bool) (p *Peer, err error) {
 }
 
 // HelloData returns the current HELLO data for the peer
-func (p *Peer) HelloData(ttl time.Duration) (h *message.HelloData, err error) {
+func (p *Peer) HelloData(ttl time.Duration) (h *blocks.HelloBlock, err error) {
 	// assemble HELLO data
-	h = new(message.HelloData)
+	h = new(blocks.HelloBlock)
 	h.PeerID = p.GetID()
-	h.Expire = uint64(time.Now().Add(ttl).Unix())
-	h.Addrs = util.Clone(p.addrList)
+	h.Expire = util.NewAbsoluteTime(time.Now().Add(ttl))
+	h.SetAddresses(p.addrList)
+
 	// sign data
 	err = h.Sign(p.prv)
 	return

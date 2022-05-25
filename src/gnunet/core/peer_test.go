@@ -19,7 +19,7 @@
 package core
 
 import (
-	"gnunet/message"
+	"gnunet/service/dht/blocks"
 	"gnunet/util"
 	"testing"
 	"time"
@@ -62,7 +62,7 @@ func TestPeerHello(t *testing.T) {
 	// convert to URL and back
 	u := h.URL()
 	t.Log(u)
-	h2, err := message.ParseHelloURL(u)
+	h2, err := blocks.ParseHelloURL(u)
 	if err != nil {
 		t.Fatal(err)
 	}
