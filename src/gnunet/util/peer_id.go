@@ -18,6 +18,8 @@
 
 package util
 
+import "bytes"
+
 // PeerID is the 32-byte binary representation od a Ed25519 key
 type PeerID struct {
 	Key []byte `size:"32"`
@@ -33,13 +35,18 @@ func NewPeerID(data []byte) *PeerID {
 			data = data[:32]
 		} else if size < 32 {
 			buf := make([]byte, 32)
-			CopyBlock(buf, data)
+			CopyAlignedBlock(buf, data)
 			data = buf
 		}
 	}
 	return &PeerID{
 		Key: data,
 	}
+}
+
+// Equals returns true if two peer IDs match.
+func (p *PeerID) Equals(q *PeerID) bool {
+	return bytes.Equal(p.Key, q.Key)
 }
 
 // String returns a human-readable representation of a peer id.
