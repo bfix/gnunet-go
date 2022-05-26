@@ -1,14 +1,26 @@
 # GNUnet in Go
 
-This repository has two parts:
+## License
 
-* `src/` contains a Go implementation of GNUnet: It is WIP and only provides a
-very limited coverage of GNUnet. The goal is to have a complete, functionally
-equivalent implementation of the GNUnet protocol in Go.
+```
+This file is part of gnunet-go, a GNUnet-implementation in Golang.
+Copyright (C) 2019-2022 Bernd Fix  >Y<
 
-* `doc/` contains documents for an implementation-agnostic specification of the
-GNUnet P2P protocols. It focuses on the peer messages, but also provides
-information on the internal messages.
+gnunet-go is free software: you can redistribute it and/or modify it
+under the terms of the GNU Affero General Public License as published
+by the Free Software Foundation, either version 3 of the License,
+or (at your option) any later version.
+
+gnunet-go is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+SPDX-License-Identifier: AGPL3.0-or-later
+```
 
 ## Author(s)
  * Bernd Fix <brf@hoi-polloi.org>
@@ -22,25 +34,27 @@ DOCUMENTATION OR COMPILABLE, RUNNABLE OR EVEN OPERATIONAL SOURCE CODE.
 
 ## Source code
 
-All source code is written in Golang (version 1.13+).
+All source code is written in Golang (version 1.18+).
+
+The folder `src/` contains a Go implementation of GNUnet: It is WIP and only
+provides a very limited coverage of GNUnet. The goal is to have a complete,
+functionally equivalent implementation of the GNUnet protocol in Go.
 
 ### Dependencies
 
-3rd party libraries are used to provide helper functionality (logging, MPI,
-Ed25519 support and other crypto-related packages). Make sure the dependent
-packages are accessible through `GOPATH`. To install the dependencies:
+3rd party libraries are managed by the Go module framework. After downloading
+the source code, make sure you run `go mod tidy` to install all dependencies.
 
-```bash
-$ go get -u golang.org/x/crypto/...
-$ go get -u golang.org/x/text/...
-$ go get -u github.com/miekg/dns/...
-$ go get -u github.com/bfix/gospel/...
-```
-
-### ./src/cmd folder
+### ./src/gnunet/cmd folder
 
 
-#### `gnunet-service-gns-go`: Implementation of the GNS service.
+#### `gnunet-service-dht-test-go`: Implementation of the DHT core service (testbed).
+
+#### `gnunet-service-gns-go`: Implementation of the GNS core service.
+
+#### `gnunet-service-revocation-go`: Implementation of the GNS revocation service.
+
+#### `revoke-zonekey`: Implementation of a stand-alone program to calculate revocations.
 
 #### `peer_mockup`: test message exchange on the lowest level (transport).
 
@@ -75,11 +89,5 @@ $ chmod 600 ~/.local/share/gnunet/identity/egos/<vanity_ego>
 ```
 ### ./src/gnunet folder
 
-Packages used to implement GNUnet protocols (currently only some of TRANSPORT
-and GNS).
-
-## Documentation
-
-* raw: raw ASCII protocol definition
-* specification: texinfo protocol definition
-
+Packages used to implement GNUnet protocols (currently only some of TRANSPORT, GNS,
+Revocation, Namecache and DHT).
