@@ -22,27 +22,50 @@ SPDX-License-Identifier: AGPL3.0-or-later
 THIS IS WORK-IN-PROGRESS AT A VERY EARLY STATE. DON'T EXPECT ANY COMPLETE
 DOCUMENTATION OR COMPILABLE, RUNNABLE OR EVEN OPERATIONAL SOURCE CODE.
 
+## TL;DR
+
+```bash
+git clone https://github.com/bfix/gnunet-go
+cd gnunet-go/src/gnunet
+go mod tidy
+go install -gcflags "-N -l" ./...
+go test -gcflags "-N -l" ./...
+```
+
 ## Source code
 
 All source code is written for Go v1.18+.
 
-The folder `src/` contains a Go implementation of GNUnet: It is WIP and only
-provides a very limited coverage of GNUnet. The goal is to have a complete,
-functionally equivalent implementation of the GNUnet protocol in Go.
-
-### Dependencies
-
 3rd party libraries are managed by the Go module framework. After downloading
-the source code, make sure you run `go mod tidy` to install all dependencies.
+the source code, make sure you run `go mod tidy` in the `src/gnunet` folder
+to install all dependencies.
 
-### ./src/gnunet/cmd folder
+### `./src/gnunet`
 
+The folder `src/gnunet` contains a Go implementation of GNUnet: It is WIP
+and only provides a very limited coverage of GNUnet. The goal is to have
+a complete, functionally equivalent implementation of the GNUnet protocol
+in Go. Currently only some aspects of Transport, GNS, Revocation, Namecache
+and DHT are implemented.
+
+Use `./build.sh` to build the executables (services and utilities, see
+below). The resulting programs are stored in `${GOPATH}/bin`.
+
+To run the unit tests, use `./test.sh`. 
+
+### `./src/gnunet/cmd`
 
 #### `gnunet-service-dht-test-go`: Implementation of the DHT core service (testbed).
 
 #### `gnunet-service-gns-go`: Implementation of the GNS core service.
 
+Stand-alone GNS service that could be used with other GNUnet utilities and
+services.
+
 #### `gnunet-service-revocation-go`: Implementation of the GNS revocation service.
+
+Stand-alone Revocation service that could be used with other GNUnet utilities
+and services.
 
 #### `revoke-zonekey`: Implementation of a stand-alone program to calculate revocations.
 
@@ -53,23 +76,24 @@ continues the calculation.
 
 The following command-line options are available:
 
-* **`-b`***: Number of leading zero bits (difficulty, default: 25). The minimum
-average difficulty `D` is fixed at 22. The expiration of a revocation is
-derived using `(b-D) * (1.1 * EPOCH)`, where `EPOCH` is 365 days and it is
-extended by 10% in order to deal with unsynchronized clocks.
+* **`-b`**: Number of leading zero bits (difficulty, default: 24). The minimum
+difficulty `D` is fixed at 23. The expiration of a revocation is derived using
+`(b-D+1)*(1.1*EPOCH)`, where `EPOCH` is 365 days and it is extended by 10% in
+order to deal with unsynchronized clocks.
 
-The default difficulty will create a revocation valid for ~3 years.
+The default difficulty will create a revocation valid for ~2 years.
 
 * **`-z`**: Zone key to be revoked (zone ID)
 
 * **`-f`**: Name of file to store revocation data
 
-* **`-v`**: verbose output
+* **`-t`**: testing mode: allow small difficulties for test runs.
 
+* **`-v`**: verbose output
 
 #### `peer_mockup`: test message exchange on the lowest level (transport).
 
-#### `vanityid`: Compute GNUnet vanity peer and ego id for a given regexp pattern.
+#### `vanityid`: Compute GNUnet vanity peer id for a given regexp pattern.
 
 N.B.: Key generation is slow at the moment, so be patient! To generate a single
 matching key some 1,000,000 keys need to be generated for a four letter prefix;
@@ -90,15 +114,7 @@ found; `time` is the time needed to find a match.
 To generate the key files, make sure GNUnet **is not running** and do: 
 
 ```bash
-$ # use a vanity peer id:
-$ echo "<hex.seed>" | xxd -r -p > /var/lib/gnunet/.local/share/gnunet/private_key.ecc
-$ sudo chown gnunet:gnunet /var/lib/gnunet/.local/share/gnunet/private_key.ecc
-$ sudo chmod 600 /var/lib/gnunet/.local/share/gnunet/private_key.ecc
-$ # use a vanity ego id:
-$ echo "<hex.scalar>" | xxd -r -p > ~/.local/share/gnunet/identity/egos/<vanity_ego>
-$ chmod 600 ~/.local/share/gnunet/identity/egos/<vanity_ego>
+echo "<hex.seed>" | xxd -r -p > /var/lib/gnunet/.local/share/gnunet/private_key.ecc
+chown gnunet:gnunet /var/lib/gnunet/.local/share/gnunet/private_key.ecc
+chmod 600 /var/lib/gnunet/.local/share/gnunet/private_key.ecc
 ```
-### ./src/gnunet folder
-
-Packages used to implement GNUnet protocols (currently only some of TRANSPORT, GNS,
-Revocation, Namecache and DHT).
