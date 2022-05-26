@@ -40,6 +40,11 @@ import (
 // Proof-of-Work data
 //----------------------------------------------------------------------
 
+const (
+	// MinDifficulty for revocations -> expires in ~1year
+	MinDifficulty = 23
+)
+
 // PoWData is the proof-of-work data
 type PoWData struct {
 	PoW       uint64            `order:"big"` // start with this PoW value

@@ -48,7 +48,8 @@ func main() {
 		testing  bool   // test mode (no minimum difficulty)
 		filename string // name of file for persistance
 	)
-	flag.IntVar(&bits, "b", 25, "Number of leading zero bits")
+	minDiff := revocation.MinDifficulty
+	flag.IntVar(&bits, "b", minDiff+1, "Number of leading zero bits")
 	flag.StringVar(&zonekey, "z", "", "Zone key to be revoked")
 	flag.StringVar(&filename, "f", "", "Name of file to store revocation")
 	flag.BoolVar(&verbose, "v", false, "verbose output")
@@ -56,12 +57,12 @@ func main() {
 	flag.Parse()
 
 	// check arguments (difficulty, zonekey and filename)
-	if bits < 22 {
+	if bits < minDiff {
 		if testing {
-			log.Println("WARNING: difficulty is less than 22!")
+			log.Printf("WARNING: difficulty is less than %d!", minDiff)
 		} else {
-			log.Println("INFO: difficulty set to 22 (required minimum)")
-			bits = 22
+			log.Printf("INFO: difficulty set to %d (required minimum)", minDiff)
+			bits = minDiff
 		}
 	}
 	if len(filename) == 0 {
