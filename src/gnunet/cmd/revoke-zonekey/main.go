@@ -45,44 +45,63 @@ func main() {
 		verbose  bool   // be verbose with messages
 		bits     int    // number of leading zero-bit requested
 		zonekey  string // zonekey to be revoked
+		testing  bool   // test mode (no minimum difficulty)
 		filename string // name of file for persistance
 	)
 	flag.IntVar(&bits, "b", 25, "Number of leading zero bits")
-	flag.BoolVar(&verbose, "v", false, "verbose output")
 	flag.StringVar(&zonekey, "z", "", "Zone key to be revoked")
 	flag.StringVar(&filename, "f", "", "Name of file to store revocation")
+	flag.BoolVar(&verbose, "v", false, "verbose output")
+	flag.BoolVar(&testing, "t", false, "test-mode only")
 	flag.Parse()
 
+	// check arguments (difficulty, zonekey and filename)
+	if bits < 22 {
+		if testing {
+			log.Println("WARNING: difficulty is less than 22!")
+		} else {
+			log.Println("INFO: difficulty set to 22 (required minimum)")
+			bits = 22
+		}
+	}
 	if len(filename) == 0 {
 		log.Fatal("Missing '-f' argument (filename fot revocation data)")
 	}
-
-	// define layout of persistant data
-	var revData struct {
-		Rd      *revocation.RevDataCalc // Revocation data
-		T       util.RelativeTime       // time spend in calculations
-		Last    uint64                  // last value used for PoW test
-		Numbits uint8                   // number of leading zero-bits
+	var (
+		keyData []byte          // binary key data
+		zk      *crypto.ZoneKey // GNUnet zone key
+		err     error
+	)
+	if keyData, err = util.DecodeStringToBinary(zonekey, 32); err != nil {
+		log.Fatal("Invalid zonekey encoding: " + err.Error())
 	}
-	dataBuf := make([]byte, 450)
+	if zk, err = crypto.NewZoneKey(keyData); err != nil {
+		log.Fatal("Invalid zonekey format: " + err.Error())
+	}
 
-	// read revocation object from file
-	file, err := os.Open(filename)
-	cont := true
-	if err != nil {
-		if len(zonekey) != 52 {
-			log.Fatal("Missing or invalid zonekey and no file specified -- aborting")
+	// read revocation object from file. If the file does not exist, a new
+	// calculation is started; otherwise the old calculation will continue.
+	var (
+		// define layout of persistant data
+		revData struct {
+			Rd      *revocation.RevDataCalc // Revocation data
+			T       util.RelativeTime       // time spend in calculations
+			Last    uint64                  // last value used for PoW test
+			Numbits uint8                   // number of leading zero-bits
 		}
-		keyData, err := util.DecodeStringToBinary(zonekey, 32)
-		if err != nil {
-			log.Fatal("Invalid zonekey: " + err.Error())
-		}
-		zk, _ := crypto.NewZoneKey(keyData)
+
+		file    *os.File
+		dataBuf = make([]byte, 17+revData.Rd.Size())
+		cont    = true
+	)
+	if file, err = os.Open(filename); err != nil {
+		// no file exists - start new caclulcation
 		revData.Rd = revocation.NewRevDataCalc(zk)
 		revData.Numbits = uint8(bits)
 		revData.T = util.NewRelativeTime(0)
 		cont = false
 	} else {
+		// read existing file
 		n, err := file.Read(dataBuf)
 		if err != nil {
 			log.Fatal("Error reading file: " + err.Error())
@@ -108,12 +127,7 @@ func main() {
 		log.Println("Starting new revocation calculation...")
 	}
 	log.Println("Press ^C to abort...")
-
-	// pre-set difficulty
 	log.Printf("Difficulty: %d\n", bits)
-	if bits < 25 {
-		log.Println("WARNING: difficulty is less than 25!")
-	}
 
 	// Start or continue calculation
 	ctx, cancelFcn := context.WithCancel(context.Background())
