@@ -1,9 +1,5 @@
-# GNUnet in Go
+# gnunet-go: GNUnet implementation in Go
 
-## License
-
-```
-This file is part of gnunet-go, a GNUnet-implementation in Golang.
 Copyright (C) 2019-2022 Bernd Fix  >Y<
 
 gnunet-go is free software: you can redistribute it and/or modify it
@@ -20,12 +16,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 SPDX-License-Identifier: AGPL3.0-or-later
-```
-
-## Author(s)
- * Bernd Fix <brf@hoi-polloi.org>
-
-All files are licensed under GNU AGPL-3.0. Copyright by the authors.
 
 ## Caveat
 
@@ -34,7 +24,7 @@ DOCUMENTATION OR COMPILABLE, RUNNABLE OR EVEN OPERATIONAL SOURCE CODE.
 
 ## Source code
 
-All source code is written in Golang (version 1.18+).
+All source code is written for Go v1.18+.
 
 The folder `src/` contains a Go implementation of GNUnet: It is WIP and only
 provides a very limited coverage of GNUnet. The goal is to have a complete,
@@ -55,6 +45,27 @@ the source code, make sure you run `go mod tidy` to install all dependencies.
 #### `gnunet-service-revocation-go`: Implementation of the GNS revocation service.
 
 #### `revoke-zonekey`: Implementation of a stand-alone program to calculate revocations.
+
+This program creates a zone key revocation block. Depending on the parameters
+the calculation can take days or even weeks. The program can be interrupted
+at any time using `^C`; restarting the program with the exact same parameters
+continues the calculation.
+
+The following command-line options are available:
+
+* **`-b`***: Number of leading zero bits (difficulty, default: 25). The minimum
+average difficulty `D` is fixed at 22. The expiration of a revocation is
+derived using `(b-D) * (1.1 * EPOCH)`, where `EPOCH` is 365 days and it is
+extended by 10% in order to deal with unsynchronized clocks.
+
+The default difficulty will create a revocation valid for ~3 years.
+
+* **`-z`**: Zone key to be revoked (zone ID)
+
+* **`-f`**: Name of file to store revocation data
+
+* **`-v`**: verbose output
+
 
 #### `peer_mockup`: test message exchange on the lowest level (transport).
 
