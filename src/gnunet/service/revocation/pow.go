@@ -143,6 +143,11 @@ func NewRevDataFromMsg(m *message.RevocationRevokeMsg) *RevData {
 	return rd
 }
 
+// Size of a serialized RevData object.
+func (rd *RevData) Size() int {
+	return 16 + 8*len(rd.PoWs) + int(rd.ZoneKeySig.SigSize())
+}
+
 // Sign the revocation data
 func (rd *RevData) Sign(skey *crypto.ZonePrivate) (err error) {
 	sigBlock := &SignedRevData{
@@ -238,6 +243,11 @@ func NewRevDataCalc(zkey *crypto.ZoneKey) *RevDataCalc {
 		SmallestIdx: 0,
 	}
 	return rd
+}
+
+// Size of a serialized RevData object.
+func (rdc *RevDataCalc) Size() int {
+	return rdc.RevData.Size() + 2*len(rdc.Bits) + 1
 }
 
 // Average number of leading zero-bits in current list
