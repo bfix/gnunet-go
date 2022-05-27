@@ -20,13 +20,18 @@ package util
 
 import (
 	"strings"
+	"sync"
 )
 
-// CounterMap is a metric with single key
-type CounterMap map[interface{}]int
+//----------------------------------------------------------------------
+// Count occurence of multiple instance at the same time.
+//----------------------------------------------------------------------
+
+// Counter is a metric with single key
+type Counter[T comparable] map[T]int
 
 // Add one to themetric for a given key and return current value
-func (cm CounterMap) Add(i interface{}) int {
+func (cm Counter[T]) Add(i T) int {
 	count, ok := cm[i]
 	if !ok {
 		count = 1
@@ -38,13 +43,75 @@ func (cm CounterMap) Add(i interface{}) int {
 }
 
 // Num returns the metric for a given key
-func (cm CounterMap) Num(i interface{}) int {
+func (cm Counter[T]) Num(i T) int {
 	count, ok := cm[i]
 	if !ok {
 		count = 0
 	}
 	return count
 }
+
+//----------------------------------------------------------------------
+// Thread-safe map implementation
+//----------------------------------------------------------------------
+
+// Map keys to values
+type Map[K comparable, V any] struct {
+	list      map[K]V
+	mtx       sync.RWMutex
+	inProcess bool
+}
+
+// NewMap allocates a new mapping.
+func NewMap[K comparable, V any]() *Map[K, V] {
+	return &Map[K, V]{
+		list:      make(map[K]V),
+		inProcess: false,
+	}
+}
+
+// Process a function in the locked map context. Calls
+// to other map functions in 'f' will use additional locks.
+func (m *Map[K, V]) Process(f func() error) error {
+	m.mtx.Lock()
+	defer m.mtx.Unlock()
+	m.inProcess = true
+	err := f()
+	m.inProcess = false
+	return err
+}
+
+// Put value into map under given key.
+func (m *Map[K, V]) Put(key K, value V) {
+	if !m.inProcess {
+		m.mtx.Lock()
+		defer m.mtx.Unlock()
+	}
+	m.list[key] = value
+}
+
+// Get value with iven key from map.
+func (m *Map[K, V]) Get(key K) (value V, ok bool) {
+	if !m.inProcess {
+		m.mtx.RLock()
+		defer m.mtx.RUnlock()
+	}
+	value, ok = m.list[key]
+	return
+}
+
+// Delete key/value pair from map.
+func (m *Map[K, V]) Delete(key K) {
+	if !m.inProcess {
+		m.mtx.Lock()
+		defer m.mtx.Unlock()
+	}
+	delete(m.list, key)
+}
+
+//----------------------------------------------------------------------
+// additional helpers
+//----------------------------------------------------------------------
 
 // StripPathRight returns a dot-separated path without
 // its last (right-most) element.
