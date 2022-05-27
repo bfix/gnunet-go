@@ -150,7 +150,7 @@ type DHTClientResultMsg struct {
 // NewDHTClientResultMsg creates a new default DHTClientResultMsg object.
 func NewDHTClientResultMsg(key *crypto.HashCode) *DHTClientResultMsg {
 	if key == nil {
-		key = crypto.NewHashCode()
+		key = crypto.NewHashCode(nil)
 	}
 	return &DHTClientResultMsg{
 		MsgSize:    64, // empty message size (no data)

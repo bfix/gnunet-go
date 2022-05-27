@@ -41,7 +41,7 @@ type NamecacheLookupMsg struct {
 // NewNamecacheLookupMsg creates a new default message.
 func NewNamecacheLookupMsg(query *crypto.HashCode) *NamecacheLookupMsg {
 	if query == nil {
-		query = crypto.NewHashCode()
+		query = crypto.NewHashCode(nil)
 	}
 	return &NamecacheLookupMsg{
 		MsgSize: 72,

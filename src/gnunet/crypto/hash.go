@@ -35,11 +35,15 @@ func (hc *HashCode) Equals(n *HashCode) bool {
 	return bytes.Equal(hc.Bits, n.Bits)
 }
 
-// NewHashCode creates a new, uninitalized hash value
-func NewHashCode() *HashCode {
-	return &HashCode{
+// NewHashCode creates a new (initalized) hash value
+func NewHashCode(buf []byte) *HashCode {
+	hc := &HashCode{
 		Bits: make([]byte, 64),
 	}
+	if buf != nil {
+		util.CopyAlignedBlock(hc.Bits, buf)
+	}
+	return hc
 }
 
 // Hash returns the SHA-512 hash value of a given blob
