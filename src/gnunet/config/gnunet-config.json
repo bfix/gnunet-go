@@ -1,7 +1,13 @@
 {
+	"local": {
+		"privateSeed": "YGoe6XFH3XdvFRl+agx9gIzPTvxA229WFdkazEMdcOs=",
+		"endpoints": [
+			"r5n+ip+udp:127.0.0.1:6666"
+		]
+	},
 	"bootstrap": {
 		"nodes": [
-			"udp+boot.gnunet.org:8765"
+			"gnunet://hello/7KTBJ90340HF1Q2GB0A57E2XJER4FDHX8HP5GHEB9125VPWPD27G/BNMDFN6HJCPWSPNBSEC06MC1K8QN1Z2DHRQSRXDTFR7FTBD4JHNBJ2RJAAEZ31FWG1Q3PMN3PXGZQ3Q7NTNEKQZFA7TE2Y46FM8E20R/1653499308?r5n%2Bip%2Budp%3A127.0.0.1%3A7654"
 		]
 	},
 	"environ": {

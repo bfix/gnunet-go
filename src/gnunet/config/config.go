@@ -29,6 +29,26 @@ import (
 )
 
 //----------------------------------------------------------------------
+// Configuration for local node
+//----------------------------------------------------------------------
+
+// NodeConfig holds parameters for the local node instance
+type NodeConfig struct {
+	PrivateSeed string   `json:"privateSeed"` // Node private key seed (base64)
+	Endpoints   []string `json:"endpoints"`   // list of endpoints available
+
+}
+
+//----------------------------------------------------------------------
+// Bootstrap configuration
+//----------------------------------------------------------------------
+
+// BootstrapConfig holds parameters for the initial connection to the network.
+type BootstrapConfig struct {
+	Nodes []string `json:"nodes"` // bootstrap nodes
+}
+
+//----------------------------------------------------------------------
 // RPC configuration
 //----------------------------------------------------------------------
 
@@ -78,15 +98,6 @@ type RevocationConfig struct {
 }
 
 //----------------------------------------------------------------------
-// Bootstrap configuration
-//----------------------------------------------------------------------
-
-// BootstrapConfig holds parameters for the initial connection to the network.
-type BootstrapConfig struct {
-	Nodes []string `json:"nodes"` // bootstrap nodes
-}
-
-//----------------------------------------------------------------------
 // Combined configuration
 //----------------------------------------------------------------------
 
@@ -95,13 +106,14 @@ type Environment map[string]string
 
 // Config is the aggregated configuration for GNUnet.
 type Config struct {
+	Local      *NodeConfig       `json:"local"`
+	Bootstrap  *BootstrapConfig  `json:"bootstrap"`
 	Env        Environment       `json:"environ"`
 	RPC        *RPCConfig        `json:"rpc"`
 	DHT        *DHTConfig        `json:"dht"`
 	GNS        *GNSConfig        `json:"gns"`
 	Namecache  *NamecacheConfig  `json:"namecache"`
 	Revocation *RevocationConfig `json:"revocation"`
-	Bootstrap  *BootstrapConfig  `json:"bootstrap"`
 }
 
 var (
