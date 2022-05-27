@@ -22,7 +22,6 @@ import (
 	"fmt"
 	"io"
 
-	"gnunet/config"
 	"gnunet/message"
 	"gnunet/service"
 	"gnunet/transport"
@@ -44,15 +43,12 @@ var (
 // Service implements a DHT service
 type Service struct {
 	Module
-
-	store Store // reference to the block storage mechanism
 }
 
 // NewService creates a new DHT service instance
 func NewService() *Service {
-	// instantiate service and assemble a new DHT handler.
 	return &Service{
-		store: NewStore(config.Cfg.DHT.Storage),
+		Module: *NewModule(),
 	}
 }
 

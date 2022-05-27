@@ -19,6 +19,7 @@
 package namecache
 
 import (
+	"gnunet/config"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
 )
@@ -33,12 +34,25 @@ import (
 
 // Namecache handles the transient storage of GNS blocks under the query key.
 type NamecacheModule struct {
+	cache service.DHTStore // transient block cache
 }
 
-func (nc *NamecacheModule) Get(ctx *service.SessionContext, query *blocks.GNSQuery) (*blocks.GNSBlock, error) {
-	return nil, nil
+// NewNamecacheModule creates a new module instance.
+func NewNamecacheModule() (nc *NamecacheModule, err error) {
+	nc = new(NamecacheModule)
+	nc.cache, err = service.NewDHTStore(config.Cfg.Namecache.Storage)
+	return
 }
 
-func (nc *NamecacheModule) Put(ctx *service.SessionContext, block *blocks.GNSBlock) error {
-	return nil
+// Get an entry from the cache if available.
+func (nc *NamecacheModule) Get(ctx *service.SessionContext, query *blocks.GNSQuery) (block *blocks.GNSBlock, err error) {
+	var b blocks.Block
+	b, err = nc.cache.Get(query)
+	err = blocks.Unwrap(b, block)
+	return
+}
+
+// Put entry into the cache.
+func (nc *NamecacheModule) Put(ctx *service.SessionContext, query *blocks.GNSQuery, block *blocks.GNSBlock) error {
+	return nc.cache.Put(query, block)
 }

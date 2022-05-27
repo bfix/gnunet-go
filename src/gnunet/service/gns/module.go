@@ -88,7 +88,7 @@ var (
 type Module struct {
 	// Use function references for calls to methods in other modules:
 	LookupLocal      func(ctx *service.SessionContext, query *blocks.GNSQuery) (*blocks.GNSBlock, error)
-	StoreLocal       func(ctx *service.SessionContext, block *blocks.GNSBlock) error
+	StoreLocal       func(ctx *service.SessionContext, query *blocks.GNSQuery, block *blocks.GNSBlock) error
 	LookupRemote     func(ctx *service.SessionContext, query blocks.Query) (blocks.Block, error)
 	RevocationQuery  func(ctx *service.SessionContext, zkey *crypto.ZoneKey) (valid bool, err error)
 	RevocationRevoke func(ctx *service.SessionContext, rd *revocation.RevData) (success bool, err error)
@@ -415,7 +415,7 @@ func (m *Module) Lookup(
 				return
 			}
 			// store RRs from remote locally.
-			m.StoreLocal(ctx, block)
+			m.StoreLocal(ctx, query, block)
 		}
 	}
 	return

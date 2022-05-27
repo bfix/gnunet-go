@@ -19,6 +19,7 @@
 package dht
 
 import (
+	"gnunet/config"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
 	"net/http"
@@ -34,12 +35,24 @@ import (
 
 // Module handles the permanent storage of blocks under a query key.
 type Module struct {
+	store service.DHTStore // reference to the block storage mechanism
+	cache service.DHTStore // transient block cache
 }
 
-// RPC returns the route and handler function for a JSON-RPC request
-func (m *Module) RPC() (string, func(http.ResponseWriter, *http.Request)) {
-	return "/gns/", func(wrt http.ResponseWriter, req *http.Request) {
-		wrt.Write([]byte(`{"msg": "This is DHT" }`))
+// NewModule returns a new module instance. It initializes the storage
+// mechanism for persistence.
+func NewModule() *Module {
+	store, err := service.NewDHTStore(config.Cfg.DHT.Storage)
+	if err != nil {
+		return nil
+	}
+	cache, err := service.NewDHTStore(config.Cfg.DHT.Cache)
+	if err != nil {
+		return nil
+	}
+	return &Module{
+		store: store,
+		cache: cache,
 	}
 }
 
@@ -51,4 +64,11 @@ func (nc *Module) Get(ctx *service.SessionContext, key blocks.Query) (blocks.Blo
 // Put a block into the DHT
 func (nc *Module) Put(ctx *service.SessionContext, key blocks.Query, block blocks.Block) error {
 	return nil
+}
+
+// RPC returns the route and handler function for a JSON-RPC request
+func (m *Module) RPC() (string, func(http.ResponseWriter, *http.Request)) {
+	return "/gns/", func(wrt http.ResponseWriter, req *http.Request) {
+		wrt.Write([]byte(`{"msg": "This is DHT" }`))
+	}
 }

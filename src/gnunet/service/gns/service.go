@@ -288,7 +288,7 @@ func (s *Service) LookupNamecache(ctx *service.SessionContext, query *blocks.GNS
 }
 
 // StoreNamecache stores a lookup in the local namecache.
-func (s *Service) StoreNamecache(ctx *service.SessionContext, block *blocks.GNSBlock) (err error) {
+func (s *Service) StoreNamecache(ctx *service.SessionContext, query *blocks.GNSQuery, block *blocks.GNSBlock) (err error) {
 	logger.Println(logger.DBG, "[gns] StoreNamecache()...")
 
 	// assemble Namecache request
@@ -425,7 +425,7 @@ func (s *Service) LookupDHT(ctx *service.SessionContext, query blocks.Query) (bl
 
 		// we got a result from DHT that was not in the namecache,
 		// so store it there now.
-		if err = s.StoreNamecache(ctx, block.(*blocks.GNSBlock)); err != nil {
+		if err = s.StoreNamecache(ctx, qGNS, block.(*blocks.GNSBlock)); err != nil {
 			logger.Printf(logger.ERROR, "[gns] can't store block in Namecache: %s\n", err.Error())
 		}
 	}

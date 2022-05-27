@@ -35,15 +35,15 @@ import (
 
 // Module handles the revocation-related calls to other modules.
 type Module struct {
-	bloomf *data.BloomFilter  // bloomfilter for fast revocation check
-	kvs    util.KeyValueStore // storage for known revocations
+	bloomf *data.BloomFilter // bloomfilter for fast revocation check
+	kvs    service.KVStore   // storage for known revocations
 }
 
 // Init a revocation module
 func (m *Module) Init() error {
 	// Initialize access to revocation data storage
 	var err error
-	if m.kvs, err = util.OpenKVStore(config.Cfg.Revocation.Storage); err != nil {
+	if m.kvs, err = service.NewKVStore(config.Cfg.Revocation.Storage); err != nil {
 		return err
 	}
 	// traverse the storage and build bloomfilter for all keys
@@ -53,11 +53,7 @@ func (m *Module) Init() error {
 		return err
 	}
 	for _, key := range keys {
-		buf, err := util.DecodeStringToBinary(key, 32)
-		if err != nil {
-			return err
-		}
-		m.bloomf.Add(buf)
+		m.bloomf.Add([]byte(key))
 	}
 	return nil
 }
