@@ -36,7 +36,6 @@ import (
 type NodeConfig struct {
 	PrivateSeed string   `json:"privateSeed"` // Node private key seed (base64)
 	Endpoints   []string `json:"endpoints"`   // list of endpoints available
-
 }
 
 //----------------------------------------------------------------------
@@ -75,7 +74,8 @@ type GNSConfig struct {
 // DHTConfig contains parameters for the distributed hash table (DHT)
 type DHTConfig struct {
 	Endpoint string `json:"endpoint"` // end-point of DHT service
-	Storage  string `jsom:"storage"`  // filesystem storage location
+	Storage  string `json:"storage"`  // filesystem storage location
+	Cache    string `json:"cache"`    // key/value cache
 }
 
 //----------------------------------------------------------------------
@@ -85,6 +85,7 @@ type DHTConfig struct {
 // NamecacheConfig contains parameters for the local name cache
 type NamecacheConfig struct {
 	Endpoint string `json:"endpoint"` // end-point of Namecache service
+	Storage  string `json:"storage"`  // key/value cache
 }
 
 //----------------------------------------------------------------------

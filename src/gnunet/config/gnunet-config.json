@@ -16,7 +16,8 @@
 	},
 	"dht": {
 		"endpoint": "unix+${RT_SYS}/gnunet-service-dht.sock",
-		"storage": "file+/var/lib/gnunet/dht/store"
+		"storage": "dht_file_store+/var/lib/gnunet/dht/store",
+		"cache": "dht_file_cache+/var/lib/gnunet/dht/cache+1000"
 	},
 	"gns": {
 		"endpoint": "unix+${RT_SYS}/gnunet-service-gns-go.sock+perm=0770",
@@ -24,7 +25,8 @@
 		"maxDepth": 250
 	},
 	"namecache": {
-		"endpoint": "unix+${RT_SYS}/gnunet-service-namecache.sock"
+		"endpoint": "unix+${RT_SYS}/gnunet-service-namecache.sock",
+		"storage": "dht_file_cache+/var/lib/gnunet/namecache+1000"
 	},
 	"revocation": {
 		"endpoint": "unix+${RT_SYS}/gnunet-service-revocation-go.sock+perm=0770",
