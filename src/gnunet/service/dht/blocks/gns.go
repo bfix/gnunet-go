@@ -50,6 +50,11 @@ func (q *GNSQuery) Key() *crypto.HashCode {
 	return q.key
 }
 
+// Type returns the desired block type for results
+func (q *GNSQuery) Type() uint16 {
+	return DHT_BLOCK_GNS
+}
+
 // Verify the integrity of the block data from a signature.
 func (q *GNSQuery) Verify(b Block) (err error) {
 	switch blk := b.(type) {

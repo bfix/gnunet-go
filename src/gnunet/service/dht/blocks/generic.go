@@ -20,6 +20,7 @@ package blocks
 
 import (
 	"gnunet/crypto"
+	"gnunet/util"
 
 	"github.com/bfix/gospel/data"
 )
@@ -33,6 +34,9 @@ type Query interface {
 
 	// Key returns the DHT key for a block
 	Key() *crypto.HashCode
+
+	// Type returns the desired block type for results
+	Type() uint16
 
 	// Verify the integrity of a retrieved block (optional). Override in
 	// custom query types to implement block-specific integrity checks
@@ -76,6 +80,11 @@ func (k *GenericQuery) Key() *crypto.HashCode {
 	return k.key
 }
 
+// Type returns the desired block type for results
+func (k *GenericQuery) Type() uint16 {
+	return DHT_BLOCK_ANY
+}
+
 // Verify interface method implementation
 func (k *GenericQuery) Verify(b Block) error {
 	// no verification, no errors ;)
@@ -89,15 +98,15 @@ func (k *GenericQuery) Decrypt(b Block) error {
 }
 
 // NewGenericQuery creates a simple Query from hash code.
-func NewGenericQuery(h *crypto.HashCode) *GenericQuery {
+func NewGenericQuery(buf []byte) *GenericQuery {
 	return &GenericQuery{
-		key: h,
+		key: crypto.NewHashCode(buf),
 	}
 }
 
 // GenericBlock is the block in simple binary representation
 type GenericBlock struct {
-	data []byte
+	data []byte `size:"*"`
 }
 
 // Data interface method implementation
@@ -114,6 +123,6 @@ func (b *GenericBlock) Verify() error {
 // NewGenericBlock creates a Block from binary data.
 func NewGenericBlock(buf []byte) *GenericBlock {
 	return &GenericBlock{
-		data: buf,
+		data: util.Clone(buf),
 	}
 }
