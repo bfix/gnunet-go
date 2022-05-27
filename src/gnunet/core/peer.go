@@ -63,7 +63,7 @@ func NewLocalPeer(cfg *config.NodeConfig) (p *Peer, err error) {
 
 	// get the key material for local node
 	var data []byte
-	if data, err = base64.RawStdEncoding.DecodeString(cfg.PrivateSeed); err != nil {
+	if data, err = base64.StdEncoding.DecodeString(cfg.PrivateSeed); err != nil {
 		return
 	}
 	p.prv = ed25519.NewPrivateKeyFromSeed(data)
