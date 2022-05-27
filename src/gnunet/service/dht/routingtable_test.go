@@ -20,11 +20,11 @@ package dht
 
 import (
 	"context"
+	"gnunet/config"
 	"gnunet/core"
+	"gnunet/util"
 	"math/rand"
 	"testing"
-
-	"github.com/bfix/gospel/crypto/ed25519"
 )
 
 const (
@@ -42,6 +42,16 @@ type Entry struct {
 	online bool         // peer connected?
 }
 
+// test data
+var (
+	cfg = &config.NodeConfig{
+		PrivateSeed: "YGoe6XFH3XdvFRl+agx9gIzPTvxA229WFdkazEMdcOs=",
+		Endpoints: []string{
+			"r5n+ip+udp://127.0.0.1:6666",
+		},
+	}
+)
+
 // TestRT connects and disconnects random peers to test the base
 // functionality of the routing table algorithms.
 func TestRT(t *testing.T) {
@@ -49,17 +59,12 @@ func TestRT(t *testing.T) {
 	rand.Seed(19031962)
 
 	// helper functions
-	genPeer := func(local bool) *PeerAddress {
+	genRemotePeer := func() *PeerAddress {
 		d := make([]byte, 32)
 		if _, err := rand.Read(d); err != nil {
 			panic(err)
 		}
-		sk := ed25519.NewPrivateKeyFromSeed(d)
-		peer, err := core.NewPeer(sk.Public().Bytes(), local)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return NewPeerAddress(peer.GetID())
+		return NewPeerAddress(util.NewPeerID(d))
 	}
 
 	// establish context
@@ -67,15 +72,18 @@ func TestRT(t *testing.T) {
 	defer cancel()
 
 	// create routing table and start command handler
-	ref := genPeer(true)
-	rt := NewRoutingTable(ref)
+	local, err := core.NewLocalPeer(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rt := NewRoutingTable(NewPeerAddress(local.GetID()))
 	ch := rt.Run(ctx)
 
 	// create a task list
 	tasks := make([]*Entry, NUMP)
 	for i := range tasks {
 		tasks[i] = new(Entry)
-		tasks[i].addr = genPeer(false)
+		tasks[i].addr = genRemotePeer()
 		tasks[i].born = rand.Int63n(EPOCHS)
 		tasks[i].ttl = 1000 + rand.Int63n(7000)
 		tasks[i].drop = 2000 + rand.Int63n(3000)
@@ -134,7 +142,7 @@ func TestRT(t *testing.T) {
 	}
 
 	// execute some routing functions on remaining table
-	k := genPeer(false)
+	k := genRemotePeer()
 	bf := NewPeerBloomFilter()
 	n := rt.SelectClosestPeer(k, bf)
 	t.Logf("Closest: %s -> %s\n", k, n)

@@ -19,23 +19,19 @@
 package core
 
 import (
+	"gnunet/config"
 	"gnunet/service/dht/blocks"
-	"gnunet/util"
 	"testing"
 	"time"
 )
 
 // test data
 var (
-	SEED = []byte{
-		0x5a, 0xf7, 0x02, 0x0e, 0xe1, 0x91, 0x60, 0x32,
-		0x88, 0x32, 0x35, 0x2b, 0xbc, 0x6a, 0x68, 0xa8,
-		0xd7, 0x1a, 0x7c, 0xbe, 0x1b, 0x92, 0x99, 0x69,
-		0xa7, 0xc6, 0x6d, 0x41, 0x5a, 0x0d, 0x8f, 0x65,
-	}
-	ADDRS = []string{
-		"r5n+ip+udp://1.2.3.4:6789",
-		"gnunet+tcp://12.3.4.5/",
+	cfg = &config.NodeConfig{
+		PrivateSeed: "YGoe6XFH3XdvFRl+agx9gIzPTvxA229WFdkazEMdcOs=",
+		Endpoints: []string{
+			"r5n+ip+udp://127.0.0.1:6666",
+		},
 	}
 	TTL = 6 * time.Hour
 )
@@ -43,17 +39,9 @@ var (
 func TestPeerHello(t *testing.T) {
 
 	// generate new local node
-	node, err := NewPeer(SEED, true)
+	node, err := NewLocalPeer(cfg)
 	if err != nil {
 		t.Fatal(err)
-	}
-	// add addresses
-	for _, a := range ADDRS {
-		addr, err := util.ParseAddress(a)
-		if err != nil {
-			t.Fatal(err)
-		}
-		node.AddAddress(addr)
 	}
 
 	// get HELLO data for the node

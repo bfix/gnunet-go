@@ -19,15 +19,29 @@
 package core
 
 import (
+	"encoding/base64"
 	"fmt"
 	"time"
 
+	"gnunet/config"
 	"gnunet/message"
 	"gnunet/service/dht/blocks"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/crypto/ed25519"
 )
+
+//----------------------------------------------------------------------
+// GNUnet P2P network node (local or remote):
+//
+// * A LOCAL node has a long-term EdDSA key pair used for signing. The
+//   public key is the node identifier (PeerID).
+//   Local nodes hold additional attributes like ephemeral keys for message
+//   exchange or a list of network addresses the node can be reached on.
+//
+// * A REMOTE node only has a public EdDSA key used by the local node
+//   to verify signatures from the remote node.
+//----------------------------------------------------------------------
 
 // Peer represents a node in the GNUnet P2P network.
 type Peer struct {
@@ -39,26 +53,54 @@ type Peer struct {
 	ephMsg   *message.EphemeralKeyMsg // ephemeral signing key message
 }
 
-// NewPeer instantiates a new peer object from given data. If a local peer
-// is created, the data is the seed for generating the private key of the node;
-// for a remote peer the data is the binary representation of its public key.
-func NewPeer(data []byte, local bool) (p *Peer, err error) {
+//----------------------------------------------------------------------
+// Create new peer objects
+//----------------------------------------------------------------------
+
+// NewLocalPeer creates a new local node from configuration data.
+func NewLocalPeer(cfg *config.NodeConfig) (p *Peer, err error) {
 	p = new(Peer)
-	if local {
-		p.prv = ed25519.NewPrivateKeyFromSeed(data)
-		p.pub = p.prv.Public()
-		p.ephPrv, p.ephMsg, err = message.NewEphemeralKey(p.pub.Bytes(), p.prv)
-		if err != nil {
+
+	// get the key material for local node
+	var data []byte
+	if data, err = base64.RawStdEncoding.DecodeString(cfg.PrivateSeed); err != nil {
+		return
+	}
+	p.prv = ed25519.NewPrivateKeyFromSeed(data)
+	p.pub = p.prv.Public()
+	p.idString = util.EncodeBinaryToString(p.pub.Bytes())
+	p.ephPrv, p.ephMsg, err = message.NewEphemeralKey(p.pub.Bytes(), p.prv)
+	if err != nil {
+		return
+	}
+	// set the endpoint addresses for local node
+	p.addrList = make([]*util.Address, len(cfg.Endpoints))
+	for i, a := range cfg.Endpoints {
+		if p.addrList[i], err = util.ParseAddress(a); err != nil {
 			return
 		}
-	} else {
-		p.prv = nil
-		p.pub = ed25519.NewPublicKeyFromBytes(data)
 	}
+	return
+}
+
+// NewPeer instantiates a new (remote) peer object from given peer ID string.
+func NewPeer(peerID string) (p *Peer, err error) {
+	p = new(Peer)
+
+	// get the key material for local node
+	var data []byte
+	if data, err = util.DecodeStringToBinary(peerID, 32); err != nil {
+		return
+	}
+	p.prv = nil
+	p.pub = ed25519.NewPublicKeyFromBytes(data)
 	p.idString = util.EncodeBinaryToString(p.pub.Bytes())
 	p.addrList = make([]*util.Address, 0)
 	return
 }
+
+//----------------------------------------------------------------------
+//----------------------------------------------------------------------
 
 // HelloData returns the current HELLO data for the peer
 func (p *Peer) HelloData(ttl time.Duration) (h *blocks.HelloBlock, err error) {
