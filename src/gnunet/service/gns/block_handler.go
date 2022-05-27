@@ -76,7 +76,7 @@ type BlockHandler interface {
 	// resource records in the same block. 'cm' maps the resource type
 	// to an integer count (how many records of a type are present in the
 	// GNS block).
-	Coexist(cm util.CounterMap) bool
+	Coexist(cm util.Counter[int]) bool
 
 	// Records returns a list of RR of the given types associated with
 	// the custom handler
@@ -103,7 +103,7 @@ type BlockHandler interface {
 // BlockHandlerList is a list of block handlers instantiated.
 type BlockHandlerList struct {
 	list   map[int]BlockHandler // list of handler instances
-	counts util.CounterMap      // count number of RRs by type
+	counts util.Counter[int]    // count number of RRs by type
 }
 
 // NewBlockHandlerList instantiates an a list of active block handlers
@@ -112,7 +112,7 @@ func NewBlockHandlerList(records []*message.ResourceRecord, labels []string) (*B
 	// initialize block handler list
 	hl := &BlockHandlerList{
 		list:   make(map[int]BlockHandler),
-		counts: make(util.CounterMap),
+		counts: make(util.Counter[int]),
 	}
 
 	// first pass: build list of shadow records in this block
@@ -260,7 +260,7 @@ func (h *ZoneKeyHandler) AddRecord(rec *message.ResourceRecord, labels []string)
 
 // Coexist return a flag indicating how a resource record of a given type
 // is to be treated (see BlockHandler interface)
-func (h *ZoneKeyHandler) Coexist(cm util.CounterMap) bool {
+func (h *ZoneKeyHandler) Coexist(cm util.Counter[int]) bool {
 	// only one type (GNS_TYPE_PKEY) is present
 	return len(cm) == 1 && cm.Num(enums.GNS_TYPE_PKEY) == 1
 }
@@ -335,7 +335,7 @@ func (h *Gns2DnsHandler) AddRecord(rec *message.ResourceRecord, labels []string)
 
 // Coexist return a flag indicating how a resource record of a given type
 // is to be treated (see BlockHandler interface)
-func (h *Gns2DnsHandler) Coexist(cm util.CounterMap) bool {
+func (h *Gns2DnsHandler) Coexist(cm util.Counter[int]) bool {
 	// only one type (GNS_TYPE_GNS2DNS) is present
 	return len(cm) == 1 && cm.Num(enums.GNS_TYPE_GNS2DNS) > 0
 }
@@ -405,7 +405,7 @@ func (h *BoxHandler) AddRecord(rec *message.ResourceRecord, labels []string) err
 
 // Coexist return a flag indicating how a resource record of a given type
 // is to be treated (see BlockHandler interface)
-func (h *BoxHandler) Coexist(cm util.CounterMap) bool {
+func (h *BoxHandler) Coexist(cm util.Counter[int]) bool {
 	// anything goes...
 	return true
 }
@@ -469,7 +469,7 @@ func (h *LehoHandler) AddRecord(rec *message.ResourceRecord, labels []string) er
 
 // Coexist return a flag indicating how a resource record of a given type
 // is to be treated (see BlockHandler interface)
-func (h *LehoHandler) Coexist(cm util.CounterMap) bool {
+func (h *LehoHandler) Coexist(cm util.Counter[int]) bool {
 	// requires exactly one LEHO and any number of other records.
 	return cm.Num(enums.GNS_TYPE_LEHO) == 1
 }
@@ -527,7 +527,7 @@ func (h *CnameHandler) AddRecord(rec *message.ResourceRecord, labels []string) e
 
 // Coexist return a flag indicating how a resource record of a given type
 // is to be treated (see BlockHandler interface)
-func (h *CnameHandler) Coexist(cm util.CounterMap) bool {
+func (h *CnameHandler) Coexist(cm util.Counter[int]) bool {
 	// only a single CNAME allowed
 	return len(cm) == 1 && cm.Num(enums.GNS_TYPE_DNS_CNAME) == 1
 }
@@ -581,7 +581,7 @@ func (h *VpnHandler) AddRecord(rec *message.ResourceRecord, labels []string) err
 
 // Coexist return a flag indicating how a resource record of a given type
 // is to be treated (see BlockHandler interface)
-func (h *VpnHandler) Coexist(cm util.CounterMap) bool {
+func (h *VpnHandler) Coexist(cm util.Counter[int]) bool {
 	// anything goes
 	return true
 }
