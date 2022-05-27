@@ -24,25 +24,40 @@ import (
 	"github.com/bfix/gospel/data"
 )
 
+//----------------------------------------------------------------------
+// Query/Block interfaces for generic DHT handling
+//----------------------------------------------------------------------
+
 // DHT Query interface
 type Query interface {
 
 	// Key returns the DHT key for a block
 	Key() *crypto.HashCode
 
-	// Verify the integrity of a retrieved block
+	// Verify the integrity of a retrieved block (optional). Override in
+	// custom query types to implement block-specific integrity checks
+	// (see GNSQuery for example).
 	Verify(blk Block) error
 
-	// Decrypt block content
+	// Decrypt block content (optional). Override in custom query types to
+	// implement block-specific encryption (see GNSQuery for example).
 	Decrypt(blk Block) error
 }
 
 // DHT Block interface
 type Block interface {
+
+	// Data returns the DHT block data (unstructured)
 	Data() []byte
+
+	// Verify the integrity of a block (optional). Override in custom query
+	// types to implement block-specific integrity checks (see GNSBlock for
+	// example). This verification is usually weaker than the verification
+	// method from a Query (see GNSBlock.Verify for explanation).
+	Verify() error
 }
 
-// Unwrap block to specific block type
+// Unwrap (raw) block to a specific block type
 func Unwrap(blk Block, obj interface{}) error {
 	return data.Unmarshal(obj, blk.Data())
 }
@@ -73,7 +88,7 @@ func (k *GenericQuery) Decrypt(b Block) error {
 	return nil
 }
 
-// NewGenericQuery creates a simple Query from binary key data.
+// NewGenericQuery creates a simple Query from hash code.
 func NewGenericQuery(h *crypto.HashCode) *GenericQuery {
 	return &GenericQuery{
 		key: h,
@@ -88,6 +103,12 @@ type GenericBlock struct {
 // Data interface method implementation
 func (b *GenericBlock) Data() []byte {
 	return b.data
+}
+
+// Verify interface method implementation
+func (b *GenericBlock) Verify() error {
+	// no verification, no errors ;)
+	return nil
 }
 
 // NewGenericBlock creates a Block from binary data.

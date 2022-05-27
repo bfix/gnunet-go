@@ -33,7 +33,7 @@ var (
 )
 
 //----------------------------------------------------------------------
-// Query key for simple GNS lookups
+// Query key for GNS lookups
 //----------------------------------------------------------------------
 
 // GNSQuery specifies the context for a basic GNS name lookup of an (atomic)
@@ -105,6 +105,10 @@ func NewGNSQuery(zkey *crypto.ZoneKey, label string) *GNSQuery {
 	}
 }
 
+//----------------------------------------------------------------------
+// GNS blocks
+//----------------------------------------------------------------------
+
 // SignedGNSBlockData represents the signed content of a GNS block
 type SignedGNSBlockData struct {
 	Purpose *crypto.SignaturePurpose ``         // Size and purpose of signature (8 bytes)
@@ -153,4 +157,18 @@ func NewBlock() *GNSBlock {
 		decrypted: false,
 		data:      nil,
 	}
+}
+
+// Verify the integrity of the block data from a signature.
+// Only the cryptographic signature is verified; the formal correctness of
+// the association between the block and a GNS label in a GNS zone can't
+// be verified. This is only possible in Query.Verify().
+func (b *GNSBlock) Verify() (err error) {
+	// verify signature
+	var buf []byte
+	if buf, err = data.Marshal(b.Body); err != nil {
+		return
+	}
+	_, err = b.DerivedKeySig.Verify(buf)
+	return
 }
