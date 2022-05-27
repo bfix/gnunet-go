@@ -19,36 +19,43 @@
 package dht
 
 import (
+	"encoding/hex"
 	"gnunet/crypto"
+	"gnunet/service"
 	blocks "gnunet/service/dht/blocks"
 	"math/rand"
 	"testing"
-
-	"github.com/bfix/gospel/data"
 )
 
 // test constants
 const (
-	fsNumBlocks = 200
+	fsNumBlocks = 5
 )
 
-// TestFileStore generates 'fsNumBlocks' fully-random blocks
+// TestDHTFileStore generates 'fsNumBlocks' fully-random blocks
 // and stores them under their SHA512 key. It than retrieves
 // each block from storage and checks for matching hash.
-func TestFileStore(t *testing.T) {
-	fs := NewFileStore("/var/lib/gnunet/dht/store")
+func TestDHTFilesStore(t *testing.T) {
 
+	// create file store
+	fs, err := service.NewFileCache("/var/lib/gnunet/dht/cache", "100")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// allocate keys
 	keys := make([]blocks.Query, 0, fsNumBlocks)
 
 	// First round: save blocks
 	for i := 0; i < fsNumBlocks; i++ {
 		// generate random block
-		size := 1024 + rand.Intn(62000)
+		size := 20 // 1024 + rand.Intn(62000)
 		buf := make([]byte, size)
 		rand.Read(buf)
 		val := blocks.NewGenericBlock(buf)
 		// generate associated key
-		key := blocks.NewGenericQuery(crypto.Hash(buf))
+		k := crypto.Hash(buf).Bits
+		key := blocks.NewGenericQuery(k)
+		t.Logf("> %d: %s -- %s", i, hex.EncodeToString(k), hex.EncodeToString(buf))
 
 		// store block
 		if err := fs.Put(key, val); err != nil {
@@ -60,21 +67,22 @@ func TestFileStore(t *testing.T) {
 	}
 
 	// Second round: retrieve blocks and check
-	for _, key := range keys {
+	for i, key := range keys {
 		// get block
 		val, err := fs.Get(key)
 		if err != nil {
 			t.Fatal(err)
 		}
-		buf, err := data.Marshal(val)
-		if err != nil {
-			t.Fatal(err)
-		}
+		buf := val.Data()
+		t.Logf("< %d: %s -- %s", i, hex.EncodeToString(key.Key().Bits), hex.EncodeToString(buf))
+
 		// re-create key
 		k := crypto.Hash(buf)
 
 		// do the keys match?
 		if !k.Equals(key.Key()) {
+			t.Log(hex.EncodeToString(k.Bits))
+			t.Log(hex.EncodeToString(key.Key().Bits))
 			t.Fatal("key/value mismatch")
 		}
 	}
