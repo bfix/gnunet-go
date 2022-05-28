@@ -24,13 +24,17 @@ DOCUMENTATION OR COMPILABLE, RUNNABLE OR EVEN OPERATIONAL SOURCE CODE.
 
 ## TL;DR
 
+Go v1.18+ is required to compile the code.
+
 ```bash
 git clone https://github.com/bfix/gnunet-go
 cd gnunet-go/src/gnunet
 go mod tidy
-go install -gcflags "-N -l" ./...
-go test -gcflags "-N -l" ./...
+go install ./...
+go test ./...
 ```
+
+The binaries are stored in `${GOPATH}/bin`.
 
 ## Source code
 
