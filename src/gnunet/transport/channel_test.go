@@ -21,6 +21,8 @@ package transport
 import (
 	"bytes"
 	"fmt"
+	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -33,20 +35,22 @@ import (
 const (
 	SockAddr      = "/tmp/gnunet-go-test.sock"
 	TCPAddrClient = "gnunet.org:80"
-	TCPAddrServer = "127.0.0.1:9876"
+	TCPAddrServer = "127.0.0.1:0"
 )
 
 type TestChannelServer struct {
 	hdlr    chan Channel
 	srvc    ChannelServer
 	running bool
+	t       *testing.T
 }
 
-func NewTestChannelServer() *TestChannelServer {
+func NewTestChannelServer(t *testing.T) *TestChannelServer {
 	return &TestChannelServer{
 		hdlr:    make(chan Channel),
 		srvc:    nil,
 		running: false,
+		t:       t,
 	}
 }
 
@@ -65,10 +69,10 @@ func (s *TestChannelServer) handle(ch Channel, sig *concurrent.Signaller) {
 	ch.Close()
 }
 
-func (s *TestChannelServer) Start(spec string) (err error) {
+func (s *TestChannelServer) Start(spec string) (addr net.Addr, err error) {
 	// check if we are already running
 	if s.running {
-		return fmt.Errorf("Server already running")
+		return nil, fmt.Errorf("Server already running")
 	}
 
 	// start channel server
@@ -87,23 +91,26 @@ func (s *TestChannelServer) Start(spec string) (err error) {
 			}
 			switch x := in.(type) {
 			case Channel:
+				s.t.Logf("New session with test channel server...")
 				go s.handle(x, sig)
 			}
 		}
+		s.t.Logf("Internal service closing...")
 		s.srvc.Close()
-		s.running = false
 	}()
-	return nil
+	endp := s.srvc.Address()
+	s.t.Logf("Started test channel server '%s'...", endp)
+	return endp, nil
 }
 
 func (s *TestChannelServer) Stop() {
+	s.t.Logf("Stopped test channel server...")
 	s.running = false
 }
 
 func TestChannelServerTCPSingle(t *testing.T) {
-	time.Sleep(time.Second)
-	s := NewTestChannelServer()
-	err := s.Start("tcp+" + TCPAddrServer)
+	s := NewTestChannelServer(t)
+	_, err := s.Start("tcp+" + TCPAddrServer)
 	defer s.Stop()
 	if err != nil {
 		t.Fatal(err)
@@ -111,24 +118,21 @@ func TestChannelServerTCPSingle(t *testing.T) {
 }
 
 func TestChannelServerTCPTwice(t *testing.T) {
-	time.Sleep(time.Second)
-	s1 := NewTestChannelServer()
-	err := s1.Start("tcp+" + TCPAddrServer)
-	defer s1.Stop()
+	s1 := NewTestChannelServer(t)
+	addr, err := s1.Start("tcp+" + TCPAddrServer)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer s1.Stop()
 	time.Sleep(time.Second)
-	s2 := NewTestChannelServer()
-	err = s2.Start("tcp+" + TCPAddrServer)
-	defer s2.Stop()
-	if err == nil {
+	s2 := NewTestChannelServer(t)
+	if _, err := s2.Start("tcp+" + addr.String()); err == nil {
 		t.Fatal("SocketServer started twice!!")
+		s2.Stop()
 	}
 }
 
 func TestChannelClientTCP(t *testing.T) {
-	time.Sleep(time.Second)
 	ch, err := NewChannel("tcp+" + TCPAddrClient)
 	if err != nil {
 		t.Fatal(err)
@@ -152,19 +156,19 @@ func TestChannelClientTCP(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	t.Logf("'%s' [%d]\n", string(buf[:n]), n)
+	//t.Logf("'%s' [%d]\n", string(buf[:n]), n)
 }
 
 func TestChannelClientServerTCP(t *testing.T) {
-	time.Sleep(time.Second)
-	s := NewTestChannelServer()
-	err := s.Start("tcp+" + TCPAddrServer)
-	defer s.Stop()
+	s := NewTestChannelServer(t)
+	addr, err := s.Start("tcp+" + TCPAddrServer)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer s.Stop()
 
-	ch, err := NewChannel("tcp+" + TCPAddrServer)
+	ch, err := NewChannel("tcp+" + addr.String())
+	defer ch.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,16 +198,21 @@ func TestChannelClientServerTCP(t *testing.T) {
 }
 
 func TestChannelClientServerSock(t *testing.T) {
-	time.Sleep(time.Second)
-	s := NewTestChannelServer()
-	if err := s.Start("unix+" + SockAddr); err != nil {
-		t.Fatal(err)
-	}
+	// drop any existing socket.
+	os.Remove(SockAddr)
 
-	ch, err := NewChannel("unix+" + SockAddr)
+	s := NewTestChannelServer(t)
+	addr, err := s.Start("unix+" + SockAddr)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer s.Stop()
+
+	ch, err := NewChannel("unix+" + addr.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ch.Close()
 	sig := concurrent.NewSignaller()
 	msg := []byte("This is just a test -- please ignore...")
 	n, err := ch.Write(msg, sig)
@@ -221,12 +230,7 @@ func TestChannelClientServerSock(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	if err = ch.Close(); err != nil {
-		t.Fatal(err)
-	}
 	if !bytes.Equal(buf[:n], msg) {
 		t.Fatal("message send/receive mismatch")
 	}
-
-	s.Stop()
 }

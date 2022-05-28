@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
 	"path"
 	"strings"
 
@@ -90,6 +91,7 @@ func NewChannel(spec string) (Channel, error) {
 type ChannelServer interface {
 	Open(spec string, hdlr chan<- Channel) error
 	Close() error
+	Address() net.Addr
 }
 
 // ChannelServerFactory instantiates specific ChannelServer imülementations.

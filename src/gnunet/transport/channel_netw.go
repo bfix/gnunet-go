@@ -171,6 +171,7 @@ func (c *NetworkChannel) Write(buf []byte, sig *concurrent.Signaller) (int, erro
 type NetworkChannelServer struct {
 	network  string       // network protocol to listen on
 	listener net.Listener // reference to listener object
+	running  bool         // server running?
 }
 
 // NewNetworkChannelServer creates a new network-based channel server
@@ -178,6 +179,7 @@ func NewNetworkChannelServer(netw string) ChannelServer {
 	return &NetworkChannelServer{
 		network:  netw,
 		listener: nil,
+		running:  false,
 	}
 }
 
@@ -218,8 +220,9 @@ func (s *NetworkChannelServer) Open(spec string, hdlr chan<- Channel) (err error
 		}
 	}
 	// run go routine to handle channel requests from clients
+	s.running = true
 	go func() {
-		for {
+		for s.running {
 			conn, err := s.listener.Accept()
 			if err != nil {
 				// signal failure and terminate
@@ -242,12 +245,21 @@ func (s *NetworkChannelServer) Open(spec string, hdlr chan<- Channel) (err error
 
 // Close a network channel server (= stop the server)
 func (s *NetworkChannelServer) Close() error {
+	s.running = false
 	if s.listener != nil {
 		err := s.listener.Close()
 		s.listener = nil
 		return err
 	}
 	return nil
+}
+
+// Address returns the listen address of the service
+func (s *NetworkChannelServer) Address() net.Addr {
+	if s.listener == nil {
+		return nil
+	}
+	return s.listener.Addr()
 }
 
 ////////////////////////////////////////////////////////////////////////
