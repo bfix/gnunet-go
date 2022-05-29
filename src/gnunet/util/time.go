@@ -145,3 +145,8 @@ func (t RelativeTime) String() string {
 	}
 	return time.Duration(t.Val * 1000).String()
 }
+
+// Add two durations
+func (t RelativeTime) Add(t2 RelativeTime) {
+	t.Val += t2.Val
+}
