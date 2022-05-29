@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"gnunet/config"
+	"gnunet/core"
 	"gnunet/rpc"
 	"gnunet/service"
 	"gnunet/service/dht"
@@ -70,8 +71,18 @@ func main() {
 		srvEndp = config.Cfg.DHT.Endpoint
 	}
 
+	// instantiate local peer
+	var local *core.Peer
+	if local, err = core.NewLocalPeer(config.Cfg.Local); err != nil {
+		logger.Printf(logger.ERROR, "[dht] No local peer: %s\n", err.Error())
+		return
+	}
+
+	// instantiate message transport layer
+	tr := transport.NewTestTransport()
+
 	// start a new DHT service
-	dht := dht.NewService()
+	dht := dht.NewService(tr, local.GetID())
 	srv := service.NewServiceImpl("dht", dht)
 	if err = srv.Start(srvEndp); err != nil {
 		logger.Printf(logger.ERROR, "[dht] Failed to start DHT service: '%s'", err.Error())
@@ -114,12 +125,12 @@ loop:
 	for {
 		select {
 		// handle transport events
-		case act := <-trans.Signal():
-			switch x := act.(type) {
-			// forward message to DHT
-			case *transport.Incoming:
-				dht.HandleMessage(x.Msg, x.Ch)
+		case ev := <-trans.Signal():
+			switch ev.Ev {
+			case transport.EV_MESSAGE:
+				dht.HandleMessage(ev.Msg, ev.Ch)
 			}
+
 		// handle OS signals
 		case sig := <-sigCh:
 			switch sig {
