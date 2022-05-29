@@ -21,13 +21,13 @@ package service
 import (
 	"context"
 	"database/sql"
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"gnunet/crypto"
 	"gnunet/service/dht/blocks"
 	"gnunet/util"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -134,10 +134,9 @@ func NewKVStore(spec string) (KVStore, error) {
 // FileStore implements a filesystem-based storage mechanism for
 // DHT queries and blocks.
 type FileStore struct {
-	path   string         // storage path
-	perm   bool           // permanent storage?
-	cached []blocks.Query // list of cached entries
-	wrPos  int            // write position in cyclic list
+	path   string             // storage path
+	cached []*crypto.HashCode // list of cached entries (key)
+	wrPos  int                // write position in cyclic list
 }
 
 // NewFileStore instantiates a new file storage.
@@ -145,7 +144,6 @@ func NewFileStore(path string) (DHTStore, error) {
 	// create file store
 	return &FileStore{
 		path: path,
-		perm: true,
 	}, nil
 }
 
@@ -159,44 +157,97 @@ func NewFileCache(path, param string) (DHTStore, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	// create file store
 	return &FileStore{
 		path:   path,
-		cached: make([]blocks.Query, num),
+		cached: make([]*crypto.HashCode, num),
 		wrPos:  0,
 	}, nil
 }
 
 // Put block into storage under given key
-func (s *FileStore) Put(key blocks.Query, val blocks.Block) (err error) {
+func (s *FileStore) Put(query blocks.Query, block blocks.Block) (err error) {
+	// get query parameters for entry
+	var (
+		btype  uint16            // block type
+		expire util.AbsoluteTime // block expiration
+	)
+	query.Get("blkType", &btype)
+	query.Get("expire", &expire)
+
+	// are we in caching mode?
+	if s.cached != nil {
+		// release previous block if defined
+		if key := s.cached[s.wrPos]; key != nil {
+			// get path and filename from key
+			path, fname := s.expandPath(key)
+			if err = os.Remove(path + "/" + fname); err != nil {
+				return
+			}
+			// free slot
+			s.cached[s.wrPos] = nil
+		}
+	}
 	// get path and filename from key
-	path, fname := s.expandPath(key.Key())
+	path, fname := s.expandPath(query.Key())
 	// make sure the path exists
 	if err = os.MkdirAll(path, 0755); err != nil {
 		return
 	}
-	// create file for storage
+	// write to file for storage
 	var fp *os.File
 	if fp, err = os.Create(path + "/" + fname); err == nil {
 		defer fp.Close()
 		// write block data
-		_, err = fp.Write(val.Data())
+		if err = binary.Write(fp, binary.BigEndian, btype); err == nil {
+			if err = binary.Write(fp, binary.BigEndian, expire); err == nil {
+				_, err = fp.Write(block.Data())
+			}
+		}
+	}
+	// update cache list
+	if s.cached != nil {
+		s.cached[s.wrPos] = query.Key()
+		s.wrPos = (s.wrPos + 1) % len(s.cached)
 	}
 	return
 }
 
 // Get block with given key from storage
-func (s *FileStore) Get(key blocks.Query) (val blocks.Block, err error) {
+func (s *FileStore) Get(query blocks.Query) (block blocks.Block, err error) {
+	// get requested block type
+	var (
+		btype  uint16            = blocks.DHT_BLOCK_ANY
+		blkt   uint16            // actual block type
+		expire util.AbsoluteTime // expiration date
+		data   []byte            // block data
+		n      int
+	)
+	query.Get("blkType", &btype)
+
 	// get path and filename from key
-	path, fname := s.expandPath(key.Key())
+	path, fname := s.expandPath(query.Key())
 	// read file content (block data)
-	var buf []byte
-	if buf, err = ioutil.ReadFile(path + "/" + fname); err != nil {
+	var file *os.File
+	if file, err = os.Open(path + "/" + fname); err != nil {
 		return
 	}
-	// assemble Block object
-	val = blocks.NewGenericBlock(buf)
+	// read block data
+	if err = binary.Read(file, binary.BigEndian, &blkt); err == nil {
+		if btype != blocks.DHT_BLOCK_ANY && btype != blkt {
+			// block types not matching
+			return
+		}
+		if err = binary.Read(file, binary.BigEndian, &expire); err == nil {
+			if n, err = file.Read(data); err == nil {
+				if n != len(data) {
+					err = fmt.Errorf("block read too short")
+				} else {
+					block = blocks.NewGenericBlock(data)
+				}
+			}
+		}
+	}
 	return
 }
 
