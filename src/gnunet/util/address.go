@@ -28,9 +28,10 @@ import (
 
 // Address specifies how a peer is reachable on the network.
 type Address struct {
-	Transport string // transport protocol
-	Options   uint32 `order:"big"` // address options
-	Address   []byte `size:"*"`    // address data (protocol-dependent)
+	Transport string       ``            // transport protocol
+	Options   uint32       `order:"big"` // address options
+	Address   []byte       `size:"*"`    // address data (protocol-dependent)
+	Expires   AbsoluteTime ``            // expiration date for address
 }
 
 // NewAddress returns a new Address for the given transport and specs
@@ -39,6 +40,7 @@ func NewAddress(transport string, addr []byte) *Address {
 		Transport: transport,
 		Options:   0,
 		Address:   Clone(addr),
+		Expires:   AbsoluteTimeNever(),
 	}
 }
 
@@ -94,4 +96,49 @@ func NewIPAddress(host []byte, port uint16) *IPAddress {
 	}
 	copy(ip.Host, host)
 	return ip
+}
+
+//----------------------------------------------------------------------
+
+// PeerAddrList is a list of addresses per peer ID.
+type PeerAddrList struct {
+	list map[string][]*Address
+}
+
+// NewPeerAddrList returns a new and empty address list.
+func NewPeerAddrList() *PeerAddrList {
+	return &PeerAddrList{
+		list: make(map[string][]*Address),
+	}
+}
+
+// Add address for peer
+func (a *PeerAddrList) Add(id string, addr *Address) {
+	// check for expired address.
+	if !addr.Expires.Expired() {
+		a.list[id] = append(a.list[id], addr)
+	}
+}
+
+// Get address for peer
+func (a *PeerAddrList) Get(id string, transport string) *Address {
+	for _, addr := range a.list[id] {
+		// check for expired address.
+		if addr.Expires.Expired() {
+			// skip expired
+			continue
+		}
+		// check for matching protocol
+		if len(transport) > 0 && transport != addr.Transport {
+			// skip other transports
+			continue
+		}
+		return addr
+	}
+	return nil
+}
+
+// Delete a list entry by key.
+func (a *PeerAddrList) Delete(id string) {
+	delete(a.list, id)
 }
