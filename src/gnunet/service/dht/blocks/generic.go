@@ -19,6 +19,8 @@
 package blocks
 
 import (
+	"bytes"
+	"encoding/gob"
 	"gnunet/crypto"
 	"gnunet/util"
 
@@ -35,8 +37,13 @@ type Query interface {
 	// Key returns the DHT key for a block
 	Key() *crypto.HashCode
 
-	// Type returns the desired block type for results
-	Type() uint16
+	// Get retrieves the value of a named query parameter. The value is
+	// unchanged if the key is not in the map or if the value in the map
+	// has an incompatible type.
+	Get(key string, value any) bool
+
+	// Set stores the value of a named query parameter
+	Set(key string, value any)
 
 	// Verify the integrity of a retrieved block (optional). Override in
 	// custom query types to implement block-specific integrity checks
@@ -72,7 +79,11 @@ func Unwrap(blk Block, obj interface{}) error {
 
 // GenericQuery is the binary representation of a DHT key
 type GenericQuery struct {
+	// Key for repository queries (local/remote)
 	key *crypto.HashCode
+
+	// query parameters (binary value representation)
+	params map[string][]byte
 }
 
 // Key interface method implementation
@@ -80,9 +91,23 @@ func (k *GenericQuery) Key() *crypto.HashCode {
 	return k.key
 }
 
-// Type returns the desired block type for results
-func (k *GenericQuery) Type() uint16 {
-	return DHT_BLOCK_ANY
+// Get retrieves the value of a named query parameter
+func (k *GenericQuery) Get(key string, value any) bool {
+	data, ok := k.params[key]
+	if !ok {
+		return false
+	}
+	dec := gob.NewDecoder(bytes.NewReader(data))
+	return dec.Decode(value) != nil
+}
+
+// Set stores the value of a named query parameter
+func (k *GenericQuery) Set(key string, value any) {
+	wrt := new(bytes.Buffer)
+	enc := gob.NewEncoder(wrt)
+	if enc.Encode(value) == nil {
+		k.params[key] = wrt.Bytes()
+	}
 }
 
 // Verify interface method implementation
@@ -100,9 +125,12 @@ func (k *GenericQuery) Decrypt(b Block) error {
 // NewGenericQuery creates a simple Query from hash code.
 func NewGenericQuery(buf []byte) *GenericQuery {
 	return &GenericQuery{
-		key: crypto.NewHashCode(buf),
+		key:    crypto.NewHashCode(buf),
+		params: make(map[string][]byte),
 	}
 }
+
+//----------------------------------------------------------------------
 
 // GenericBlock is the block in simple binary representation
 type GenericBlock struct {

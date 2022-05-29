@@ -39,20 +39,10 @@ var (
 // GNSQuery specifies the context for a basic GNS name lookup of an (atomic)
 // label in a given zone identified by its public key.
 type GNSQuery struct {
-	Zone    *crypto.ZoneKey  // Public zone key
-	Label   string           // Atomic label
-	derived *crypto.ZoneKey  // Derived key from (pkey,label)
-	key     *crypto.HashCode // Key for repository queries (local/remote)
-}
-
-// Key query interface implementation.
-func (q *GNSQuery) Key() *crypto.HashCode {
-	return q.key
-}
-
-// Type returns the desired block type for results
-func (q *GNSQuery) Type() uint16 {
-	return DHT_BLOCK_GNS
+	GenericQuery
+	Zone    *crypto.ZoneKey // Public zone key
+	Label   string          // Atomic label
+	derived *crypto.ZoneKey // Derived zone key from (pkey,label)
 }
 
 // Verify the integrity of the block data from a signature.
@@ -102,11 +92,12 @@ func NewGNSQuery(zkey *crypto.ZoneKey, label string) *GNSQuery {
 	// key as the SHA512 hash of the binary key representation.
 	// (key blinding)
 	pd, _ := zkey.Derive(label, "gns")
+	gq := crypto.Hash(pd.Bytes()).Bits
 	return &GNSQuery{
-		Zone:    zkey,
-		Label:   label,
-		derived: pd,
-		key:     crypto.Hash(pd.Bytes()),
+		GenericQuery: *NewGenericQuery(gq),
+		Zone:         zkey,
+		Label:        label,
+		derived:      pd,
 	}
 }
 
