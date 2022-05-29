@@ -97,6 +97,11 @@ func (c *NetworkChannel) IsOpen() bool {
 	return c.conn != nil
 }
 
+// Remote address of network channel
+func (c *NetworkChannel) Remote() net.Addr {
+	return c.conn.RemoteAddr()
+}
+
 // Read bytes from a network channel into buffer: Returns the number of read
 // bytes and an error code. Only works on open channels ;)
 // The read can be aborted by sending 'true' on the cmd interface; the

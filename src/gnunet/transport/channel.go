@@ -57,6 +57,7 @@ type Channel interface {
 	IsOpen() bool                                     // check if channel is open
 	Read([]byte, *concurrent.Signaller) (int, error)  // read from channel
 	Write([]byte, *concurrent.Signaller) (int, error) // write to channel
+	Remote() net.Addr                                 // address of remote channel endpoint
 }
 
 // ChannelFactory instantiates specific Channel imülementations.
