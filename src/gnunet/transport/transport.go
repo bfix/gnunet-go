@@ -27,6 +27,21 @@ import (
 	"github.com/bfix/gospel/concurrent"
 )
 
+// Event identifier
+const (
+	EV_CONNECT = iota
+	EV_DISCONNECT
+	EV_MESSAGE
+)
+
+// Signal send by the transport mechanism to communicate events
+type Signal struct {
+	Ev   int             // event identifier
+	Peer *util.PeerID    // remote peer
+	Msg  message.Message // message received
+	Ch   *MsgChannel     // channel for responses
+}
+
 // Transport is the genric interface for the transport layer
 type Transport interface {
 
@@ -34,7 +49,7 @@ type Transport interface {
 	// establishment of a connection to another peer N using an address A.
 	// When the connection attempt is successful, information on the new
 	// peer is offered through the PEER_CONNECTED signal.
-	TryConnect(peer *util.PeerID, addr *util.Address)
+	TryConnect(peer *util.PeerID)
 
 	// Hold is a function which tells the underlay to keep a hold on to a
 	// connection to a peer P. Underlays are usually limited in the number
@@ -64,8 +79,9 @@ type Transport interface {
 	L2NSE() float64
 
 	// Signal returns a channel for transport signals (send by the transport
-	// to communicate connect and disconnect events and others)
-	Signal() <-chan interface{}
+	// to communicate connect and disconnect events, incoming messages and
+	// other information)
+	Signal() <-chan *Signal
 }
 
 //======================================================================
@@ -82,21 +98,23 @@ type Session struct {
 type TestTransport struct {
 	ctx      *concurrent.Signaller // service context
 	hdlr     chan Channel          // handler for incoming traffic
-	sig      chan interface{}      // signal channel
+	sig      chan *Signal          // signal channel
 	srvc     ChannelServer         // connection manager
 	running  bool                  // transport running?
 	sessions map[string]*Session   // list of open sessions
 	rwlock   sync.RWMutex          // lock for sessions map
+	peers    *util.AddrList        // list of known peers with addresses
 }
 
 // NewTestTransport instantiates a simple UDP-based transport layer
 func NewTestTransport() *TestTransport {
 	return &TestTransport{
 		hdlr:     make(chan Channel),
-		sig:      make(chan interface{}),
+		sig:      make(chan *Signal),
 		srvc:     nil,
 		running:  false,
 		sessions: make(map[string]*Session),
+		peers:    util.NewAddrList(),
 	}
 }
 
@@ -145,7 +163,7 @@ func (s *TestTransport) Stop() {
 // establishment of a connection to another peer using an address.
 // When the connection attempt is successful, information on the new
 // peer is offered through the PEER_CONNECTED signal.
-func (t *TestTransport) TryConnect(peer *util.PeerID, addr util.Address) {}
+func (t *TestTransport) TryConnect(peer *util.PeerID) {}
 
 // Hold is a function which tells the underlay to keep a hold on to a
 // connection to a peer P. Underlays are usually limited in the number
@@ -204,20 +222,13 @@ func (t *TestTransport) L2NSE() float64 {
 }
 
 // Signal returns a channel for transport signals (send by the transport
-// to communicate connect and disconnect events and others)
-func (t *TestTransport) Signal() <-chan interface{} {
+// layer to communicate connect and disconnect events and others)
+func (t *TestTransport) Signal() <-chan *Signal {
 	return t.sig
 }
 
 //----------------------------------------------------------------------
 //----------------------------------------------------------------------
-
-// Incoming associates an incoming message (request/response) with
-// the transport channel (for optional replies).
-type Incoming struct {
-	Msg message.Message
-	Ch  *MsgChannel
-}
 
 // handle incoming traffic
 func (t *TestTransport) handle(ch Channel) {
@@ -228,15 +239,30 @@ func (t *TestTransport) handle(ch Channel) {
 		if err != nil {
 			panic(err)
 		}
+		// prepare signal
+		sig := &Signal{
+			Ch: msgCh,
+		}
 		// inspect message for peer state events
 		switch x := msg.(type) {
 		case *message.HelloMsg:
 			// start session
+			sig.Ev = EV_CONNECT
+			sig.Peer = x.PeerID
+			id := sig.Peer.String()
 			t.rwlock.Lock()
-			id := x.PeerID.String()
 			t.sessions[id] = &Session{
 				OnHold: false,
 				Ch:     msgCh,
+			}
+			// keep peer addresses
+			for _, addr := range x.Addresses {
+				a := &util.Address{
+					Transport: addr.Transport,
+					Address:   addr.Address,
+					Expires:   addr.ExpireOn,
+				}
+				t.peers.Add(id, a)
 			}
 			t.rwlock.Unlock()
 			/*
@@ -248,9 +274,6 @@ func (t *TestTransport) handle(ch Channel) {
 			*/
 		}
 		// forward message
-		t.sig <- &Incoming{
-			Msg: msg,
-			Ch:  msgCh,
-		}
+		t.sig <- sig
 	}
 }
