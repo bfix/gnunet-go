@@ -170,12 +170,10 @@ func (rd *RevData) Sign(skey *crypto.ZonePrivate) (err error) {
 	return
 }
 
-// Verify a revocation object: returns the (smallest) number of leading
-// zero-bits in the PoWs of this revocation; a number > 0, but smaller
-// than the minimum (25) indicates invalid PoWs; a value of -1 indicates
-// a failed signature; -2 indicates an expired revocation and -3 for a
-// "out-of-order" PoW sequence.
-func (rd *RevData) Verify(withSig bool) int {
+// Verify a revocation object and return the average difficulty of the PoWs
+// in this revocation and a verification status (-1=failed signature, -2=
+// expired revocation, -3="out-of-order" PoW sequence).
+func (rd *RevData) Verify(withSig bool) (zbits float64, rc int) {
 
 	// (1) check signature
 	if withSig {
@@ -189,39 +187,36 @@ func (rd *RevData) Verify(withSig bool) int {
 		}
 		sigData, err := data.Marshal(sigBlock)
 		if err != nil {
-			return -1
+			return 0., -1
 		}
 		valid, err := rd.ZoneKeySig.Verify(sigData)
 		if err != nil || !valid {
-			return -1
+			return 0., -1
 		}
 	}
 
 	// (2) check PoWs
-	var (
-		zbits float64 = 0
-		last  uint64  = 0
-	)
+	var last uint64 = 0
 	for _, pow := range rd.PoWs {
 		// check sequence order
 		if pow <= last {
-			return -3
+			return 0., -3
 		}
 		last = pow
 		// compute number of leading zero-bits
 		work := NewPoWData(pow, rd.Timestamp, &rd.ZoneKeySig.ZoneKey)
 		zbits += float64(512 - work.Compute().BitLen())
 	}
-	zbits /= 32.0
+	zbits /= float64(len(rd.PoWs))
 
 	// (3) check expiration
-	if zbits > 24.0 {
-		ttl := time.Duration(int((zbits-24)*365*24)) * time.Hour
+	if zbits >= 23.0 {
+		ttl := time.Duration(int((zbits-22)*365*24*1.1)) * time.Hour
 		if util.AbsoluteTimeNow().Add(ttl).Expired() {
-			return -2
+			return zbits, -2
 		}
 	}
-	return int(zbits)
+	return zbits, 0
 }
 
 //----------------------------------------------------------------------

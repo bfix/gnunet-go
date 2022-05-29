@@ -33,6 +33,9 @@ import (
 // "GNUnet Revocation" implementation
 //======================================================================
 
+// The minimum average difficulty acceptable for a set of revocation PoWs
+const MinAvgDifficulty = 23
+
 // Module handles the revocation-related calls to other modules.
 type Module struct {
 	bloomf *data.BloomFilter // bloomfilter for fast revocation check
@@ -98,7 +101,7 @@ func (m *Module) Query(ctx *service.SessionContext, zkey *crypto.ZoneKey) (valid
 // Revoke a key with given revocation data
 func (m *Module) Revoke(ctx *service.SessionContext, rd *RevData) (success bool, err error) {
 	// verify the revocation data
-	rc := rd.Verify(true)
+	diff, rc := rd.Verify(true)
 	switch {
 	case rc == -1:
 		logger.Println(logger.WARN, "[revocation] Revoke: Missing/invalid signature")
@@ -109,10 +112,12 @@ func (m *Module) Revoke(ctx *service.SessionContext, rd *RevData) (success bool,
 	case rc == -3:
 		logger.Println(logger.WARN, "[revocation] Revoke: Wrong PoW sequence order")
 		return false, nil
-	case rc < 25:
+	}
+	if diff < float64(MinAvgDifficulty) {
 		logger.Println(logger.WARN, "[revocation] Revoke: Difficulty to small")
 		return false, nil
 	}
+
 	// store the revocation data
 	// (1) add it to the bloomfilter
 	m.bloomf.Add(rd.ZoneKeySig.KeyData)

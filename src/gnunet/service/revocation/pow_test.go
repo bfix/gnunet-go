@@ -16,7 +16,6 @@ func TestRevocationRFC(t *testing.T) {
 	var (
 		D     = "6fea32c05af58bfa979553d188605fd57d8bf9cc263b78d5f7478c07b998ed70"
 		ZKEY  = "000100002ca223e879ecc4bbdeb5da17319281d63b2e3b6955f1c3775c804a98d5f8ddaa"
-		DIFF  = 7
 		PROOF = "" +
 			"0005d66da3598127" +
 			"0000395d1827c000" +
@@ -142,8 +141,11 @@ func TestRevocationRFC(t *testing.T) {
 	}
 
 	// verify revocation data object
-	rc := revData.Verify(true)
-	if rc != DIFF {
+	diff, rc := revData.Verify(true)
+	if testing.Verbose() {
+		t.Logf("Average difficulty of PoWs = %f\n", diff)
+	}
+	if rc != 0 {
 		t.Fatalf("REV_Verify (pkey): %d\n", rc)
 	}
 }
