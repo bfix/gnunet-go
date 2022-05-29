@@ -75,10 +75,13 @@ func NewLocalPeer(cfg *config.NodeConfig) (p *Peer, err error) {
 	}
 	// set the endpoint addresses for local node
 	p.addrList = make([]*util.Address, len(cfg.Endpoints))
+	var addr *util.Address
 	for i, a := range cfg.Endpoints {
-		if p.addrList[i], err = util.ParseAddress(a); err != nil {
+		if addr, err = util.ParseAddress(a); err != nil {
 			return
 		}
+		addr.Expires = util.NewAbsoluteTime(time.Now().Add(12 * time.Hour))
+		p.addrList[i] = addr
 	}
 	return
 }
@@ -101,6 +104,22 @@ func NewPeer(peerID string) (p *Peer, err error) {
 
 //----------------------------------------------------------------------
 //----------------------------------------------------------------------
+
+// Address returns a peer address for the given transport protocol
+func (p *Peer) Address(transport string) *util.Address {
+	for _, addr := range p.addrList {
+		// skip expired entries
+		if addr.Expires.Expired() {
+			continue
+		}
+		// filter by transport protocol
+		if len(transport) > 0 && transport != addr.Transport {
+			continue
+		}
+		return addr
+	}
+	return nil
+}
 
 // HelloData returns the current HELLO data for the peer
 func (p *Peer) HelloData(ttl time.Duration) (h *blocks.HelloBlock, err error) {
