@@ -116,6 +116,8 @@ type SignedGNSBlockData struct {
 // An encrypted and signed container for GNS resource records that represents
 // the "atomic" data structure associated with a GNS label in a given zone.
 type GNSBlock struct {
+	GenericBlock
+
 	// persistent
 	DerivedKeySig *crypto.ZoneSignature // Derived key used for signing
 	Body          *SignedGNSBlockData
