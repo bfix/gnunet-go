@@ -32,6 +32,7 @@ var (
 // Message is an interface for all GNUnet-specific messages.
 type Message interface {
 	Header() *Header
+	String() string
 }
 
 // Header encapsulates the common part of all GNUnet messages (at the
