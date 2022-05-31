@@ -44,29 +44,13 @@ var (
 // Service implements a DHT service
 type Service struct {
 	Module
-
-	running bool // service running?
 }
 
 // NewService creates a new DHT service instance
-func NewService(ctx context.Context, c *core.Core) *Service {
-	// create service instance
+func NewService(ctx context.Context, c *core.Core) service.Service {
 	return &Service{
-		Module:  *NewModule(ctx, c),
-		running: false,
+		Module: *NewModule(ctx, c),
 	}
-}
-
-// Start the DHT service
-func (s *Service) Start(ctx context.Context, path string) error {
-	s.running = true
-	return nil
-}
-
-// Stop the DHT service
-func (s *Service) Stop() error {
-	s.running = false
-	return nil
 }
 
 // ServeClient processes a client channel.

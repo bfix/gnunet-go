@@ -20,120 +20,132 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"gnunet/message"
 	"gnunet/util"
-	"sync"
 
 	"github.com/bfix/gospel/logger"
 )
 
+//----------------------------------------------------------------------
+
 // Responder is a back-channel for messages generated during
-// message processing.
+// message processing. The Connection type is a responder
+// and used as such in ServeClient().
 type Responder interface {
 	// Handle outgoing message
 	Send(ctx context.Context, msg message.Message) error
 }
 
-// Service is an interface for GNUnet services. Every service has one channel
-// end-point it listens to for incoming channel requests (network-based
-// channels established by service clients). The end-point is specified in
-// Channel semantics in the specification string.
+// TransportResponder is used as a responder in message handling for
+// messages received from Transport.
+type TransportResponder struct {
+	Peer    *util.PeerID
+	SendFcn func(context.Context, *util.PeerID, message.Message) error
+}
+
+// Send a message back to caller.
+func (r *TransportResponder) Send(ctx context.Context, msg message.Message) error {
+	if r.SendFcn == nil {
+		return errors.New("no send function defined")
+	}
+	return r.SendFcn(ctx, r.Peer, msg)
+}
+
+//----------------------------------------------------------------------
+
+// Service is an interface for GNUnet services
 type Service interface {
 	Module
 
-	// Start a service
-	Start(ctx context.Context, path string) error
-
-	// Serve a client session
+	// Serve a client session: A service has a socket it listens to for
+	// incoming connections (sessions) which are used for message exchange
+	// with local GNUnet services or clients.
 	ServeClient(ctx context.Context, id int, mc *Connection)
 
-	// Handle a single incoming message. Returns true if message was processed.
+	// Handle a single incoming message (either locally from a socket
+	// connection or from Transport). Response messages can be send
+	// via a Responder. Returns true if message was processed.
 	HandleMessage(ctx context.Context, msg message.Message, resp Responder) bool
-
-	// Stop the service
-	Stop() error
 }
 
-// ServiceImpl is an implementation of generic service functionality.
-type ServiceImpl struct {
-	impl    Service            // Specific service implementation
-	hdlr    chan *Connection   // Channel from listener
-	srvc    *ConnectionManager // multi-client service
-	wg      *sync.WaitGroup    // wait group for go routine synchronization
-	name    string             // service name
-	running bool               // service currently running?
+// SocketHandler handles incoming connections on the local service socket.
+// It delegates calls to ServeClient() and HandleMessage() methods
+// to a custom service 'srv'.
+type SocketHandler struct {
+	srv  Service            // Specific service implementation
+	hdlr chan *Connection   // handler for incoming connections
+	cmgr *ConnectionManager // manager for client connections
+	name string             // service name
 }
 
-// NewServiceImpl instantiates a new ServiceImpl object.
-func NewServiceImpl(name string, srv Service) *ServiceImpl {
-	return &ServiceImpl{
-		impl:    srv,
-		hdlr:    make(chan *Connection),
-		srvc:    nil,
-		wg:      new(sync.WaitGroup),
-		name:    name,
-		running: false,
+// NewSocketHandler instantiates a new socket handler.
+func NewSocketHandler(name string, srv Service) *SocketHandler {
+	return &SocketHandler{
+		srv:  srv,
+		hdlr: make(chan *Connection),
+		cmgr: nil,
+		name: name,
 	}
 }
 
-// Start a service
-func (si *ServiceImpl) Start(ctx context.Context, path string, params map[string]string) (err error) {
+// Start the socket handler by listening on a Unix domain socket specified
+// by its path and additional parameters. Incoming connections from clients
+// are dispatched to 'hdlr'. Stopped socket handlers can be re-started.
+func (h *SocketHandler) Start(ctx context.Context, path string, params map[string]string) (err error) {
 	// check if we are already running
-	if si.running {
-		logger.Printf(logger.ERROR, "Service '%s' already running.\n", si.name)
+	if h.cmgr != nil {
+		logger.Printf(logger.ERROR, "Service '%s' already running.\n", h.name)
 		return fmt.Errorf("service already running")
 	}
-
 	// start connection manager
-	logger.Printf(logger.INFO, "[%s] Service starting.\n", si.name)
-	if si.srvc, err = NewConnectionManager(ctx, path, params, si.hdlr); err != nil {
+	logger.Printf(logger.INFO, "[%s] Service starting.\n", h.name)
+	if h.cmgr, err = NewConnectionManager(ctx, path, params, h.hdlr); err != nil {
 		return
 	}
-	si.running = true
 
-	// handle clients
+	// handle client connections
 	go func() {
 	loop:
-		for si.running {
+		for {
 			select {
 
-			// handle incoming connections
-			case conn := <-si.hdlr:
+			// handle incoming connection
+			case conn := <-h.hdlr:
 				// run a new session with context
 				id := util.NextID()
-				logger.Printf(logger.INFO, "[%s] Session '%d' started.\n", si.name, id)
+				logger.Printf(logger.INFO, "[%s] Session '%d' started.\n", h.name, id)
 
 				go func() {
 					// serve client on the message channel
-					si.impl.ServeClient(ctx, id, conn)
+					h.srv.ServeClient(ctx, id, conn)
 					// session is done now.
-					logger.Printf(logger.INFO, "[%s] Session with client '%d' ended.\n", si.name, id)
+					logger.Printf(logger.INFO, "[%s] Session with client '%d' ended.\n", h.name, id)
 				}()
 
 			// handle termination
 			case <-ctx.Done():
-				logger.Printf(logger.INFO, "[%s] Listener terminated.\n", si.name)
+				logger.Printf(logger.INFO, "[%s] Listener terminated.\n", h.name)
 				break loop
 			}
 		}
 
 		// close-down service
-		logger.Printf(logger.INFO, "[%s] Service closing.\n", si.name)
-		si.srvc.Close()
-		si.running = false
+		logger.Printf(logger.INFO, "[%s] Service closing.\n", h.name)
+		h.cmgr.Close()
 	}()
-
-	return si.impl.Start(ctx, path)
+	return nil
 }
 
-// Stop a service
-func (si *ServiceImpl) Stop() error {
-	if !si.running {
-		logger.Printf(logger.WARN, "Service '%s' not running.\n", si.name)
+// Stop socket handler.
+func (h *SocketHandler) Stop() error {
+	if h.cmgr == nil {
+		logger.Printf(logger.WARN, "Service '%s' not running.\n", h.name)
 		return fmt.Errorf("service not running")
 	}
-	si.running = false
-	logger.Printf(logger.INFO, "[%s] Service terminating.\n", si.name)
-	return si.impl.Stop()
+	logger.Printf(logger.INFO, "[%s] Service terminating.\n", h.name)
+	h.cmgr.Close()
+	h.cmgr = nil
+	return nil
 }

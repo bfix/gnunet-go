@@ -65,16 +65,6 @@ func NewService() service.Service {
 	return inst
 }
 
-// Start the GNS service
-func (s *Service) Start(ctx context.Context, path string) error {
-	return nil
-}
-
-// Stop the GNS service
-func (s *Service) Stop() error {
-	return nil
-}
-
 // ServeClient processes a client channel.
 func (s *Service) ServeClient(ctx context.Context, id int, mc *service.Connection) {
 	reqID := 0
