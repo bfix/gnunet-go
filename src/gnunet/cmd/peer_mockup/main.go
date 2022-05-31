@@ -1,18 +1,20 @@
 package main
 
 import (
-	"errors"
+	"context"
 	"flag"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"gnunet/config"
 	"gnunet/core"
 	"gnunet/crypto"
 	"gnunet/message"
-	"gnunet/transport"
-	"gnunet/util"
+	"gnunet/service"
 
-	"github.com/bfix/gospel/concurrent"
 	"github.com/bfix/gospel/logger"
 )
 
@@ -21,29 +23,39 @@ var (
 	localCfg = &config.NodeConfig{
 		PrivateSeed: "YGoe6XFH3XdvFRl+agx9gIzPTvxA229WFdkazEMdcOs=",
 		Endpoints: []string{
-			"r5n+ip+udp://127.0.0.1:6666",
+			"udp:127.0.0.1:2086",
 		},
 	}
-	remoteCfg = "3GXXMNb5YpIUO7ejIR2Yy0Cf5texuLfDjHkXcqbPxkc="
+	// configuration for remote node
+	remoteCfg  = "3GXXMNb5YpIUO7ejIR2Yy0Cf5texuLfDjHkXcqbPxkc="
+	remoteAddr = "udp:172.17.0.5:2086"
 
-	local      *core.Peer              // local peer (with private key)
-	remote     *core.Peer              // remote peer
-	remoteAddr = "tcp+172.17.0.5:2086" // network address of remote peer
+	// top-level variables used accross functions
+	local  *core.Peer // local peer (with private key)
+	remote *core.Peer // remote peer
+	c      *core.Core
+	secret *crypto.HashCode
 )
 
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// handle command line arguments
 	var (
 		asServer bool
 		err      error
-		ch       transport.Channel
 	)
-	flag.BoolVar(&asServer, "s", false, "accept incoming connections")
+	flag.BoolVar(&asServer, "s", false, "wait for incoming connections")
 	flag.Parse()
 
-	// setup peer instances
+	// setup peer and core instances
 	if local, err = core.NewLocalPeer(localCfg); err != nil {
 		fmt.Println("local failed: " + err.Error())
+		return
+	}
+	if c, err = core.NewCore(ctx, local); err != nil {
+		fmt.Println("core failed: " + err.Error())
 		return
 	}
 	if remote, err = core.NewPeer(remoteCfg); err != nil {
@@ -57,143 +69,110 @@ func main() {
 	fmt.Printf("    [%s]\n", local.GetID().String())
 	fmt.Println("======================================================================")
 
-	if asServer {
-		// run as server
-		fmt.Println("Waiting for connections...")
-		hdlr := make(chan transport.Channel)
-		go func() {
-			for {
-				select {
-				case ch = <-hdlr:
-					mc := transport.NewMsgChannel(ch)
-					if err = process(mc, remote, local); err != nil {
-						logger.Println(logger.ERROR, err.Error())
-					}
-				}
-			}
-		}()
-		_, err = transport.NewChannelServer("tcp+0.0.0.0:2086", hdlr)
-	} else {
-		// connect to peer
-		fmt.Println("Connecting to target peer")
-		if ch, err = transport.NewChannel(remoteAddr); err != nil {
-			logger.Println(logger.ERROR, err.Error())
-		}
-		mc := transport.NewMsgChannel(ch)
-		err = process(mc, local, remote)
-	}
-	if err != nil {
-		fmt.Println(err)
-	}
-}
+	// handle messages coming from network
+	module := service.NewModuleImpl()
+	listener := module.Run(c.Context(), process, nil)
+	c.Register("mockup", listener)
 
-// process never terminates; it is used for protocol exploration only.
-func process(ch *transport.MsgChannel, from, to *core.Peer) (err error) {
-	sig := concurrent.NewSignaller() // signaller instance
-
-	// create a new connection instance
-	c := transport.NewConnection(ch, from, to)
-	defer c.Close()
-
-	// read and push next message
-	in := make(chan message.Message)
-	go func() {
-		for {
-			msg, err := c.Receive(sig)
-			if err != nil {
-				fmt.Printf("Receive: %s\n", err.Error())
-				return
-			}
-			in <- msg
-		}
-	}()
-
-	// are we initiating the connection?
-	init := (from == local)
-	if init {
-		peerid := local.GetID()
-		c.Send(message.NewTransportTCPWelcomeMsg(peerid), sig)
+	if !asServer {
+		// we start the message exchange
+		c.Send(remote.GetID(), message.NewTransportTCPWelcomeMsg(c.PeerID()))
 	}
 
-	// remember peer addresses (only ONE!)
-	pAddr := local.GetAddressList()[0]
-	tAddr := remote.GetAddressList()[0]
+	// handle OS signals
+	sigCh := make(chan os.Signal, 5)
+	signal.Notify(sigCh)
 
-	send := make(map[uint16]bool)
-	//received := make(map[uint16]bool)
-	pending := make(map[uint16]message.Message)
+	// heart beat
+	tick := time.NewTicker(5 * time.Minute)
 
-	// process loop
+loop:
 	for {
 		select {
-		case m := <-in:
-			switch msg := m.(type) {
-
-			case *message.TransportTCPWelcomeMsg:
-				peerid := local.GetID()
-				if init {
-					c.Send(message.NewHelloMsg(peerid), sig)
-					target := remote.GetID()
-					c.Send(message.NewTransportPingMsg(target, tAddr), sig)
-				} else {
-					c.Send(message.NewTransportTCPWelcomeMsg(peerid), sig)
-				}
-
-			case *message.HelloMsg:
-
-			case *message.TransportPingMsg:
-				mOut := message.NewTransportPongMsg(msg.Challenge, pAddr)
-				if err := mOut.Sign(local.PrvKey()); err != nil {
-					return err
-				}
-				c.Send(mOut, sig)
-
-			case *message.TransportPongMsg:
-				rc, err := msg.Verify(remote.PubKey())
-				if err != nil {
-					return err
-				}
-				if !rc {
-					return errors.New("PONG verification failed")
-				}
-				send[message.TRANSPORT_PONG] = true
-				if mOut, ok := pending[message.TRANSPORT_SESSION_SYN]; ok {
-					c.Send(mOut, sig)
-				}
-
-			case *message.SessionSynMsg:
-				mOut := message.NewSessionSynAckMsg()
-				mOut.Timestamp = msg.Timestamp
-				if send[message.TRANSPORT_PONG] {
-					c.Send(mOut, sig)
-				} else {
-					pending[message.TRANSPORT_SESSION_SYN] = mOut
-				}
-
-			case *message.SessionQuotaMsg:
-				c.SetBandwidth(msg.Quota)
-
-			case *message.SessionAckMsg:
-
-			case *message.SessionKeepAliveMsg:
-				c.Send(message.NewSessionKeepAliveRespMsg(msg.Nonce), sig)
-
-			case *message.EphemeralKeyMsg:
-				rc, err := msg.Verify(remote.PubKey())
-				if err != nil {
-					return err
-				}
-				if !rc {
-					return errors.New("EPHKEY verification failed")
-				}
-				remote.SetEphKeyMsg(msg)
-				c.Send(local.EphKeyMsg(), sig)
-				secret := crypto.SharedSecret(local.EphPrvKey(), remote.EphKeyMsg().Public())
-				c.SharedSecret(util.Clone(secret.Bits[:]))
-
+		// handle OS signals
+		case sig := <-sigCh:
+			switch sig {
+			case syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM:
+				logger.Printf(logger.INFO, "Terminating service (on signal '%s')\n", sig)
+				break loop
+			case syscall.SIGHUP:
+				logger.Println(logger.INFO, "SIGHUP")
+			case syscall.SIGURG:
+				// TODO: https://github.com/golang/go/issues/37942
 			default:
-				fmt.Printf("!!! %v\n", msg)
+				logger.Println(logger.INFO, "Unhandled signal: "+sig.String())
 			}
+		// handle heart beat
+		case now := <-tick.C:
+			logger.Println(logger.INFO, "Heart beat at "+now.String())
 		}
+	}
+	// terminate pending routines
+	cancel()
+}
+
+// process incoming messages and send responses; it is used for protocol exploration only.
+// it tries to mimick the message flow between "real" GNUnet peers.
+func process(ctx context.Context, ev *core.Event) {
+
+	logger.Printf(logger.DBG, "<<< %s", ev.Msg.String())
+
+	switch msg := ev.Msg.(type) {
+
+	case *message.TransportTCPWelcomeMsg:
+		c.Send(ev.Peer, message.NewTransportPingMsg(ev.Peer, nil))
+
+	case *message.HelloMsg:
+
+	case *message.TransportPingMsg:
+		mOut := message.NewTransportPongMsg(msg.Challenge, nil)
+		if err := mOut.Sign(local.PrvKey()); err != nil {
+			logger.Println(logger.ERROR, "PONG: signing failed")
+			return
+		}
+		c.Send(ev.Peer, mOut)
+		logger.Printf(logger.DBG, ">>> %s", mOut)
+
+	case *message.TransportPongMsg:
+		rc, err := msg.Verify(remote.PubKey())
+		if err != nil {
+			logger.Println(logger.ERROR, "PONG verification: "+err.Error())
+		}
+		if !rc {
+			logger.Println(logger.ERROR, "PONG verification failed")
+		}
+
+	case *message.SessionSynMsg:
+		mOut := message.NewSessionSynAckMsg()
+		mOut.Timestamp = msg.Timestamp
+		c.Send(ev.Peer, mOut)
+		logger.Printf(logger.DBG, ">>> %s", mOut)
+
+	case *message.SessionQuotaMsg:
+
+	case *message.SessionAckMsg:
+
+	case *message.SessionKeepAliveMsg:
+		mOut := message.NewSessionKeepAliveRespMsg(msg.Nonce)
+		c.Send(ev.Peer, mOut)
+		logger.Printf(logger.DBG, ">>> %s", mOut)
+
+	case *message.EphemeralKeyMsg:
+		rc, err := msg.Verify(remote.PubKey())
+		if err != nil {
+			logger.Println(logger.ERROR, "EPHKEY verification: "+err.Error())
+			return
+		} else if !rc {
+			logger.Println(logger.ERROR, "EPHKEY verification failed")
+			return
+		}
+		remote.SetEphKeyMsg(msg)
+		mOut := local.EphKeyMsg()
+		c.Send(ev.Peer, mOut)
+		logger.Printf(logger.DBG, ">>> %s", mOut)
+		secret = crypto.SharedSecret(local.EphPrvKey(), remote.EphKeyMsg().Public())
+
+	default:
+		fmt.Printf("!!! %v\n", msg)
 	}
 }
