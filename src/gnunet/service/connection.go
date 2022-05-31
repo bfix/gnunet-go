@@ -43,10 +43,9 @@ var (
 // based on Unix domain sockets. It is used locally by services and
 // clients in the standard GNUnet environment.
 type Connection struct {
-	ctx  context.Context // execution context
-	path string          // file name of Unix socket
-	conn net.Conn        // associated connection
-	buf  []byte          // read/write buffer
+	path string   // file name of Unix socket
+	conn net.Conn // associated connection
+	buf  []byte   // read/write buffer
 }
 
 // NewConnection creates a new connection to a socket with given path.
@@ -256,7 +255,6 @@ func NewConnectionManager(
 			}
 			// handle connection
 			c := &Connection{
-				ctx:  ctx,
 				conn: conn,
 				path: path,
 				buf:  make([]byte, 65536),
@@ -280,5 +278,3 @@ func (s *ConnectionManager) Close() error {
 	}
 	return nil
 }
-
-func (s *ConnectionManager) xxx() {}

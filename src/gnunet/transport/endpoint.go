@@ -19,84 +19,239 @@
 package transport
 
 import (
+	"context"
+	"errors"
+	"gnunet/message"
 	"gnunet/util"
 	"net"
 )
 
-//----------------------------------------------------------------------
-// UDP endpoint
-//----------------------------------------------------------------------
+var (
+	ErrEndpNotAvailable     = errors.New("no endpoint for address available")
+	ErrEndpProtocolMismatch = errors.New("transport protocol mismatch")
+)
 
-type UDPEndpoint struct {
-	addr   *net.UDPAddr
-	listen *net.UDPConn
-	ch     chan *TransportMessage
-}
+// Endpoint represents a local endpoint that can send and receive messages.
+// Implementations need to manage the relations between peer IDs and
+// remote endpoints for TCP and UDP traffic.
+type Endpoint interface {
+	// Run the endpoint and send received messages to channel
+	Run(context.Context, chan *TransportMessage) error
 
-func (ep *UDPEndpoint) Run(ch chan *TransportMessage) error {
-	return nil
-}
+	// Send message on endpoint
+	Send(context.Context, *TransportMessage) error
 
-func (ep *UDPEndpoint) Send(msg *TransportMessage) error {
-	return nil
-}
+	// Address returns the listening address for the endpoint
+	Address() net.Addr
 
-func (ep *UDPEndpoint) Address() *util.Address {
-	return nil
-}
-
-func NewUDPEndpoint(addr *util.Address) (*UDPEndpoint, error) {
-	return nil, nil
+	// Return endpoint identifier
+	ID() int
 }
 
 //----------------------------------------------------------------------
-// TCP endpoint
-//----------------------------------------------------------------------
 
-type TCPEndpoint struct {
-	addr   *net.TCPAddr
-	listen *net.TCPListener
-	ch     chan *TransportMessage
-}
-
-func (ep *TCPEndpoint) Run(ch chan *TransportMessage) error {
-	return nil
-}
-
-func (ep *TCPEndpoint) Send(msg *TransportMessage) error {
-	return nil
-}
-
-func (ep *TCPEndpoint) Address() *util.Address {
-	return nil
-}
-
-func NewTCPEndpoint(addr *util.Address) (*UDPEndpoint, error) {
-	return nil, nil
+// NewEndpoint returns a suitable endpoint for the address.
+func NewEndpoint(addr net.Addr) (ep Endpoint, err error) {
+	switch epMode(addr.Network()) {
+	case "packet":
+		ep, err = newPacketEndpoint(addr)
+	case "stream":
+		ep, err = newStreamEndpoint(addr)
+	default:
+		err = ErrEndpNotAvailable
+	}
+	return
 }
 
 //----------------------------------------------------------------------
-// UDS (Unix domain socket) endpoint
+// Packet-oriented endpoint
 //----------------------------------------------------------------------
 
-type UDSEndpoint struct {
-	addr   string
-	listen *net.UnixConn
-	ch     chan *TransportMessage
+// PacketEndpoint for packet-oriented network protocols
+type PaketEndpoint struct {
+	id   int         // endpoint identifier
+	addr net.Addr    // endpoint address
+	conn *PacketConn // packet connection
+	buf  []byte      // buffer for read/write operations
 }
 
-func (ep *UDSEndpoint) Run(ch chan *TransportMessage) error {
+// Run packet endpoint: send incoming messages to the handler.
+func (ep *PaketEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) (err error) {
+	// create listener
+	var (
+		lc net.ListenConfig
+		lp net.PacketConn
+	)
+	if lp, err = lc.ListenPacket(ctx, ep.addr.Network(), ep.addr.String()); err != nil {
+		return
+	}
+	ep.conn = NewPacketConn(lp)
+
+	// run watch dog for termination
+	go func() {
+		<-ctx.Done()
+		ep.conn.Close()
+	}()
+	// run go routine to handle messages from clients
+	go func() {
+		for {
+			// read next message
+			msg, err := ReadMessage(ctx, ep.conn, ep.buf)
+			if err != nil {
+				break
+			}
+			// check for transport message
+			if msg.Header().MsgType == message.DUMMY {
+				// set transient attributes
+				tm := msg.(*TransportMessage)
+				tm.endp = ep.id
+				tm.conn = 0
+				// send to handler
+				go func() {
+					hdlr <- tm
+				}()
+			}
+		}
+		// connection ended.
+		ep.conn.Close()
+	}()
+	return
+}
+
+func (ep *PaketEndpoint) Send(ctx context.Context, msg *TransportMessage) error {
 	return nil
 }
 
-func (ep *UDSEndpoint) Send(msg *TransportMessage) error {
+// Address returms the
+func (ep *PaketEndpoint) Address() net.Addr {
+	if ep.conn != nil {
+		return ep.conn.conn.LocalAddr()
+	}
+	return ep.addr
+}
+
+// ID returns the endpoint identifier
+func (ep *PaketEndpoint) ID() int {
+	return ep.id
+}
+
+func newPacketEndpoint(addr net.Addr) (ep *PaketEndpoint, err error) {
+	// check for matching protocol
+	if epMode(addr.Network()) != "packet" {
+		err = ErrEndpProtocolMismatch
+		return
+	}
+	// create endpoint
+	ep = &PaketEndpoint{
+		id:   util.NextID(),
+		addr: addr,
+	}
+	return
+}
+
+//----------------------------------------------------------------------
+// Stream-oriented endpoint
+//----------------------------------------------------------------------
+
+// StreamEndpoint for stream-oriented network protocols
+type StreamEndpoint struct {
+	id       int                      // endpoint identifier
+	addr     net.Addr                 // listening address
+	listener net.Listener             // listener instance
+	conns    *util.Map[int, net.Conn] // active connections
+	buf      []byte                   // read/write buffer
+}
+
+// Run packet endpoint: send incoming messages to the handler.
+func (ep *StreamEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) (err error) {
+	// create listener
+	var lc net.ListenConfig
+	if ep.listener, err = lc.Listen(ctx, ep.addr.Network(), ep.addr.String()); err != nil {
+		return
+	}
+	// run watch dog for termination
+	go func() {
+		<-ctx.Done()
+		ep.listener.Close()
+	}()
+	// run go routine to handle messages from clients
+	go func() {
+		for {
+			// get next client connection
+			conn, err := ep.listener.Accept()
+			if err != nil {
+				return
+			}
+			session := util.NextID()
+			ep.conns.Put(session, conn)
+			go func() {
+				for {
+					// read next message from connection
+					msg, err := ReadMessage(ctx, conn, ep.buf)
+					if err != nil {
+						break
+					}
+					// check for transport message
+					if msg.Header().MsgType == message.DUMMY {
+						// set transient attributes
+						tm := msg.(*TransportMessage)
+						tm.endp = ep.id
+						tm.conn = session
+						// send to handler
+						go func() {
+							hdlr <- tm
+						}()
+					}
+				}
+				// connection ended.
+				conn.Close()
+				ep.conns.Delete(session)
+			}()
+		}
+	}()
+	return
+}
+
+func (ep *StreamEndpoint) Send(ctx context.Context, msg *TransportMessage) error {
 	return nil
 }
 
-func (ep *UDSEndpoint) Address() *util.Address {
-	return nil
+// Address returns the actual listening endpoint address
+func (ep *StreamEndpoint) Address() net.Addr {
+	if ep.listener != nil {
+		return ep.listener.Addr()
+	}
+	return ep.addr
 }
 
-func NewUDSEndpoint(addr *util.Address) (*UDPEndpoint, error) {
-	return nil, nil
+// ID returns the endpoint identifier
+func (ep *StreamEndpoint) ID() int {
+	return ep.id
+}
+
+func newStreamEndpoint(addr net.Addr) (ep *StreamEndpoint, err error) {
+	// check for matching protocol
+	if epMode(addr.Network()) != "stream" {
+		err = ErrEndpProtocolMismatch
+		return
+	}
+	// create endpoint
+	ep = &StreamEndpoint{
+		id:    util.NextID(),
+		addr:  addr,
+		conns: util.NewMap[int, net.Conn](),
+		buf:   make([]byte, 65536),
+	}
+	return
+}
+
+// epMode returns the endpoint mode (packet or stream) for a given network
+func epMode(netw string) string {
+	switch netw {
+	case "udp", "r5n+ip+udp":
+		return "packet"
+	case "tcp", "unix":
+		return "stream"
+	}
+	return ""
 }

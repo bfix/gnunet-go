@@ -49,7 +49,7 @@ type Module struct {
 
 // NewModule returns a new module instance. It initializes the storage
 // mechanism for persistence.
-func NewModule(c *core.Core) (m *Module) {
+func NewModule(ctx context.Context, c *core.Core) (m *Module) {
 	// create permanent storage handler
 	store, err := service.NewDHTStore(config.Cfg.DHT.Storage)
 	if err != nil {
@@ -72,7 +72,7 @@ func NewModule(c *core.Core) (m *Module) {
 		rtable:     rt,
 	}
 	// register as listener for core events
-	listener := m.Run(c.Context(), m.event, m.Filter())
+	listener := m.Run(ctx, m.event, m.Filter())
 	c.Register("dht", listener)
 
 	return
@@ -81,7 +81,7 @@ func NewModule(c *core.Core) (m *Module) {
 //----------------------------------------------------------------------
 
 // Get a block from the DHT
-func (nc *Module) Get(ctx *service.SessionContext, query blocks.Query) (block blocks.Block, err error) {
+func (nc *Module) Get(ctx context.Context, query blocks.Query) (block blocks.Block, err error) {
 
 	// check if we have the requested block in cache or permanent storage.
 	block, err = nc.cache.Get(query)
@@ -100,7 +100,7 @@ func (nc *Module) Get(ctx *service.SessionContext, query blocks.Query) (block bl
 }
 
 // Put a block into the DHT
-func (nc *Module) Put(ctx *service.SessionContext, key blocks.Query, block blocks.Block) error {
+func (nc *Module) Put(ctx context.Context, key blocks.Query, block blocks.Block) error {
 	return nil
 }
 

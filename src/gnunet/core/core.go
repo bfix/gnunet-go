@@ -27,9 +27,6 @@ import (
 
 // Core service
 type Core struct {
-	// execution context
-	ctx context.Context
-
 	// local peer instance
 	local *Peer
 
@@ -47,7 +44,6 @@ type Core struct {
 func NewCore(ctx context.Context, local *Peer) (c *Core, err error) {
 	// create new core instance
 	c = new(Core)
-	c.ctx = ctx
 	c.local = local
 	c.incoming = make(chan *transport.TransportMessage)
 	c.listeners = make(map[string]*Listener)
@@ -55,7 +51,7 @@ func NewCore(ctx context.Context, local *Peer) (c *Core, err error) {
 
 	// add all local peer endpoints to transport.
 	for _, addr := range local.addrList {
-		if _, err = c.trans.AddEndpoint(addr); err != nil {
+		if _, err = c.trans.AddEndpoint(ctx, addr); err != nil {
 			return
 		}
 	}
@@ -75,9 +71,9 @@ func NewCore(ctx context.Context, local *Peer) (c *Core, err error) {
 					// keep peer addresses
 					for _, addr := range msg.Addresses {
 						a := &util.Address{
-							Transport: addr.Transport,
-							Address:   addr.Address,
-							Expires:   addr.ExpireOn,
+							Netw:    addr.Transport,
+							Address: addr.Address,
+							Expires: addr.ExpireOn,
 						}
 						c.trans.Learn(msg.PeerID, a)
 					}
@@ -96,7 +92,7 @@ func NewCore(ctx context.Context, local *Peer) (c *Core, err error) {
 				c.dispatch(ev)
 
 			// wait for termination
-			case <-c.ctx.Done():
+			case <-ctx.Done():
 				return
 			}
 		}
@@ -107,10 +103,6 @@ func NewCore(ctx context.Context, local *Peer) (c *Core, err error) {
 // PeerID returns the peer id of the local node.
 func (c *Core) PeerID() *util.PeerID {
 	return c.local.GetID()
-}
-
-func (c *Core) Context() context.Context {
-	return c.ctx
 }
 
 //----------------------------------------------------------------------
@@ -152,4 +144,4 @@ func (c *Core) dispatch(ev *Event) {
 
 // Send is a function that allows the local peer to send a protocol
 // message to a remote peer. The transport will
-func (c *Core) Send(peer *util.PeerID, msg message.Message) {}
+func (c *Core) Send(ctx context.Context, peer *util.PeerID, msg message.Message) {}

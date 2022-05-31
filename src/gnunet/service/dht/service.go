@@ -49,10 +49,10 @@ type Service struct {
 }
 
 // NewService creates a new DHT service instance
-func NewService(c *core.Core) *Service {
+func NewService(ctx context.Context, c *core.Core) *Service {
 	// create service instance
 	return &Service{
-		Module:  *NewModule(c),
+		Module:  *NewModule(ctx, c),
 		running: false,
 	}
 }
@@ -70,48 +70,49 @@ func (s *Service) Stop() error {
 }
 
 // ServeClient processes a client channel.
-func (s *Service) ServeClient(ctx *service.SessionContext, mc *service.Connection) {
+func (s *Service) ServeClient(ctx context.Context, id int, mc *service.Connection) {
 	reqID := 0
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithCancel(ctx)
+
 loop:
 	for {
 		// receive next message from client
 		reqID++
-		logger.Printf(logger.DBG, "[dht:%d:%d] Waiting for client request...\n", ctx.ID, reqID)
-		msg, err := mc.Receive(ctx.Context())
+		logger.Printf(logger.DBG, "[dht:%d:%d] Waiting for client request...\n", id, reqID)
+		msg, err := mc.Receive(ctx)
 		if err != nil {
 			if err == io.EOF {
-				logger.Printf(logger.INFO, "[dht:%d:%d] Client channel closed.\n", ctx.ID, reqID)
+				logger.Printf(logger.INFO, "[dht:%d:%d] Client channel closed.\n", id, reqID)
 			} else if err == service.ErrConnectionInterrupted {
-				logger.Printf(logger.INFO, "[dht:%d:%d] Service operation interrupted.\n", ctx.ID, reqID)
+				logger.Printf(logger.INFO, "[dht:%d:%d] Service operation interrupted.\n", id, reqID)
 			} else {
-				logger.Printf(logger.ERROR, "[dht:%d:%d] Message-receive failed: %s\n", ctx.ID, reqID, err.Error())
+				logger.Printf(logger.ERROR, "[dht:%d:%d] Message-receive failed: %s\n", id, reqID, err.Error())
 			}
 			break loop
 		}
-		logger.Printf(logger.INFO, "[dht:%d:%d] Received request: %v\n", ctx.ID, reqID, msg)
+		logger.Printf(logger.INFO, "[dht:%d:%d] Received request: %v\n", id, reqID, msg)
 
 		// handle message
-		if !s.HandleMessage(msg, mc) {
-			//----------------------------------------------------------
-			// UNKNOWN message type received
-			//----------------------------------------------------------
-			logger.Printf(logger.ERROR, "[dht:%d:%d] Unhandled message of type (%d)\n", ctx.ID, reqID, msg.Header().MsgType)
-			break loop
-		}
+		s.HandleMessage(context.WithValue(ctx, "label", fmt.Sprintf(":%d:%d", id, reqID)), msg, mc)
 	}
 	// close client connection
 	mc.Close()
 
 	// cancel all tasks running for this session/connection
-	logger.Printf(logger.INFO, "[dht:%d] Start closing session... [%d]\n", ctx.ID, ctx.Waiting())
-	ctx.Cancel()
+	logger.Printf(logger.INFO, "[dht:%d] Start closing session...\n", id)
+	cancel()
 }
 
 // HandleMessage handles a DHT request/response message. If the transport channel
 // is nil, responses are send directly via the transport layer.
-func (s *Service) HandleMessage(msg message.Message, mc *service.Connection) bool {
-
-	// handle message
+func (s *Service) HandleMessage(ctx context.Context, msg message.Message, back service.Responder) bool {
+	// assemble log label
+	label := ""
+	if v := ctx.Value("label"); v != nil {
+		label = v.(string)
+	}
+	// process message
 	switch msg.(type) {
 	case *message.DHTClientPutMsg:
 		//----------------------------------------------------------
@@ -137,7 +138,13 @@ func (s *Service) HandleMessage(msg message.Message, mc *service.Connection) boo
 		//----------------------------------------------------------
 		// DHT RESULT
 		//----------------------------------------------------------
+
+	default:
+		//----------------------------------------------------------
+		// UNKNOWN message type received
+		//----------------------------------------------------------
+		logger.Printf(logger.ERROR, "[dht%s] Unhandled message of type (%d)\n", label, msg.Header().MsgType)
+		return false
 	}
-	// message not handled
-	return false
+	return true
 }

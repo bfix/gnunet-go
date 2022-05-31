@@ -113,7 +113,7 @@ func (p *Peer) Address(transport string) *util.Address {
 			continue
 		}
 		// filter by transport protocol
-		if len(transport) > 0 && transport != addr.Transport {
+		if len(transport) > 0 && transport != addr.Netw {
 			continue
 		}
 		return addr

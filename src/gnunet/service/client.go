@@ -43,15 +43,15 @@ func NewClient(ctx context.Context, path string) (*Client, error) {
 	}, nil
 }
 
-// SendRequest sends a give message to the service.
-func (c *Client) SendRequest(ctx *SessionContext, req message.Message) error {
-	return c.ch.Send(ctx.ctx, req)
+// SendRequest sends a message to the service.
+func (c *Client) SendRequest(ctx context.Context, req message.Message) error {
+	return c.ch.Send(ctx, req)
 }
 
 // ReceiveResponse waits for a response from the service; it can be interrupted
 // by sending "false" to the cmd channel.
-func (c *Client) ReceiveResponse(ctx *SessionContext) (message.Message, error) {
-	return c.ch.Receive(ctx.ctx)
+func (c *Client) ReceiveResponse(ctx context.Context) (message.Message, error) {
+	return c.ch.Receive(ctx)
 }
 
 // Close a client; no further message exchange is possible.
@@ -62,7 +62,7 @@ func (c *Client) Close() error {
 // RequestResponse is a helper method for a one request - one response
 // secenarios of client/serice interactions.
 func RequestResponse(
-	ctx *SessionContext,
+	ctx context.Context,
 	caller string,
 	callee string,
 	path string,
@@ -70,7 +70,7 @@ func RequestResponse(
 
 	// client-connect to the service
 	logger.Printf(logger.DBG, "[%s] Connecting to %s service...\n", caller, callee)
-	cl, err := NewClient(ctx.ctx, path)
+	cl, err := NewClient(ctx, path)
 	if err != nil {
 		return nil, err
 	}

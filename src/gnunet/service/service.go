@@ -21,10 +21,19 @@ package service
 import (
 	"context"
 	"fmt"
+	"gnunet/message"
+	"gnunet/util"
 	"sync"
 
 	"github.com/bfix/gospel/logger"
 )
+
+// Responder is a back-channel for messages generated during
+// message processing.
+type Responder interface {
+	// Handle outgoing message
+	Send(ctx context.Context, msg message.Message) error
+}
 
 // Service is an interface for GNUnet services. Every service has one channel
 // end-point it listens to for incoming channel requests (network-based
@@ -32,25 +41,28 @@ import (
 // Channel semantics in the specification string.
 type Service interface {
 	Module
+
 	// Start a service
 	Start(ctx context.Context, path string) error
+
 	// Serve a client session
-	ServeClient(ctx *SessionContext, ch *Connection)
+	ServeClient(ctx context.Context, id int, mc *Connection)
+
+	// Handle a single incoming message. Returns true if message was processed.
+	HandleMessage(ctx context.Context, msg message.Message, resp Responder) bool
+
 	// Stop the service
 	Stop() error
 }
 
 // ServiceImpl is an implementation of generic service functionality.
 type ServiceImpl struct {
-	impl    Service                 // Specific service implementation
-	hdlr    chan *Connection        // Channel from listener
-	ctrl    chan bool               // Control channel
-	drop    chan int                // Channel to drop a session from pending list
-	srvc    *ConnectionManager      // multi-client service
-	wg      *sync.WaitGroup         // wait group for go routine synchronization
-	name    string                  // service name
-	running bool                    // service currently running?
-	pending map[int]*SessionContext // list of pending sessions
+	impl    Service            // Specific service implementation
+	hdlr    chan *Connection   // Channel from listener
+	srvc    *ConnectionManager // multi-client service
+	wg      *sync.WaitGroup    // wait group for go routine synchronization
+	name    string             // service name
+	running bool               // service currently running?
 }
 
 // NewServiceImpl instantiates a new ServiceImpl object.
@@ -58,13 +70,10 @@ func NewServiceImpl(name string, srv Service) *ServiceImpl {
 	return &ServiceImpl{
 		impl:    srv,
 		hdlr:    make(chan *Connection),
-		ctrl:    make(chan bool),
-		drop:    make(chan int),
 		srvc:    nil,
 		wg:      new(sync.WaitGroup),
 		name:    name,
 		running: false,
-		pending: make(map[int]*SessionContext),
 	}
 }
 
@@ -84,9 +93,7 @@ func (si *ServiceImpl) Start(ctx context.Context, path string, params map[string
 	si.running = true
 
 	// handle clients
-	si.wg.Add(1)
 	go func() {
-		defer si.wg.Done()
 	loop:
 		for si.running {
 			select {
@@ -94,33 +101,21 @@ func (si *ServiceImpl) Start(ctx context.Context, path string, params map[string
 			// handle incoming connections
 			case conn := <-si.hdlr:
 				// run a new session with context
-				ctx := NewSessionContext(ctx)
-				sessID := ctx.ID
-				si.pending[sessID] = ctx
-				logger.Printf(logger.INFO, "[%s] Session '%d' started.\n", si.name, sessID)
+				id := util.NextID()
+				logger.Printf(logger.INFO, "[%s] Session '%d' started.\n", si.name, id)
 
 				go func() {
 					// serve client on the message channel
-					si.impl.ServeClient(ctx, conn)
+					si.impl.ServeClient(ctx, id, conn)
 					// session is done now.
-					logger.Printf(logger.INFO, "[%s] Session with client '%d' ended.\n", si.name, sessID)
-					si.drop <- sessID
+					logger.Printf(logger.INFO, "[%s] Session with client '%d' ended.\n", si.name, id)
 				}()
-
-			// handle session removal
-			case sessID := <-si.drop:
-				delete(si.pending, sessID)
 
 			// handle termination
 			case <-ctx.Done():
 				logger.Printf(logger.INFO, "[%s] Listener terminated.\n", si.name)
 				break loop
 			}
-		}
-		// terminate pending sessions
-		for _, sess := range si.pending {
-			logger.Printf(logger.DBG, "[%s] Session '%d' closing...\n", si.name, sess.ID)
-			sess.Cancel()
 		}
 
 		// close-down service
@@ -139,10 +134,6 @@ func (si *ServiceImpl) Stop() error {
 		return fmt.Errorf("service not running")
 	}
 	si.running = false
-	si.ctrl <- true
 	logger.Printf(logger.INFO, "[%s] Service terminating.\n", si.name)
-
-	err := si.impl.Stop()
-	si.wg.Wait()
-	return err
+	return si.impl.Stop()
 }

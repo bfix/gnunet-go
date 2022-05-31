@@ -23,6 +23,7 @@ import (
 	"errors"
 	"gnunet/message"
 	"gnunet/util"
+	"net"
 )
 
 // Trnsport layer error codes
@@ -34,20 +35,6 @@ var (
 // Network-oriented transport implementation
 //======================================================================
 
-// Endpoint represents a local endpoint that can send and receive messages.
-// Implementations need to manage the relations between peer IDs and
-// remote endpoints for TCP and UDP traffic.
-type Endpoint interface {
-	// Run the endpoint and send received messages to channel
-	Run(chan *TransportMessage) error
-
-	// Send message on endpoint
-	Send(*TransportMessage) error
-
-	// Address returns the listening address for the endpoint
-	Address() *util.Address
-}
-
 // TransportMessage is the unit processed by the transport mechanism.
 // Peer refers to the remote endpoint (sender/receiver) and
 // Msg is the exchanged GNUnet message. The packet itself satisfies the
@@ -56,6 +43,10 @@ type TransportMessage struct {
 	Hdr  *message.Header
 	Peer *util.PeerID    // remote peer
 	Msg  message.Message // GNUnet message
+
+	// package-local attributes (transient)
+	endp int // id of endpoint (incoming message)
+	conn int // id of connection (optional, incoming message)
 }
 
 // Header returns the message header.
@@ -63,11 +54,16 @@ func (msg *TransportMessage) Header() *message.Header {
 	return msg.Hdr
 }
 
+// String returns the message in human-readable form
+func (msg *TransportMessage) String() string {
+	return "TransportMessage{...}"
+}
+
 // NewTransportMessage creates a message suitable for transfer
 func NewTransportMessage(peer *util.PeerID, msg message.Message) *TransportMessage {
 	return &TransportMessage{
 		Hdr: &message.Header{
-			MsgType: 0, // indicate a transport message
+			MsgType: message.DUMMY, // used for tagging transport messages
 			MsgSize: msg.Header().Size() + 8,
 		},
 		Peer: peer,
@@ -80,9 +76,8 @@ func NewTransportMessage(peer *util.PeerID, msg message.Message) *TransportMessa
 // Transport enables network-oriented (like IP, UDP, TCP or UDS)
 // message exchange on multiple endpoints.
 type Transport struct {
-	ctx       context.Context        // runtime context
 	incoming  chan *TransportMessage // messages as received from the network
-	endpoints map[string]Endpoint    // list of available endpoints
+	endpoints map[int]Endpoint       // list of available endpoints
 	peers     *util.PeerAddrList     // list of known peers with addresses
 }
 
@@ -90,9 +85,8 @@ type Transport struct {
 func NewTransport(ctx context.Context, ch chan *TransportMessage) (t *Transport) {
 	// create transport instance
 	return &Transport{
-		ctx:       ctx,
 		incoming:  ch,
-		endpoints: make(map[string]Endpoint),
+		endpoints: make(map[int]Endpoint),
 		peers:     util.NewPeerAddrList(),
 	}
 }
@@ -103,20 +97,14 @@ func NewTransport(ctx context.Context, ch chan *TransportMessage) (t *Transport)
 
 // AddEndpoint instantiates and run a new endpoint handler for the
 // given address (must map to a network interface).
-func (t *Transport) AddEndpoint(addr *util.Address) (a *util.Address, err error) {
-	// instantiate endpoint based on network spec
-	var ep Endpoint
-	switch addr.Transport {
-	case "udp":
-		ep, err = NewUDPEndpoint(addr)
-	case "tcp":
-		ep, err = NewTCPEndpoint(addr)
-	case "unix":
-		ep, err = NewUDSEndpoint(addr)
-	}
+func (t *Transport) AddEndpoint(ctx context.Context, addr net.Addr) (a net.Addr, err error) {
 	// register endpoint
-	t.endpoints[addr.String()] = ep
-	ep.Run(t.incoming)
+	var ep Endpoint
+	if ep, err = NewEndpoint(addr); err != nil {
+		return
+	}
+	t.endpoints[ep.ID()] = ep
+	ep.Run(ctx, t.incoming)
 	return ep.Address(), nil
 }
 
@@ -124,7 +112,7 @@ func (t *Transport) AddEndpoint(addr *util.Address) (a *util.Address, err error)
 // establishment of a connection to another peer using an address.
 // When the connection attempt is successful, information on the new
 // peer is offered through the PEER_CONNECTED signal.
-func (t *Transport) TryConnect(peer *util.PeerID, addr *util.Address) error {
+func (t *Transport) TryConnect(peer *util.PeerID, addr net.Addr) error {
 	// select endpoint for address
 	if ep := t.findEndpoint(peer, addr); ep == nil {
 		return ErrTransNoEndpoint
@@ -132,7 +120,7 @@ func (t *Transport) TryConnect(peer *util.PeerID, addr *util.Address) error {
 	return nil
 }
 
-func (t *Transport) findEndpoint(peer *util.PeerID, addr *util.Address) Endpoint {
+func (t *Transport) findEndpoint(peer *util.PeerID, addr net.Addr) Endpoint {
 	return nil
 }
 
@@ -165,4 +153,4 @@ func (t *Transport) L2NSE() float64 {
 	return 0.
 }
 
-func (t *Transport) Learn(peer *util.PeerID, addr *util.Address) {}
+func (t *Transport) Learn(peer *util.PeerID, addr net.Addr) {}

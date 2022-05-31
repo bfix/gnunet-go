@@ -47,7 +47,7 @@ type HelloAddress struct {
 // NewHelloAddress create a new HELLO address from the given address
 func NewHelloAddress(a *util.Address) *HelloAddress {
 	addr := &HelloAddress{
-		Transport: a.Transport,
+		Transport: a.Netw,
 		AddrSize:  uint16(len(a.Address)),
 		ExpireOn:  a.Expires,
 		Address:   make([]byte, len(a.Address)),

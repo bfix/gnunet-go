@@ -19,6 +19,7 @@
 package namecache
 
 import (
+	"context"
 	"gnunet/config"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
@@ -45,7 +46,7 @@ func NewNamecacheModule() (nc *NamecacheModule, err error) {
 }
 
 // Get an entry from the cache if available.
-func (nc *NamecacheModule) Get(ctx *service.SessionContext, query *blocks.GNSQuery) (block *blocks.GNSBlock, err error) {
+func (nc *NamecacheModule) Get(ctx context.Context, query *blocks.GNSQuery) (block *blocks.GNSBlock, err error) {
 	var b blocks.Block
 	b, err = nc.cache.Get(query)
 	err = blocks.Unwrap(b, block)
@@ -53,6 +54,6 @@ func (nc *NamecacheModule) Get(ctx *service.SessionContext, query *blocks.GNSQue
 }
 
 // Put entry into the cache.
-func (nc *NamecacheModule) Put(ctx *service.SessionContext, query *blocks.GNSQuery, block *blocks.GNSBlock) error {
+func (nc *NamecacheModule) Put(ctx context.Context, query *blocks.GNSQuery, block *blocks.GNSBlock) error {
 	return nc.cache.Put(query, block)
 }

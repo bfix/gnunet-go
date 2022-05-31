@@ -56,9 +56,8 @@ func TestCoreSimple(t *testing.T) {
 	}
 
 	// register as listener
-	filter := NewEventFilter()
 	incoming := make(chan *Event)
-	core.Register("test", NewListener(incoming, filter))
+	core.Register("test", NewListener(incoming, nil))
 
 	// run event handler
 	go func() {
@@ -83,5 +82,5 @@ func TestCoreSimple(t *testing.T) {
 		ha := message.NewHelloAddress(a)
 		msg.AddAddress(ha)
 	}
-	core.Send(local.GetID(), msg)
+	core.Send(ctx, local.GetID(), msg)
 }

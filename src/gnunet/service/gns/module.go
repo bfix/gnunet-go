@@ -91,11 +91,11 @@ type Module struct {
 	service.ModuleImpl
 
 	// Use function references for calls to methods in other modules:
-	LookupLocal      func(ctx *service.SessionContext, query *blocks.GNSQuery) (*blocks.GNSBlock, error)
-	StoreLocal       func(ctx *service.SessionContext, query *blocks.GNSQuery, block *blocks.GNSBlock) error
-	LookupRemote     func(ctx *service.SessionContext, query blocks.Query) (blocks.Block, error)
-	RevocationQuery  func(ctx *service.SessionContext, zkey *crypto.ZoneKey) (valid bool, err error)
-	RevocationRevoke func(ctx *service.SessionContext, rd *revocation.RevData) (success bool, err error)
+	LookupLocal      func(ctx context.Context, query *blocks.GNSQuery) (*blocks.GNSBlock, error)
+	StoreLocal       func(ctx context.Context, query *blocks.GNSQuery, block *blocks.GNSBlock) error
+	LookupRemote     func(ctx context.Context, query blocks.Query) (blocks.Block, error)
+	RevocationQuery  func(ctx context.Context, zkey *crypto.ZoneKey) (valid bool, err error)
+	RevocationRevoke func(ctx context.Context, rd *revocation.RevData) (success bool, err error)
 }
 
 func NewModule(ctx context.Context) (m *Module) {
@@ -110,7 +110,7 @@ func NewModule(ctx context.Context) (m *Module) {
 // Resolve a GNS name with multiple labels. If pkey is not nil, the name
 // is interpreted as "relative to current zone".
 func (m *Module) Resolve(
-	ctx *service.SessionContext,
+	ctx context.Context,
 	path string,
 	zkey *crypto.ZoneKey,
 	kind RRTypeList,
@@ -137,7 +137,7 @@ func (m *Module) Resolve(
 // ResolveAbsolute resolves a fully qualified GNS absolute name
 // (with multiple labels).
 func (m *Module) ResolveAbsolute(
-	ctx *service.SessionContext,
+	ctx context.Context,
 	labels []string,
 	kind RRTypeList,
 	mode int,
@@ -164,7 +164,7 @@ func (m *Module) ResolveAbsolute(
 // processing simple (PKEY,Label) lookups in sequence and handle intermediate
 // GNS record types
 func (m *Module) ResolveRelative(
-	ctx *service.SessionContext,
+	ctx context.Context,
 	labels []string,
 	zkey *crypto.ZoneKey,
 	kind RRTypeList,
@@ -338,7 +338,7 @@ func (m *Module) ResolveRelative(
 // a PKEY TLD), it is also resolved with GNS. All other names are resolved
 // via DNS queries.
 func (m *Module) ResolveUnknown(
-	ctx *service.SessionContext,
+	ctx context.Context,
 	name string,
 	labels []string,
 	zkey *crypto.ZoneKey,
@@ -387,7 +387,7 @@ func (m *Module) GetZoneKey(path string) *crypto.ZoneKey {
 
 // Lookup name in GNS.
 func (m *Module) Lookup(
-	ctx *service.SessionContext,
+	ctx context.Context,
 	zkey *crypto.ZoneKey,
 	label string,
 	mode int) (block *blocks.GNSBlock, err error) {

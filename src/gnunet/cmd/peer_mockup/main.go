@@ -71,12 +71,12 @@ func main() {
 
 	// handle messages coming from network
 	module := service.NewModuleImpl()
-	listener := module.Run(c.Context(), process, nil)
+	listener := module.Run(ctx, process, nil)
 	c.Register("mockup", listener)
 
 	if !asServer {
 		// we start the message exchange
-		c.Send(remote.GetID(), message.NewTransportTCPWelcomeMsg(c.PeerID()))
+		c.Send(ctx, remote.GetID(), message.NewTransportTCPWelcomeMsg(c.PeerID()))
 	}
 
 	// handle OS signals
@@ -120,7 +120,7 @@ func process(ctx context.Context, ev *core.Event) {
 	switch msg := ev.Msg.(type) {
 
 	case *message.TransportTCPWelcomeMsg:
-		c.Send(ev.Peer, message.NewTransportPingMsg(ev.Peer, nil))
+		c.Send(ctx, ev.Peer, message.NewTransportPingMsg(ev.Peer, nil))
 
 	case *message.HelloMsg:
 
@@ -130,7 +130,7 @@ func process(ctx context.Context, ev *core.Event) {
 			logger.Println(logger.ERROR, "PONG: signing failed")
 			return
 		}
-		c.Send(ev.Peer, mOut)
+		c.Send(ctx, ev.Peer, mOut)
 		logger.Printf(logger.DBG, ">>> %s", mOut)
 
 	case *message.TransportPongMsg:
@@ -145,7 +145,7 @@ func process(ctx context.Context, ev *core.Event) {
 	case *message.SessionSynMsg:
 		mOut := message.NewSessionSynAckMsg()
 		mOut.Timestamp = msg.Timestamp
-		c.Send(ev.Peer, mOut)
+		c.Send(ctx, ev.Peer, mOut)
 		logger.Printf(logger.DBG, ">>> %s", mOut)
 
 	case *message.SessionQuotaMsg:
@@ -154,7 +154,7 @@ func process(ctx context.Context, ev *core.Event) {
 
 	case *message.SessionKeepAliveMsg:
 		mOut := message.NewSessionKeepAliveRespMsg(msg.Nonce)
-		c.Send(ev.Peer, mOut)
+		c.Send(ctx, ev.Peer, mOut)
 		logger.Printf(logger.DBG, ">>> %s", mOut)
 
 	case *message.EphemeralKeyMsg:
@@ -168,7 +168,7 @@ func process(ctx context.Context, ev *core.Event) {
 		}
 		remote.SetEphKeyMsg(msg)
 		mOut := local.EphKeyMsg()
-		c.Send(ev.Peer, mOut)
+		c.Send(ctx, ev.Peer, mOut)
 		logger.Printf(logger.DBG, ">>> %s", mOut)
 		secret = crypto.SharedSecret(local.EphPrvKey(), remote.EphKeyMsg().Public())
 

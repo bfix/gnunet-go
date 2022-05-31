@@ -19,6 +19,7 @@
 package gns
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -27,7 +28,6 @@ import (
 	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/message"
-	"gnunet/service"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/logger"
@@ -205,7 +205,7 @@ func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *message.Reco
 // parallel; the first result delivered by any of the servers is returned
 // as the result list of matching resource records.
 func (gns *Module) ResolveDNS(
-	ctx *service.SessionContext,
+	ctx context.Context,
 	name string,
 	servers []string,
 	kind RRTypeList,

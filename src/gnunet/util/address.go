@@ -28,19 +28,19 @@ import (
 
 // Address specifies how a peer is reachable on the network.
 type Address struct {
-	Transport string       ``            // transport protocol
-	Options   uint32       `order:"big"` // address options
-	Address   []byte       `size:"*"`    // address data (protocol-dependent)
-	Expires   AbsoluteTime ``            // expiration date for address
+	Netw    string       ``            // network protocol
+	Options uint32       `order:"big"` // address options
+	Expires AbsoluteTime ``            // expiration date for address
+	Address []byte       `size:"*"`    // address data (protocol-dependent)
 }
 
 // NewAddress returns a new Address for the given transport and specs
 func NewAddress(transport string, addr []byte) *Address {
 	return &Address{
-		Transport: transport,
-		Options:   0,
-		Address:   Clone(addr),
-		Expires:   AbsoluteTimeNever(),
+		Netw:    transport,
+		Options: 0,
+		Address: Clone(addr),
+		Expires: AbsoluteTimeNever(),
 	}
 }
 
@@ -58,14 +58,21 @@ func ParseAddress(s string) (addr *Address, err error) {
 
 // Equals return true if two addresses match.
 func (a *Address) Equals(b *Address) bool {
-	return a.Transport == b.Transport &&
+	return a.Netw == b.Netw &&
 		a.Options == b.Options &&
 		bytes.Equal(a.Address, b.Address)
 }
 
+// implement net.Addr interface methods:
+
 // String returns a human-readable representation of an address.
 func (a *Address) String() string {
-	return fmt.Sprintf("%s:%s", a.Transport, a.Address)
+	return string(a.Address)
+}
+
+// Network returns the protocol specifier.
+func (a *Address) Network() string {
+	return a.Netw
 }
 
 //----------------------------------------------------------------------
@@ -129,7 +136,7 @@ func (a *PeerAddrList) Get(id string, transport string) *Address {
 			continue
 		}
 		// check for matching protocol
-		if len(transport) > 0 && transport != addr.Transport {
+		if len(transport) > 0 && transport != addr.Netw {
 			// skip other transports
 			continue
 		}

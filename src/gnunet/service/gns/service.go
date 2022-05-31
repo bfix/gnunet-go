@@ -25,7 +25,6 @@ import (
 	"io"
 
 	"gnunet/config"
-	"gnunet/core"
 	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/message"
@@ -77,104 +76,116 @@ func (s *Service) Stop() error {
 }
 
 // ServeClient processes a client channel.
-func (s *Service) ServeClient(ctx *service.SessionContext, mc *service.Connection) {
+func (s *Service) ServeClient(ctx context.Context, id int, mc *service.Connection) {
 	reqID := 0
-loop:
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithCancel(ctx)
+
 	for {
 		// receive next message from client
 		reqID++
-		logger.Printf(logger.DBG, "[gns:%d:%d] Waiting for client request...\n", ctx.ID, reqID)
-		msg, err := mc.Receive(ctx.Context())
+		logger.Printf(logger.DBG, "[gns:%d:%d] Waiting for client request...\n", id, reqID)
+		msg, err := mc.Receive(ctx)
 		if err != nil {
 			if err == io.EOF {
-				logger.Printf(logger.INFO, "[gns:%d:%d] Client channel closed.\n", ctx.ID, reqID)
+				logger.Printf(logger.INFO, "[gns:%d:%d] Client channel closed.\n", id, reqID)
 			} else if err == service.ErrConnectionInterrupted {
-				logger.Printf(logger.INFO, "[gns:%d:%d] Service operation interrupted.\n", ctx.ID, reqID)
+				logger.Printf(logger.INFO, "[gns:%d:%d] Service operation interrupted.\n", id, reqID)
 			} else {
-				logger.Printf(logger.ERROR, "[gns:%d:%d] Message-receive failed: %s\n", ctx.ID, reqID, err.Error())
+				logger.Printf(logger.ERROR, "[gns:%d:%d] Message-receive failed: %s\n", id, reqID, err.Error())
 			}
-			break loop
+			break
 		}
-		logger.Printf(logger.INFO, "[gns:%d:%d] Received request: %v\n", ctx.ID, reqID, msg)
+		logger.Printf(logger.INFO, "[gns:%d:%d] Received request: %v\n", id, reqID, msg)
 
-		// perform lookup
-		switch m := msg.(type) {
-		case *message.LookupMsg:
-			//----------------------------------------------------------
-			// GNS_LOOKUP
-			//----------------------------------------------------------
-
-			// perform lookup on block (locally and remote)
-			go func(id int, m *message.LookupMsg) {
-				logger.Printf(logger.INFO, "[gns:%d:%d] Lookup request received.\n", ctx.ID, id)
-				resp := message.NewGNSLookupResultMsg(m.ID)
-				ctx.Add()
-				defer func() {
-					// send response
-					if resp != nil {
-						if err := mc.Send(ctx.Context(), resp); err != nil {
-							logger.Printf(logger.ERROR, "[gns:%d:%d] Failed to send response: %s\n", ctx.ID, id, err.Error())
-						}
-					}
-					// go-routine finished
-					logger.Printf(logger.DBG, "[gns:%d:%d] Lookup request finished.\n", ctx.ID, id)
-					ctx.Remove()
-				}()
-
-				label := m.GetName()
-				kind := NewRRTypeList(int(m.Type))
-				recset, err := s.Resolve(ctx, label, m.Zone, kind, int(m.Options), 0)
-				if err != nil {
-					logger.Printf(logger.ERROR, "[gns:%d:%d] Failed to lookup block: %s\n", ctx.ID, id, err.Error())
-					if err == service.ErrConnectionInterrupted {
-						resp = nil
-					}
-					return
-				}
-				// handle records
-				if recset != nil {
-					logger.Printf(logger.DBG, "[gns:%d:%d] Received record set with %d entries\n", ctx.ID, id, recset.Count)
-
-					// get records from block
-					if recset.Count == 0 {
-						logger.Printf(logger.WARN, "[gns:%d:%d] No records in block\n", ctx.ID, id)
-						return
-					}
-					// process records
-					for i, rec := range recset.Records {
-						logger.Printf(logger.DBG, "[gns:%d:%d] Record #%d: %v\n", ctx.ID, id, i, rec)
-
-						// is this the record type we are looking for?
-						if rec.Type == m.Type || int(m.Type) == enums.GNS_TYPE_ANY {
-							// add it to the response message
-							resp.AddRecord(rec)
-						}
-					}
-				}
-			}(reqID, m)
-
-		default:
-			//----------------------------------------------------------
-			// UNKNOWN message type received
-			//----------------------------------------------------------
-			logger.Printf(logger.ERROR, "[gns:%d:%d] Unhandled message of type (%d)\n", ctx.ID, reqID, msg.Header().MsgType)
-			break loop
-		}
+		// handle message
+		s.HandleMessage(context.WithValue(ctx, "label", fmt.Sprintf(":%d:%d", id, reqID)), msg, mc)
 	}
 	// close client connection
 	mc.Close()
 
 	// cancel all tasks running for this session/connection
-	logger.Printf(logger.INFO, "[gns:%d] Start closing session... [%d]\n", ctx.ID, ctx.Waiting())
-	ctx.Cancel()
+	logger.Printf(logger.INFO, "[gns:%d] Start closing session...\n", id)
+	cancel()
+}
+
+// Handle a single incoming message
+func (s *Service) HandleMessage(ctx context.Context, msg message.Message, back service.Responder) bool {
+	// assemble log label
+	label := ""
+	if v := ctx.Value("label"); v != nil {
+		label = v.(string)
+	}
+	// perform lookup
+	switch m := msg.(type) {
+	case *message.LookupMsg:
+		//----------------------------------------------------------
+		// GNS_LOOKUP
+		//----------------------------------------------------------
+
+		// perform lookup on block (locally and remote)
+		go func(m *message.LookupMsg) {
+			logger.Printf(logger.INFO, "[gns%s] Lookup request received.\n", label)
+			resp := message.NewGNSLookupResultMsg(m.ID)
+			defer func() {
+				// send response
+				if resp != nil {
+					if err := back.Send(ctx, resp); err != nil {
+						logger.Printf(logger.ERROR, "[gns%s] Failed to send response: %s\n", label, err.Error())
+					}
+				}
+				// go-routine finished
+				logger.Printf(logger.DBG, "[gns%s] Lookup request finished.\n", label)
+			}()
+
+			label := m.GetName()
+			kind := NewRRTypeList(int(m.Type))
+			recset, err := s.Resolve(ctx, label, m.Zone, kind, int(m.Options), 0)
+			if err != nil {
+				logger.Printf(logger.ERROR, "[gns%s] Failed to lookup block: %s\n", label, err.Error())
+				if err == service.ErrConnectionInterrupted {
+					resp = nil
+				}
+				return
+			}
+			// handle records
+			if recset != nil {
+				logger.Printf(logger.DBG, "[gns%s] Received record set with %d entries\n", label, recset.Count)
+
+				// get records from block
+				if recset.Count == 0 {
+					logger.Printf(logger.WARN, "[gns%s] No records in block\n", label)
+					return
+				}
+				// process records
+				for i, rec := range recset.Records {
+					logger.Printf(logger.DBG, "[gns%s] Record #%d: %v\n", label, i, rec)
+
+					// is this the record type we are looking for?
+					if rec.Type == m.Type || int(m.Type) == enums.GNS_TYPE_ANY {
+						// add it to the response message
+						resp.AddRecord(rec)
+					}
+				}
+			}
+		}(m)
+
+	default:
+		//----------------------------------------------------------
+		// UNKNOWN message type received
+		//----------------------------------------------------------
+		logger.Printf(logger.ERROR, "[gns%s] Unhandled message of type (%d)\n", label, msg.Header().MsgType)
+		return false
+	}
+	return true
 }
 
 //======================================================================
-// Revocationrelated methods
+// Revocation-related methods
 //======================================================================
 
 // QueryKeyRevocation checks if a key has been revoked
-func (s *Service) QueryKeyRevocation(ctx *service.SessionContext, zkey *crypto.ZoneKey) (valid bool, err error) {
+func (s *Service) QueryKeyRevocation(ctx context.Context, zkey *crypto.ZoneKey) (valid bool, err error) {
 	logger.Printf(logger.DBG, "[gns] QueryKeyRev(%s)...\n", util.EncodeBinaryToString(zkey.Bytes()))
 
 	// assemble request
@@ -197,7 +208,7 @@ func (s *Service) QueryKeyRevocation(ctx *service.SessionContext, zkey *crypto.Z
 }
 
 // RevokeKey revokes a key with given revocation data
-func (s *Service) RevokeKey(ctx *service.SessionContext, rd *revocation.RevData) (success bool, err error) {
+func (s *Service) RevokeKey(ctx context.Context, rd *revocation.RevData) (success bool, err error) {
 	logger.Printf(logger.DBG, "[gns] RevokeKey(%s)...\n", rd.ZoneKeySig.ID())
 
 	// assemble request
@@ -227,7 +238,7 @@ func (s *Service) RevokeKey(ctx *service.SessionContext, rd *revocation.RevData)
 //======================================================================
 
 // LookupNamecache returns a cached lookup (if available)
-func (s *Service) LookupNamecache(ctx *service.SessionContext, query *blocks.GNSQuery) (block *blocks.GNSBlock, err error) {
+func (s *Service) LookupNamecache(ctx context.Context, query *blocks.GNSQuery) (block *blocks.GNSBlock, err error) {
 	logger.Printf(logger.DBG, "[gns] LookupNamecache(%s)...\n", hex.EncodeToString(query.Key().Bits))
 
 	// assemble Namecache request
@@ -289,7 +300,7 @@ func (s *Service) LookupNamecache(ctx *service.SessionContext, query *blocks.GNS
 }
 
 // StoreNamecache stores a lookup in the local namecache.
-func (s *Service) StoreNamecache(ctx *service.SessionContext, query *blocks.GNSQuery, block *blocks.GNSBlock) (err error) {
+func (s *Service) StoreNamecache(ctx context.Context, query *blocks.GNSQuery, block *blocks.GNSBlock) (err error) {
 	logger.Println(logger.DBG, "[gns] StoreNamecache()...")
 
 	// assemble Namecache request
@@ -329,13 +340,13 @@ func (s *Service) StoreNamecache(ctx *service.SessionContext, query *blocks.GNSQ
 //======================================================================
 
 // LookupDHT gets a GNS block from the DHT for the given query key.
-func (s *Service) LookupDHT(ctx *service.SessionContext, query blocks.Query) (block blocks.Block, err error) {
+func (s *Service) LookupDHT(ctx context.Context, query blocks.Query) (block blocks.Block, err error) {
 	logger.Printf(logger.DBG, "[gns] LookupDHT(%s)...\n", hex.EncodeToString(query.Key().Bits))
 	block = nil
 
 	// client-connect to the DHT service
 	logger.Println(logger.DBG, "[gns] Connecting to DHT service...")
-	cl, err := service.NewClient(ctx.Context(), config.Cfg.DHT.Service.Socket)
+	cl, err := service.NewClient(ctx, config.Cfg.DHT.Service.Socket)
 	if err != nil {
 		return nil, err
 	}
@@ -431,8 +442,4 @@ func (s *Service) LookupDHT(ctx *service.SessionContext, query blocks.Query) (bl
 		}
 	}
 	return
-}
-
-func (s *Service) Event(ev *core.Event) {
-
 }

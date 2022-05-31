@@ -19,6 +19,7 @@
 package revocation
 
 import (
+	"context"
 	"gnunet/config"
 	"gnunet/core"
 	"gnunet/crypto"
@@ -92,7 +93,7 @@ func (m *Module) RPC() (string, func(http.ResponseWriter, *http.Request)) {
 
 // Query return true if the pkey is valid (not revoked) and false
 // if the pkey has been revoked.
-func (m *Module) Query(ctx *service.SessionContext, zkey *crypto.ZoneKey) (valid bool, err error) {
+func (m *Module) Query(ctx context.Context, zkey *crypto.ZoneKey) (valid bool, err error) {
 	// fast check first: is the key in the bloomfilter?
 	data := zkey.Bytes()
 	if !m.bloomf.Contains(data) {
@@ -111,7 +112,7 @@ func (m *Module) Query(ctx *service.SessionContext, zkey *crypto.ZoneKey) (valid
 }
 
 // Revoke a key with given revocation data
-func (m *Module) Revoke(ctx *service.SessionContext, rd *RevData) (success bool, err error) {
+func (m *Module) Revoke(ctx context.Context, rd *RevData) (success bool, err error) {
 	// verify the revocation data
 	diff, rc := rd.Verify(true)
 	switch {

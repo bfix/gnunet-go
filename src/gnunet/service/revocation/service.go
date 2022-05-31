@@ -20,9 +20,9 @@ package revocation
 
 import (
 	"context"
+	"fmt"
 	"io"
 
-	"gnunet/core"
 	"gnunet/message"
 	"gnunet/service"
 
@@ -56,107 +56,112 @@ func (s *Service) Stop() error {
 }
 
 // ServeClient processes a client channel.
-func (s *Service) ServeClient(ctx *service.SessionContext, mc *service.Connection) {
+func (s *Service) ServeClient(ctx context.Context, id int, mc *service.Connection) {
 	reqID := 0
-loop:
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithCancel(ctx)
+
 	for {
 		// receive next message from client
 		reqID++
-		logger.Printf(logger.DBG, "[revocation:%d:%d] Waiting for client request...\n", ctx.ID, reqID)
-		msg, err := mc.Receive(ctx.Context())
+		logger.Printf(logger.DBG, "[revocation:%d:%d] Waiting for client request...\n", id, reqID)
+		msg, err := mc.Receive(ctx)
 		if err != nil {
 			if err == io.EOF {
-				logger.Printf(logger.INFO, "[revocation:%d:%d] Client channel closed.\n", ctx.ID, reqID)
+				logger.Printf(logger.INFO, "[revocation:%d:%d] Client channel closed.\n", id, reqID)
 			} else if err == service.ErrConnectionInterrupted {
-				logger.Printf(logger.INFO, "[revocation:%d:%d] Service operation interrupted.\n", ctx.ID, reqID)
+				logger.Printf(logger.INFO, "[revocation:%d:%d] Service operation interrupted.\n", id, reqID)
 			} else {
-				logger.Printf(logger.ERROR, "[revocation:%d:%d] Message-receive failed: %s\n", ctx.ID, reqID, err.Error())
+				logger.Printf(logger.ERROR, "[revocation:%d:%d] Message-receive failed: %s\n", id, reqID, err.Error())
 			}
-			break loop
+			break
 		}
-		logger.Printf(logger.INFO, "[revocation:%d:%d] Received request: %v\n", ctx.ID, reqID, msg)
+		logger.Printf(logger.INFO, "[revocation:%d:%d] Received request: %v\n", id, reqID, msg)
 
-		// handle request
-		switch m := msg.(type) {
-		case *message.RevocationQueryMsg:
-			//----------------------------------------------------------
-			// REVOCATION_QUERY
-			//----------------------------------------------------------
-			go func(id int, m *message.RevocationQueryMsg) {
-				logger.Printf(logger.INFO, "[revocation:%d:%d] Query request received.\n", ctx.ID, id)
-				var resp *message.RevocationQueryResponseMsg
-				ctx.Add()
-				defer func() {
-					// send response
-					if resp != nil {
-						if err := mc.Send(ctx.Context(), resp); err != nil {
-							logger.Printf(logger.ERROR, "[revocation:%d:%d] Failed to send response: %s\n", ctx.ID, id, err.Error())
-						}
-					}
-					// go-routine finished
-					logger.Printf(logger.DBG, "[revocation:%d:%d] Query request finished.\n", ctx.ID, id)
-					ctx.Remove()
-				}()
-
-				valid, err := s.Query(ctx, m.Zone)
-				if err != nil {
-					logger.Printf(logger.ERROR, "[revocation:%d:%d] Failed to query revocation status: %s\n", ctx.ID, id, err.Error())
-					if err == service.ErrConnectionInterrupted {
-						resp = nil
-					}
-					return
-				}
-				resp = message.NewRevocationQueryResponseMsg(valid)
-			}(reqID, m)
-
-		case *message.RevocationRevokeMsg:
-			//----------------------------------------------------------
-			// REVOCATION_REVOKE
-			//----------------------------------------------------------
-			go func(id int, m *message.RevocationRevokeMsg) {
-				logger.Printf(logger.INFO, "[revocation:%d:%d] Revoke request received.\n", ctx.ID, id)
-				var resp *message.RevocationRevokeResponseMsg
-				ctx.Add()
-				defer func() {
-					// send response
-					if resp != nil {
-						if err := mc.Send(ctx.Context(), resp); err != nil {
-							logger.Printf(logger.ERROR, "[revocation:%d:%d] Failed to send response: %s\n", ctx.ID, id, err.Error())
-						}
-					}
-					// go-routine finished
-					logger.Printf(logger.DBG, "[revocation:%d:%d] Revoke request finished.\n", ctx.ID, id)
-					ctx.Remove()
-				}()
-
-				rd := NewRevDataFromMsg(m)
-				valid, err := s.Revoke(ctx, rd)
-				if err != nil {
-					logger.Printf(logger.ERROR, "[revocation:%d:%d] Failed to revoke key: %s\n", ctx.ID, id, err.Error())
-					if err == service.ErrConnectionInterrupted {
-						resp = nil
-					}
-					return
-				}
-				resp = message.NewRevocationRevokeResponseMsg(valid)
-			}(reqID, m)
-
-		default:
-			//----------------------------------------------------------
-			// UNKNOWN message type received
-			//----------------------------------------------------------
-			logger.Printf(logger.ERROR, "[revocation:%d:%d] Unhandled message of type (%d)\n", ctx.ID, reqID, msg.Header().MsgType)
-			break loop
-		}
+		// handle message
+		s.HandleMessage(context.WithValue(ctx, "label", fmt.Sprintf(":%d:%d", id, reqID)), msg, mc)
 	}
 	// close client connection
 	mc.Close()
 
 	// cancel all tasks running for this session/connection
-	logger.Printf(logger.INFO, "[revocation:%d] Start closing session... [%d]\n", ctx.ID, ctx.Waiting())
-	ctx.Cancel()
+	logger.Printf(logger.INFO, "[revocation:%d] Start closing session...\n", id)
+	cancel()
 }
 
-func (s *Service) Event(ev *core.Event) {
+// Handle a single incoming message
+func (s *Service) HandleMessage(ctx context.Context, msg message.Message, back service.Responder) bool {
+	// assemble log label
+	label := ""
+	if v := ctx.Value("label"); v != nil {
+		label = v.(string)
+	}
+	switch m := msg.(type) {
+	case *message.RevocationQueryMsg:
+		//----------------------------------------------------------
+		// REVOCATION_QUERY
+		//----------------------------------------------------------
+		go func(m *message.RevocationQueryMsg) {
+			logger.Printf(logger.INFO, "[revocation%s] Query request received.\n", label)
+			var resp *message.RevocationQueryResponseMsg
+			defer func() {
+				// send response
+				if resp != nil {
+					if err := back.Send(ctx, resp); err != nil {
+						logger.Printf(logger.ERROR, "[revocation%s] Failed to send response: %s\n", label, err.Error())
+					}
+				}
+				// go-routine finished
+				logger.Printf(logger.DBG, "[revocation%s] Query request finished.\n", label)
+			}()
 
+			valid, err := s.Query(ctx, m.Zone)
+			if err != nil {
+				logger.Printf(logger.ERROR, "[revocation%s] Failed to query revocation status: %s\n", label, err.Error())
+				if err == service.ErrConnectionInterrupted {
+					resp = nil
+				}
+				return
+			}
+			resp = message.NewRevocationQueryResponseMsg(valid)
+		}(m)
+
+	case *message.RevocationRevokeMsg:
+		//----------------------------------------------------------
+		// REVOCATION_REVOKE
+		//----------------------------------------------------------
+		go func(m *message.RevocationRevokeMsg) {
+			logger.Printf(logger.INFO, "[revocation%s] Revoke request received.\n", label)
+			var resp *message.RevocationRevokeResponseMsg
+			defer func() {
+				// send response
+				if resp != nil {
+					if err := back.Send(ctx, resp); err != nil {
+						logger.Printf(logger.ERROR, "[revocation%s] Failed to send response: %s\n", label, err.Error())
+					}
+				}
+				// go-routine finished
+				logger.Printf(logger.DBG, "[revocation%s] Revoke request finished.\n", label)
+			}()
+
+			rd := NewRevDataFromMsg(m)
+			valid, err := s.Revoke(ctx, rd)
+			if err != nil {
+				logger.Printf(logger.ERROR, "[revocation%s] Failed to revoke key: %s\n", label, err.Error())
+				if err == service.ErrConnectionInterrupted {
+					resp = nil
+				}
+				return
+			}
+			resp = message.NewRevocationRevokeResponseMsg(valid)
+		}(m)
+
+	default:
+		//----------------------------------------------------------
+		// UNKNOWN message type received
+		//----------------------------------------------------------
+		logger.Printf(logger.ERROR, "[revocation%s] Unhandled message of type (%d)\n", label, msg.Header().MsgType)
+		return false
+	}
+	return true
 }
