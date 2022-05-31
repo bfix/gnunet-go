@@ -20,7 +20,9 @@ package revocation
 
 import (
 	"gnunet/config"
+	"gnunet/core"
 	"gnunet/crypto"
+	"gnunet/message"
 	"gnunet/service"
 	"gnunet/util"
 	"net/http"
@@ -69,6 +71,16 @@ func NewModule() *Module {
 		return nil
 	}
 	return m
+}
+
+// Filter returns the event filter for the service
+func (m *Module) Filter() *core.EventFilter {
+	f := core.NewEventFilter()
+	f.AddMsgType(message.REVOCATION_QUERY)
+	f.AddMsgType(message.REVOCATION_QUERY_RESPONSE)
+	f.AddMsgType(message.REVOCATION_REVOKE)
+	f.AddMsgType(message.REVOCATION_REVOKE_RESPONSE)
+	return f
 }
 
 // RPC returns the route and handler function for a JSON-RPC request

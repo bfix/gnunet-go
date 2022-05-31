@@ -20,6 +20,8 @@ package dht
 
 import (
 	"gnunet/config"
+	"gnunet/core"
+	"gnunet/message"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
 	"net/http"
@@ -35,29 +37,63 @@ import (
 
 // Module handles the permanent storage of blocks under a query key.
 type Module struct {
+	service.ModuleImpl
+
 	store service.DHTStore // reference to the block storage mechanism
 	cache service.DHTStore // transient block cache
+	core  *core.Core       // reference to core services
+
+	rtable *RoutingTable // routing table
 }
 
 // NewModule returns a new module instance. It initializes the storage
 // mechanism for persistence.
-func NewModule() *Module {
+func NewModule(c *core.Core) (m *Module) {
+	// create permanent storage handler
 	store, err := service.NewDHTStore(config.Cfg.DHT.Storage)
 	if err != nil {
 		return nil
 	}
+	// create cache handler
 	cache, err := service.NewDHTStore(config.Cfg.DHT.Cache)
 	if err != nil {
 		return nil
 	}
-	return &Module{
-		store: store,
-		cache: cache,
+	// create routing table
+	rt := NewRoutingTable(NewPeerAddress(c.PeerID()))
+
+	// return module instance
+	m = &Module{
+		ModuleImpl: *service.NewModuleImpl(),
+		store:      store,
+		cache:      cache,
+		core:       c,
+		rtable:     rt,
 	}
+	// register as listener for core events
+	m.Run(c.Context(), m.event)
+
+	return
 }
 
+//----------------------------------------------------------------------
+
 // Get a block from the DHT
-func (nc *Module) Get(ctx *service.SessionContext, key blocks.Query) (blocks.Block, error) {
+func (nc *Module) Get(ctx *service.SessionContext, query blocks.Query) (block blocks.Block, err error) {
+
+	// check if we have the requested block in cache or permanent storage.
+	block, err = nc.cache.Get(query)
+	if err == nil {
+		// yes: we are done
+		return
+	}
+	block, err = nc.store.Get(query)
+	if err == nil {
+		// yes: we are done
+		return
+	}
+	// retrieve the block from the DHT
+
 	return nil, nil
 }
 
@@ -65,6 +101,26 @@ func (nc *Module) Get(ctx *service.SessionContext, key blocks.Query) (blocks.Blo
 func (nc *Module) Put(ctx *service.SessionContext, key blocks.Query, block blocks.Block) error {
 	return nil
 }
+
+//----------------------------------------------------------------------
+
+// Filter returns the event filter for the module
+func (m *Module) Filter() *core.EventFilter {
+	f := core.NewEventFilter()
+	f.AddMsgType(message.DHT_CLIENT_GET)
+	f.AddMsgType(message.DHT_CLIENT_GET_RESULTS_KNOWN)
+	f.AddMsgType(message.DHT_CLIENT_GET_STOP)
+	f.AddMsgType(message.DHT_CLIENT_PUT)
+	f.AddMsgType(message.DHT_CLIENT_RESULT)
+	return f
+}
+
+// Event handler
+func (nc *Module) event(ev *core.Event) {
+
+}
+
+//----------------------------------------------------------------------
 
 // RPC returns the route and handler function for a JSON-RPC request
 func (m *Module) RPC() (string, func(http.ResponseWriter, *http.Request)) {

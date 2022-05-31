@@ -19,18 +19,19 @@
 package gns
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"io"
 
 	"gnunet/config"
+	"gnunet/core"
 	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
 	"gnunet/service/revocation"
-	"gnunet/transport"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/data"
@@ -66,7 +67,7 @@ func NewService() service.Service {
 }
 
 // Start the GNS service
-func (s *Service) Start(spec string) error {
+func (s *Service) Start(ctx context.Context, path string) error {
 	return nil
 }
 
@@ -76,18 +77,18 @@ func (s *Service) Stop() error {
 }
 
 // ServeClient processes a client channel.
-func (s *Service) ServeClient(ctx *service.SessionContext, mc *transport.MsgChannel) {
+func (s *Service) ServeClient(ctx *service.SessionContext, mc *service.Connection) {
 	reqID := 0
 loop:
 	for {
 		// receive next message from client
 		reqID++
 		logger.Printf(logger.DBG, "[gns:%d:%d] Waiting for client request...\n", ctx.ID, reqID)
-		msg, err := mc.Receive(ctx.Signaller())
+		msg, err := mc.Receive(ctx.Context())
 		if err != nil {
 			if err == io.EOF {
 				logger.Printf(logger.INFO, "[gns:%d:%d] Client channel closed.\n", ctx.ID, reqID)
-			} else if err == transport.ErrChannelInterrupted {
+			} else if err == service.ErrConnectionInterrupted {
 				logger.Printf(logger.INFO, "[gns:%d:%d] Service operation interrupted.\n", ctx.ID, reqID)
 			} else {
 				logger.Printf(logger.ERROR, "[gns:%d:%d] Message-receive failed: %s\n", ctx.ID, reqID, err.Error())
@@ -111,7 +112,7 @@ loop:
 				defer func() {
 					// send response
 					if resp != nil {
-						if err := mc.Send(resp, ctx.Signaller()); err != nil {
+						if err := mc.Send(ctx.Context(), resp); err != nil {
 							logger.Printf(logger.ERROR, "[gns:%d:%d] Failed to send response: %s\n", ctx.ID, id, err.Error())
 						}
 					}
@@ -125,7 +126,7 @@ loop:
 				recset, err := s.Resolve(ctx, label, m.Zone, kind, int(m.Options), 0)
 				if err != nil {
 					logger.Printf(logger.ERROR, "[gns:%d:%d] Failed to lookup block: %s\n", ctx.ID, id, err.Error())
-					if err == transport.ErrChannelInterrupted {
+					if err == service.ErrConnectionInterrupted {
 						resp = nil
 					}
 					return
@@ -181,7 +182,7 @@ func (s *Service) QueryKeyRevocation(ctx *service.SessionContext, zkey *crypto.Z
 
 	// get response from Revocation service
 	var resp message.Message
-	if resp, err = service.RequestResponse(ctx, "gns", "Revocation", config.Cfg.Revocation.Endpoint, req); err != nil {
+	if resp, err = service.RequestResponse(ctx, "gns", "Revocation", config.Cfg.Revocation.Service.Socket, req); err != nil {
 		return
 	}
 
@@ -207,7 +208,7 @@ func (s *Service) RevokeKey(ctx *service.SessionContext, rd *revocation.RevData)
 
 	// get response from Revocation service
 	var resp message.Message
-	if resp, err = service.RequestResponse(ctx, "gns", "Revocation", config.Cfg.Revocation.Endpoint, req); err != nil {
+	if resp, err = service.RequestResponse(ctx, "gns", "Revocation", config.Cfg.Revocation.Service.Socket, req); err != nil {
 		return
 	}
 
@@ -236,7 +237,7 @@ func (s *Service) LookupNamecache(ctx *service.SessionContext, query *blocks.GNS
 
 	// get response from Namecache service
 	var resp message.Message
-	if resp, err = service.RequestResponse(ctx, "gns", "Namecache", config.Cfg.Namecache.Endpoint, req); err != nil {
+	if resp, err = service.RequestResponse(ctx, "gns", "Namecache", config.Cfg.Namecache.Service.Socket, req); err != nil {
 		return
 	}
 
@@ -297,7 +298,7 @@ func (s *Service) StoreNamecache(ctx *service.SessionContext, query *blocks.GNSQ
 
 	// get response from Namecache service
 	var resp message.Message
-	if resp, err = service.RequestResponse(ctx, "gns", "Namecache", config.Cfg.Namecache.Endpoint, req); err != nil {
+	if resp, err = service.RequestResponse(ctx, "gns", "Namecache", config.Cfg.Namecache.Service.Socket, req); err != nil {
 		return
 	}
 
@@ -334,7 +335,7 @@ func (s *Service) LookupDHT(ctx *service.SessionContext, query blocks.Query) (bl
 
 	// client-connect to the DHT service
 	logger.Println(logger.DBG, "[gns] Connecting to DHT service...")
-	cl, err := service.NewClient(config.Cfg.DHT.Endpoint)
+	cl, err := service.NewClient(ctx.Context(), config.Cfg.DHT.Service.Socket)
 	if err != nil {
 		return nil, err
 	}
@@ -369,7 +370,7 @@ func (s *Service) LookupDHT(ctx *service.SessionContext, query blocks.Query) (bl
 
 	if err = interact(reqGet, true); err != nil {
 		// check for aborted remote lookup: we need to cancel the query
-		if err == transport.ErrChannelInterrupted {
+		if err == service.ErrConnectionInterrupted {
 			logger.Println(logger.WARN, "[gns] remote Lookup aborted -- cleaning up.")
 
 			// send DHT GET_STOP request and terminate
@@ -378,7 +379,7 @@ func (s *Service) LookupDHT(ctx *service.SessionContext, query blocks.Query) (bl
 			if err = interact(reqStop, false); err != nil {
 				logger.Printf(logger.ERROR, "[gns] remote Lookup abort failed: %s\n", err.Error())
 			}
-			return nil, transport.ErrChannelInterrupted
+			return nil, service.ErrConnectionInterrupted
 		}
 	}
 
@@ -430,4 +431,8 @@ func (s *Service) LookupDHT(ctx *service.SessionContext, query blocks.Query) (bl
 		}
 	}
 	return
+}
+
+func (s *Service) Event(ev *core.Event) {
+
 }

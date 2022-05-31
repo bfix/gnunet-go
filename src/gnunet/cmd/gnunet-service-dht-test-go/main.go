@@ -32,7 +32,6 @@ import (
 	"gnunet/rpc"
 	"gnunet/service"
 	"gnunet/service/dht"
-	"gnunet/transport"
 
 	"github.com/bfix/gospel/logger"
 )
@@ -47,14 +46,16 @@ func main() {
 
 	var (
 		cfgFile  string
-		srvEndp  string
+		socket   string
+		param    string
 		err      error
 		logLevel int
 		rpcEndp  string
 	)
 	// handle command line arguments
 	flag.StringVar(&cfgFile, "c", "gnunet-config.json", "GNUnet configuration file")
-	flag.StringVar(&srvEndp, "s", "", "DHT service end-point")
+	flag.StringVar(&socket, "s", "", "GNS service socket")
+	flag.StringVar(&param, "p", "", "socket parameters (<key>=<value>,...)")
 	flag.IntVar(&logLevel, "L", logger.INFO, "DHT log level (default: INFO)")
 	flag.StringVar(&rpcEndp, "R", "", "JSON-RPC endpoint (default: none)")
 	flag.Parse()
@@ -67,41 +68,43 @@ func main() {
 
 	// apply configuration
 	logger.SetLogLevel(logLevel)
-	if len(srvEndp) == 0 {
-		srvEndp = config.Cfg.DHT.Endpoint
+	if len(socket) == 0 {
+		socket = config.Cfg.GNS.Service.Socket
+	}
+	params := make(map[string]string)
+	if len(param) == 0 {
+		for _, p := range strings.Split(param, ",") {
+			kv := strings.SplitN(p, "=", 2)
+			params[kv[0]] = kv[1]
+		}
+	} else {
+		params = config.Cfg.GNS.Service.Params
 	}
 
-	// instantiate local peer
+	// instantiate core service
+	ctx, cancel := context.WithCancel(context.Background())
 	var local *core.Peer
 	if local, err = core.NewLocalPeer(config.Cfg.Local); err != nil {
 		logger.Printf(logger.ERROR, "[dht] No local peer: %s\n", err.Error())
 		return
 	}
-
-	// instantiate message transport layer
-	tr := transport.NewTestTransport()
+	var c *core.Core
+	if c, err = core.NewCore(ctx, local); err != nil {
+		logger.Printf(logger.ERROR, "[dht] core failed: %s\n", err.Error())
+		return
+	}
 
 	// start a new DHT service
-	dht := dht.NewService(tr, local.GetID())
+	dht := dht.NewService(c)
 	srv := service.NewServiceImpl("dht", dht)
-	if err = srv.Start(srvEndp); err != nil {
+	if err = srv.Start(ctx, socket, params); err != nil {
 		logger.Printf(logger.ERROR, "[dht] Failed to start DHT service: '%s'", err.Error())
 		return
 	}
 
-	// start test transport service
-	trans := transport.NewTestTransport()
-	if err = trans.Start("udp+127.0.0.1:8765"); err != nil {
-		logger.Printf(logger.ERROR, "[dht] Failed to start transport: '%s'", err.Error())
-		return
-	}
-
 	// start JSON-RPC server on request
-	var cancel func() = func() {}
 	if len(rpcEndp) > 0 {
-		var ctx context.Context
-		ctx, cancel = context.WithCancel(context.Background())
-		parts := strings.Split(rpcEndp, "+")
+		parts := strings.Split(rpcEndp, ":")
 		if parts[0] != "tcp" {
 			logger.Println(logger.ERROR, "[dht] RPC must have a TCP/IP endpoint")
 			return
@@ -124,13 +127,6 @@ func main() {
 loop:
 	for {
 		select {
-		// handle transport events
-		case ev := <-trans.Signal():
-			switch ev.Ev {
-			case transport.EV_MESSAGE:
-				dht.HandleMessage(ev.Msg, ev.Ch)
-			}
-
 		// handle OS signals
 		case sig := <-sigCh:
 			switch sig {

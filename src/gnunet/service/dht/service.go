@@ -19,12 +19,13 @@
 package dht
 
 import (
+	"context"
 	"fmt"
 	"io"
 
+	"gnunet/core"
 	"gnunet/message"
 	"gnunet/service"
-	"gnunet/transport"
 
 	"github.com/bfix/gospel/logger"
 )
@@ -43,38 +44,44 @@ var (
 // Service implements a DHT service
 type Service struct {
 	Module
+
+	running bool // service running?
 }
 
 // NewService creates a new DHT service instance
-func NewService() *Service {
+func NewService(c *core.Core) *Service {
+	// create service instance
 	return &Service{
-		Module: *NewModule(),
+		Module:  *NewModule(c),
+		running: false,
 	}
 }
 
 // Start the DHT service
-func (s *Service) Start(spec string) error {
+func (s *Service) Start(ctx context.Context, path string) error {
+	s.running = true
 	return nil
 }
 
 // Stop the DHT service
 func (s *Service) Stop() error {
+	s.running = false
 	return nil
 }
 
 // ServeClient processes a client channel.
-func (s *Service) ServeClient(ctx *service.SessionContext, mc *transport.MsgChannel) {
+func (s *Service) ServeClient(ctx *service.SessionContext, mc *service.Connection) {
 	reqID := 0
 loop:
 	for {
 		// receive next message from client
 		reqID++
 		logger.Printf(logger.DBG, "[dht:%d:%d] Waiting for client request...\n", ctx.ID, reqID)
-		msg, err := mc.Receive(ctx.Signaller())
+		msg, err := mc.Receive(ctx.Context())
 		if err != nil {
 			if err == io.EOF {
 				logger.Printf(logger.INFO, "[dht:%d:%d] Client channel closed.\n", ctx.ID, reqID)
-			} else if err == transport.ErrChannelInterrupted {
+			} else if err == service.ErrConnectionInterrupted {
 				logger.Printf(logger.INFO, "[dht:%d:%d] Service operation interrupted.\n", ctx.ID, reqID)
 			} else {
 				logger.Printf(logger.ERROR, "[dht:%d:%d] Message-receive failed: %s\n", ctx.ID, reqID, err.Error())
@@ -100,7 +107,9 @@ loop:
 	ctx.Cancel()
 }
 
-func (s *Service) HandleMessage(msg message.Message, mc *transport.MsgChannel) bool {
+// HandleMessage handles a DHT request/response message. If the transport channel
+// is nil, responses are send directly via the transport layer.
+func (s *Service) HandleMessage(msg message.Message, mc *service.Connection) bool {
 
 	// handle message
 	switch msg.(type) {

@@ -19,11 +19,12 @@
 package revocation
 
 import (
+	"context"
 	"io"
 
+	"gnunet/core"
 	"gnunet/message"
 	"gnunet/service"
-	"gnunet/transport"
 
 	"github.com/bfix/gospel/logger"
 )
@@ -45,7 +46,7 @@ func NewService() service.Service {
 }
 
 // Start the Revocation service
-func (s *Service) Start(spec string) error {
+func (s *Service) Start(ctx context.Context, path string) error {
 	return nil
 }
 
@@ -55,18 +56,18 @@ func (s *Service) Stop() error {
 }
 
 // ServeClient processes a client channel.
-func (s *Service) ServeClient(ctx *service.SessionContext, mc *transport.MsgChannel) {
+func (s *Service) ServeClient(ctx *service.SessionContext, mc *service.Connection) {
 	reqID := 0
 loop:
 	for {
 		// receive next message from client
 		reqID++
 		logger.Printf(logger.DBG, "[revocation:%d:%d] Waiting for client request...\n", ctx.ID, reqID)
-		msg, err := mc.Receive(ctx.Signaller())
+		msg, err := mc.Receive(ctx.Context())
 		if err != nil {
 			if err == io.EOF {
 				logger.Printf(logger.INFO, "[revocation:%d:%d] Client channel closed.\n", ctx.ID, reqID)
-			} else if err == transport.ErrChannelInterrupted {
+			} else if err == service.ErrConnectionInterrupted {
 				logger.Printf(logger.INFO, "[revocation:%d:%d] Service operation interrupted.\n", ctx.ID, reqID)
 			} else {
 				logger.Printf(logger.ERROR, "[revocation:%d:%d] Message-receive failed: %s\n", ctx.ID, reqID, err.Error())
@@ -88,7 +89,7 @@ loop:
 				defer func() {
 					// send response
 					if resp != nil {
-						if err := mc.Send(resp, ctx.Signaller()); err != nil {
+						if err := mc.Send(ctx.Context(), resp); err != nil {
 							logger.Printf(logger.ERROR, "[revocation:%d:%d] Failed to send response: %s\n", ctx.ID, id, err.Error())
 						}
 					}
@@ -100,7 +101,7 @@ loop:
 				valid, err := s.Query(ctx, m.Zone)
 				if err != nil {
 					logger.Printf(logger.ERROR, "[revocation:%d:%d] Failed to query revocation status: %s\n", ctx.ID, id, err.Error())
-					if err == transport.ErrChannelInterrupted {
+					if err == service.ErrConnectionInterrupted {
 						resp = nil
 					}
 					return
@@ -119,7 +120,7 @@ loop:
 				defer func() {
 					// send response
 					if resp != nil {
-						if err := mc.Send(resp, ctx.Signaller()); err != nil {
+						if err := mc.Send(ctx.Context(), resp); err != nil {
 							logger.Printf(logger.ERROR, "[revocation:%d:%d] Failed to send response: %s\n", ctx.ID, id, err.Error())
 						}
 					}
@@ -132,7 +133,7 @@ loop:
 				valid, err := s.Revoke(ctx, rd)
 				if err != nil {
 					logger.Printf(logger.ERROR, "[revocation:%d:%d] Failed to revoke key: %s\n", ctx.ID, id, err.Error())
-					if err == transport.ErrChannelInterrupted {
+					if err == service.ErrConnectionInterrupted {
 						resp = nil
 					}
 					return
@@ -154,4 +155,8 @@ loop:
 	// cancel all tasks running for this session/connection
 	logger.Printf(logger.INFO, "[revocation:%d] Start closing session... [%d]\n", ctx.ID, ctx.Waiting())
 	ctx.Cancel()
+}
+
+func (s *Service) Event(ev *core.Event) {
+
 }

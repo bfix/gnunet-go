@@ -19,39 +19,39 @@
 package service
 
 import (
+	"context"
 	"gnunet/message"
-	"gnunet/transport"
 
 	"github.com/bfix/gospel/logger"
 )
 
 // Client type: Use to perform client-side interactions with GNUnet services.
 type Client struct {
-	ch *transport.MsgChannel // channel for message exchange
+	ch *Connection // channel for message exchange
 }
 
-// NewClient creates a new client instance for the given channel endpoint.
-func NewClient(endp string) (*Client, error) {
-	// create a new channel to endpoint.
-	ch, err := transport.NewChannel(endp)
+// NewClient connects to a socket with given path
+func NewClient(ctx context.Context, path string) (*Client, error) {
+	// create a connection
+	ch, err := NewConnection(ctx, path)
 	if err != nil {
 		return nil, err
 	}
 	// wrap into a message channel for the client.
 	return &Client{
-		ch: transport.NewMsgChannel(ch),
+		ch: ch,
 	}, nil
 }
 
 // SendRequest sends a give message to the service.
 func (c *Client) SendRequest(ctx *SessionContext, req message.Message) error {
-	return c.ch.Send(req, ctx.Signaller())
+	return c.ch.Send(ctx.ctx, req)
 }
 
 // ReceiveResponse waits for a response from the service; it can be interrupted
 // by sending "false" to the cmd channel.
 func (c *Client) ReceiveResponse(ctx *SessionContext) (message.Message, error) {
-	return c.ch.Receive(ctx.Signaller())
+	return c.ch.Receive(ctx.ctx)
 }
 
 // Close a client; no further message exchange is possible.
@@ -65,12 +65,12 @@ func RequestResponse(
 	ctx *SessionContext,
 	caller string,
 	callee string,
-	endp string,
+	path string,
 	req message.Message) (message.Message, error) {
 
 	// client-connect to the service
 	logger.Printf(logger.DBG, "[%s] Connecting to %s service...\n", caller, callee)
-	cl, err := NewClient(endp)
+	cl, err := NewClient(ctx.ctx, path)
 	if err != nil {
 		return nil, err
 	}

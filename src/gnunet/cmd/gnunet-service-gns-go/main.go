@@ -45,14 +45,16 @@ func main() {
 
 	var (
 		cfgFile  string
-		srvEndp  string
+		socket   string
+		param    string
 		err      error
 		logLevel int
 		rpcEndp  string
 	)
 	// handle command line arguments
 	flag.StringVar(&cfgFile, "c", "gnunet-config.json", "GNUnet configuration file")
-	flag.StringVar(&srvEndp, "s", "", "GNS service end-point")
+	flag.StringVar(&socket, "s", "", "GNS service socket")
+	flag.StringVar(&param, "p", "", "socket parameters (<key>=<value>,...)")
 	flag.IntVar(&logLevel, "L", logger.INFO, "GNS log level (default: INFO)")
 	flag.StringVar(&rpcEndp, "R", "", "JSON-RPC endpoint (default: none)")
 	flag.Parse()
@@ -63,26 +65,33 @@ func main() {
 		return
 	}
 
-	// apply configuration
+	// apply configuration (from file and command-line)
 	logger.SetLogLevel(logLevel)
-	if len(srvEndp) == 0 {
-		srvEndp = config.Cfg.GNS.Endpoint
+	if len(socket) == 0 {
+		socket = config.Cfg.GNS.Service.Socket
+	}
+	params := make(map[string]string)
+	if len(param) == 0 {
+		for _, p := range strings.Split(param, ",") {
+			kv := strings.SplitN(p, "=", 2)
+			params[kv[0]] = kv[1]
+		}
+	} else {
+		params = config.Cfg.GNS.Service.Params
 	}
 
 	// start a new GNS service
+	ctx, cancel := context.WithCancel(context.Background())
 	gns := gns.NewService()
 	srv := service.NewServiceImpl("gns", gns)
-	if err = srv.Start(srvEndp); err != nil {
+	if err = srv.Start(ctx, socket, params); err != nil {
 		logger.Printf(logger.ERROR, "[gns] Error: '%s'", err.Error())
 		return
 	}
 
 	// start JSON-RPC server on request
-	var cancel func() = func() {}
 	if len(rpcEndp) > 0 {
-		var ctx context.Context
-		ctx, cancel = context.WithCancel(context.Background())
-		parts := strings.Split(rpcEndp, "+")
+		parts := strings.Split(rpcEndp, ":")
 		if parts[0] != "tcp" {
 			logger.Println(logger.ERROR, "[gns] RPC must have a TCP/IP endpoint")
 			return

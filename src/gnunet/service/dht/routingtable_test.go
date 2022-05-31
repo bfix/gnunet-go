@@ -19,7 +19,6 @@
 package dht
 
 import (
-	"context"
 	"gnunet/config"
 	"gnunet/core"
 	"gnunet/util"
@@ -67,17 +66,12 @@ func TestRT(t *testing.T) {
 		return NewPeerAddress(util.NewPeerID(d))
 	}
 
-	// establish context
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	// create routing table and start command handler
 	local, err := core.NewLocalPeer(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	rt := NewRoutingTable(NewPeerAddress(local.GetID()))
-	ch := rt.Run(ctx)
 
 	// create a task list
 	tasks := make([]*Entry, NUMP)
@@ -93,19 +87,13 @@ func TestRT(t *testing.T) {
 
 	// actions:
 	connected := func(task *Entry, e int64, msg string) {
-		ch <- &RTCommand{
-			Cmd:  RtcConnect,
-			Data: task.addr,
-		}
+		rt.Add(task.addr, true)
 		task.online = true
 		task.last = e
 		t.Logf("[%6d] %s %s\n", e, task.addr, msg)
 	}
 	disconnected := func(task *Entry, e int64, msg string) {
-		ch <- &RTCommand{
-			Cmd:  RtcDisconnect,
-			Data: task.addr,
-		}
+		rt.Remove(task.addr)
 		task.online = false
 		task.last = e
 		t.Logf("[%6d] %s %s\n", e, task.addr, msg)

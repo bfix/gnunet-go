@@ -20,7 +20,6 @@ package dht
 
 import (
 	"bytes"
-	"context"
 	"crypto/sha512"
 	"encoding/hex"
 	"gnunet/util"
@@ -86,20 +85,6 @@ func (addr *PeerAddress) Distance(p *PeerAddress) (*math.Int, int) {
 // Routing table implementation
 //======================================================================
 
-// RT command codes:
-const (
-	RtcConnect    = iota // PEER_CONNECTED
-	RtcDisconnect        // PEER_DISCONNECTED
-	RtcL2NSE             // new network size estimation (log2) available
-)
-
-// RTCommand is a command sent by the transport layer to keep the
-// routing table up-to-date.
-type RTCommand struct {
-	Cmd  int         // command identifier ("Rtc???")
-	Data interface{} // command parameter
-}
-
 // RoutingTable holds the (local) routing table for a node.
 // The index of of an address is the number of bits in the
 // distance to the reference address, so smaller index means
@@ -122,37 +107,6 @@ func NewRoutingTable(ref *PeerAddress) *RoutingTable {
 		rt.buckets[i] = NewBucket(numK)
 	}
 	return rt
-}
-
-// Run routing table command handler (used by the transport layer).
-func (rt *RoutingTable) Run(ctx context.Context) chan *RTCommand {
-	ch := make(chan *RTCommand)
-	go func() {
-		for {
-			select {
-			case cmd := <-ch:
-				switch cmd.Cmd {
-				// signal: peer connected
-				case RtcConnect:
-					// add peer to routing table
-					go rt.Add(cmd.Data.(*PeerAddress), true)
-
-				// signal: peer disconnected
-				case RtcDisconnect:
-					go rt.Remove(cmd.Data.(*PeerAddress))
-
-				// signal: new NSE available
-				case RtcL2NSE:
-					rt.l2nse = cmd.Data.(float64)
-				}
-			// terminate signal received
-			case <-ctx.Done():
-				// quit command processing
-				return
-			}
-		}
-	}()
-	return ch
 }
 
 // Add new peer address to routing table.

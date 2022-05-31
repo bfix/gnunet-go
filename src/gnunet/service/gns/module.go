@@ -19,11 +19,13 @@
 package gns
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"gnunet/config"
+	"gnunet/core"
 	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/message"
@@ -86,6 +88,8 @@ var (
 
 // Module handles the resolution of GNS names to RRs bundled in a block.
 type Module struct {
+	service.ModuleImpl
+
 	// Use function references for calls to methods in other modules:
 	LookupLocal      func(ctx *service.SessionContext, query *blocks.GNSQuery) (*blocks.GNSBlock, error)
 	StoreLocal       func(ctx *service.SessionContext, query *blocks.GNSQuery, block *blocks.GNSBlock) error
@@ -94,12 +98,14 @@ type Module struct {
 	RevocationRevoke func(ctx *service.SessionContext, rd *revocation.RevData) (success bool, err error)
 }
 
-// RPC returns the route and handler function for a JSON-RPC request
-func (m *Module) RPC() (string, func(http.ResponseWriter, *http.Request)) {
-	return "/gns/", func(wrt http.ResponseWriter, req *http.Request) {
-		wrt.Write([]byte(`{"msg": "This is GNS" }`))
+func NewModule(ctx context.Context) (m *Module) {
+	m = &Module{
+		ModuleImpl: *service.NewModuleImpl(),
 	}
+	return
 }
+
+//----------------------------------------------------------------------
 
 // Resolve a GNS name with multiple labels. If pkey is not nil, the name
 // is interpreted as "relative to current zone".
@@ -442,4 +448,30 @@ func (m *Module) records(buf []byte) ([]*message.ResourceRecord, error) {
 		return nil, err
 	}
 	return rs.Records, nil
+}
+
+//----------------------------------------------------------------------
+
+// Filter returns the event filter for the service
+func (m *Module) Filter() *core.EventFilter {
+	f := core.NewEventFilter()
+	f.AddMsgType(message.GNS_LOOKUP)
+	f.AddMsgType(message.GNS_LOOKUP_RESULT)
+	f.AddMsgType(message.GNS_REVERSE_LOOKUP)
+	f.AddMsgType(message.GNS_REVERSE_LOOKUP_RESULT)
+	return f
+}
+
+// Event handler
+func (m *Module) event(ev *core.Event) {
+
+}
+
+//----------------------------------------------------------------------
+
+// RPC returns the route and handler function for a JSON-RPC request
+func (m *Module) RPC() (string, func(http.ResponseWriter, *http.Request)) {
+	return "/gns/", func(wrt http.ResponseWriter, req *http.Request) {
+		wrt.Write([]byte(`{"msg": "This is GNS" }`))
+	}
 }

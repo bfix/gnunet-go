@@ -19,166 +19,128 @@
 package transport
 
 import (
-	"fmt"
+	"context"
+	"errors"
 	"gnunet/message"
 	"gnunet/util"
-	"sync"
-
-	"github.com/bfix/gospel/concurrent"
 )
 
-// Event identifier
-const (
-	EV_CONNECT = iota
-	EV_DISCONNECT
-	EV_MESSAGE
+// Trnsport layer error codes
+var (
+	ErrTransNoEndpoint = errors.New("no matching endpoint found")
 )
 
-// Signal send by the transport mechanism to communicate events
-type Signal struct {
-	Ev   int             // event identifier
+//======================================================================
+// Network-oriented transport implementation
+//======================================================================
+
+// Endpoint represents a local endpoint that can send and receive messages.
+// Implementations need to manage the relations between peer IDs and
+// remote endpoints for TCP and UDP traffic.
+type Endpoint interface {
+	// Run the endpoint and send received messages to channel
+	Run(chan *TransportMessage) error
+
+	// Send message on endpoint
+	Send(*TransportMessage) error
+
+	// Address returns the listening address for the endpoint
+	Address() *util.Address
+}
+
+// TransportMessage is the unit processed by the transport mechanism.
+// Peer refers to the remote endpoint (sender/receiver) and
+// Msg is the exchanged GNUnet message. The packet itself satisfies the
+// message.Message interface.
+type TransportMessage struct {
+	Hdr  *message.Header
 	Peer *util.PeerID    // remote peer
-	Msg  message.Message // message received
-	Ch   *MsgChannel     // channel for responses
+	Msg  message.Message // GNUnet message
 }
 
-// Transport is the genric interface for the transport layer
-type Transport interface {
-
-	// TryConnect is a function which allows the local peer to attempt the
-	// establishment of a connection to another peer N using an address A.
-	// When the connection attempt is successful, information on the new
-	// peer is offered through the PEER_CONNECTED signal.
-	TryConnect(peer *util.PeerID)
-
-	// Hold is a function which tells the underlay to keep a hold on to a
-	// connection to a peer P. Underlays are usually limited in the number
-	// of active connections. With this function the DHT can indicate to the
-	// underlay which connections should preferably be preserved.
-	Hold(peer *util.PeerID)
-
-	// Drop is a function which tells the underlay to drop the connection to a
-	// peer P. This function is only there for symmetry and used during the
-	// peer's shutdown to release all of the remaining HOLDs. As R5N always
-	// prefers the longest-lived connections, it would never drop an active
-	// connection that it has called HOLD() on before. Nevertheless, underlay
-	// implementations should not rely on this always being true. A call to
-	// DROP() also does not imply that the underlay must close the connection:
-	// it merely removes the preference to preserve the connection that was
-	// established by HOLD().
-	Drop(peer *util.PeerID)
-
-	// Send is a function that allows the local peer to send a protocol
-	// message M to a peer P.
-	Send(peer *util.PeerID, msg message.Message)
-
-	// L2NSE is ESTIMATE_NETWORK_SIZE(), a procedure that provides estimates
-	// on the base-2 logarithm of the network size L2NSE, that is the base-2
-	// logarithm number of peers in the network, for use by the routing
-	// algorithm.
-	L2NSE() float64
-
-	// Signal returns a channel for transport signals (send by the transport
-	// to communicate connect and disconnect events, incoming messages and
-	// other information)
-	Signal() <-chan *Signal
+// Header returns the message header.
+func (msg *TransportMessage) Header() *message.Header {
+	return msg.Hdr
 }
 
-//======================================================================
-// Implementation of a simple transport mechanism (testing-only).
-//======================================================================
-
-// Session for peer connection
-type Session struct {
-	OnHold bool        // don't drop this session
-	Ch     *MsgChannel // message exchange
-}
-
-// TestTransport is a simple UDP-based transport layer
-type TestTransport struct {
-	ctx      *concurrent.Signaller // service context
-	hdlr     chan Channel          // handler for incoming traffic
-	sig      chan *Signal          // signal channel
-	srvc     ChannelServer         // connection manager
-	running  bool                  // transport running?
-	sessions map[string]*Session   // list of open sessions
-	rwlock   sync.RWMutex          // lock for sessions map
-	peers    *util.AddrList        // list of known peers with addresses
-}
-
-// NewTestTransport instantiates a simple UDP-based transport layer
-func NewTestTransport() *TestTransport {
-	return &TestTransport{
-		hdlr:     make(chan Channel),
-		sig:      make(chan *Signal),
-		srvc:     nil,
-		running:  false,
-		sessions: make(map[string]*Session),
-		peers:    util.NewAddrList(),
+// NewTransportMessage creates a message suitable for transfer
+func NewTransportMessage(peer *util.PeerID, msg message.Message) *TransportMessage {
+	return &TransportMessage{
+		Hdr: &message.Header{
+			MsgType: 0, // indicate a transport message
+			MsgSize: msg.Header().Size() + 8,
+		},
+		Peer: peer,
+		Msg:  msg,
 	}
 }
 
-// Start a transport service for given spec:
-//     "unix+/tmp/test.sock" -- for UDS channels
-//     "tcp+1.2.3.4:5"       -- for TCP channels
-//     "udp+1.2.3.4:5"       -- for UDP channels
-func (s *TestTransport) Start(spec string) (err error) {
-	// check if we are already running
-	if s.running {
-		return fmt.Errorf("Server already running")
-	}
-	// start channel server
-	if s.srvc, err = NewChannelServer(spec, s.hdlr); err != nil {
-		return
-	}
-	s.running = true
+//----------------------------------------------------------------------
 
-	// handle clients
-	s.ctx = concurrent.NewSignaller()
-	go func() {
-		for s.running {
-			// wait for next request
-			in := <-s.hdlr
-			if in == nil {
-				break
-			}
-			switch x := in.(type) {
-			// new connection established
-			case Channel:
-				go s.handle(x)
-			}
-		}
-		s.srvc.Close()
-		s.running = false
-	}()
-	return nil
+// Transport enables network-oriented (like IP, UDP, TCP or UDS)
+// message exchange on multiple endpoints.
+type Transport struct {
+	ctx       context.Context        // runtime context
+	incoming  chan *TransportMessage // messages as received from the network
+	endpoints map[string]Endpoint    // list of available endpoints
+	peers     *util.PeerAddrList     // list of known peers with addresses
 }
 
-// Stop a transport service
-func (s *TestTransport) Stop() {
-	s.running = false
+// NewTransport creates and runs a new transport layer implementation.
+func NewTransport(ctx context.Context, ch chan *TransportMessage) (t *Transport) {
+	// create transport instance
+	return &Transport{
+		ctx:       ctx,
+		incoming:  ch,
+		endpoints: make(map[string]Endpoint),
+		peers:     util.NewPeerAddrList(),
+	}
+}
+
+//----------------------------------------------------------------------
+// Endpoint handling
+//----------------------------------------------------------------------
+
+// AddEndpoint instantiates and run a new endpoint handler for the
+// given address (must map to a network interface).
+func (t *Transport) AddEndpoint(addr *util.Address) (a *util.Address, err error) {
+	// instantiate endpoint based on network spec
+	var ep Endpoint
+	switch addr.Transport {
+	case "udp":
+		ep, err = NewUDPEndpoint(addr)
+	case "tcp":
+		ep, err = NewTCPEndpoint(addr)
+	case "unix":
+		ep, err = NewUDSEndpoint(addr)
+	}
+	// register endpoint
+	t.endpoints[addr.String()] = ep
+	ep.Run(t.incoming)
+	return ep.Address(), nil
 }
 
 // TryConnect is a function which allows the local peer to attempt the
 // establishment of a connection to another peer using an address.
 // When the connection attempt is successful, information on the new
 // peer is offered through the PEER_CONNECTED signal.
-func (t *TestTransport) TryConnect(peer *util.PeerID) {}
+func (t *Transport) TryConnect(peer *util.PeerID, addr *util.Address) error {
+	// select endpoint for address
+	if ep := t.findEndpoint(peer, addr); ep == nil {
+		return ErrTransNoEndpoint
+	}
+	return nil
+}
+
+func (t *Transport) findEndpoint(peer *util.PeerID, addr *util.Address) Endpoint {
+	return nil
+}
 
 // Hold is a function which tells the underlay to keep a hold on to a
 // connection to a peer P. Underlays are usually limited in the number
 // of active connections. With this function the DHT can indicate to the
 // underlay which connections should preferably be preserved.
-func (t *TestTransport) Hold(peer *util.PeerID) {
-	// one map writer at a time
-	t.rwlock.Lock()
-	defer t.rwlock.Unlock()
-
-	// if the session is known, it is put on hold.
-	if sess, ok := t.sessions[peer.String()]; ok {
-		sess.OnHold = true
-	}
-}
+func (t *Transport) Hold(peer *util.PeerID) {}
 
 // Drop is a function which tells the underlay to drop the connection to a
 // peer P. This function is only there for symmetry and used during the
@@ -189,91 +151,18 @@ func (t *TestTransport) Hold(peer *util.PeerID) {
 // DROP() also does not imply that the underlay must close the connection:
 // it merely removes the preference to preserve the connection that was
 // established by HOLD().
-func (t *TestTransport) Drop(peer *util.PeerID) {
-	// one map writer at a time
-	t.rwlock.Lock()
-	defer t.rwlock.Unlock()
-
-	// if the session is known, unhold it.
-	if sess, ok := t.sessions[peer.String()]; ok {
-		sess.OnHold = false
-	}
-}
+func (t *Transport) Drop(peer *util.PeerID) {}
 
 // Send is a function that allows the local peer to send a protocol
-// message M to a peer P.
-func (t *TestTransport) Send(peer *util.PeerID, msg message.Message) {
-	// reader-only
-	t.rwlock.RLock()
-	defer t.rwlock.RUnlock()
-
-	// if the session is known, send message to peer
-	if sess, ok := t.sessions[peer.String()]; ok {
-		sess.Ch.Send(msg, t.ctx)
-	}
-}
+// message to a remote peer. The transport will
+func (t *Transport) Send(peer *util.PeerID, msg message.Message) {}
 
 // L2NSE is ESTIMATE_NETWORK_SIZE(), a procedure that provides estimates
 // on the base-2 logarithm of the network size L2NSE, that is the base-2
 // logarithm number of peers in the network, for use by the routing
 // algorithm.
-func (t *TestTransport) L2NSE() float64 {
-	return 0
+func (t *Transport) L2NSE() float64 {
+	return 0.
 }
 
-// Signal returns a channel for transport signals (send by the transport
-// layer to communicate connect and disconnect events and others)
-func (t *TestTransport) Signal() <-chan *Signal {
-	return t.sig
-}
-
-//----------------------------------------------------------------------
-//----------------------------------------------------------------------
-
-// handle incoming traffic
-func (t *TestTransport) handle(ch Channel) {
-	msgCh := NewMsgChannel(ch)
-	for {
-		// receive next message
-		msg, err := msgCh.Receive(t.ctx)
-		if err != nil {
-			panic(err)
-		}
-		// prepare signal
-		sig := &Signal{
-			Ch: msgCh,
-		}
-		// inspect message for peer state events
-		switch x := msg.(type) {
-		case *message.HelloMsg:
-			// start session
-			sig.Ev = EV_CONNECT
-			sig.Peer = x.PeerID
-			id := sig.Peer.String()
-			t.rwlock.Lock()
-			t.sessions[id] = &Session{
-				OnHold: false,
-				Ch:     msgCh,
-			}
-			// keep peer addresses
-			for _, addr := range x.Addresses {
-				a := &util.Address{
-					Transport: addr.Transport,
-					Address:   addr.Address,
-					Expires:   addr.ExpireOn,
-				}
-				t.peers.Add(id, a)
-			}
-			t.rwlock.Unlock()
-			/*
-				case *message.HangupMsg:
-					// quit session
-					t.rwlock.Lock()
-					delete(t.sessions, x.PeerID.String())
-					t.rwlock.Unlock()
-			*/
-		}
-		// forward message
-		t.sig <- sig
-	}
-}
+func (t *Transport) Learn(peer *util.PeerID, addr *util.Address) {}

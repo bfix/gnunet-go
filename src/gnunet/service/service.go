@@ -1,5 +1,5 @@
 // This file is part of gnunet-go, a GNUnet-implementation in Golang.
-// Copyright (C) 2019, 2020 Bernd Fix  >Y<
+// Copyright (C) 2019-2022 Bernd Fix  >Y<
 //
 // gnunet-go is free software: you can redistribute it and/or modify it
 // under the terms of the GNU Affero General Public License as published
@@ -19,20 +19,12 @@
 package service
 
 import (
+	"context"
 	"fmt"
-	"net/http"
 	"sync"
-
-	"gnunet/transport"
 
 	"github.com/bfix/gospel/logger"
 )
-
-// Module is an interface for GNUnet service modules (workers).
-type Module interface {
-	// RPC returns the route and handler for JSON-RPC requests
-	RPC() (string, func(http.ResponseWriter, *http.Request))
-}
 
 // Service is an interface for GNUnet services. Every service has one channel
 // end-point it listens to for incoming channel requests (network-based
@@ -40,21 +32,21 @@ type Module interface {
 // Channel semantics in the specification string.
 type Service interface {
 	Module
-	// Start a service on the given endpoint
-	Start(spec string) error
+	// Start a service
+	Start(ctx context.Context, path string) error
 	// Serve a client session
-	ServeClient(ctx *SessionContext, ch *transport.MsgChannel)
+	ServeClient(ctx *SessionContext, ch *Connection)
 	// Stop the service
 	Stop() error
 }
 
-// Impl is an implementation of generic service functionality.
-type Impl struct {
+// ServiceImpl is an implementation of generic service functionality.
+type ServiceImpl struct {
 	impl    Service                 // Specific service implementation
-	hdlr    chan transport.Channel  // Channel from listener
+	hdlr    chan *Connection        // Channel from listener
 	ctrl    chan bool               // Control channel
 	drop    chan int                // Channel to drop a session from pending list
-	srvc    transport.ChannelServer // multi-user service
+	srvc    *ConnectionManager      // multi-client service
 	wg      *sync.WaitGroup         // wait group for go routine synchronization
 	name    string                  // service name
 	running bool                    // service currently running?
@@ -62,10 +54,10 @@ type Impl struct {
 }
 
 // NewServiceImpl instantiates a new ServiceImpl object.
-func NewServiceImpl(name string, srv Service) *Impl {
-	return &Impl{
+func NewServiceImpl(name string, srv Service) *ServiceImpl {
+	return &ServiceImpl{
 		impl:    srv,
-		hdlr:    make(chan transport.Channel),
+		hdlr:    make(chan *Connection),
 		ctrl:    make(chan bool),
 		drop:    make(chan int),
 		srvc:    nil,
@@ -77,16 +69,16 @@ func NewServiceImpl(name string, srv Service) *Impl {
 }
 
 // Start a service
-func (si *Impl) Start(spec string) (err error) {
+func (si *ServiceImpl) Start(ctx context.Context, path string, params map[string]string) (err error) {
 	// check if we are already running
 	if si.running {
 		logger.Printf(logger.ERROR, "Service '%s' already running.\n", si.name)
 		return fmt.Errorf("service already running")
 	}
 
-	// start channel server
+	// start connection manager
 	logger.Printf(logger.INFO, "[%s] Service starting.\n", si.name)
-	if si.srvc, err = transport.NewChannelServer(spec, si.hdlr); err != nil {
+	if si.srvc, err = NewConnectionManager(ctx, path, params, si.hdlr); err != nil {
 		return
 	}
 	si.running = true
@@ -100,42 +92,35 @@ func (si *Impl) Start(spec string) (err error) {
 			select {
 
 			// handle incoming connections
-			case in := <-si.hdlr:
-				if in == nil {
-					logger.Printf(logger.INFO, "[%s] Listener terminated.\n", si.name)
-					break loop
-				}
-				switch ch := in.(type) {
-				case transport.Channel:
-					// run a new session with context
-					ctx := NewSessionContext()
-					sessID := ctx.ID
-					si.pending[sessID] = ctx
-					logger.Printf(logger.INFO, "[%s] Session '%d' started.\n", si.name, sessID)
+			case conn := <-si.hdlr:
+				// run a new session with context
+				ctx := NewSessionContext(ctx)
+				sessID := ctx.ID
+				si.pending[sessID] = ctx
+				logger.Printf(logger.INFO, "[%s] Session '%d' started.\n", si.name, sessID)
 
-					go func() {
-						// serve client on the message channel
-						si.impl.ServeClient(ctx, transport.NewMsgChannel(ch))
-						// session is done now.
-						logger.Printf(logger.INFO, "[%s] Session with client '%d' ended.\n", si.name, sessID)
-						si.drop <- sessID
-					}()
-				}
+				go func() {
+					// serve client on the message channel
+					si.impl.ServeClient(ctx, conn)
+					// session is done now.
+					logger.Printf(logger.INFO, "[%s] Session with client '%d' ended.\n", si.name, sessID)
+					si.drop <- sessID
+				}()
 
 			// handle session removal
 			case sessID := <-si.drop:
 				delete(si.pending, sessID)
 
-			// handle cancelation signal on listener.
-			case <-si.ctrl:
+			// handle termination
+			case <-ctx.Done():
+				logger.Printf(logger.INFO, "[%s] Listener terminated.\n", si.name)
 				break loop
 			}
 		}
-
 		// terminate pending sessions
-		for _, ctx := range si.pending {
-			logger.Printf(logger.DBG, "[%s] Session '%d' closing...\n", si.name, ctx.ID)
-			ctx.Cancel()
+		for _, sess := range si.pending {
+			logger.Printf(logger.DBG, "[%s] Session '%d' closing...\n", si.name, sess.ID)
+			sess.Cancel()
 		}
 
 		// close-down service
@@ -144,11 +129,11 @@ func (si *Impl) Start(spec string) (err error) {
 		si.running = false
 	}()
 
-	return si.impl.Start(spec)
+	return si.impl.Start(ctx, path)
 }
 
 // Stop a service
-func (si *Impl) Stop() error {
+func (si *ServiceImpl) Stop() error {
 	if !si.running {
 		logger.Printf(logger.WARN, "Service '%s' not running.\n", si.name)
 		return fmt.Errorf("service not running")

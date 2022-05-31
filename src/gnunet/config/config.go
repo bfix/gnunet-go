@@ -53,7 +53,16 @@ type BootstrapConfig struct {
 
 // RPCConfig contains parameters for the JSON-RPC service
 type RPCConfig struct {
-	Endpoint string `json:"endpoint"` // end-point of JSON-RPC service
+	Endpoint string `json:"endpoint"` // endpoint for JSON-RPC service
+}
+
+//----------------------------------------------------------------------
+// Generic service endpoint configuration (socket)
+//----------------------------------------------------------------------
+
+type ServiceConfig struct {
+	Socket string            `json:"socket"` // socket file name
+	Params map[string]string `json:"params"` // socket parameters
 }
 
 //----------------------------------------------------------------------
@@ -62,9 +71,9 @@ type RPCConfig struct {
 
 // GNSConfig contains parameters for the GNU Name System service
 type GNSConfig struct {
-	Endpoint     string `json:"endpoint"`     // end-point of GNS service
-	DHTReplLevel int    `json:"dhtReplLevel"` // DHT replication level
-	MaxDepth     int    `json:"maxDepth"`     // maximum recursion depth in resolution
+	Service      *ServiceConfig `json:"service"`      // socket for GNS service
+	DHTReplLevel int            `json:"dhtReplLevel"` // DHT replication level
+	MaxDepth     int            `json:"maxDepth"`     // maximum recursion depth in resolution
 }
 
 //----------------------------------------------------------------------
@@ -73,9 +82,9 @@ type GNSConfig struct {
 
 // DHTConfig contains parameters for the distributed hash table (DHT)
 type DHTConfig struct {
-	Endpoint string `json:"endpoint"` // end-point of DHT service
-	Storage  string `json:"storage"`  // filesystem storage location
-	Cache    string `json:"cache"`    // key/value cache
+	Service *ServiceConfig `json:"service"` // socket for DHT service
+	Storage string         `json:"storage"` // filesystem storage location
+	Cache   string         `json:"cache"`   // key/value cache
 }
 
 //----------------------------------------------------------------------
@@ -84,8 +93,8 @@ type DHTConfig struct {
 
 // NamecacheConfig contains parameters for the local name cache
 type NamecacheConfig struct {
-	Endpoint string `json:"endpoint"` // end-point of Namecache service
-	Storage  string `json:"storage"`  // key/value cache
+	Service *ServiceConfig `json:"service"` // socket for Namecache service
+	Storage string         `json:"storage"` // key/value cache
 }
 
 //----------------------------------------------------------------------
@@ -94,8 +103,8 @@ type NamecacheConfig struct {
 
 // RevocationConfig contains parameters for the key revocation service
 type RevocationConfig struct {
-	Endpoint string `json:"endpoint"` // end-point of Revocation service
-	Storage  string `json:"storage"`  // persistance mechanism for revocation data
+	Service *ServiceConfig `json:"service"` // socket for Revocation service
+	Storage string         `json:"storage"` // persistance mechanism for revocation data
 }
 
 //----------------------------------------------------------------------

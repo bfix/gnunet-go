@@ -58,6 +58,11 @@ func (h *HelloBlock) SetAddresses(a []*util.Address) {
 	h.finalize()
 }
 
+// Addresses returns the list of addresses
+func (h *HelloBlock) Addresses() []*util.Address {
+	return util.Clone(h.addrs)
+}
+
 // ParseHelloURL parses a HELLO URL of the following form:
 //     gnunet://hello/<PeerID>/<signature>/<expire>?<addrs>
 // The addresses are encoded.

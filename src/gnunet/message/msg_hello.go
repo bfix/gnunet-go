@@ -45,11 +45,11 @@ type HelloAddress struct {
 }
 
 // NewHelloAddress create a new HELLO address from the given address
-func NewHelloAddress(a *util.Address, expire util.AbsoluteTime) *HelloAddress {
+func NewHelloAddress(a *util.Address) *HelloAddress {
 	addr := &HelloAddress{
 		Transport: a.Transport,
 		AddrSize:  uint16(len(a.Address)),
-		ExpireOn:  expire,
+		ExpireOn:  a.Expires,
 		Address:   make([]byte, len(a.Address)),
 	}
 	copy(addr.Address, a.Address)
