@@ -29,8 +29,7 @@ import (
 
 // Event types
 const (
-	EV_ANY        = iota // matches any event type
-	EV_CONNECT           // peer connected
+	EV_CONNECT    = iota // peer connected
 	EV_DISCONNECT        // peer disconnected
 	EV_MESSAGE           // incoming message
 )
@@ -51,15 +50,19 @@ func NewEventFilter() *EventFilter {
 	}
 }
 
+// AddEvent add  an event id to filter
 func (f *EventFilter) AddEvent(ev int) {
 	f.evTypes[ev] = true
 }
 
+// AddMsgType adds a message type to filter
 func (f *EventFilter) AddMsgType(mt uint16) {
 	f.evTypes[EV_MESSAGE] = true
 	f.msgTypes[mt] = true
 }
 
+// CheckEvent returns true if an event id is matched
+// by the filter or the filter is empty.
 func (f *EventFilter) CheckEvent(ev int) bool {
 	if len(f.evTypes) == 0 {
 		return true
@@ -68,6 +71,8 @@ func (f *EventFilter) CheckEvent(ev int) bool {
 	return ok
 }
 
+// CheckMsgType returns true if a message type is matched
+// by the filter or the filter is empty.
 func (f *EventFilter) CheckMsgType(mt uint16) bool {
 	if len(f.msgTypes) == 0 {
 		return true
@@ -93,6 +98,10 @@ type Listener struct {
 
 // NewListener for given filter and receiving channel
 func NewListener(ch chan *Event, f *EventFilter) *Listener {
+	if f == nil {
+		// set empty default filter
+		f = NewEventFilter()
+	}
 	return &Listener{
 		ch:     ch,
 		filter: f,
