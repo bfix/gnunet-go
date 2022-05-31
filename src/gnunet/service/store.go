@@ -28,6 +28,7 @@ import (
 	"gnunet/crypto"
 	"gnunet/service/dht/blocks"
 	"gnunet/util"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -221,7 +222,6 @@ func (s *FileStore) Get(query blocks.Query) (block blocks.Block, err error) {
 		blkt   uint16            // actual block type
 		expire util.AbsoluteTime // expiration date
 		data   []byte            // block data
-		n      int
 	)
 	query.Get("blkType", &btype)
 
@@ -239,12 +239,8 @@ func (s *FileStore) Get(query blocks.Query) (block blocks.Block, err error) {
 			return
 		}
 		if err = binary.Read(file, binary.BigEndian, &expire); err == nil {
-			if n, err = file.Read(data); err == nil {
-				if n != len(data) {
-					err = fmt.Errorf("block read too short")
-				} else {
-					block = blocks.NewGenericBlock(data)
-				}
+			if data, err = ioutil.ReadAll(file); err == nil {
+				block = blocks.NewGenericBlock(data)
 			}
 		}
 	}
