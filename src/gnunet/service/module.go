@@ -34,7 +34,7 @@ type Module interface {
 }
 
 // EventHandler is a function prototype for event handling
-type EventHandler func(*core.Event)
+type EventHandler func(context.Context, *core.Event)
 
 // ModuleImpl is an event-handling type used by Module implementations.
 type ModuleImpl struct {
@@ -49,21 +49,22 @@ func NewModuleImpl() (m *ModuleImpl) {
 }
 
 // Run event handling loop
-func (m *ModuleImpl) Run(ctx context.Context, hdlr EventHandler) {
-	// run the handler if available
-	if hdlr != nil {
-		go func() {
-			for {
-				select {
-				// Handle events
-				case event := <-m.ch:
-					hdlr(event)
+func (m *ModuleImpl) Run(ctx context.Context, hdlr EventHandler, filter *core.EventFilter) (listener *core.Listener) {
+	// listener for registration
+	listener = core.NewListener(m.ch, filter)
+	// run event loop
+	go func() {
+		for {
+			select {
+			// Handle events
+			case event := <-m.ch:
+				hdlr(ctx, event)
 
-				// wait for terminate signal
-				case <-ctx.Done():
-					return
-				}
+			// wait for terminate signal
+			case <-ctx.Done():
+				return
 			}
-		}()
-	}
+		}
+	}()
+	return
 }

@@ -19,6 +19,7 @@
 package dht
 
 import (
+	"context"
 	"gnunet/config"
 	"gnunet/core"
 	"gnunet/message"
@@ -71,7 +72,8 @@ func NewModule(c *core.Core) (m *Module) {
 		rtable:     rt,
 	}
 	// register as listener for core events
-	m.Run(c.Context(), m.event)
+	listener := m.Run(c.Context(), m.event, m.Filter())
+	c.Register("dht", listener)
 
 	return
 }
@@ -107,6 +109,8 @@ func (nc *Module) Put(ctx *service.SessionContext, key blocks.Query, block block
 // Filter returns the event filter for the module
 func (m *Module) Filter() *core.EventFilter {
 	f := core.NewEventFilter()
+	f.AddEvent(core.EV_CONNECT)
+	f.AddEvent(core.EV_DISCONNECT)
 	f.AddMsgType(message.DHT_CLIENT_GET)
 	f.AddMsgType(message.DHT_CLIENT_GET_RESULTS_KNOWN)
 	f.AddMsgType(message.DHT_CLIENT_GET_STOP)
@@ -116,7 +120,7 @@ func (m *Module) Filter() *core.EventFilter {
 }
 
 // Event handler
-func (nc *Module) event(ev *core.Event) {
+func (nc *Module) event(ctx context.Context, ev *core.Event) {
 
 }
 
