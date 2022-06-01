@@ -20,7 +20,6 @@ package util
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
 	"net"
 	"strings"
@@ -44,8 +43,18 @@ func NewAddress(transport string, addr []byte) *Address {
 	}
 }
 
+func NewAddressWrap(addr net.Addr) *Address {
+	return &Address{
+		Netw:    addr.Network(),
+		Options: 0,
+		Address: []byte(addr.String()),
+		Expires: AbsoluteTimeNever(),
+	}
+}
+
 // ParseAddress translates a GNUnet address string like
-// "r5n+ip+udp://1.2.3.4:6789" or "gnunet+tcp://12.3.4.5/"
+// "r5n+ip+udp://1.2.3.4:6789" or "gnunet+tcp://12.3.4.5/".
+// It can also handle standard strings like "udp:127.0.0.1:6735".
 func ParseAddress(s string) (addr *Address, err error) {
 	p := strings.SplitN(s, ":", 2)
 	if len(p) != 2 {
@@ -63,6 +72,11 @@ func (a *Address) Equals(b *Address) bool {
 		bytes.Equal(a.Address, b.Address)
 }
 
+// StringAll returns a human-readable representation of an address.
+func (a *Address) StringAll() string {
+	return a.Netw + "://" + string(a.Address)
+}
+
 // implement net.Addr interface methods:
 
 // String returns a human-readable representation of an address.
@@ -78,13 +92,8 @@ func (a *Address) Network() string {
 //----------------------------------------------------------------------
 
 // AddressString returns a string representaion of an address.
-func AddressString(transport string, addr []byte) string {
-	if transport == "tcp" || transport == "udp" {
-		alen := len(addr)
-		port := uint(addr[alen-2])*256 + uint(addr[alen-1])
-		return fmt.Sprintf("%s:%s:%d", transport, net.IP(addr[:alen-2]).String(), port)
-	}
-	return fmt.Sprintf("%s:%s", transport, hex.EncodeToString(addr))
+func AddressString(network string, addr []byte) string {
+	return network + "://" + string(addr)
 }
 
 //----------------------------------------------------------------------
@@ -109,43 +118,66 @@ func NewIPAddress(host []byte, port uint16) *IPAddress {
 
 // PeerAddrList is a list of addresses per peer ID.
 type PeerAddrList struct {
-	list map[string][]*Address
+	list *Map[string, []*Address]
 }
 
 // NewPeerAddrList returns a new and empty address list.
 func NewPeerAddrList() *PeerAddrList {
 	return &PeerAddrList{
-		list: make(map[string][]*Address),
+		list: NewMap[string, []*Address](),
 	}
 }
 
-// Add address for peer
-func (a *PeerAddrList) Add(id string, addr *Address) {
+// Add address for peer. The returned mode is 0=not added, 1=new peer,
+// 2=new address
+func (a *PeerAddrList) Add(id string, addr *Address) (mode int) {
 	// check for expired address.
+	mode = 0
 	if !addr.Expires.Expired() {
-		a.list[id] = append(a.list[id], addr)
+		// run add operation
+		a.list.Process(func() error {
+			list, ok := a.list.Get(id)
+			if !ok {
+				list = make([]*Address, 0)
+				mode = 1
+			} else {
+				for _, a := range list {
+					if a.Equals(addr) {
+						return nil
+					}
+				}
+				mode = 2
+			}
+			list = append(list, addr)
+			a.list.Put(id, list)
+			return nil
+		})
 	}
+	return
 }
 
 // Get address for peer
 func (a *PeerAddrList) Get(id string, transport string) *Address {
-	for _, addr := range a.list[id] {
-		// check for expired address.
-		if addr.Expires.Expired() {
-			// skip expired
-			continue
+	list, ok := a.list.Get(id)
+	if ok {
+		for _, addr := range list {
+			// check for expired address.
+			if addr.Expires.Expired() {
+				// skip expired
+				continue
+			}
+			// check for matching protocol
+			if len(transport) > 0 && transport != addr.Netw {
+				// skip other transports
+				continue
+			}
+			return addr
 		}
-		// check for matching protocol
-		if len(transport) > 0 && transport != addr.Netw {
-			// skip other transports
-			continue
-		}
-		return addr
 	}
 	return nil
 }
 
 // Delete a list entry by key.
 func (a *PeerAddrList) Delete(id string) {
-	delete(a.list, id)
+	a.list.Delete(id)
 }

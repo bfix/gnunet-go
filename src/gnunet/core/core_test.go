@@ -21,15 +21,99 @@ package core
 import (
 	"context"
 	"gnunet/config"
-	"gnunet/message"
+	"gnunet/util"
 	"testing"
 	"time"
 )
 
-const (
-	ADDR = "udp:127.0.0.1:6765"
+var (
+	peer1Cfg = &config.NodeConfig{
+		PrivateSeed: "iYK1wSi5XtCP774eNFk1LYXqKlOPEpwKBw+2/bMkE24=",
+		Endpoints:   []string{"udp://127.0.0.1:20861"},
+	}
+
+	peer2Cfg = &config.NodeConfig{
+		PrivateSeed: "Bv9umksEO51jjWWrOGEH+4r8wl9Vi+LItpdBpTOi2PE=",
+		Endpoints:   []string{"udp://127.0.0.1:20862"},
+	}
 )
 
+//----------------------------------------------------------------------
+// create and run a node with given spec
+//----------------------------------------------------------------------
+
+type TestNode struct {
+	id   int
+	t    *testing.T
+	peer *Peer
+	core *Core
+	addr *util.Address
+}
+
+func (n *TestNode) Learn(ctx context.Context, peer *util.PeerID, addr *util.Address) {
+	n.t.Logf("[%d] Learning %s for %s", n.id, addr.StringAll(), peer.String())
+	n.core.Learn(ctx, peer, addr)
+}
+
+func NewTestNode(t *testing.T, ctx context.Context, cfg *config.NodeConfig) (node *TestNode, err error) {
+
+	// create test node
+	node = new(TestNode)
+	node.t = t
+	node.id = util.NextID()
+
+	// create peer object
+	if node.peer, err = NewLocalPeer(cfg); err != nil {
+		return
+	}
+	t.Logf("[%d] Node %s starting", node.id, node.peer.GetID())
+
+	// create core service
+	if node.core, err = NewCore(ctx, node.peer); err != nil {
+		return
+	}
+	for _, addr := range node.core.trans.Endpoints() {
+		s := addr.Network() + ":" + addr.String()
+		if node.addr, err = util.ParseAddress(s); err != nil {
+			continue
+		}
+		t.Logf("[%d] Listening on %s", node.id, s)
+	}
+
+	// register as event listener
+	incoming := make(chan *Event)
+	node.core.Register("test", NewListener(incoming, nil))
+
+	// heart beat
+	tick := time.NewTicker(5 * time.Minute)
+
+	// run event handler
+	go func() {
+		for {
+			select {
+			// show incoming event
+			case ev := <-incoming:
+				t.Logf("[%d] <<< Event %v", node.id, ev)
+
+			// handle termination signal
+			case <-ctx.Done():
+				t.Logf("[%d] Shutting down node", node.id)
+				return
+
+			// handle heart beat
+			case now := <-tick.C:
+				t.Logf("[%d] Heart beat at %s", node.id, now.String())
+			}
+		}
+	}()
+	return
+}
+
+//----------------------------------------------------------------------
+// Two node GNUnet (smallest and simplest network)
+//----------------------------------------------------------------------
+
+// TestCoreSimple test a two node network
 func TestCoreSimple(t *testing.T) {
 
 	// setup execution context
@@ -39,48 +123,21 @@ func TestCoreSimple(t *testing.T) {
 		time.Sleep(time.Second)
 	}()
 
-	// create local peer
-	localCfg := &config.NodeConfig{
-		PrivateSeed: "YGoe6XFH3XdvFRl+agx9gIzPTvxA229WFdkazEMdcOs=",
-		Endpoints:   []string{ADDR},
+	// create and run nodes
+	node1, err := NewTestNode(t, ctx, peer1Cfg)
+	if err != nil {
+		t.Fatal(err)
 	}
-	local, err := NewLocalPeer(localCfg)
+	node2, err := NewTestNode(t, ctx, peer2Cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// create core service
-	core, err := NewCore(ctx, local)
-	if err != nil {
-		t.Fatal(err)
+	// learn peer addresses (triggers HELLO)
+	for _, addr := range node2.core.trans.Endpoints() {
+		node1.Learn(ctx, node2.peer.GetID(), util.NewAddressWrap(addr))
 	}
 
-	// register as listener
-	incoming := make(chan *Event)
-	core.Register("test", NewListener(incoming, nil))
-
-	// run event handler
-	go func() {
-		for {
-			select {
-			case ev := <-incoming:
-				t.Logf("<<< Event %v", ev)
-			case <-ctx.Done():
-				t.Log("Shutting down server")
-				return
-			}
-		}
-	}()
-
-	// send HELLO message to transport
-	hello, err := local.HelloData(time.Hour)
-	if err != nil {
-		t.Fatal(err)
-	}
-	msg := message.NewHelloMsg(local.GetID())
-	for _, a := range hello.Addresses() {
-		ha := message.NewHelloAddress(a)
-		msg.AddAddress(ha)
-	}
-	core.Send(ctx, local.GetID(), msg)
+	// wait for 5 seconds
+	time.Sleep(5 * time.Second)
 }

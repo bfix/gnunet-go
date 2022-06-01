@@ -122,3 +122,7 @@ echo "<hex.seed>" | xxd -r -p > /var/lib/gnunet/.local/share/gnunet/private_key.
 chown gnunet:gnunet /var/lib/gnunet/.local/share/gnunet/private_key.ecc
 chmod 600 /var/lib/gnunet/.local/share/gnunet/private_key.ecc
 ```
+
+For gnunet-go configuration files you need to paste the result of
+`echo "<hex.seed>" | xxd -r -p | base64` into the `PrivateSeed` field in the
+`NodeConfig` section.

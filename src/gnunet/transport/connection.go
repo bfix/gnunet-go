@@ -113,34 +113,3 @@ func (s *ConnectionManager) Close() (err error) {
 	}
 	return
 }
-
-//----------------------------------------------------------------------
-
-// PacketConn is a wrapper around net.PacketConn to provide ReadCloser
-// and WriteCloser interfaces.
-type PacketConn struct {
-	conn net.PacketConn
-	peer net.Addr
-}
-
-// NewPacketConn wrapes a net.PacketConn
-func NewPacketConn(conn net.PacketConn) *PacketConn {
-	return &PacketConn{
-		conn: conn,
-	}
-}
-
-// Read bytes from packet connection
-func (c *PacketConn) Read(buf []byte) (int, error) {
-	n, addr, err := c.conn.ReadFrom(buf)
-	c.peer = addr
-	return n, err
-}
-
-func (c *PacketConn) Write(buf []byte) (int, error) {
-	return c.conn.WriteTo(buf, c.peer)
-}
-
-func (c *PacketConn) Close() error {
-	return c.conn.Close()
-}

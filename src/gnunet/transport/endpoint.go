@@ -19,6 +19,7 @@
 package transport
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"gnunet/message"
@@ -39,10 +40,13 @@ type Endpoint interface {
 	Run(context.Context, chan *TransportMessage) error
 
 	// Send message on endpoint
-	Send(context.Context, *TransportMessage) error
+	Send(context.Context, net.Addr, *TransportMessage) error
 
 	// Address returns the listening address for the endpoint
 	Address() net.Addr
+
+	// CanSendTo returns true if the endpoint can sent to address
+	CanSendTo(net.Addr) bool
 
 	// Return endpoint identifier
 	ID() int
@@ -69,23 +73,19 @@ func NewEndpoint(addr net.Addr) (ep Endpoint, err error) {
 
 // PacketEndpoint for packet-oriented network protocols
 type PaketEndpoint struct {
-	id   int         // endpoint identifier
-	addr net.Addr    // endpoint address
-	conn *PacketConn // packet connection
-	buf  []byte      // buffer for read/write operations
+	id   int            // endpoint identifier
+	addr net.Addr       // endpoint address
+	conn net.PacketConn // packet connection
+	buf  []byte         // buffer for read/write operations
 }
 
 // Run packet endpoint: send incoming messages to the handler.
 func (ep *PaketEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) (err error) {
 	// create listener
-	var (
-		lc net.ListenConfig
-		lp net.PacketConn
-	)
-	if lp, err = lc.ListenPacket(ctx, ep.addr.Network(), ep.addr.String()); err != nil {
+	var lc net.ListenConfig
+	if ep.conn, err = lc.ListenPacket(ctx, ep.addr.Network(), ep.addr.String()); err != nil {
 		return
 	}
-	ep.conn = NewPacketConn(lp)
 
 	// run watch dog for termination
 	go func() {
@@ -95,8 +95,13 @@ func (ep *PaketEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) (
 	// run go routine to handle messages from clients
 	go func() {
 		for {
-			// read next message
-			msg, err := ReadMessage(ctx, ep.conn, ep.buf)
+			// read next message from packet
+			n, _, err := ep.conn.ReadFrom(ep.buf)
+			if err != nil {
+				break
+			}
+			rdr := bytes.NewBuffer(util.Clone(ep.buf[:n]))
+			msg, err := ReadMessageDirect(rdr, ep.buf)
 			if err != nil {
 				break
 			}
@@ -118,16 +123,29 @@ func (ep *PaketEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) (
 	return
 }
 
-func (ep *PaketEndpoint) Send(ctx context.Context, msg *TransportMessage) error {
-	return nil
+// Send message to address from endpoint
+func (ep *PaketEndpoint) Send(ctx context.Context, addr net.Addr, msg *TransportMessage) (err error) {
+	var a *net.UDPAddr
+	a, err = net.ResolveUDPAddr(addr.Network(), addr.String())
+	var buf []byte
+	if buf, err = msg.Bytes(); err != nil {
+		return
+	}
+	_, err = ep.conn.WriteTo(buf, a)
+	return
 }
 
 // Address returms the
 func (ep *PaketEndpoint) Address() net.Addr {
 	if ep.conn != nil {
-		return ep.conn.conn.LocalAddr()
+		return ep.conn.LocalAddr()
 	}
 	return ep.addr
+}
+
+// CanSendTo returns true if the endpoint can sent to address
+func (ep *PaketEndpoint) CanSendTo(addr net.Addr) bool {
+	return epMode(addr.Network()) == "packet"
 }
 
 // ID returns the endpoint identifier
@@ -145,6 +163,7 @@ func newPacketEndpoint(addr net.Addr) (ep *PaketEndpoint, err error) {
 	ep = &PaketEndpoint{
 		id:   util.NextID(),
 		addr: addr,
+		buf:  make([]byte, 65536),
 	}
 	return
 }
@@ -212,7 +231,8 @@ func (ep *StreamEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) 
 	return
 }
 
-func (ep *StreamEndpoint) Send(ctx context.Context, msg *TransportMessage) error {
+// Send message to address from endpoint
+func (ep *StreamEndpoint) Send(ctx context.Context, addr net.Addr, msg *TransportMessage) error {
 	return nil
 }
 
@@ -222,6 +242,11 @@ func (ep *StreamEndpoint) Address() net.Addr {
 		return ep.listener.Addr()
 	}
 	return ep.addr
+}
+
+// CanSendTo returns true if the endpoint can sent to address
+func (ep *StreamEndpoint) CanSendTo(addr net.Addr) bool {
+	return epMode(addr.Network()) == "stream"
 }
 
 // ID returns the endpoint identifier
@@ -248,7 +273,7 @@ func newStreamEndpoint(addr net.Addr) (ep *StreamEndpoint, err error) {
 // epMode returns the endpoint mode (packet or stream) for a given network
 func epMode(netw string) string {
 	switch netw {
-	case "udp", "r5n+ip+udp":
+	case "udp", "udp4", "udp6", "r5n+ip+udp":
 		return "packet"
 	case "tcp", "unix":
 		return "stream"

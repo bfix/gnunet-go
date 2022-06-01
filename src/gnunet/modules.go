@@ -52,29 +52,33 @@ func (inst Instances) Register() {
 	rpc.Register(inst.Revocation)
 }
 
-// Local reference to instance list
+// Local reference to instance list. The list is initialized
+// by core.
 var (
 	Modules Instances
 )
 
+/* TODO: implement
 // Initialize instance list and link module functions as required.
-func init() {
+// This function is called by core on start-up.
+func Init(ctx context.Context) {
 
 	// Namecache (no calls to other modules)
-	Modules.Namecache = new(namecache.NamecacheModule)
+	Modules.Namecache = namecache.NewModule(ctx, c)
 
 	// DHT (no calls to other modules)
-	Modules.DHT = new(dht.Module)
+	Modules.DHT = dht.NewModule(ctx, c)
 
 	// Revocation (no calls to other modules)
-	Modules.Revocation = revocation.NewModule()
+	Modules.Revocation = revocation.NewModule(ctx, c)
 
 	// GNS (calls Namecache, DHT and Identity)
-	Modules.GNS = &gns.Module{
-		LookupLocal:      Modules.Namecache.Get,
-		StoreLocal:       Modules.Namecache.Put,
-		LookupRemote:     Modules.DHT.Get,
-		RevocationQuery:  Modules.Revocation.Query,
-		RevocationRevoke: Modules.Revocation.Revoke,
-	}
+	gns := gns.NewModule(ctx, c)
+	Modules.GNS = gns
+	gns.LookupLocal = Modules.Namecache.Get
+	gns.StoreLocal = Modules.Namecache.Put
+	gns.LookupRemote = Modules.DHT.Get
+	gns.RevocationQuery = Modules.Revocation.Query
+	gns.RevocationRevoke = Modules.Revocation.Revoke
 }
+*/

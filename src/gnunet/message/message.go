@@ -29,11 +29,18 @@ var (
 	ErrMsgHeaderTooSmall = errors.New("Message header too small")
 )
 
+//----------------------------------------------------------------------
+
 // Message is an interface for all GNUnet-specific messages.
 type Message interface {
+	// Header of message
 	Header() *Header
+
+	// String returns a human-readable message
 	String() string
 }
+
+//----------------------------------------------------------------------
 
 // Header encapsulates the common part of all GNUnet messages (at the
 // beginning of the data).

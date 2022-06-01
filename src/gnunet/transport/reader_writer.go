@@ -28,6 +28,12 @@ import (
 	"github.com/bfix/gospel/data"
 )
 
+// WriteMessageDirect writes directly to io.Writer
+func WriteMessageDirect(wrt io.Writer, msg message.Message) error {
+	dwc := &directWriteCloser{wrt}
+	return WriteMessage(context.Background(), dwc, msg)
+}
+
 // WriteMessage to io.WriteCloser
 func WriteMessage(ctx context.Context, wrt io.WriteCloser, msg message.Message) (err error) {
 	// convert message to binary data
@@ -61,6 +67,16 @@ func WriteMessage(ctx context.Context, wrt io.WriteCloser, msg message.Message) 
 		err = fmt.Errorf("WriteMessage incomplete (%d of %d)", n, len(buf))
 	}
 	return
+}
+
+//----------------------------------------------------------------------
+
+// ReadMessageDirect reads directly from io.Reader
+func ReadMessageDirect(rdr io.Reader, buf []byte) (msg message.Message, err error) {
+	drc := &directReadCloser{
+		rdr: rdr,
+	}
+	return ReadMessage(context.Background(), drc, buf)
 }
 
 // ReadMessage from io.ReadCloser
@@ -110,4 +126,32 @@ func ReadMessage(ctx context.Context, rdr io.ReadCloser, buf []byte) (msg messag
 		return nil, err
 	}
 	return msg, nil
+}
+
+//----------------------------------------------------------------------
+// helper for wrapped ReadCloser/WriteCloser (close is nop)
+//----------------------------------------------------------------------
+
+type directReadCloser struct {
+	rdr io.Reader
+}
+
+func (drc *directReadCloser) Read(buf []byte) (int, error) {
+	return drc.rdr.Read(buf)
+}
+
+func (drc *directReadCloser) Close() error {
+	return nil
+}
+
+type directWriteCloser struct {
+	wrt io.Writer
+}
+
+func (dwc *directWriteCloser) Write(buf []byte) (int, error) {
+	return dwc.wrt.Write(buf)
+}
+
+func (dwc *directWriteCloser) Close() error {
+	return nil
 }
