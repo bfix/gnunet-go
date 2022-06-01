@@ -21,6 +21,7 @@ package namecache
 import (
 	"context"
 	"gnunet/config"
+	"gnunet/core"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
 )
@@ -35,25 +36,29 @@ import (
 
 // Namecache handles the transient storage of GNS blocks under the query key.
 type NamecacheModule struct {
+	service.ModuleImpl
+
 	cache service.DHTStore // transient block cache
 }
 
-// NewNamecacheModule creates a new module instance.
-func NewNamecacheModule() (nc *NamecacheModule, err error) {
-	nc = new(NamecacheModule)
-	nc.cache, err = service.NewDHTStore(config.Cfg.Namecache.Storage)
+// NewModule creates a new module instance.
+func NewModule(ctx context.Context, c *core.Core) (m *NamecacheModule) {
+	m = &NamecacheModule{
+		ModuleImpl: *service.NewModuleImpl(),
+	}
+	m.cache, _ = service.NewDHTStore(config.Cfg.Namecache.Storage)
 	return
 }
 
 // Get an entry from the cache if available.
-func (nc *NamecacheModule) Get(ctx context.Context, query *blocks.GNSQuery) (block *blocks.GNSBlock, err error) {
+func (m *NamecacheModule) Get(ctx context.Context, query *blocks.GNSQuery) (block *blocks.GNSBlock, err error) {
 	var b blocks.Block
-	b, err = nc.cache.Get(query)
+	b, err = m.cache.Get(query)
 	err = blocks.Unwrap(b, block)
 	return
 }
 
 // Put entry into the cache.
-func (nc *NamecacheModule) Put(ctx context.Context, query *blocks.GNSQuery, block *blocks.GNSBlock) error {
-	return nc.cache.Put(query, block)
+func (m *NamecacheModule) Put(ctx context.Context, query *blocks.GNSQuery, block *blocks.GNSBlock) error {
+	return m.cache.Put(query, block)
 }

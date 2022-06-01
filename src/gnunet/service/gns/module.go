@@ -98,11 +98,32 @@ type Module struct {
 	RevocationRevoke func(ctx context.Context, rd *revocation.RevData) (success bool, err error)
 }
 
-func NewModule(ctx context.Context) (m *Module) {
+func NewModule(ctx context.Context, c *core.Core) (m *Module) {
 	m = &Module{
 		ModuleImpl: *service.NewModuleImpl(),
 	}
+	// register as listener for core events
+	listener := m.Run(ctx, m.event, m.Filter())
+	c.Register("gns", listener)
+
 	return
+}
+
+//----------------------------------------------------------------------
+
+// Filter returns the event filter for the service
+func (m *Module) Filter() *core.EventFilter {
+	f := core.NewEventFilter()
+	f.AddMsgType(message.GNS_LOOKUP)
+	f.AddMsgType(message.GNS_LOOKUP_RESULT)
+	f.AddMsgType(message.GNS_REVERSE_LOOKUP)
+	f.AddMsgType(message.GNS_REVERSE_LOOKUP_RESULT)
+	return f
+}
+
+// Event handler
+func (m *Module) event(ctx context.Context, ev *core.Event) {
+
 }
 
 //----------------------------------------------------------------------
@@ -448,23 +469,6 @@ func (m *Module) records(buf []byte) ([]*message.ResourceRecord, error) {
 		return nil, err
 	}
 	return rs.Records, nil
-}
-
-//----------------------------------------------------------------------
-
-// Filter returns the event filter for the service
-func (m *Module) Filter() *core.EventFilter {
-	f := core.NewEventFilter()
-	f.AddMsgType(message.GNS_LOOKUP)
-	f.AddMsgType(message.GNS_LOOKUP_RESULT)
-	f.AddMsgType(message.GNS_REVERSE_LOOKUP)
-	f.AddMsgType(message.GNS_REVERSE_LOOKUP_RESULT)
-	return f
-}
-
-// Event handler
-func (m *Module) event(ev *core.Event) {
-
 }
 
 //----------------------------------------------------------------------

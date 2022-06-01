@@ -83,7 +83,7 @@ func main() {
 	// start a new REVOCATION service
 	ctx, cancel := context.WithCancel(context.Background())
 	rvc := revocation.NewService()
-	srv := service.NewServiceImpl("revocation", rvc)
+	srv := service.NewSocketHandler("revocation", rvc)
 	if err = srv.Start(ctx, socket, params); err != nil {
 		logger.Printf(logger.ERROR, "[revocation] Error: '%s'\n", err.Error())
 		return

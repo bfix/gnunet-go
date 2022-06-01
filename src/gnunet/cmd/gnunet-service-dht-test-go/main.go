@@ -96,7 +96,7 @@ func main() {
 
 	// start a new DHT service
 	dht := dht.NewService(ctx, c)
-	srv := service.NewServiceImpl("dht", dht)
+	srv := service.NewSocketHandler("dht", dht)
 	if err = srv.Start(ctx, socket, params); err != nil {
 		logger.Printf(logger.ERROR, "[dht] Failed to start DHT service: '%s'", err.Error())
 		return

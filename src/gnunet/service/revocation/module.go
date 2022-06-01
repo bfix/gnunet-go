@@ -41,38 +41,45 @@ const MinAvgDifficulty = 23
 
 // Module handles the revocation-related calls to other modules.
 type Module struct {
+	service.ModuleImpl
+
 	bloomf *data.BloomFilter // bloomfilter for fast revocation check
 	kvs    service.KVStore   // storage for known revocations
 }
 
-// Init a revocation module
-func (m *Module) Init() error {
-	// Initialize access to revocation data storage
-	var err error
-	if m.kvs, err = service.NewKVStore(config.Cfg.Revocation.Storage); err != nil {
-		return err
-	}
-	// traverse the storage and build bloomfilter for all keys
-	m.bloomf = data.NewBloomFilter(1000000, 1e-8)
-	keys, err := m.kvs.List()
-	if err != nil {
-		return err
-	}
-	for _, key := range keys {
-		m.bloomf.Add([]byte(key))
-	}
-	return nil
-}
-
 // NewModule returns an initialized revocation module
-func NewModule() *Module {
-	m := new(Module)
-	if err := m.Init(); err != nil {
+func NewModule(ctx context.Context, c *core.Core) (m *Module) {
+	// create and init instance
+	m = &Module{
+		ModuleImpl: *service.NewModuleImpl(),
+	}
+	init := func() (err error) {
+		// Initialize access to revocation data storage
+		if m.kvs, err = service.NewKVStore(config.Cfg.Revocation.Storage); err != nil {
+			return
+		}
+		// traverse the storage and build bloomfilter for all keys
+		m.bloomf = data.NewBloomFilter(1000000, 1e-8)
+		var keys []string
+		if keys, err = m.kvs.List(); err != nil {
+			return
+		}
+		for _, key := range keys {
+			m.bloomf.Add([]byte(key))
+		}
+		return
+	}
+	if err := init(); err != nil {
 		logger.Printf(logger.ERROR, "[revocation] Failed to initialize module: %s\n", err.Error())
 		return nil
 	}
+	// register as listener for core events
+	listener := m.Run(ctx, m.event, m.Filter())
+	c.Register("gns", listener)
 	return m
 }
+
+//----------------------------------------------------------------------
 
 // Filter returns the event filter for the service
 func (m *Module) Filter() *core.EventFilter {
@@ -84,12 +91,12 @@ func (m *Module) Filter() *core.EventFilter {
 	return f
 }
 
-// RPC returns the route and handler function for a JSON-RPC request
-func (m *Module) RPC() (string, func(http.ResponseWriter, *http.Request)) {
-	return "/revocation/", func(wrt http.ResponseWriter, req *http.Request) {
-		wrt.Write([]byte(`{"msg": "This is REVOCATION" }`))
-	}
+// Event handler
+func (m *Module) event(ctx context.Context, ev *core.Event) {
+
 }
+
+//----------------------------------------------------------------------
 
 // Query return true if the pkey is valid (not revoked) and false
 // if the pkey has been revoked.
@@ -142,4 +149,13 @@ func (m *Module) Revoke(ctx context.Context, rd *RevData) (success bool, err err
 	value := util.EncodeBinaryToString(buf)
 	err = m.kvs.Put(rd.ZoneKeySig.ID(), value)
 	return true, err
+}
+
+//----------------------------------------------------------------------
+
+// RPC returns the route and handler function for a JSON-RPC request
+func (m *Module) RPC() (string, func(http.ResponseWriter, *http.Request)) {
+	return "/revocation/", func(wrt http.ResponseWriter, req *http.Request) {
+		wrt.Write([]byte(`{"msg": "This is REVOCATION" }`))
+	}
 }

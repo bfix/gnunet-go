@@ -83,7 +83,7 @@ func main() {
 	// start a new GNS service
 	ctx, cancel := context.WithCancel(context.Background())
 	gns := gns.NewService()
-	srv := service.NewServiceImpl("gns", gns)
+	srv := service.NewSocketHandler("gns", gns)
 	if err = srv.Start(ctx, socket, params); err != nil {
 		logger.Printf(logger.ERROR, "[gns] Error: '%s'", err.Error())
 		return
