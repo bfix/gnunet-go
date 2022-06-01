@@ -93,7 +93,7 @@ func NewCore(ctx context.Context, local *Peer) (c *Core, err error) {
 						// generate EV_CONNECT event
 						ev = new(Event)
 						ev.ID = EV_CONNECT
-						ev.Peer = msg.PeerID
+						ev.Peer = tm.Peer
 						ev.Msg = msg
 						c.dispatch(ev)
 					}
@@ -126,7 +126,7 @@ func (c *Core) Send(ctx context.Context, peer *util.PeerID, msg message.Message)
 	if err != nil {
 		return err
 	}
-	tm := transport.NewTransportMessage(peer, payload)
+	tm := transport.NewTransportMessage(c.PeerID(), payload)
 	return c.trans.Send(ctx, addr, tm)
 }
 

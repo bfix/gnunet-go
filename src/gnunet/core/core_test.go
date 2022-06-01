@@ -93,7 +93,14 @@ func NewTestNode(t *testing.T, ctx context.Context, cfg *config.NodeConfig) (nod
 			select {
 			// show incoming event
 			case ev := <-incoming:
-				t.Logf("[%d] <<< Event %v", node.id, ev)
+				switch ev.ID {
+				case EV_CONNECT:
+					t.Logf("[%d] <<< Peer %s connected", node.id, ev.Peer)
+				case EV_DISCONNECT:
+					t.Logf("[%d] <<< Peer %s diconnected", node.id, ev.Peer)
+				case EV_MESSAGE:
+					t.Logf("[%d] <<< Msg from %s of type %d", node.id, ev.Peer, ev.Msg.Header().MsgType)
+				}
 
 			// handle termination signal
 			case <-ctx.Done():
