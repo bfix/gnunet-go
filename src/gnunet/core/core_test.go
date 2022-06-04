@@ -20,6 +20,7 @@ package core
 
 import (
 	"context"
+	"encoding/hex"
 	"gnunet/config"
 	"gnunet/util"
 	"testing"
@@ -29,12 +30,12 @@ import (
 var (
 	peer1Cfg = &config.NodeConfig{
 		PrivateSeed: "iYK1wSi5XtCP774eNFk1LYXqKlOPEpwKBw+2/bMkE24=",
-		Endpoints:   []string{"udp://127.0.0.1:20861"},
+		Endpoints:   []string{"ip+udp://127.0.0.1:20861"},
 	}
 
 	peer2Cfg = &config.NodeConfig{
 		PrivateSeed: "Bv9umksEO51jjWWrOGEH+4r8wl9Vi+LItpdBpTOi2PE=",
-		Endpoints:   []string{"udp://127.0.0.1:20862"},
+		Endpoints:   []string{"ip+udp://127.0.0.1:20862"},
 	}
 )
 
@@ -52,7 +53,9 @@ type TestNode struct {
 
 func (n *TestNode) Learn(ctx context.Context, peer *util.PeerID, addr *util.Address) {
 	n.t.Logf("[%d] Learning %s for %s", n.id, addr.StringAll(), peer.String())
-	n.core.Learn(ctx, peer, addr)
+	if err := n.core.Learn(ctx, peer, addr); err != nil {
+		n.t.Log("Learn: " + err.Error())
+	}
 }
 
 func NewTestNode(t *testing.T, ctx context.Context, cfg *config.NodeConfig) (node *TestNode, err error) {
@@ -67,6 +70,7 @@ func NewTestNode(t *testing.T, ctx context.Context, cfg *config.NodeConfig) (nod
 		return
 	}
 	t.Logf("[%d] Node %s starting", node.id, node.peer.GetID())
+	t.Logf("[%d]   --> %s", node.id, hex.EncodeToString(node.peer.GetID().Key))
 
 	// create core service
 	if node.core, err = NewCore(ctx, node.peer); err != nil {
@@ -100,6 +104,7 @@ func NewTestNode(t *testing.T, ctx context.Context, cfg *config.NodeConfig) (nod
 					t.Logf("[%d] <<< Peer %s diconnected", node.id, ev.Peer)
 				case EV_MESSAGE:
 					t.Logf("[%d] <<< Msg from %s of type %d", node.id, ev.Peer, ev.Msg.Header().MsgType)
+					t.Logf("[%d] <<<    --> %s", node.id, ev.Msg.String())
 				}
 
 			// handle termination signal
