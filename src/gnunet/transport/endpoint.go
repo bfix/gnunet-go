@@ -30,6 +30,8 @@ import (
 var (
 	ErrEndpNotAvailable     = errors.New("no endpoint for address available")
 	ErrEndpProtocolMismatch = errors.New("transport protocol mismatch")
+	ErrEndpProtocolUnknown  = errors.New("unknown transport protocol")
+	ErrEndpExists           = errors.New("endpoint exists")
 )
 
 // Endpoint represents a local endpoint that can send and receive messages.
@@ -83,9 +85,12 @@ type PaketEndpoint struct {
 func (ep *PaketEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) (err error) {
 	// create listener
 	var lc net.ListenConfig
-	if ep.conn, err = lc.ListenPacket(ctx, ep.addr.Network(), ep.addr.String()); err != nil {
+	xproto := ep.addr.Network()
+	if ep.conn, err = lc.ListenPacket(ctx, epProtocol(xproto), ep.addr.String()); err != nil {
 		return
 	}
+	// use the actual listening address
+	ep.addr = util.NewAddress(xproto, []byte(ep.conn.LocalAddr().String()))
 
 	// run watch dog for termination
 	go func() {
@@ -95,27 +100,15 @@ func (ep *PaketEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) (
 	// run go routine to handle messages from clients
 	go func() {
 		for {
-			// read next message from packet
-			n, _, err := ep.conn.ReadFrom(ep.buf)
+			// read next message
+			tm, err := ep.read()
 			if err != nil {
 				break
 			}
-			rdr := bytes.NewBuffer(util.Clone(ep.buf[:n]))
-			msg, err := ReadMessageDirect(rdr, ep.buf)
-			if err != nil {
-				break
-			}
-			// check for transport message
-			if msg.Header().MsgType == message.DUMMY {
-				// set transient attributes
-				tm := msg.(*TransportMessage)
-				tm.endp = ep.id
-				tm.conn = 0
-				// send to handler
-				go func() {
-					hdlr <- tm
-				}()
-			}
+			// send transport message to handler
+			go func() {
+				hdlr <- tm
+			}()
 		}
 		// connection ended.
 		ep.conn.Close()
@@ -123,13 +116,55 @@ func (ep *PaketEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) (
 	return
 }
 
+// Read a transport message from endpoint based on extended protocol
+func (ep *PaketEndpoint) read() (tm *TransportMessage, err error) {
+	// read next packet (assuming that it contains one complete message)
+	var n int
+	if n, _, err = ep.conn.ReadFrom(ep.buf); err != nil {
+		return
+	}
+	// parse transport message based on extended protocol
+	var (
+		peer *util.PeerID
+		msg  message.Message
+	)
+	switch ep.addr.Network() {
+	case "ip+udp":
+		// parse peer id and message in sequence
+		peer = util.NewPeerID(ep.buf[:32])
+		rdr := bytes.NewBuffer(util.Clone(ep.buf[32:n]))
+		if msg, err = ReadMessageDirect(rdr, ep.buf); err != nil {
+			return
+		}
+	default:
+		panic(ErrEndpProtocolUnknown)
+	}
+	// return transport message
+	return &TransportMessage{
+		Peer: peer,
+		Msg:  msg,
+	}, nil
+}
+
 // Send message to address from endpoint
 func (ep *PaketEndpoint) Send(ctx context.Context, addr net.Addr, msg *TransportMessage) (err error) {
+	// resolve target address
 	var a *net.UDPAddr
-	a, err = net.ResolveUDPAddr(addr.Network(), addr.String())
+	a, err = net.ResolveUDPAddr(epProtocol(addr.Network()), addr.String())
+
+	// get message content (TransportMessage)
 	var buf []byte
 	if buf, err = msg.Bytes(); err != nil {
 		return
+	}
+	// handle extended protocol:
+	switch ep.addr.Network() {
+	case "ip+udp":
+		// no modifications required
+
+	default:
+		// unknown protocol
+		return ErrEndpProtocolUnknown
 	}
 	_, err = ep.conn.WriteTo(buf, a)
 	return
@@ -137,9 +172,6 @@ func (ep *PaketEndpoint) Send(ctx context.Context, addr net.Addr, msg *Transport
 
 // Address returms the
 func (ep *PaketEndpoint) Address() net.Addr {
-	if ep.conn != nil {
-		return ep.conn.LocalAddr()
-	}
 	return ep.addr
 }
 
@@ -153,6 +185,7 @@ func (ep *PaketEndpoint) ID() int {
 	return ep.id
 }
 
+// create a new packet endpoint for protcol and address
 func newPacketEndpoint(addr net.Addr) (ep *PaketEndpoint, err error) {
 	// check for matching protocol
 	if epMode(addr.Network()) != "packet" {
@@ -185,9 +218,13 @@ type StreamEndpoint struct {
 func (ep *StreamEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) (err error) {
 	// create listener
 	var lc net.ListenConfig
-	if ep.listener, err = lc.Listen(ctx, ep.addr.Network(), ep.addr.String()); err != nil {
+	xproto := ep.addr.Network()
+	if ep.listener, err = lc.Listen(ctx, epProtocol(xproto), ep.addr.String()); err != nil {
 		return
 	}
+	// get actual listening address
+	ep.addr = util.NewAddress(xproto, []byte(ep.listener.Addr().String()))
+
 	// run watch dog for termination
 	go func() {
 		<-ctx.Done()
@@ -206,21 +243,14 @@ func (ep *StreamEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) 
 			go func() {
 				for {
 					// read next message from connection
-					msg, err := ReadMessage(ctx, conn, ep.buf)
+					tm, err := ep.read(ctx, conn)
 					if err != nil {
 						break
 					}
-					// check for transport message
-					if msg.Header().MsgType == message.DUMMY {
-						// set transient attributes
-						tm := msg.(*TransportMessage)
-						tm.endp = ep.id
-						tm.conn = session
-						// send to handler
-						go func() {
-							hdlr <- tm
-						}()
-					}
+					// send transport message to handler
+					go func() {
+						hdlr <- tm
+					}()
 				}
 				// connection ended.
 				conn.Close()
@@ -231,6 +261,34 @@ func (ep *StreamEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) 
 	return
 }
 
+// Read a transport message from endpoint based on extended protocol
+func (ep *StreamEndpoint) read(ctx context.Context, conn net.Conn) (tm *TransportMessage, err error) {
+	// parse transport message based on extended protocol
+	var (
+		peer *util.PeerID
+		msg  message.Message
+	)
+	switch ep.addr.Network() {
+	case "ip+udp":
+		// parse peer id
+		peer = util.NewPeerID(nil)
+		if _, err = conn.Read(peer.Key); err != nil {
+			return
+		}
+		// read next message from connection
+		if msg, err = ReadMessage(ctx, conn, ep.buf); err != nil {
+			break
+		}
+	default:
+		panic(ErrEndpProtocolUnknown)
+	}
+	// return transport message
+	return &TransportMessage{
+		Peer: peer,
+		Msg:  msg,
+	}, nil
+}
+
 // Send message to address from endpoint
 func (ep *StreamEndpoint) Send(ctx context.Context, addr net.Addr, msg *TransportMessage) error {
 	return nil
@@ -238,9 +296,6 @@ func (ep *StreamEndpoint) Send(ctx context.Context, addr net.Addr, msg *Transpor
 
 // Address returns the actual listening endpoint address
 func (ep *StreamEndpoint) Address() net.Addr {
-	if ep.listener != nil {
-		return ep.listener.Addr()
-	}
 	return ep.addr
 }
 
@@ -254,6 +309,7 @@ func (ep *StreamEndpoint) ID() int {
 	return ep.id
 }
 
+// create a new endpoint based on extended protocol and address
 func newStreamEndpoint(addr net.Addr) (ep *StreamEndpoint, err error) {
 	// check for matching protocol
 	if epMode(addr.Network()) != "stream" {
@@ -270,10 +326,29 @@ func newStreamEndpoint(addr net.Addr) (ep *StreamEndpoint, err error) {
 	return
 }
 
+//----------------------------------------------------------------------
+// derive endpoint mode (packet/stream) and transport protocol from
+// net.Adddr.Network() strings
+//----------------------------------------------------------------------
+
+// epProtocol returns the transport protocol for a given network string
+// that can include extended protocol information like "r5n+ip+udp"
+func epProtocol(netw string) string {
+	switch netw {
+	case "udp", "udp4", "udp6", "ip+udp":
+		return "udp"
+	case "tcp", "tcp4", "tcp6":
+		return "tcp"
+	case "unix":
+		return "unix"
+	}
+	return ""
+}
+
 // epMode returns the endpoint mode (packet or stream) for a given network
 func epMode(netw string) string {
-	switch netw {
-	case "udp", "udp4", "udp6", "r5n+ip+udp":
+	switch epProtocol(netw) {
+	case "udp":
 		return "packet"
 	case "tcp", "unix":
 		return "stream"
