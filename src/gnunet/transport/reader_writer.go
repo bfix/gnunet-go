@@ -113,10 +113,7 @@ func ReadMessage(ctx context.Context, rdr io.ReadCloser, buf []byte) (msg messag
 	if err = get(4, int(mh.MsgSize)-4); err != nil {
 		return nil, err
 	}
-	// handle transport message case
-	if mh.MsgType == message.DUMMY {
-		msg = NewTransportMessage(nil, nil)
-	} else if msg, err = message.NewEmptyMessage(mh.MsgType); err != nil {
+	if msg, err = message.NewEmptyMessage(mh.MsgType); err != nil {
 		return nil, err
 	}
 	if msg == nil {
