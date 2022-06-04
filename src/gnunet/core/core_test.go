@@ -30,7 +30,7 @@ import (
 var (
 	peer1Cfg = &config.NodeConfig{
 		PrivateSeed: "iYK1wSi5XtCP774eNFk1LYXqKlOPEpwKBw+2/bMkE24=",
-		Endpoints:   []string{"ip+udp://127.0.0.1:20861"},
+		Endpoints:   []string{"ip+udp://127.0.0.1:0"},
 	}
 
 	peer2Cfg = &config.NodeConfig{
