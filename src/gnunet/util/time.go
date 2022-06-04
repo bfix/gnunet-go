@@ -81,16 +81,28 @@ func (t AbsoluteTime) Add(d time.Duration) AbsoluteTime {
 	}
 }
 
+// Elapsed time since 't'. Return 0 if 't' is in the future.
+func (t AbsoluteTime) Elapsed() RelativeTime {
+	dt, elapsed := t.Diff(AbsoluteTimeNow())
+	if !elapsed {
+		dt = NewRelativeTime(0)
+	}
+	return dt
+}
+
 // Diff returns the relative time between two absolute times;
-// the ordering of the absolute times doesn't matter.
-func (t AbsoluteTime) Diff(t2 AbsoluteTime) RelativeTime {
+// returns true if t2 is after t1.
+func (t AbsoluteTime) Diff(t2 AbsoluteTime) (dt RelativeTime, elapsed bool) {
 	var d uint64
 	if t.Compare(t2) == 1 {
 		d = t.Val - t2.Val
+		elapsed = false
 	} else {
 		d = t2.Val - t.Val
+		elapsed = true
 	}
-	return RelativeTime{d}
+	dt = RelativeTime{d}
+	return
 }
 
 // Expired returns true if the timestamp is in the past.
@@ -149,4 +161,15 @@ func (t RelativeTime) String() string {
 // Add two durations
 func (t RelativeTime) Add(t2 RelativeTime) {
 	t.Val += t2.Val
+}
+
+// Compare two durations
+func (t RelativeTime) Compare(t2 RelativeTime) int {
+	switch {
+	case t.Val < t2.Val:
+		return -1
+	case t.Val > t2.Val:
+		return 1
+	}
+	return 0
 }
