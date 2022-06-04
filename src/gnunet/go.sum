@@ -1,5 +1,5 @@
-github.com/bfix/gospel v1.2.11 h1:z/c6MFNq/lz4mO8+PK60a3NvH+lbTKAlLCShuFFZUvg=
-github.com/bfix/gospel v1.2.11/go.mod h1:cdu63bA9ZdfeDoqZ+vnWOcbY9Puwdzmf5DMxMGMznRI=
+github.com/bfix/gospel v1.2.14 h1:lIdagJvkebG+uYbVdfK6XbT1udnq/ezd/Gi54EaMtV0=
+github.com/bfix/gospel v1.2.14/go.mod h1:cdu63bA9ZdfeDoqZ+vnWOcbY9Puwdzmf5DMxMGMznRI=
 github.com/cespare/xxhash/v2 v2.1.2 h1:YRXhKfTDauu4ajMg1TPgFO5jnlC2HCbmLXMcTG5cbYE=
 github.com/cespare/xxhash/v2 v2.1.2/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
 github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f h1:lO4WD4F/rVNCu3HqELle0jiPLLBs70cWOduZpkS1E78=
