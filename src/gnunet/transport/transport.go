@@ -41,32 +41,19 @@ var (
 // Msg is the exchanged GNUnet message. The packet itself satisfies the
 // message.Message interface.
 type TransportMessage struct {
-	Hdr     *message.Header ``         // message header
-	Peer    *util.PeerID    ``         // remote peer
-	Payload []byte          `size:"*"` // GNUnet message
-
-	// package-local attributes (transient)
-	msg  message.Message
-	endp int // id of endpoint (incoming message)
-	conn int // id of connection (optional, incoming message)
-}
-
-func (msg *TransportMessage) Header() *message.Header {
-	return msg.Hdr
-}
-
-func (msg *TransportMessage) Message() (m message.Message, err error) {
-	if m = msg.msg; m == nil {
-		rdr := bytes.NewBuffer(msg.Payload)
-		m, err = ReadMessageDirect(rdr, nil)
-	}
-	return
+	Peer *util.PeerID    // remote peer
+	Msg  message.Message // GNUnet message
 }
 
 // Bytes returns the binary representation of a transport message
 func (msg *TransportMessage) Bytes() ([]byte, error) {
 	buf := new(bytes.Buffer)
-	err := WriteMessageDirect(buf, msg)
+	// serialize peer id
+	if _, err := buf.Write(msg.Peer.Key); err != nil {
+		return nil, err
+	}
+	// serialize message
+	err := WriteMessageDirect(buf, msg.Msg)
 	return buf.Bytes(), err
 }
 
@@ -76,21 +63,13 @@ func (msg *TransportMessage) String() string {
 }
 
 // NewTransportMessage creates a message suitable for transfer
-func NewTransportMessage(peer *util.PeerID, payload []byte) (tm *TransportMessage) {
+func NewTransportMessage(peer *util.PeerID, msg message.Message) (tm *TransportMessage) {
 	if peer == nil {
 		peer = util.NewPeerID(nil)
 	}
-	msize := 0
-	if payload != nil {
-		msize = len(payload)
-	}
 	tm = &TransportMessage{
-		Hdr: &message.Header{
-			MsgSize: uint16(36 + msize),
-			MsgType: message.DUMMY,
-		},
-		Peer:    peer,
-		Payload: payload,
+		Peer: peer,
+		Msg:  msg,
 	}
 	return
 }
@@ -100,8 +79,8 @@ func NewTransportMessage(peer *util.PeerID, payload []byte) (tm *TransportMessag
 // Transport enables network-oriented (like IP, UDP, TCP or UDS)
 // message exchange on multiple endpoints.
 type Transport struct {
-	incoming  chan *TransportMessage // messages as received from the network
-	endpoints map[int]Endpoint       // list of available endpoints
+	incoming  chan *TransportMessage   // messages as received from the network
+	endpoints *util.Map[int, Endpoint] // list of available endpoints
 }
 
 // NewTransport creates and runs a new transport layer implementation.
@@ -109,19 +88,19 @@ func NewTransport(ctx context.Context, ch chan *TransportMessage) (t *Transport)
 	// create transport instance
 	return &Transport{
 		incoming:  ch,
-		endpoints: make(map[int]Endpoint),
+		endpoints: util.NewMap[int, Endpoint](),
 	}
 }
 
 // Send a message over suitable endpoint
 func (t *Transport) Send(ctx context.Context, addr net.Addr, msg *TransportMessage) (err error) {
-	for _, ep := range t.endpoints {
+	// use the first endpoint able to handle address
+	return t.endpoints.ProcessRange(func(_ int, ep Endpoint) error {
 		if ep.CanSendTo(addr) {
-			err = ep.Send(ctx, addr, msg)
-			break
+			return ep.Send(ctx, addr, msg)
 		}
-	}
-	return
+		return nil
+	}, true)
 }
 
 //----------------------------------------------------------------------
@@ -131,12 +110,24 @@ func (t *Transport) Send(ctx context.Context, addr net.Addr, msg *TransportMessa
 // AddEndpoint instantiates and run a new endpoint handler for the
 // given address (must map to a network interface).
 func (t *Transport) AddEndpoint(ctx context.Context, addr net.Addr) (a net.Addr, err error) {
-	// register endpoint
+	// check if endpoint is already available
+	as := addr.Network() + "://" + addr.String()
+	if err = t.endpoints.ProcessRange(func(_ int, ep Endpoint) error {
+		ae := ep.Address().Network() + "://" + ep.Address().String()
+		if as == ae {
+			return ErrEndpExists
+		}
+		return nil
+	}, true); err != nil {
+		return
+	}
+	// register new endpoint
 	var ep Endpoint
 	if ep, err = NewEndpoint(addr); err != nil {
 		return
 	}
-	t.endpoints[ep.ID()] = ep
+	// add endpoint to list and run it
+	t.endpoints.Put(ep.ID(), ep)
 	ep.Run(ctx, t.incoming)
 	return ep.Address(), nil
 }
@@ -144,8 +135,9 @@ func (t *Transport) AddEndpoint(ctx context.Context, addr net.Addr) (a net.Addr,
 // Endpoints returns a list of listening addresses managed by transport.
 func (t *Transport) Endpoints() (list []net.Addr) {
 	list = make([]net.Addr, 0)
-	for _, ep := range t.endpoints {
+	t.endpoints.ProcessRange(func(_ int, ep Endpoint) error {
 		list = append(list, ep.Address())
-	}
+		return nil
+	}, true)
 	return
 }
