@@ -20,14 +20,13 @@ package core
 
 import (
 	"context"
+	"errors"
 	"gnunet/message"
 	"gnunet/service/dht/blocks"
 	"gnunet/transport"
 	"gnunet/util"
 	"net"
 	"time"
-
-	"github.com/bfix/gospel/data"
 )
 
 // Core service
@@ -77,32 +76,31 @@ func NewCore(ctx context.Context, local *Peer) (c *Core, err error) {
 				var ev *Event
 
 				// inspect message for peer state events
-				m, err := tm.Message()
-				if err == nil {
-					switch msg := m.(type) {
-					case *message.HelloMsg:
-						// keep peer addresses
-						for _, addr := range msg.Addresses {
-							a := &util.Address{
-								Netw:    addr.Transport,
-								Address: addr.Address,
-								Expires: addr.ExpireOn,
-							}
-							c.Learn(ctx, msg.PeerID, a)
+				switch msg := tm.Msg.(type) {
+				case *message.HelloMsg:
+					// keep peer addresses
+					for _, addr := range msg.Addresses {
+						a := &util.Address{
+							Netw:    addr.Transport,
+							Address: addr.Address,
+							Expires: addr.ExpireOn,
 						}
-						// generate EV_CONNECT event
-						ev = new(Event)
-						ev.ID = EV_CONNECT
-						ev.Peer = tm.Peer
-						ev.Msg = msg
-						c.dispatch(ev)
+						c.Learn(ctx, msg.PeerID, a)
 					}
+					// generate EV_CONNECT event
+					ev = &Event{
+						ID:   EV_CONNECT,
+						Peer: tm.Peer,
+						Msg:  msg,
+					}
+					c.dispatch(ev)
 				}
 				// generate EV_MESSAGE event
-				ev = new(Event)
-				ev.ID = EV_MESSAGE
-				ev.Peer = tm.Peer
-				ev.Msg, _ = tm.Message()
+				ev = &Event{
+					ID:   EV_MESSAGE,
+					Peer: tm.Peer,
+					Msg:  tm.Msg,
+				}
 				c.dispatch(ev)
 
 			// wait for termination
@@ -119,14 +117,13 @@ func NewCore(ctx context.Context, local *Peer) (c *Core, err error) {
 // Send is a function that allows the local peer to send a protocol
 // message to a remote peer.
 func (c *Core) Send(ctx context.Context, peer *util.PeerID, msg message.Message) error {
-	// TODO: select best endpoint protocol for transport; now fixed to UDP
-	netw := "udp"
+	// TODO: select best endpoint protocol for transport; now fixed to IP+UDP
+	netw := "ip+udp"
 	addr := c.peers.Get(peer.String(), netw)
-	payload, err := data.Marshal(msg)
-	if err != nil {
-		return err
+	if addr == nil {
+		return errors.New("no endpoint for address")
 	}
-	tm := transport.NewTransportMessage(c.PeerID(), payload)
+	tm := transport.NewTransportMessage(c.PeerID(), msg)
 	return c.trans.Send(ctx, addr, tm)
 }
 
