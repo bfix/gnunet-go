@@ -151,7 +151,7 @@ func (a *PeerAddrList) Add(id string, addr *Address) (mode int) {
 			list = append(list, addr)
 			a.list.Put(id, list)
 			return nil
-		})
+		}, false)
 	}
 	return
 }

@@ -121,7 +121,7 @@ func (p *dbPool) remove(key string) error {
 			p.insts.Delete(key)
 		}
 		return
-	})
+	}, false)
 }
 
 // Connect to a SQL database (various types and flavors):
@@ -180,6 +180,6 @@ func (p *dbPool) Connect(spec string) (db *DbConn, err error) {
 		db = new(DbConn)
 		db.conn, err = inst.db.Conn(p.ctx)
 		return err
-	})
+	}, false)
 	return
 }
