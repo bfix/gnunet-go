@@ -130,10 +130,17 @@ func (c *Core) Send(ctx context.Context, peer *util.PeerID, msg message.Message)
 // Learn a (new) address for peer
 func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addr *util.Address) (err error) {
 	if c.peers.Add(peer.String(), addr) == 1 {
+		// collect endpoint addresses
+		addrList := make([]*util.Address, 0)
+		for _, eAddr := range c.trans.Endpoints() {
+			if a, ok := eAddr.(*util.Address); ok {
+				addrList = append(addrList, a)
+			}
+		}
 		// new peer id: send HELLO message to newly added peer
 		node := c.local
 		var hello *blocks.HelloBlock
-		hello, err = node.HelloData(time.Hour)
+		hello, err = node.HelloData(time.Hour, addrList)
 		if err != nil {
 			return
 		}
