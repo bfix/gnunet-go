@@ -20,12 +20,15 @@ package dht
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha512"
 	"encoding/hex"
 	"gnunet/util"
 	"math/rand"
 	"sync"
+	"time"
 
+	"github.com/bfix/gospel/logger"
 	"github.com/bfix/gospel/math"
 )
 
@@ -48,7 +51,10 @@ const (
 // PeerAddress is the identifier for a peer in the DHT network.
 // It is the SHA-512 hash of the PeerID (public Ed25519 key).
 type PeerAddress struct {
-	addr [sizeAddr]byte
+	addr      [sizeAddr]byte    // hash value as bytes
+	connected bool              // is peer connected?
+	lastSeen  util.AbsoluteTime // time the peer was last seen
+	lastUsed  util.AbsoluteTime // time the peer was last used
 }
 
 // NewPeerAddress returns the DHT address of a peer.
@@ -57,6 +63,8 @@ func NewPeerAddress(peer *util.PeerID) *PeerAddress {
 	h := rtHash()
 	h.Write(peer.Key)
 	copy(r.addr[:], h.Sum(nil))
+	r.lastSeen = util.AbsoluteTimeNow()
+	r.lastUsed = util.AbsoluteTimeNow()
 	return r
 }
 
@@ -90,36 +98,51 @@ func (addr *PeerAddress) Distance(p *PeerAddress) (*math.Int, int) {
 // distance to the reference address, so smaller index means
 // "nearer" to the reference address.
 type RoutingTable struct {
-	ref     *PeerAddress          // reference address for distance
-	buckets []*Bucket             // list of buckets
-	list    map[*PeerAddress]bool // keep list of peers
-	rwlock  sync.RWMutex          // lock for write operations
-	l2nse   float64               // log2 of estimated network size
+	ref       *PeerAddress              // reference address for distance
+	buckets   []*Bucket                 // list of buckets
+	list      map[*PeerAddress]struct{} // keep list of peers
+	rwlock    sync.RWMutex              // lock for write operations
+	l2nse     float64                   // log2 of estimated network size
+	inProcess bool                      // flag if Process() is running
 }
 
 // NewRoutingTable creates a new routing table for the reference address.
 func NewRoutingTable(ref *PeerAddress) *RoutingTable {
-	rt := new(RoutingTable)
-	rt.ref = ref
-	rt.list = make(map[*PeerAddress]bool)
-	rt.buckets = make([]*Bucket, numBuckets)
+	// create routing table
+	rt := &RoutingTable{
+		ref:       ref,
+		list:      make(map[*PeerAddress]struct{}),
+		buckets:   make([]*Bucket, numBuckets),
+		l2nse:     0.,
+		inProcess: false,
+	}
+	// fill buckets
 	for i := range rt.buckets {
 		rt.buckets[i] = NewBucket(numK)
 	}
 	return rt
 }
 
+//----------------------------------------------------------------------
+// Peer management
+//----------------------------------------------------------------------
+
 // Add new peer address to routing table.
 // Returns true if the entry was added, false otherwise.
-func (rt *RoutingTable) Add(p *PeerAddress, connected bool) bool {
+func (rt *RoutingTable) Add(p *PeerAddress) bool {
 	// ensure one write and no readers
 	rt.rwlock.Lock()
 	defer rt.rwlock.Unlock()
 
+	// check if peer is already known
+	if _, ok := rt.list[p]; ok {
+		return false
+	}
+
 	// compute distance (bucket index) and insert address.
 	_, idx := p.Distance(rt.ref)
-	if rt.buckets[idx].Add(p, connected) {
-		rt.list[p] = true
+	if rt.buckets[idx].Add(p) {
+		rt.list[p] = struct{}{}
 		return true
 	}
 	// Full bucket: we did not add the address to the routing table.
@@ -139,11 +162,23 @@ func (rt *RoutingTable) Remove(p *PeerAddress) bool {
 		delete(rt.list, p)
 		return true
 	}
+	// remove from internal list
+	delete(rt.list, p)
 	return false
 }
 
 //----------------------------------------------------------------------
-// routing functions
+
+// Process a function f in the locked context of a routing table
+func (rt *RoutingTable) Process(f func() error) error {
+	// ensure one write and no readers
+	rt.rwlock.Lock()
+	defer rt.rwlock.Unlock()
+	return f()
+}
+
+//----------------------------------------------------------------------
+// Routing functions
 //----------------------------------------------------------------------
 
 // SelectClosestPeer for a given peer address and bloomfilter.
@@ -160,6 +195,8 @@ func (rt *RoutingTable) SelectClosestPeer(p *PeerAddress, bf *PeerBloomFilter) (
 			n = k
 		}
 	}
+	// mark peer as used
+	n.lastUsed = util.AbsoluteTimeNow()
 	return
 }
 
@@ -175,6 +212,8 @@ func (rt *RoutingTable) SelectRandomPeer(bf *PeerBloomFilter) *PeerAddress {
 		idx := rand.Intn(size)
 		for k := range rt.list {
 			if idx == 0 {
+				// mark peer as used
+				k.lastUsed = util.AbsoluteTimeNow()
 				return k
 			}
 			idx--
@@ -221,33 +260,50 @@ func (rt *RoutingTable) ComputeOutDegree(repl, hop int) int {
 	return 1 + int(rm1/(rt.l2nse+rm1*hf))
 }
 
+//----------------------------------------------------------------------
+
+// Heartbeat handler for periodic tasks
+func (rt *RoutingTable) heartbeat(ctx context.Context) {
+
+	// check for dead or expired peers
+	timeout := util.NewRelativeTime(3 * time.Hour)
+	if err := rt.Process(func() error {
+		for addr := range rt.list {
+			if addr.connected {
+				continue
+			}
+			// check if we can/need to drop a peer
+			drop := timeout.Compare(addr.lastSeen.Elapsed()) < 0
+			if drop || timeout.Compare(addr.lastUsed.Elapsed()) < 0 {
+				rt.Remove(addr)
+			}
+		}
+		return nil
+	}); err != nil {
+		logger.Println(logger.ERROR, "[dht] RT heartbeat: "+err.Error())
+	}
+}
+
 //======================================================================
 // Routing table buckets
 //======================================================================
 
-// PeerEntry in a k-Bucket: use routing specific attributes
-// for book-keeping
-type PeerEntry struct {
-	addr      *PeerAddress // peer address
-	connected bool         // is peer connected?
-}
-
 // Bucket holds peer entries with approx. same distance from node
 type Bucket struct {
-	list   []*PeerEntry
+	list   []*PeerAddress
 	rwlock sync.RWMutex
 }
 
 // NewBucket creates a new entry list of given size
 func NewBucket(n int) *Bucket {
 	return &Bucket{
-		list: make([]*PeerEntry, 0, n),
+		list: make([]*PeerAddress, 0, n),
 	}
 }
 
 // Add peer address to the bucket if there is free space.
 // Returns true if entry is added, false otherwise.
-func (b *Bucket) Add(p *PeerAddress, connected bool) bool {
+func (b *Bucket) Add(p *PeerAddress) bool {
 	// only one writer and no readers
 	b.rwlock.Lock()
 	defer b.rwlock.Unlock()
@@ -255,11 +311,7 @@ func (b *Bucket) Add(p *PeerAddress, connected bool) bool {
 	// check for free space in bucket
 	if len(b.list) < numK {
 		// append entry at the end
-		pe := &PeerEntry{
-			addr:      p,
-			connected: connected,
-		}
-		b.list = append(b.list, pe)
+		b.list = append(b.list, p)
 		return true
 	}
 	return false
@@ -273,7 +325,7 @@ func (b *Bucket) Remove(p *PeerAddress) bool {
 	defer b.rwlock.Unlock()
 
 	for i, pe := range b.list {
-		if pe.addr.Equals(p) {
+		if pe.Equals(p) {
 			// found entry: remove it
 			b.list = append(b.list[:i], b.list[i+1:]...)
 			return true
@@ -289,16 +341,16 @@ func (b *Bucket) SelectClosestPeer(p *PeerAddress, bf *PeerBloomFilter) (n *Peer
 	b.rwlock.RLock()
 	defer b.rwlock.RUnlock()
 
-	for _, pe := range b.list {
+	for _, addr := range b.list {
 		// skip addresses in bloomfilter
-		if bf.Contains(pe.addr) {
+		if bf.Contains(addr) {
 			continue
 		}
 		// check for shorter distance
-		if d, _ := p.Distance(pe.addr); n == nil || d.Cmp(dist) < 0 {
+		if d, _ := p.Distance(addr); n == nil || d.Cmp(dist) < 0 {
 			// remember best match
 			dist = d
-			n = pe.addr
+			n = addr
 		}
 	}
 	return

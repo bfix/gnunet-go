@@ -87,7 +87,8 @@ func TestRT(t *testing.T) {
 
 	// actions:
 	connected := func(task *Entry, e int64, msg string) {
-		rt.Add(task.addr, true)
+		task.addr.connected = true
+		rt.Add(task.addr)
 		task.online = true
 		task.last = e
 		t.Logf("[%6d] %s %s\n", e, task.addr, msg)
