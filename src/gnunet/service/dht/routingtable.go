@@ -101,7 +101,7 @@ type RoutingTable struct {
 	ref       *PeerAddress              // reference address for distance
 	buckets   []*Bucket                 // list of buckets
 	list      map[*PeerAddress]struct{} // keep list of peers
-	rwlock    sync.RWMutex              // lock for write operations
+	mtx       sync.RWMutex              // lock for write operations
 	l2nse     float64                   // log2 of estimated network size
 	inProcess bool                      // flag if Process() is running
 }
@@ -131,8 +131,8 @@ func NewRoutingTable(ref *PeerAddress) *RoutingTable {
 // Returns true if the entry was added, false otherwise.
 func (rt *RoutingTable) Add(p *PeerAddress) bool {
 	// ensure one write and no readers
-	rt.rwlock.Lock()
-	defer rt.rwlock.Unlock()
+	rt.lock(false)
+	defer rt.unlock(false)
 
 	// check if peer is already known
 	if _, ok := rt.list[p]; ok {
@@ -153,8 +153,8 @@ func (rt *RoutingTable) Add(p *PeerAddress) bool {
 // Returns true if the entry was removed, false otherwise.
 func (rt *RoutingTable) Remove(p *PeerAddress) bool {
 	// ensure one write and no readers
-	rt.rwlock.Lock()
-	defer rt.rwlock.Unlock()
+	rt.lock(false)
+	defer rt.unlock(false)
 
 	// compute distance (bucket index) and remove entry from bucket
 	_, idx := p.Distance(rt.ref)
@@ -170,10 +170,15 @@ func (rt *RoutingTable) Remove(p *PeerAddress) bool {
 //----------------------------------------------------------------------
 
 // Process a function f in the locked context of a routing table
-func (rt *RoutingTable) Process(f func() error) error {
-	// ensure one write and no readers
-	rt.rwlock.Lock()
-	defer rt.rwlock.Unlock()
+func (rt *RoutingTable) Process(f func() error, readonly bool) error {
+	// handle locking
+	rt.lock(readonly)
+	rt.inProcess = true
+	defer func() {
+		rt.inProcess = false
+		rt.unlock(readonly)
+	}()
+	// call function in unlocked context
 	return f()
 }
 
@@ -184,8 +189,8 @@ func (rt *RoutingTable) Process(f func() error) error {
 // SelectClosestPeer for a given peer address and bloomfilter.
 func (rt *RoutingTable) SelectClosestPeer(p *PeerAddress, bf *PeerBloomFilter) (n *PeerAddress) {
 	// no writer allowed
-	rt.rwlock.RLock()
-	defer rt.rwlock.RUnlock()
+	rt.mtx.RLock()
+	defer rt.mtx.RUnlock()
 
 	// find closest address
 	var dist *math.Int
@@ -204,8 +209,8 @@ func (rt *RoutingTable) SelectClosestPeer(p *PeerAddress, bf *PeerBloomFilter) (
 // included in the bloomfilter)
 func (rt *RoutingTable) SelectRandomPeer(bf *PeerBloomFilter) *PeerAddress {
 	// no writer allowed
-	rt.rwlock.RLock()
-	defer rt.rwlock.RUnlock()
+	rt.mtx.RLock()
+	defer rt.mtx.RUnlock()
 
 	// select random entry from list
 	if size := len(rt.list); size > 0 {
@@ -279,8 +284,32 @@ func (rt *RoutingTable) heartbeat(ctx context.Context) {
 			}
 		}
 		return nil
-	}); err != nil {
+	}, false); err != nil {
 		logger.Println(logger.ERROR, "[dht] RT heartbeat: "+err.Error())
+	}
+}
+
+//----------------------------------------------------------------------
+
+// lock with given mode (if not in processing function)
+func (rt *RoutingTable) lock(readonly bool) {
+	if !rt.inProcess {
+		if readonly {
+			rt.mtx.RLock()
+		} else {
+			rt.mtx.Lock()
+		}
+	}
+}
+
+// lock with given mode (if not in processing function)
+func (rt *RoutingTable) unlock(readonly bool) {
+	if !rt.inProcess {
+		if readonly {
+			rt.mtx.RUnlock()
+		} else {
+			rt.mtx.Unlock()
+		}
 	}
 }
 
