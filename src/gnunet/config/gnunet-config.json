@@ -2,7 +2,7 @@
 	"local": {
 		"privateSeed": "YGoe6XFH3XdvFRl+agx9gIzPTvxA229WFdkazEMdcOs=",
 		"endpoints": [
-			"r5n+ip+udp:127.0.0.1:6666"
+			"ip+udp://127.0.0.1:6666"
 		]
 	},
 	"bootstrap": {
