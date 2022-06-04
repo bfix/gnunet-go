@@ -30,13 +30,12 @@ func NewPeerID(data []byte) *PeerID {
 	if data == nil {
 		data = make([]byte, 32)
 	} else {
-		size := len(data)
-		if size > 32 {
-			data = data[:32]
-		} else if size < 32 {
+		if len(data) < 32 {
 			buf := make([]byte, 32)
 			CopyAlignedBlock(buf, data)
 			data = buf
+		} else {
+			data = Clone(data[:32])
 		}
 	}
 	return &PeerID{
