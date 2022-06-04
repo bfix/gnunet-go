@@ -22,6 +22,7 @@ import (
 	"context"
 	"gnunet/core"
 	"net/http"
+	"time"
 )
 
 // Module is an interface for GNUnet service modules (workers).
@@ -36,6 +37,9 @@ type Module interface {
 // EventHandler is a function prototype for event handling
 type EventHandler func(context.Context, *core.Event)
 
+// Heartbeat is a function prototype for periodic tasks
+type Heartbeat func(context.Context)
+
 // ModuleImpl is an event-handling type used by Module implementations.
 type ModuleImpl struct {
 	ch chan *core.Event // channel for core events.
@@ -49,9 +53,19 @@ func NewModuleImpl() (m *ModuleImpl) {
 }
 
 // Run event handling loop
-func (m *ModuleImpl) Run(ctx context.Context, hdlr EventHandler, filter *core.EventFilter) (listener *core.Listener) {
+func (m *ModuleImpl) Run(
+	ctx context.Context,
+	hdlr EventHandler, filter *core.EventFilter,
+	pulse time.Duration, heartbeat Heartbeat,
+) (listener *core.Listener) {
 	// listener for registration
 	listener = core.NewListener(m.ch, filter)
+
+	// if no heartbeat handler is defined, set pulse to near flatline.
+	if heartbeat == nil {
+		pulse = 365 * 24 * time.Hour // once a year
+	}
+	tick := time.Tick(pulse)
 	// run event loop
 	go func() {
 		for {
@@ -63,6 +77,13 @@ func (m *ModuleImpl) Run(ctx context.Context, hdlr EventHandler, filter *core.Ev
 			// wait for terminate signal
 			case <-ctx.Done():
 				return
+
+			// handle heartbeat
+			case <-tick:
+				// check for defined heartbeat handler
+				if heartbeat != nil {
+					heartbeat(ctx)
+				}
 			}
 		}
 	}()

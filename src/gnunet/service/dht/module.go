@@ -26,6 +26,7 @@ import (
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
 	"net/http"
+	"time"
 )
 
 //======================================================================
@@ -72,7 +73,7 @@ func NewModule(ctx context.Context, c *core.Core) (m *Module) {
 		rtable:     rt,
 	}
 	// register as listener for core events
-	listener := m.Run(ctx, m.event, m.Filter())
+	listener := m.Run(ctx, m.event, m.Filter(), 15*time.Minute, m.heartbeat)
 	c.Register("dht", listener)
 
 	return
@@ -119,9 +120,24 @@ func (m *Module) Filter() *core.EventFilter {
 	return f
 }
 
-// Event handler
-func (nc *Module) event(ctx context.Context, ev *core.Event) {
+// Event handler for infrastructure signals
+func (m *Module) event(ctx context.Context, ev *core.Event) {
+	switch ev.ID {
+	// New peer connected:
+	case core.EV_CONNECT:
+		// Add peer to routing table
 
+	}
+
+}
+
+// Heartbeat handler for periodic tasks
+func (m *Module) heartbeat(ctx context.Context) {
+	// update the estimated network size
+	m.rtable.l2nse = m.core.L2NSE()
+
+	// run heartbeat for routing table
+	m.rtable.heartbeat(ctx)
 }
 
 //----------------------------------------------------------------------

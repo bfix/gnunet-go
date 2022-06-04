@@ -71,7 +71,7 @@ func main() {
 
 	// handle messages coming from network
 	module := service.NewModuleImpl()
-	listener := module.Run(ctx, process, nil)
+	listener := module.Run(ctx, process, nil, 0, nil)
 	c.Register("mockup", listener)
 
 	if !asServer {

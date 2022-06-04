@@ -74,7 +74,7 @@ func NewModule(ctx context.Context, c *core.Core) (m *Module) {
 		return nil
 	}
 	// register as listener for core events
-	listener := m.Run(ctx, m.event, m.Filter())
+	listener := m.Run(ctx, m.event, m.Filter(), 0, nil)
 	c.Register("gns", listener)
 	return m
 }

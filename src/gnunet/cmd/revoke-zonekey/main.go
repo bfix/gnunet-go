@@ -299,7 +299,7 @@ func main() {
 			}
 		}
 		// update elapsed time
-		rd.T.Add(util.AbsoluteTimeNow().Diff(startTime))
+		rd.T.Add(startTime.Elapsed())
 		rd.Last = last
 
 		log.Println("Writing revocation data to file...")
