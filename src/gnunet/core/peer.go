@@ -121,13 +121,15 @@ func (p *Peer) Address(transport string) *util.Address {
 	return nil
 }
 
-// HelloData returns the current HELLO data for the peer
-func (p *Peer) HelloData(ttl time.Duration) (h *blocks.HelloBlock, err error) {
+// HelloData returns the current HELLO data for the peer. The list of listening
+// endpoint addresses re passed in from core to reflect the actual active
+// endpoints.
+func (p *Peer) HelloData(ttl time.Duration, a []*util.Address) (h *blocks.HelloBlock, err error) {
 	// assemble HELLO data
 	h = new(blocks.HelloBlock)
 	h.PeerID = p.GetID()
 	h.Expire = util.NewAbsoluteTime(time.Now().Add(ttl))
-	h.SetAddresses(p.addrList)
+	h.SetAddresses(a)
 
 	// sign data
 	err = h.Sign(p.prv)

@@ -30,7 +30,7 @@ var (
 	cfg = &config.NodeConfig{
 		PrivateSeed: "YGoe6XFH3XdvFRl+agx9gIzPTvxA229WFdkazEMdcOs=",
 		Endpoints: []string{
-			"r5n+ip+udp://127.0.0.1:6666",
+			"ip+udp://127.0.0.1:6666",
 		},
 	}
 	TTL = 6 * time.Hour
@@ -45,7 +45,7 @@ func TestPeerHello(t *testing.T) {
 	}
 
 	// get HELLO data for the node
-	h, err := node.HelloData(TTL)
+	h, err := node.HelloData(TTL, node.addrList)
 
 	// convert to URL and back
 	u := h.URL()
