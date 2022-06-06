@@ -81,7 +81,7 @@ func NewModule(ctx context.Context, c *core.Core) (m *Module) {
 
 //----------------------------------------------------------------------
 
-// Get a block from the DHT
+// Get a block from the DHT ["dht:get"]
 func (nc *Module) Get(ctx context.Context, query blocks.Query) (block blocks.Block, err error) {
 
 	// check if we have the requested block in cache or permanent storage.
@@ -100,7 +100,7 @@ func (nc *Module) Get(ctx context.Context, query blocks.Query) (block blocks.Blo
 	return nil, nil
 }
 
-// Put a block into the DHT
+// Put a block into the DHT ["dht:put"]
 func (nc *Module) Put(ctx context.Context, key blocks.Query, block blocks.Block) error {
 	return nil
 }
@@ -138,6 +138,20 @@ func (m *Module) heartbeat(ctx context.Context) {
 
 	// run heartbeat for routing table
 	m.rtable.heartbeat(ctx)
+}
+
+//----------------------------------------------------------------------
+
+// Export functions
+func (m *Module) Export(fcn map[string]any) {
+	// add exported functions from module
+	fcn["dht:get"] = m.Get
+	fcn["dht:put"] = m.Put
+}
+
+// Import functions
+func (m *Module) Import(fcm map[string]any) {
+	// nothing to import now.
 }
 
 //----------------------------------------------------------------------

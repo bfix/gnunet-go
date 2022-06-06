@@ -98,8 +98,22 @@ func (m *Module) event(ctx context.Context, ev *core.Event) {
 
 //----------------------------------------------------------------------
 
+// Export functions
+func (m *Module) Export(fcn map[string]any) {
+	// add exported functions from module
+	fcn["rev:query"] = m.Query
+	fcn["rev:revoke"] = m.Revoke
+}
+
+// Import functions
+func (m *Module) Import(fcm map[string]any) {
+	// nothing to import now.
+}
+
+//----------------------------------------------------------------------
+
 // Query return true if the pkey is valid (not revoked) and false
-// if the pkey has been revoked.
+// if the pkey has been revoked ["rev:query"]
 func (m *Module) Query(ctx context.Context, zkey *crypto.ZoneKey) (valid bool, err error) {
 	// fast check first: is the key in the bloomfilter?
 	data := zkey.Bytes()
@@ -118,7 +132,7 @@ func (m *Module) Query(ctx context.Context, zkey *crypto.ZoneKey) (valid bool, e
 	return false, nil
 }
 
-// Revoke a key with given revocation data
+// Revoke a key with given revocation data ["rev:revoke"]
 func (m *Module) Revoke(ctx context.Context, rd *RevData) (success bool, err error) {
 	// verify the revocation data
 	diff, rc := rd.Verify(true)

@@ -98,6 +98,7 @@ type Module struct {
 	RevocationRevoke func(ctx context.Context, rd *revocation.RevData) (success bool, err error)
 }
 
+// NewModule instantiates a new GNS module.
 func NewModule(ctx context.Context, c *core.Core) (m *Module) {
 	m = &Module{
 		ModuleImpl: *service.NewModuleImpl(),
@@ -124,6 +125,23 @@ func (m *Module) Filter() *core.EventFilter {
 // Event handler
 func (m *Module) event(ctx context.Context, ev *core.Event) {
 
+}
+
+//----------------------------------------------------------------------
+
+// Export functions
+func (m *Module) Export(fcn map[string]any) {
+	// add exported functions from module
+}
+
+// Import functions
+func (m *Module) Import(fcn map[string]any) {
+	// resolve imports from other modules
+	m.LookupLocal = fcn["namecache:get"].(func(ctx context.Context, query *blocks.GNSQuery) (*blocks.GNSBlock, error))
+	m.StoreLocal = fcn["namecache:put"].(func(ctx context.Context, query *blocks.GNSQuery, block *blocks.GNSBlock) error)
+	m.LookupRemote = fcn["dht:get"].(func(ctx context.Context, query blocks.Query) (blocks.Block, error))
+	m.RevocationQuery = fcn["rev:query"].(func(ctx context.Context, zkey *crypto.ZoneKey) (valid bool, err error))
+	m.RevocationRevoke = fcn["rev:revoke"].(func(ctx context.Context, rd *revocation.RevData) (success bool, err error))
 }
 
 //----------------------------------------------------------------------

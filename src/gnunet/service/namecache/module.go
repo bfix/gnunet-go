@@ -35,23 +35,39 @@ import (
 //----------------------------------------------------------------------
 
 // Namecache handles the transient storage of GNS blocks under the query key.
-type NamecacheModule struct {
+type Module struct {
 	service.ModuleImpl
 
 	cache service.DHTStore // transient block cache
 }
 
 // NewModule creates a new module instance.
-func NewModule(ctx context.Context, c *core.Core) (m *NamecacheModule) {
-	m = &NamecacheModule{
+func NewModule(ctx context.Context, c *core.Core) (m *Module) {
+	m = &Module{
 		ModuleImpl: *service.NewModuleImpl(),
 	}
 	m.cache, _ = service.NewDHTStore(config.Cfg.Namecache.Storage)
 	return
 }
 
+//----------------------------------------------------------------------
+
+// Export functions
+func (m *Module) Export(fcn map[string]any) {
+	// add exported functions from module
+	fcn["namecache:get"] = m.Get
+	fcn["namecache:put"] = m.Put
+}
+
+// Import functions
+func (m *Module) Import(fcm map[string]any) {
+	// nothing to import now.
+}
+
+//----------------------------------------------------------------------
+
 // Get an entry from the cache if available.
-func (m *NamecacheModule) Get(ctx context.Context, query *blocks.GNSQuery) (block *blocks.GNSBlock, err error) {
+func (m *Module) Get(ctx context.Context, query *blocks.GNSQuery) (block *blocks.GNSBlock, err error) {
 	var b blocks.Block
 	b, err = m.cache.Get(query)
 	err = blocks.Unwrap(b, block)
@@ -59,6 +75,6 @@ func (m *NamecacheModule) Get(ctx context.Context, query *blocks.GNSQuery) (bloc
 }
 
 // Put entry into the cache.
-func (m *NamecacheModule) Put(ctx context.Context, query *blocks.GNSQuery, block *blocks.GNSBlock) error {
+func (m *Module) Put(ctx context.Context, query *blocks.GNSQuery, block *blocks.GNSBlock) error {
 	return m.cache.Put(query, block)
 }
