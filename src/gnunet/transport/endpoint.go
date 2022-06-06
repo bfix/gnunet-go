@@ -32,6 +32,7 @@ var (
 	ErrEndpProtocolMismatch = errors.New("transport protocol mismatch")
 	ErrEndpProtocolUnknown  = errors.New("unknown transport protocol")
 	ErrEndpExists           = errors.New("endpoint exists")
+	ErrEndpNoAddress        = errors.New("no address for endpoint")
 )
 
 // Endpoint represents a local endpoint that can send and receive messages.
@@ -86,7 +87,7 @@ func (ep *PaketEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) (
 	// create listener
 	var lc net.ListenConfig
 	xproto := ep.addr.Network()
-	if ep.conn, err = lc.ListenPacket(ctx, epProtocol(xproto), ep.addr.String()); err != nil {
+	if ep.conn, err = lc.ListenPacket(ctx, EpProtocol(xproto), ep.addr.String()); err != nil {
 		return
 	}
 	// use the actual listening address
@@ -150,7 +151,7 @@ func (ep *PaketEndpoint) read() (tm *TransportMessage, err error) {
 func (ep *PaketEndpoint) Send(ctx context.Context, addr net.Addr, msg *TransportMessage) (err error) {
 	// resolve target address
 	var a *net.UDPAddr
-	a, err = net.ResolveUDPAddr(epProtocol(addr.Network()), addr.String())
+	a, err = net.ResolveUDPAddr(EpProtocol(addr.Network()), addr.String())
 
 	// get message content (TransportMessage)
 	var buf []byte
@@ -219,7 +220,7 @@ func (ep *StreamEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) 
 	// create listener
 	var lc net.ListenConfig
 	xproto := ep.addr.Network()
-	if ep.listener, err = lc.Listen(ctx, epProtocol(xproto), ep.addr.String()); err != nil {
+	if ep.listener, err = lc.Listen(ctx, EpProtocol(xproto), ep.addr.String()); err != nil {
 		return
 	}
 	// get actual listening address
@@ -331,9 +332,9 @@ func newStreamEndpoint(addr net.Addr) (ep *StreamEndpoint, err error) {
 // net.Adddr.Network() strings
 //----------------------------------------------------------------------
 
-// epProtocol returns the transport protocol for a given network string
+// EpProtocol returns the transport protocol for a given network string
 // that can include extended protocol information like "r5n+ip+udp"
-func epProtocol(netw string) string {
+func EpProtocol(netw string) string {
 	switch netw {
 	case "udp", "udp4", "udp6", "ip+udp":
 		return "udp"
@@ -347,7 +348,7 @@ func epProtocol(netw string) string {
 
 // epMode returns the endpoint mode (packet or stream) for a given network
 func epMode(netw string) string {
-	switch epProtocol(netw) {
+	switch EpProtocol(netw) {
 	case "udp":
 		return "packet"
 	case "tcp", "unix":
