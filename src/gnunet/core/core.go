@@ -85,7 +85,7 @@ func NewCore(ctx context.Context, node *config.NodeConfig) (c *Core, err error) 
 		local:     peer,
 		incoming:  incoming,
 		listeners: make(map[string]*Listener),
-		trans:     transport.NewTransport(ctx, incoming),
+		trans:     transport.NewTransport(ctx, node.Name, incoming),
 		peers:     util.NewPeerAddrList(),
 		endpoints: make(map[string]*EndpointRef),
 	}
@@ -107,7 +107,7 @@ func NewCore(ctx context.Context, node *config.NodeConfig) (c *Core, err error) 
 			// handle UPNP port forwarding
 			protocol := transport.EpProtocol(epCfg.Network)
 			var localA, remoteA string
-			if upnpId, remoteA, localA, err = transport.UPnP_Open(protocol, epCfg.Address[5:], epCfg.Port); err != nil {
+			if upnpId, remoteA, localA, err = c.trans.ForwardOpen(protocol, epCfg.Address[5:], epCfg.Port); err != nil {
 				return
 			}
 			// parse local and remote addresses
@@ -189,6 +189,12 @@ func NewCore(ctx context.Context, node *config.NodeConfig) (c *Core, err error) 
 		}
 	}()
 	return
+}
+
+// Shutdown all core-related processes.
+func (c *Core) Shutdown() {
+	c.trans.Shutdown()
+	c.local.Shutdown()
 }
 
 //----------------------------------------------------------------------

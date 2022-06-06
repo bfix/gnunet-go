@@ -90,6 +90,9 @@ func NewPeer(peerID string) (p *Peer, err error) {
 	return
 }
 
+// Shutdown peer-related processes.
+func (p *Peer) Shutdown() {}
+
 //----------------------------------------------------------------------
 //----------------------------------------------------------------------
 

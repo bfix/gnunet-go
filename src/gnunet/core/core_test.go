@@ -22,7 +22,6 @@ import (
 	"context"
 	"encoding/hex"
 	"gnunet/config"
-	"gnunet/transport"
 	"gnunet/util"
 	"testing"
 	"time"
@@ -37,6 +36,7 @@ func TestCoreSimple(t *testing.T) {
 
 	var (
 		peer1Cfg = &config.NodeConfig{
+			Name:        "p1",
 			PrivateSeed: "iYK1wSi5XtCP774eNFk1LYXqKlOPEpwKBw+2/bMkE24=",
 			Endpoints: []*config.EndpointConfig{
 				{
@@ -50,6 +50,7 @@ func TestCoreSimple(t *testing.T) {
 		}
 
 		peer2Cfg = &config.NodeConfig{
+			Name:        "p2",
 			PrivateSeed: "Bv9umksEO51jjWWrOGEH+4r8wl9Vi+LItpdBpTOi2PE=",
 			Endpoints: []*config.EndpointConfig{
 				{
@@ -71,11 +72,11 @@ func TestCoreSimple(t *testing.T) {
 	}()
 
 	// create and run nodes
-	node1, err := NewTestNode(t, ctx, peer1Cfg, "p1")
+	node1, err := NewTestNode(t, ctx, peer1Cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	node2, err := NewTestNode(t, ctx, peer2Cfg, "p2")
+	node2, err := NewTestNode(t, ctx, peer2Cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,15 +101,11 @@ func TestCoreSimple(t *testing.T) {
 
 // TestCoreSimple test a two node network
 func TestCoreUPNP(t *testing.T) {
-	// start UPnP
-	if err := transport.UPnP_Start("test"); err != nil {
-		t.Fatal(err)
-	}
-	defer transport.UPnP_Quit()
 
 	// configuration data
 	var (
 		peer1Cfg = &config.NodeConfig{
+			Name:        "p1",
 			PrivateSeed: "iYK1wSi5XtCP774eNFk1LYXqKlOPEpwKBw+2/bMkE24=",
 			Endpoints: []*config.EndpointConfig{
 				{
@@ -121,6 +118,7 @@ func TestCoreUPNP(t *testing.T) {
 			},
 		}
 		peer2Cfg = &config.NodeConfig{
+			Name:        "p2",
 			PrivateSeed: "Bv9umksEO51jjWWrOGEH+4r8wl9Vi+LItpdBpTOi2PE=",
 			Endpoints: []*config.EndpointConfig{
 				{
@@ -142,16 +140,16 @@ func TestCoreUPNP(t *testing.T) {
 	}()
 
 	// create and run nodes
-	node1, err := NewTestNode(t, ctx, peer1Cfg, "p1")
+	node1, err := NewTestNode(t, ctx, peer1Cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer node1.Shutdown()
-	node2, err := NewTestNode(t, ctx, peer2Cfg, "p2")
+	node2, err := NewTestNode(t, ctx, peer2Cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer node1.Shutdown()
+	defer node2.Shutdown()
 
 	// learn peer addresses (triggers HELLO)
 	list, err := node2.core.Addresses()
@@ -179,7 +177,7 @@ type TestNode struct {
 }
 
 func (n *TestNode) Shutdown() {
-
+	n.core.Shutdown()
 }
 
 func (n *TestNode) Learn(ctx context.Context, peer *util.PeerID, addr *util.Address) {
@@ -189,7 +187,7 @@ func (n *TestNode) Learn(ctx context.Context, peer *util.PeerID, addr *util.Addr
 	}
 }
 
-func NewTestNode(t *testing.T, ctx context.Context, cfg *config.NodeConfig, id string) (node *TestNode, err error) {
+func NewTestNode(t *testing.T, ctx context.Context, cfg *config.NodeConfig) (node *TestNode, err error) {
 
 	// create test node
 	node = new(TestNode)
@@ -223,7 +221,7 @@ func NewTestNode(t *testing.T, ctx context.Context, cfg *config.NodeConfig, id s
 
 	// register as event listener
 	incoming := make(chan *Event)
-	node.core.Register(id, NewListener(incoming, nil))
+	node.core.Register(cfg.Name, NewListener(incoming, nil))
 
 	// heart beat
 	tick := time.NewTicker(5 * time.Minute)

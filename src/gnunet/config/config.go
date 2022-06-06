@@ -50,6 +50,7 @@ func (c *EndpointConfig) Addr() string {
 
 // NodeConfig holds parameters for the local node instance
 type NodeConfig struct {
+	Name        string            `json:"name"`        // (short) name for local node
 	PrivateSeed string            `json:"privateSeed"` // Node private key seed (base64)
 	Endpoints   []*EndpointConfig `json:"endpoints"`   // list of endpoints available
 }

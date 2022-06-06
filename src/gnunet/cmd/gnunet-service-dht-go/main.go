@@ -32,7 +32,6 @@ import (
 	"gnunet/rpc"
 	"gnunet/service"
 	"gnunet/service/dht"
-	"gnunet/transport"
 
 	"github.com/bfix/gospel/logger"
 )
@@ -82,12 +81,6 @@ func main() {
 		params = config.Cfg.GNS.Service.Params
 	}
 
-	// start UPnP handler
-	if err := transport.UPnP_Start("gnunet-dht-go"); err != nil {
-		logger.Println(logger.CRITICAL, "UPnP not available!")
-	}
-	defer transport.UPnP_Quit()
-
 	// instantiate core service
 	ctx, cancel := context.WithCancel(context.Background())
 	var c *core.Core
@@ -95,6 +88,7 @@ func main() {
 		logger.Printf(logger.ERROR, "[dht] core failed: %s\n", err.Error())
 		return
 	}
+	defer c.Shutdown()
 
 	// start a new DHT service
 	dht := dht.NewService(ctx, c)

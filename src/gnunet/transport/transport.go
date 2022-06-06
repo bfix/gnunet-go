@@ -25,6 +25,8 @@ import (
 	"gnunet/message"
 	"gnunet/util"
 	"net"
+
+	"github.com/bfix/gospel/network"
 )
 
 // Trnsport layer error codes
@@ -81,14 +83,27 @@ func NewTransportMessage(peer *util.PeerID, msg message.Message) (tm *TransportM
 type Transport struct {
 	incoming  chan *TransportMessage   // messages as received from the network
 	endpoints *util.Map[int, Endpoint] // list of available endpoints
+	upnp      *network.PortMapper      // UPnP mapper (optional)
 }
 
 // NewTransport creates and runs a new transport layer implementation.
-func NewTransport(ctx context.Context, ch chan *TransportMessage) (t *Transport) {
+func NewTransport(ctx context.Context, tag string, ch chan *TransportMessage) (t *Transport) {
 	// create transport instance
+	mngr, err := network.NewPortMapper(tag)
+	if err != nil {
+		mngr = nil
+	}
 	return &Transport{
 		incoming:  ch,
 		endpoints: util.NewMap[int, Endpoint](),
+		upnp:      mngr,
+	}
+}
+
+// Shutdown transport-related processes
+func (t *Transport) Shutdown() {
+	if t.upnp != nil {
+		t.upnp.Close()
 	}
 }
 
@@ -134,4 +149,20 @@ func (t *Transport) AddEndpoint(ctx context.Context, addr *util.Address) (ep End
 	t.endpoints.Put(ep.ID(), ep)
 	ep.Run(ctx, t.incoming)
 	return
+}
+
+//----------------------------------------------------------------------
+// UPnP handling
+//----------------------------------------------------------------------
+
+// ForwardOpen returns a local address for listening that will receive traffic
+// from a port forward handled by UPnP on the router.
+func (t *Transport) ForwardOpen(protocol, param string, port int) (id, local, remote string, err error) {
+	// no parameters currently defined, so just do the assignment.
+	return t.upnp.Assign(protocol, port)
+}
+
+// ForwardClose closes a specific port forwarding
+func (t *Transport) ForwardClose(id string) error {
+	return t.upnp.Unassign(id)
 }
