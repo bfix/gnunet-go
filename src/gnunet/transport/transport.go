@@ -135,13 +135,3 @@ func (t *Transport) AddEndpoint(ctx context.Context, addr *util.Address) (ep End
 	ep.Run(ctx, t.incoming)
 	return
 }
-
-// Endpoints returns a list of listening addresses managed by transport.
-func (t *Transport) Endpoints() (list []net.Addr) {
-	list = make([]net.Addr, 0)
-	t.endpoints.ProcessRange(func(_ int, ep Endpoint) error {
-		list = append(list, ep.Address())
-		return nil
-	}, true)
-	return
-}

@@ -31,6 +31,14 @@ import (
 	"time"
 )
 
+//----------------------------------------------------------------------
+// Core-related error codes
+var (
+	ErrCoreNoUpnpDyn  = errors.New("no dynamic port with UPnP")
+	ErrCoreNoEndpAddr = errors.New("no endpoint for address")
+)
+
+//----------------------------------------------------------------------
 // EndpointRef is a reference to an endpoint instance managed by core.
 type EndpointRef struct {
 	id     string             // endpoint identifier in configuration
@@ -39,6 +47,7 @@ type EndpointRef struct {
 	upnpId string             // UPNP identifier (empty if unused)
 }
 
+//----------------------------------------------------------------------
 // Core service
 type Core struct {
 	// local peer instance
@@ -90,17 +99,22 @@ func NewCore(ctx context.Context, node *config.NodeConfig) (c *Core, err error) 
 		)
 		// handle special addresses:
 		if strings.HasPrefix(epCfg.Address, "upnp:") {
+			// don't allow dynamic port assignment
+			if epCfg.Port == 0 {
+				err = ErrCoreNoUpnpDyn
+				return
+			}
 			// handle UPNP port forwarding
 			protocol := transport.EpProtocol(epCfg.Network)
 			var localA, remoteA string
-			if upnpId, localA, remoteA, err = transport.UPNP(protocol, epCfg.Address[5:], epCfg.Port); err != nil {
+			if upnpId, remoteA, localA, err = transport.UPnP_Open(protocol, epCfg.Address[5:], epCfg.Port); err != nil {
 				return
 			}
 			// parse local and remote addresses
-			if local, err = util.ParseAddress(localA); err != nil {
+			if local, err = util.ParseAddress(epCfg.Network + "://" + localA); err != nil {
 				return
 			}
-			if remote, err = util.ParseAddress(remoteA); err != nil {
+			if remote, err = util.ParseAddress(epCfg.Network + "://" + remoteA); err != nil {
 				return
 			}
 		} else {
@@ -184,11 +198,33 @@ func NewCore(ctx context.Context, node *config.NodeConfig) (c *Core, err error) 
 func (c *Core) Send(ctx context.Context, peer *util.PeerID, msg message.Message) error {
 	// TODO: select best endpoint protocol for transport; now fixed to IP+UDP
 	netw := "ip+udp"
-	addr := c.peers.Get(peer.String(), netw)
-	if addr == nil {
-		return errors.New("no endpoint for address")
+	addrs := c.peers.Get(peer.String(), netw)
+	if len(addrs) == 0 {
+		return ErrCoreNoEndpAddr
 	}
+	// TODO: select best address; curently selects first
+	addr := addrs[0]
+
+	// select best endpoint for transport
+	var ep transport.Endpoint
+	for _, epCfg := range c.endpoints {
+		if epCfg.addr.Network() == netw {
+			if ep == nil {
+				ep = epCfg.ep
+			}
+			// TODO: compare endpoints, select better one:
+			// if ep.Better(epCfg.ep) {
+			//     ep = epCfg.ep
+			// }
+		}
+	}
+	// check we have an endpoint to send on
+	if ep == nil {
+		return ErrCoreNoEndpAddr
+	}
+	// assemble transport message
 	tm := transport.NewTransportMessage(c.PeerID(), msg)
+	// send on transport
 	return c.trans.Send(ctx, addr, tm)
 }
 
@@ -219,6 +255,16 @@ func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addr *util.Address)
 	return
 }
 
+// Addresses returns the list of listening endpoint addresses
+func (c *Core) Addresses() (list []*util.Address, err error) {
+	for _, epRef := range c.endpoints {
+		list = append(list, epRef.addr)
+	}
+	return
+}
+
+//----------------------------------------------------------------------
+
 // Peer returns the local peer
 func (c *Core) Peer() *Peer {
 	return c.local
@@ -228,6 +274,8 @@ func (c *Core) Peer() *Peer {
 func (c *Core) PeerID() *util.PeerID {
 	return c.local.GetID()
 }
+
+//----------------------------------------------------------------------
 
 // TryConnect is a function which allows the local peer to attempt the
 // establishment of a connection to another peer using an address.

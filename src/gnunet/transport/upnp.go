@@ -19,9 +19,6 @@
 package transport
 
 import (
-	"errors"
-	"strings"
-
 	"github.com/bfix/gospel/network"
 )
 
@@ -32,19 +29,25 @@ var (
 	upnpManager *network.PortMapper
 )
 
-// initialize at start-up
-func init() {
-	upnpManager, _ = network.NewPortMapper("gnunet-go")
+// UPnP_Start initialize at start-up
+func UPnP_Start(tag string) (err error) {
+	upnpManager, err = network.NewPortMapper(tag)
+	return
 }
 
-//----------------------------------------------------------------------
-// UPNP returns a local address for listening that will receive traffic
+// UPnP_Open returns a local address for listening that will receive traffic
 // from a port forward handled by UPnP on the router.
-func UPNP(protocol, addr string, port int) (id, local, remote string, err error) {
-	// check address format.
-	if !strings.HasPrefix(addr, "upnp:") {
-		err = errors.New("invalid address for UPNP")
-		return
-	}
+func UPnP_Open(protocol, param string, port int) (id, local, remote string, err error) {
+	// no parameters currently defined, so just do the assignment.
 	return upnpManager.Assign(protocol, port)
+}
+
+// UPnP_Close closes a port forwarding
+func UPnP_Close(id string) error {
+	return upnpManager.Unassign(id)
+}
+
+// UPnP_Quit terminates UPnP
+func UPnP_Quit() error {
+	return upnpManager.Close()
 }

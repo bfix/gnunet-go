@@ -34,11 +34,11 @@ type Address struct {
 }
 
 // NewAddress returns a new Address for the given transport and specs
-func NewAddress(transport string, addr []byte) *Address {
+func NewAddress(transport string, addr string) *Address {
 	return &Address{
 		Netw:    transport,
 		Options: 0,
-		Address: Clone(addr),
+		Address: Clone([]byte(addr)),
 		Expires: AbsoluteTimeNever(),
 	}
 }
@@ -61,7 +61,7 @@ func ParseAddress(s string) (addr *Address, err error) {
 		err = fmt.Errorf("invalid address format: '%s'", s)
 		return
 	}
-	addr = NewAddress(p[0], []byte(strings.Trim(p[1], "/")))
+	addr = NewAddress(p[0], strings.Trim(p[1], "/"))
 	return
 }
 
@@ -160,7 +160,7 @@ func (a *PeerAddrList) Add(id string, addr *Address) (mode int) {
 }
 
 // Get address for peer
-func (a *PeerAddrList) Get(id string, transport string) *Address {
+func (a *PeerAddrList) Get(id string, transport string) (res []*Address) {
 	list, ok := a.list.Get(id)
 	if ok {
 		for _, addr := range list {
@@ -174,10 +174,10 @@ func (a *PeerAddrList) Get(id string, transport string) *Address {
 				// skip other transports
 				continue
 			}
-			return addr
+			res = append(res, addr)
 		}
 	}
-	return nil
+	return
 }
 
 // Delete a list entry by key.

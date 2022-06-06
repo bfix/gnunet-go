@@ -33,6 +33,7 @@ var (
 	ErrEndpProtocolUnknown  = errors.New("unknown transport protocol")
 	ErrEndpExists           = errors.New("endpoint exists")
 	ErrEndpNoAddress        = errors.New("no address for endpoint")
+	ErrEndpNoConnection     = errors.New("no connection on endpoint")
 )
 
 // Endpoint represents a local endpoint that can send and receive messages.
@@ -91,7 +92,7 @@ func (ep *PaketEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) (
 		return
 	}
 	// use the actual listening address
-	ep.addr = util.NewAddress(xproto, []byte(ep.conn.LocalAddr().String()))
+	ep.addr = util.NewAddress(xproto, ep.conn.LocalAddr().String())
 
 	// run watch dog for termination
 	go func() {
@@ -149,6 +150,10 @@ func (ep *PaketEndpoint) read() (tm *TransportMessage, err error) {
 
 // Send message to address from endpoint
 func (ep *PaketEndpoint) Send(ctx context.Context, addr net.Addr, msg *TransportMessage) (err error) {
+	// check for valid connection
+	if ep.conn == nil {
+		return ErrEndpNoConnection
+	}
 	// resolve target address
 	var a *net.UDPAddr
 	a, err = net.ResolveUDPAddr(EpProtocol(addr.Network()), addr.String())
@@ -177,8 +182,9 @@ func (ep *PaketEndpoint) Address() net.Addr {
 }
 
 // CanSendTo returns true if the endpoint can sent to address
-func (ep *PaketEndpoint) CanSendTo(addr net.Addr) bool {
-	return epMode(addr.Network()) == "packet"
+func (ep *PaketEndpoint) CanSendTo(addr net.Addr) (ok bool) {
+	ok = EpProtocol(addr.Network()) == EpProtocol(ep.addr.Network())
+	return
 }
 
 // ID returns the endpoint identifier
@@ -224,7 +230,7 @@ func (ep *StreamEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) 
 		return
 	}
 	// get actual listening address
-	ep.addr = util.NewAddress(xproto, []byte(ep.listener.Addr().String()))
+	ep.addr = util.NewAddress(xproto, ep.listener.Addr().String())
 
 	// run watch dog for termination
 	go func() {
