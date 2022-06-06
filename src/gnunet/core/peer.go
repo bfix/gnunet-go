@@ -48,7 +48,6 @@ type Peer struct {
 	prv      *ed25519.PrivateKey      // node private key (long-term signing key)
 	pub      *ed25519.PublicKey       // node public key (=identifier)
 	idString string                   // node identifier as string
-	addrList []*util.Address          // list of addresses associated with node
 	ephPrv   *ed25519.PrivateKey      // ephemeral signing key
 	ephMsg   *message.EphemeralKeyMsg // ephemeral signing key message
 }
@@ -73,16 +72,6 @@ func NewLocalPeer(cfg *config.NodeConfig) (p *Peer, err error) {
 	if err != nil {
 		return
 	}
-	// set the endpoint addresses for local node
-	p.addrList = make([]*util.Address, len(cfg.Endpoints))
-	var addr *util.Address
-	for i, a := range cfg.Endpoints {
-		if addr, err = util.ParseAddress(a); err != nil {
-			return
-		}
-		addr.Expires = util.NewAbsoluteTime(time.Now().Add(12 * time.Hour))
-		p.addrList[i] = addr
-	}
 	return
 }
 
@@ -98,28 +87,11 @@ func NewPeer(peerID string) (p *Peer, err error) {
 	p.prv = nil
 	p.pub = ed25519.NewPublicKeyFromBytes(data)
 	p.idString = util.EncodeBinaryToString(p.pub.Bytes())
-	p.addrList = make([]*util.Address, 0)
 	return
 }
 
 //----------------------------------------------------------------------
 //----------------------------------------------------------------------
-
-// Address returns a peer address for the given transport protocol
-func (p *Peer) Address(transport string) *util.Address {
-	for _, addr := range p.addrList {
-		// skip expired entries
-		if addr.Expires.Expired() {
-			continue
-		}
-		// filter by transport protocol
-		if len(transport) > 0 && transport != addr.Netw {
-			continue
-		}
-		return addr
-	}
-	return nil
-}
 
 // HelloData returns the current HELLO data for the peer. The list of listening
 // endpoint addresses re passed in from core to reflect the actual active
@@ -171,16 +143,6 @@ func (p *Peer) GetID() *util.PeerID {
 // GetIDString returns the string representation of the public key of the node.
 func (p *Peer) GetIDString() string {
 	return p.idString
-}
-
-// GetAddressList returns a list of addresses associated with this peer.
-func (p *Peer) GetAddressList() []*util.Address {
-	return p.addrList
-}
-
-// AddAddress adds a new address for a node.
-func (p *Peer) AddAddress(a *util.Address) {
-	p.addrList = append(p.addrList, a)
 }
 
 // Sign a message with the (long-term) private key.
