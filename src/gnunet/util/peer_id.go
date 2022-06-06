@@ -25,22 +25,19 @@ type PeerID struct {
 	Key []byte `size:"32"`
 }
 
-// NewPeerID creates a new object from the data.
-func NewPeerID(data []byte) *PeerID {
-	if data == nil {
-		data = make([]byte, 32)
-	} else {
+// NewPeerID creates a new peer id from data.
+func NewPeerID(data []byte) (p *PeerID) {
+	p = &PeerID{
+		Key: make([]byte, 32),
+	}
+	if data != nil {
 		if len(data) < 32 {
-			buf := make([]byte, 32)
-			CopyAlignedBlock(buf, data)
-			data = buf
+			CopyAlignedBlock(p.Key, data)
 		} else {
-			data = Clone(data[:32])
+			copy(p.Key, data[:32])
 		}
 	}
-	return &PeerID{
-		Key: data,
-	}
+	return
 }
 
 // Equals returns true if two peer IDs match.
