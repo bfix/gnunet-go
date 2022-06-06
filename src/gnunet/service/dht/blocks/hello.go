@@ -177,7 +177,7 @@ func (h *HelloBlock) URL() string {
 		if i > 0 {
 			u += "&"
 		}
-		u += url.QueryEscape(a.String())
+		u += url.QueryEscape(a.URI())
 	}
 	return u
 }

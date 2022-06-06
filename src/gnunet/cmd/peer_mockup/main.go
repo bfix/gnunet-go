@@ -22,13 +22,19 @@ var (
 	// configuration for local node
 	localCfg = &config.NodeConfig{
 		PrivateSeed: "YGoe6XFH3XdvFRl+agx9gIzPTvxA229WFdkazEMdcOs=",
-		Endpoints: []string{
-			"udp:127.0.0.1:2086",
+		Endpoints: []*config.EndpointConfig{
+			{
+				ID:      "local",
+				Network: "udp",
+				Address: "127.0.0.1",
+				Port:    2086,
+				TTL:     86400,
+			},
 		},
 	}
 	// configuration for remote node
 	remoteCfg  = "3GXXMNb5YpIUO7ejIR2Yy0Cf5texuLfDjHkXcqbPxkc="
-	remoteAddr = "udp:172.17.0.5:2086"
+	remoteAddr = "udp://172.17.0.5:2086"
 
 	// top-level variables used accross functions
 	local  *core.Peer // local peer (with private key)
@@ -50,14 +56,11 @@ func main() {
 	flag.Parse()
 
 	// setup peer and core instances
-	if local, err = core.NewLocalPeer(localCfg); err != nil {
-		fmt.Println("local failed: " + err.Error())
-		return
-	}
-	if c, err = core.NewCore(ctx, local); err != nil {
+	if c, err = core.NewCore(ctx, localCfg); err != nil {
 		fmt.Println("core failed: " + err.Error())
 		return
 	}
+	local = c.Peer()
 	if remote, err = core.NewPeer(remoteCfg); err != nil {
 		fmt.Println("remote failed: " + err.Error())
 		return

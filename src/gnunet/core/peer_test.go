@@ -21,6 +21,7 @@ package core
 import (
 	"gnunet/config"
 	"gnunet/service/dht/blocks"
+	"gnunet/util"
 	"testing"
 	"time"
 )
@@ -29,8 +30,13 @@ import (
 var (
 	cfg = &config.NodeConfig{
 		PrivateSeed: "YGoe6XFH3XdvFRl+agx9gIzPTvxA229WFdkazEMdcOs=",
-		Endpoints: []string{
-			"ip+udp://127.0.0.1:6666",
+		Endpoints: []*config.EndpointConfig{
+			{
+				ID:      "test",
+				Network: "r5n+ip+udp",
+				Address: "127.0.0.1",
+				Port:    6666,
+			},
 		},
 	}
 	TTL = 6 * time.Hour
@@ -44,8 +50,17 @@ func TestPeerHello(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// get HELLO data for the node
-	h, err := node.HelloData(TTL, node.addrList)
+	// get HELLO data for the node:
+	// This hack will only work for direct listening addresses
+	addrList := make([]*util.Address, 0)
+	for _, epRef := range cfg.Endpoints {
+		addr, err := util.ParseAddress(epRef.Addr())
+		if err != nil {
+			t.Fatal(err)
+		}
+		addrList = append(addrList, addr)
+	}
+	h, err := node.HelloData(TTL, addrList)
 
 	// convert to URL and back
 	u := h.URL()

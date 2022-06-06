@@ -109,7 +109,12 @@ func (t *Transport) Send(ctx context.Context, addr net.Addr, msg *TransportMessa
 
 // AddEndpoint instantiates and run a new endpoint handler for the
 // given address (must map to a network interface).
-func (t *Transport) AddEndpoint(ctx context.Context, addr net.Addr) (a net.Addr, err error) {
+func (t *Transport) AddEndpoint(ctx context.Context, addr *util.Address) (ep Endpoint, err error) {
+	// check for valid address
+	if addr == nil {
+		err = ErrEndpNoAddress
+		return
+	}
 	// check if endpoint is already available
 	as := addr.Network() + "://" + addr.String()
 	if err = t.endpoints.ProcessRange(func(_ int, ep Endpoint) error {
@@ -122,14 +127,13 @@ func (t *Transport) AddEndpoint(ctx context.Context, addr net.Addr) (a net.Addr,
 		return
 	}
 	// register new endpoint
-	var ep Endpoint
 	if ep, err = NewEndpoint(addr); err != nil {
 		return
 	}
 	// add endpoint to list and run it
 	t.endpoints.Put(ep.ID(), ep)
 	ep.Run(ctx, t.incoming)
-	return ep.Address(), nil
+	return
 }
 
 // Endpoints returns a list of listening addresses managed by transport.

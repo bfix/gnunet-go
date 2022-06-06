@@ -91,8 +91,11 @@ func (a *Address) Network() string {
 
 //----------------------------------------------------------------------
 
-// AddressString returns a string representaion of an address.
-func AddressString(network string, addr []byte) string {
+// URI returns a string representaion of an address.
+func (a *Address) URI() string {
+	return URI(a.Netw, a.Address)
+}
+func URI(network string, addr []byte) string {
 	return network + "://" + string(addr)
 }
 

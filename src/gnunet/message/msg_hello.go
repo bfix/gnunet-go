@@ -59,7 +59,7 @@ func NewHelloAddress(a *util.Address) *HelloAddress {
 // String returns a human-readable representation of the message.
 func (a *HelloAddress) String() string {
 	return fmt.Sprintf("Address{%s,expire=%s}",
-		util.AddressString(a.Transport, a.Address), a.ExpireOn)
+		util.URI(a.Transport, a.Address), a.ExpireOn)
 }
 
 // HelloMsg is a message send by peers to announce their presence
