@@ -1,58 +1,64 @@
 {
-	"local": {
-		"privateSeed": "YGoe6XFH3XdvFRl+agx9gIzPTvxA229WFdkazEMdcOs=",
-		"endpoints": [
-			"ip+udp://127.0.0.1:6666"
-		]
-	},
-	"bootstrap": {
-		"nodes": [
-			"gnunet://hello/7KTBJ90340HF1Q2GB0A57E2XJER4FDHX8HP5GHEB9125VPWPD27G/BNMDFN6HJCPWSPNBSEC06MC1K8QN1Z2DHRQSRXDTFR7FTBD4JHNBJ2RJAAEZ31FWG1Q3PMN3PXGZQ3Q7NTNEKQZFA7TE2Y46FM8E20R/1653499308?r5n%2Bip%2Budp%3A127.0.0.1%3A7654"
-		]
-	},
-	"environ": {
-		"TMP": "/tmp",
-		"RT_SYS": "${TMP}/gnunet-system-runtime"
-	},
-	"dht": {
-		"service": {
-			"socket": "${RT_SYS}/gnunet-service-dht.sock",
-			"params": {
-				"perm": "0770"
-			}
-		},
-		"storage": "dht_file_store+/var/lib/gnunet/dht/store",
-		"cache": "dht_file_cache+/var/lib/gnunet/dht/cache+1000"
-	},
-	"gns": {
-		"service": {
-			"socket": "${RT_SYS}/gnunet-service-gns-go.sock",
-			"params": {
-				"perm": "0770"
-			}
-		},
-		"dhtReplLevel": 10,
-		"maxDepth": 250
-	},
-	"namecache": {
-		"service": {
-			"socket": "${RT_SYS}/gnunet-service-namecache.sock",
-			"params": {
-				"perm": "0770"
-			}
-		},
-		"storage": "dht_file_cache:/var/lib/gnunet/namecache:1000"
-	},
-	"revocation": {
-		"service": {
-			"socket": "${RT_SYS}/gnunet-service-revocation-go.sock",
-			"params": {
-				"perm": "0770"
-			}
-		},
-		"storage": "redis:localhost:6397::15"
-	},
-	"rpc": {
-		"endpoint": "tcp:127.0.0.1:80"
-	}
+    "bootstrap": {
+        "nodes": [
+            "gnunet://hello/7KTBJ90340HF1Q2GB0A57E2XJER4FDHX8HP5GHEB9125VPWPD27G/BNMDFN6HJCPWSPNBSEC06MC1K8QN1Z2DHRQSRXDTFR7FTBD4JHNBJ2RJAAEZ31FWG1Q3PMN3PXGZQ3Q7NTNEKQZFA7TE2Y46FM8E20R/1653499308?r5n%2Bip%2Budp%3A127.0.0.1%3A7654"
+        ]
+    },
+    "local": {
+        "privateSeed": "YGoe6XFH3XdvFRl+agx9gIzPTvxA229WFdkazEMdcOs=",
+        "endpoints": [
+            {
+                "id": "test",
+                "network": "ip+udp",
+                "address": "upnp:192.168.178.1",
+                "port": 6666,
+                "ttl": 86400
+            }
+        ]
+    },
+    "environ": {
+        "TMP": "/tmp",
+        "RT_SYS": "${TMP}/gnunet-system-runtime"
+    },
+    "dht": {
+        "service": {
+            "socket": "${RT_SYS}/gnunet-service-dht.sock",
+            "params": {
+                "perm": "0770"
+            }
+        },
+        "storage": "dht_file_store+/var/lib/gnunet/dht/store",
+        "cache": "dht_file_cache+/var/lib/gnunet/dht/cache+1000"
+    },
+    "gns": {
+        "service": {
+            "socket": "${RT_SYS}/gnunet-service-gns-go.sock",
+            "params": {
+                "perm": "0770"
+            }
+        },
+        "dhtReplLevel": 10,
+        "maxDepth": 250
+    },
+    "namecache": {
+        "service": {
+            "socket": "${RT_SYS}/gnunet-service-namecache.sock",
+            "params": {
+                "perm": "0770"
+            }
+        },
+        "storage": "dht_file_cache:/var/lib/gnunet/namecache:1000"
+    },
+    "revocation": {
+        "service": {
+            "socket": "${RT_SYS}/gnunet-service-revocation-go.sock",
+            "params": {
+                "perm": "0770"
+            }
+        },
+        "storage": "redis:localhost:6397::15"
+    },
+    "rpc": {
+        "endpoint": "tcp:127.0.0.1:80"
+    }
 }

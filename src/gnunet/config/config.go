@@ -20,6 +20,7 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"reflect"
 	"regexp"
@@ -32,10 +33,25 @@ import (
 // Configuration for local node
 //----------------------------------------------------------------------
 
+// EndpointConfig holds parameters for local network listeners.
+type EndpointConfig struct {
+	ID      string `json:"id"`      // endpoint identifier
+	Network string `json:"network"` // network protocol to use on endpoint
+	Address string `json:"address"` // address to listen on
+	Port    int    `json:"port"`    // port for listening to network
+	TTL     int    `json:"ttl"`     // time-to-live for address (in seconds)
+}
+
+// Addr returns an address string for endpoint configuration; it does NOT
+// handle special cases like UPNP and such.
+func (c *EndpointConfig) Addr() string {
+	return fmt.Sprintf("%s://%s:%d", c.Network, c.Address, c.Port)
+}
+
 // NodeConfig holds parameters for the local node instance
 type NodeConfig struct {
-	PrivateSeed string   `json:"privateSeed"` // Node private key seed (base64)
-	Endpoints   []string `json:"endpoints"`   // list of endpoints available
+	PrivateSeed string            `json:"privateSeed"` // Node private key seed (base64)
+	Endpoints   []*EndpointConfig `json:"endpoints"`   // list of endpoints available
 }
 
 //----------------------------------------------------------------------
@@ -139,9 +155,16 @@ func ParseConfig(fileName string) (err error) {
 	if err != nil {
 		return
 	}
+	return ParseConfigBytes(file, true)
+}
+
+// ParseConfigBytes reads a configuration from binary data. The data is
+// a JSON-encoded content. If 'subst' is true, the configuration strings
+// are subsituted
+func ParseConfigBytes(data []byte, subst bool) (err error) {
 	// unmarshal to Config data structure
 	Cfg = new(Config)
-	if err = json.Unmarshal(file, Cfg); err == nil {
+	if err = json.Unmarshal(data, Cfg); err == nil {
 		// process all string-based config settings and apply
 		// string substitutions.
 		applySubstitutions(Cfg, Cfg.Env)
