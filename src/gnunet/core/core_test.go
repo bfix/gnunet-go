@@ -30,12 +30,28 @@ import (
 var (
 	peer1Cfg = &config.NodeConfig{
 		PrivateSeed: "iYK1wSi5XtCP774eNFk1LYXqKlOPEpwKBw+2/bMkE24=",
-		Endpoints:   []string{"ip+udp://127.0.0.1:0"},
+		Endpoints: []*config.EndpointConfig{
+			{
+				ID:      "p1",
+				Network: "ip+udp",
+				Address: "127.0.0.1",
+				Port:    0,
+				TTL:     86400,
+			},
+		},
 	}
 
 	peer2Cfg = &config.NodeConfig{
 		PrivateSeed: "Bv9umksEO51jjWWrOGEH+4r8wl9Vi+LItpdBpTOi2PE=",
-		Endpoints:   []string{"ip+udp://127.0.0.1:20862"},
+		Endpoints: []*config.EndpointConfig{
+			{
+				ID:      "p2",
+				Network: "ip+udp",
+				Address: "127.0.0.1",
+				Port:    20862,
+				TTL:     86400,
+			},
+		},
 	}
 )
 
@@ -65,6 +81,12 @@ func NewTestNode(t *testing.T, ctx context.Context, cfg *config.NodeConfig) (nod
 	node.t = t
 	node.id = util.NextID()
 
+	// create core service
+	if node.core, err = NewCore(ctx, cfg); err != nil {
+		return
+	}
+	node.peer = node.core.Peer()
+
 	// create peer object
 	if node.peer, err = NewLocalPeer(cfg); err != nil {
 		return
@@ -72,10 +94,6 @@ func NewTestNode(t *testing.T, ctx context.Context, cfg *config.NodeConfig) (nod
 	t.Logf("[%d] Node %s starting", node.id, node.peer.GetID())
 	t.Logf("[%d]   --> %s", node.id, hex.EncodeToString(node.peer.GetID().Key))
 
-	// create core service
-	if node.core, err = NewCore(ctx, node.peer); err != nil {
-		return
-	}
 	for _, addr := range node.core.trans.Endpoints() {
 		s := addr.Network() + ":" + addr.String()
 		if node.addr, err = util.ParseAddress(s); err != nil {

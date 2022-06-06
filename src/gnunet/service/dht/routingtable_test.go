@@ -45,8 +45,12 @@ type Entry struct {
 var (
 	cfg = &config.NodeConfig{
 		PrivateSeed: "YGoe6XFH3XdvFRl+agx9gIzPTvxA229WFdkazEMdcOs=",
-		Endpoints: []string{
-			"r5n+ip+udp://127.0.0.1:6666",
+		Endpoints: []*config.EndpointConfig{
+			{
+				Network: "r5n+ip+udp",
+				Address: "127.0.0.1",
+				Port:    6666,
+			},
 		},
 	}
 )

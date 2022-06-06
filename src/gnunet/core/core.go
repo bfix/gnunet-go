@@ -21,13 +21,23 @@ package core
 import (
 	"context"
 	"errors"
+	"gnunet/config"
 	"gnunet/message"
 	"gnunet/service/dht/blocks"
 	"gnunet/transport"
 	"gnunet/util"
 	"net"
+	"strings"
 	"time"
 )
+
+// EndpointRef is a reference to an endpoint instance managed by core.
+type EndpointRef struct {
+	id     string             // endpoint identifier in configuration
+	ep     transport.Endpoint // reference to endpoint
+	addr   *util.Address      // public endpoint address
+	upnpId string             // UPNP identifier (empty if unused)
+}
 
 // Core service
 type Core struct {
@@ -40,30 +50,85 @@ type Core struct {
 	// reference to transport implementation
 	trans *transport.Transport
 
-	// registered listeners
+	// registered signal listeners
 	listeners map[string]*Listener
 
 	// list of known peers with addresses
 	peers *util.PeerAddrList
+
+	// List of registered endpoints
+	endpoints map[string]*EndpointRef
 }
 
 //----------------------------------------------------------------------
 
 // NewCore creates and runs a new core instance.
-func NewCore(ctx context.Context, local *Peer) (c *Core, err error) {
+func NewCore(ctx context.Context, node *config.NodeConfig) (c *Core, err error) {
+
+	// instantiate peer
+	var peer *Peer
+	if peer, err = NewLocalPeer(node); err != nil {
+		return
+	}
 	// create new core instance
 	incoming := make(chan *transport.TransportMessage)
 	c = &Core{
-		local:     local,
+		local:     peer,
 		incoming:  incoming,
 		listeners: make(map[string]*Listener),
 		trans:     transport.NewTransport(ctx, incoming),
 		peers:     util.NewPeerAddrList(),
+		endpoints: make(map[string]*EndpointRef),
 	}
 	// add all local peer endpoints to transport.
-	for _, addr := range local.addrList {
-		if _, err = c.trans.AddEndpoint(ctx, addr); err != nil {
+	for _, epCfg := range node.Endpoints {
+		var (
+			upnpId string             // upnp identifier
+			local  *util.Address      // local address
+			remote *util.Address      // remote address
+			ep     transport.Endpoint // endpoint reference
+		)
+		// handle special addresses:
+		if strings.HasPrefix(epCfg.Address, "upnp:") {
+			// handle UPNP port forwarding
+			protocol := transport.EpProtocol(epCfg.Network)
+			var localA, remoteA string
+			if upnpId, localA, remoteA, err = transport.UPNP(protocol, epCfg.Address[5:], epCfg.Port); err != nil {
+				return
+			}
+			// parse local and remote addresses
+			if local, err = util.ParseAddress(localA); err != nil {
+				return
+			}
+			if remote, err = util.ParseAddress(remoteA); err != nil {
+				return
+			}
+		} else {
+			// direct address specification:
+			if local, err = util.ParseAddress(epCfg.Addr()); err != nil {
+				return
+			}
+			remote = local
+			upnpId = ""
+		}
+		// add endpoint for address
+		if ep, err = c.trans.AddEndpoint(ctx, local); err != nil {
 			return
+		}
+		// if port is set to 0, replace it with port assigned dynamically.
+		// only applies to direct listening addresses!
+		if epCfg.Port == 0 && local == remote {
+			addr := ep.Address()
+			if remote, err = util.ParseAddress(addr.Network() + "://" + addr.String()); err != nil {
+				return
+			}
+		}
+		// save endpoint reference
+		c.endpoints[epCfg.ID] = &EndpointRef{
+			id:     epCfg.ID,
+			ep:     ep,
+			addr:   remote,
+			upnpId: upnpId,
 		}
 	}
 	// run message pump
@@ -130,12 +195,12 @@ func (c *Core) Send(ctx context.Context, peer *util.PeerID, msg message.Message)
 // Learn a (new) address for peer
 func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addr *util.Address) (err error) {
 	if c.peers.Add(peer.String(), addr) == 1 {
+		// we added a previously unknown peer: send a HELLO
+
 		// collect endpoint addresses
 		addrList := make([]*util.Address, 0)
-		for _, eAddr := range c.trans.Endpoints() {
-			if a, ok := eAddr.(*util.Address); ok {
-				addrList = append(addrList, a)
-			}
+		for _, epRef := range c.endpoints {
+			addrList = append(addrList, epRef.addr)
 		}
 		// new peer id: send HELLO message to newly added peer
 		node := c.local
@@ -152,6 +217,11 @@ func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addr *util.Address)
 		err = c.Send(ctx, peer, msg)
 	}
 	return
+}
+
+// Peer returns the local peer
+func (c *Core) Peer() *Peer {
+	return c.local
 }
 
 // PeerID returns the peer id of the local node.
