@@ -83,13 +83,8 @@ func main() {
 
 	// instantiate core service
 	ctx, cancel := context.WithCancel(context.Background())
-	var local *core.Peer
-	if local, err = core.NewLocalPeer(config.Cfg.Local); err != nil {
-		logger.Printf(logger.ERROR, "[dht] No local peer: %s\n", err.Error())
-		return
-	}
 	var c *core.Core
-	if c, err = core.NewCore(ctx, local); err != nil {
+	if c, err = core.NewCore(ctx, config.Cfg.Local); err != nil {
 		logger.Printf(logger.ERROR, "[dht] core failed: %s\n", err.Error())
 		return
 	}
