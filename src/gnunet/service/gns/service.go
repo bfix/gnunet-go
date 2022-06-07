@@ -25,12 +25,14 @@ import (
 	"io"
 
 	"gnunet/config"
+	"gnunet/core"
 	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
 	"gnunet/service/revocation"
+	"gnunet/transport"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/data"
@@ -54,15 +56,22 @@ type Service struct {
 }
 
 // NewService creates a new GNS service instance
-func NewService() service.Service {
-	// instantiate service and assemble a new GNS handler.
-	inst := new(Service)
-	inst.LookupLocal = inst.LookupNamecache
-	inst.StoreLocal = inst.StoreNamecache
-	inst.LookupRemote = inst.LookupDHT
-	inst.RevocationQuery = inst.QueryKeyRevocation
-	inst.RevocationRevoke = inst.RevokeKey
-	return inst
+func NewService(ctx context.Context, c *core.Core) service.Service {
+	// instantiate service
+	mod := NewModule(ctx, c)
+	srv := &Service{
+		Module: *mod,
+	}
+	srv.ProcessFcn = srv.HandleMessage
+
+	// set external function references (external services)
+	srv.LookupLocal = srv.LookupNamecache
+	srv.StoreLocal = srv.StoreNamecache
+	srv.LookupRemote = srv.LookupDHT
+	srv.RevocationQuery = srv.QueryKeyRevocation
+	srv.RevocationRevoke = srv.RevokeKey
+
+	return srv
 }
 
 // ServeClient processes a client channel.
@@ -100,7 +109,7 @@ func (s *Service) ServeClient(ctx context.Context, id int, mc *service.Connectio
 }
 
 // Handle a single incoming message
-func (s *Service) HandleMessage(ctx context.Context, msg message.Message, back service.Responder) bool {
+func (s *Service) HandleMessage(ctx context.Context, msg message.Message, back transport.Responder) bool {
 	// assemble log label
 	label := ""
 	if v := ctx.Value("label"); v != nil {

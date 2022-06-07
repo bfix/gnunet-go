@@ -174,11 +174,21 @@ func NewCore(ctx context.Context, node *config.NodeConfig) (c *Core, err error) 
 					}
 					c.dispatch(ev)
 				}
+				// set default responder (core) if no custom responder
+				// is defined by the receiving endpoint.
+				resp := tm.Resp
+				if resp == nil {
+					resp = &transport.TransportResponder{
+						Peer:    tm.Peer,
+						SendFcn: c.Send,
+					}
+				}
 				// generate EV_MESSAGE event
 				ev = &Event{
 					ID:   EV_MESSAGE,
 					Peer: tm.Peer,
 					Msg:  tm.Msg,
+					Resp: tm.Resp,
 				}
 				c.dispatch(ev)
 

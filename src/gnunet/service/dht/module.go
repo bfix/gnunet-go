@@ -82,15 +82,15 @@ func NewModule(ctx context.Context, c *core.Core) (m *Module) {
 //----------------------------------------------------------------------
 
 // Get a block from the DHT ["dht:get"]
-func (nc *Module) Get(ctx context.Context, query blocks.Query) (block blocks.Block, err error) {
+func (m *Module) Get(ctx context.Context, query blocks.Query) (block blocks.Block, err error) {
 
 	// check if we have the requested block in cache or permanent storage.
-	block, err = nc.cache.Get(query)
+	block, err = m.cache.Get(query)
 	if err == nil {
 		// yes: we are done
 		return
 	}
-	block, err = nc.store.Get(query)
+	block, err = m.store.Get(query)
 	if err == nil {
 		// yes: we are done
 		return
@@ -101,7 +101,7 @@ func (nc *Module) Get(ctx context.Context, query blocks.Query) (block blocks.Blo
 }
 
 // Put a block into the DHT ["dht:put"]
-func (nc *Module) Put(ctx context.Context, key blocks.Query, block blocks.Block) error {
+func (m *Module) Put(ctx context.Context, key blocks.Query, block blocks.Block) error {
 	return nil
 }
 
@@ -126,9 +126,20 @@ func (m *Module) event(ctx context.Context, ev *core.Event) {
 	// New peer connected:
 	case core.EV_CONNECT:
 		// Add peer to routing table
+		m.rtable.Add(NewPeerAddress(ev.Peer))
 
+	// Peer disconnected:
+	case core.EV_DISCONNECT:
+		// Remove peer from routing table
+		m.rtable.Remove(NewPeerAddress(ev.Peer))
+
+	// Message received.
+	case core.EV_MESSAGE:
+		// process message (if applicable)
+		if m.ProcessFcn != nil {
+			m.ProcessFcn(ctx, ev.Msg, ev.Resp)
+		}
 	}
-
 }
 
 // Heartbeat handler for periodic tasks

@@ -26,6 +26,7 @@ import (
 	"gnunet/core"
 	"gnunet/message"
 	"gnunet/service"
+	"gnunet/transport"
 
 	"github.com/bfix/gospel/logger"
 )
@@ -48,9 +49,12 @@ type Service struct {
 
 // NewService creates a new DHT service instance
 func NewService(ctx context.Context, c *core.Core) service.Service {
-	return &Service{
-		Module: *NewModule(ctx, c),
+	mod := NewModule(ctx, c)
+	srv := &Service{
+		Module: *mod,
 	}
+	srv.ProcessFcn = srv.HandleMessage
+	return srv
 }
 
 // ServeClient processes a client channel.
@@ -90,7 +94,7 @@ loop:
 
 // HandleMessage handles a DHT request/response message. If the transport channel
 // is nil, responses are send directly via the transport layer.
-func (s *Service) HandleMessage(ctx context.Context, msg message.Message, back service.Responder) bool {
+func (s *Service) HandleMessage(ctx context.Context, msg message.Message, back transport.Responder) bool {
 	// assemble log label
 	label := ""
 	if v := ctx.Value("label"); v != nil {

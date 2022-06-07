@@ -23,8 +23,10 @@ import (
 	"fmt"
 	"io"
 
+	"gnunet/core"
 	"gnunet/message"
 	"gnunet/service"
+	"gnunet/transport"
 
 	"github.com/bfix/gospel/logger"
 )
@@ -39,10 +41,14 @@ type Service struct {
 }
 
 // NewService creates a new revocation service instance
-func NewService() service.Service {
-	// instantiate service and assemble a new Revocation handler.
-	inst := new(Service)
-	return inst
+func NewService(ctx context.Context, c *core.Core) service.Service {
+	// instantiate service
+	mod := NewModule(ctx, c)
+	srv := &Service{
+		Module: *mod,
+	}
+	srv.ProcessFcn = srv.HandleMessage
+	return srv
 }
 
 // ServeClient processes a client channel.
@@ -80,7 +86,7 @@ func (s *Service) ServeClient(ctx context.Context, id int, mc *service.Connectio
 }
 
 // Handle a single incoming message
-func (s *Service) HandleMessage(ctx context.Context, msg message.Message, back service.Responder) bool {
+func (s *Service) HandleMessage(ctx context.Context, msg message.Message, back transport.Responder) bool {
 	// assemble log label
 	label := ""
 	if v := ctx.Value("label"); v != nil {

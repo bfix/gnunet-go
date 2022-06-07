@@ -21,6 +21,8 @@ package service
 import (
 	"context"
 	"gnunet/core"
+	"gnunet/message"
+	"gnunet/transport"
 	"net/http"
 	"time"
 )
@@ -78,13 +80,18 @@ type Heartbeat func(context.Context)
 
 // ModuleImpl is an event-handling type used by Module implementations.
 type ModuleImpl struct {
-	ch chan *core.Event // channel for core events.
+	// channel for core events.
+	ch chan *core.Event
+
+	// ProcessFcn message: function reference (implemented by service)
+	ProcessFcn func(ctx context.Context, msg message.Message, back transport.Responder) bool
 }
 
 // NewModuleImplementation returns a new base module and starts
 func NewModuleImpl() (m *ModuleImpl) {
 	return &ModuleImpl{
-		ch: make(chan *core.Event),
+		ch:         make(chan *core.Event),
+		ProcessFcn: nil,
 	}
 }
 
