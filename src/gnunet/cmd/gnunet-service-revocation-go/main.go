@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"gnunet/config"
+	"gnunet/core"
 	"gnunet/rpc"
 	"gnunet/service"
 	"gnunet/service/revocation"
@@ -80,9 +81,17 @@ func main() {
 		params = config.Cfg.GNS.Service.Params
 	}
 
-	// start a new REVOCATION service
+	// instantiate core service
 	ctx, cancel := context.WithCancel(context.Background())
-	rvc := revocation.NewService()
+	var c *core.Core
+	if c, err = core.NewCore(ctx, config.Cfg.Local); err != nil {
+		logger.Printf(logger.ERROR, "[gns] core failed: %s\n", err.Error())
+		return
+	}
+	defer c.Shutdown()
+
+	// start a new REVOCATION service
+	rvc := revocation.NewService(ctx, c)
 	srv := service.NewSocketHandler("revocation", rvc)
 	if err = srv.Start(ctx, socket, params); err != nil {
 		logger.Printf(logger.ERROR, "[revocation] Error: '%s'\n", err.Error())
