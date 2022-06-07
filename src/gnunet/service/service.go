@@ -20,38 +20,13 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"gnunet/message"
+	"gnunet/transport"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/logger"
 )
-
-//----------------------------------------------------------------------
-
-// Responder is a back-channel for messages generated during
-// message processing. The Connection type is a responder
-// and used as such in ServeClient().
-type Responder interface {
-	// Handle outgoing message
-	Send(ctx context.Context, msg message.Message) error
-}
-
-// TransportResponder is used as a responder in message handling for
-// messages received from Transport.
-type TransportResponder struct {
-	Peer    *util.PeerID
-	SendFcn func(context.Context, *util.PeerID, message.Message) error
-}
-
-// Send a message back to caller.
-func (r *TransportResponder) Send(ctx context.Context, msg message.Message) error {
-	if r.SendFcn == nil {
-		return errors.New("no send function defined")
-	}
-	return r.SendFcn(ctx, r.Peer, msg)
-}
 
 //----------------------------------------------------------------------
 
@@ -67,7 +42,7 @@ type Service interface {
 	// Handle a single incoming message (either locally from a socket
 	// connection or from Transport). Response messages can be send
 	// via a Responder. Returns true if message was processed.
-	HandleMessage(ctx context.Context, msg message.Message, resp Responder) bool
+	HandleMessage(ctx context.Context, msg message.Message, resp transport.Responder) bool
 }
 
 // SocketHandler handles incoming connections on the local service socket.

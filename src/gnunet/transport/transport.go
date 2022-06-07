@@ -43,8 +43,17 @@ var (
 // Msg is the exchanged GNUnet message. The packet itself satisfies the
 // message.Message interface.
 type TransportMessage struct {
-	Peer *util.PeerID    // remote peer
-	Msg  message.Message // GNUnet message
+	// Peer is a identifier for a remote peer
+	Peer *util.PeerID
+
+	// Msg is a generic GNnet message
+	Msg message.Message
+
+	// Resp is an optional custom endpoint responder that can be set by
+	// endpoints for messages received from the internet if they want to
+	// handle responses directly (instead of core/transport/endpoint
+	// resolving the return path). Set to nil if not used.
+	Resp Responder
 }
 
 // Bytes returns the binary representation of a transport message
