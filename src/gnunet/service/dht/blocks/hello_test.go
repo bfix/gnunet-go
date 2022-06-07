@@ -18,27 +18,32 @@
 
 package blocks
 
-import "testing"
+import (
+	"net/url"
+	"testing"
+)
 
-const (
+var (
 	helloURL = "gnunet://hello" +
 		"/7KTBJ90340HF1Q2GB0A57E2XJER4FDHX8HP5GHEB9125VPWPD27G" +
 
 		"/BNMDFN6HJCPWSPNBSEC06MC1K8QN1Z2DHRQSRXDTFR7FTBD4JHN" +
 		"BJ2RJAAEZ31FWG1Q3PMN3PXGZQ3Q7NTNEKQZFA7TE2Y46FM8E20R" +
 		"/1653499308" +
-		"?r5n%2Bip%2Budp%3A1.2.3.4%3A6789" +
-		"&gnunet%2Btcp%3A12.3.4.5"
+		"?" + url.QueryEscape("r5n+ip+udp://1.2.3.4:6789") +
+		"&" + url.QueryEscape("gnunet+tcp://12.3.4.5:1453")
 )
 
 func TestHelloURL(t *testing.T) {
 
+	t.Log(helloURL)
 	hd, err := ParseHelloURL(helloURL)
 	if err != nil {
 		t.Fatal(err)
 	}
 	u := hd.URL()
 	if u != helloURL {
+		t.Log(u)
 		t.Fatal("urls don't match")
 	}
 }
