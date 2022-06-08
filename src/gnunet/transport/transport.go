@@ -125,13 +125,24 @@ func (t *Transport) Shutdown() {
 
 // Send a message over suitable endpoint
 func (t *Transport) Send(ctx context.Context, addr net.Addr, msg *TransportMessage) (err error) {
-	// use the first endpoint able to handle address
-	return t.endpoints.ProcessRange(func(_ int, ep Endpoint) error {
+	// select best endpoint able to handle address
+	var bestEp Endpoint
+	err = t.endpoints.ProcessRange(func(_ int, ep Endpoint) error {
 		if ep.CanSendTo(addr) {
-			return ep.Send(ctx, addr, msg)
+			if bestEp == nil {
+				bestEp = ep
+			}
+			// TODO: compare endpoints, select better one:
+			// if ep.Better(bestEp) {
+			//     bestEp = ep
+			// }
 		}
 		return nil
 	}, true)
+	if err != nil {
+		return
+	}
+	return bestEp.Send(ctx, addr, msg)
 }
 
 //----------------------------------------------------------------------
