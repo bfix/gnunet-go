@@ -39,9 +39,13 @@ func main() {
 	var (
 		remoteId   string
 		remoteAddr string
+		localAddr  string
+		localPort  int
 	)
 	flag.StringVar(&remoteId, "i", "", "peer id of remote node")
 	flag.StringVar(&remoteAddr, "a", "", "address of remote node")
+	flag.StringVar(&localAddr, "l", "127.0.0.1", "listening address of local node")
+	flag.IntVar(&localPort, "p", 2086, "port of local node")
 	flag.Parse()
 
 	// convert arguments
@@ -54,10 +58,12 @@ func main() {
 	if rAddr, err = util.ParseAddress(remoteAddr); err != nil {
 		log.Fatal(err)
 	}
-	if buf, err = util.DecodeStringToBinary(remoteId, 32); err != nil {
-		log.Fatal(err)
+	if len(remoteId) > 0 {
+		if buf, err = util.DecodeStringToBinary(remoteId, 32); err != nil {
+			log.Fatal(err)
+		}
+		rId = util.NewPeerID(buf)
 	}
-	rId = util.NewPeerID(buf)
 
 	// configuration data
 	var (
@@ -68,8 +74,8 @@ func main() {
 				{
 					ID:      "p1",
 					Network: "ip+udp",
-					Address: "127.0.0.1",
-					Port:    2086,
+					Address: localAddr,
+					Port:    localPort,
 					TTL:     86400,
 				},
 			},
@@ -114,7 +120,11 @@ func (n *TestNode) Shutdown() {
 }
 
 func (n *TestNode) Learn(ctx context.Context, peer *util.PeerID, addr *util.Address) {
-	log.Printf("[%d] Learning %s for %s", n.id, addr.StringAll(), peer.String())
+	label := "@"
+	if peer != nil {
+		label = peer.String()
+	}
+	log.Printf("[%d] Learning %s for %s", n.id, addr.StringAll(), label)
 	if err := n.core.Learn(ctx, peer, addr); err != nil {
 		log.Println("Learn: " + err.Error())
 	}

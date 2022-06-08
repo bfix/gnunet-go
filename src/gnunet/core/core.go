@@ -212,32 +212,24 @@ func (c *Core) Shutdown() {
 // Send is a function that allows the local peer to send a protocol
 // message to a remote peer.
 func (c *Core) Send(ctx context.Context, peer *util.PeerID, msg message.Message) error {
+	// get peer label (id or "@")
+	label := "@"
+	if peer != nil {
+		label = peer.String()
+	}
 	// TODO: select best endpoint protocol for transport; now fixed to IP+UDP
 	netw := "ip+udp"
-	addrs := c.peers.Get(peer.String(), netw)
+	addrs := c.peers.Get(label, netw)
 	if len(addrs) == 0 {
 		return ErrCoreNoEndpAddr
 	}
 	// TODO: select best address; curently selects first
 	addr := addrs[0]
+	return c.send(ctx, addr, msg)
+}
 
-	// select best endpoint for transport
-	var ep transport.Endpoint
-	for _, epCfg := range c.endpoints {
-		if epCfg.addr.Network() == netw {
-			if ep == nil {
-				ep = epCfg.ep
-			}
-			// TODO: compare endpoints, select better one:
-			// if ep.Better(epCfg.ep) {
-			//     ep = epCfg.ep
-			// }
-		}
-	}
-	// check we have an endpoint to send on
-	if ep == nil {
-		return ErrCoreNoEndpAddr
-	}
+// send message directly to address
+func (c *Core) send(ctx context.Context, addr *util.Address, msg message.Message) error {
 	// assemble transport message
 	tm := transport.NewTransportMessage(c.PeerID(), msg)
 	// send on transport
@@ -246,26 +238,30 @@ func (c *Core) Send(ctx context.Context, peer *util.PeerID, msg message.Message)
 
 // Learn a (new) address for peer
 func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addr *util.Address) (err error) {
+	// assemble HELLO message:
+	addrList := make([]*util.Address, 0)
+	for _, epRef := range c.endpoints {
+		addrList = append(addrList, epRef.addr)
+	}
+	node := c.local
+	var hello *blocks.HelloBlock
+	hello, err = node.HelloData(time.Hour, addrList)
+	if err != nil {
+		return
+	}
+	msg := message.NewHelloMsg(node.GetID())
+	for _, a := range hello.Addresses() {
+		ha := message.NewHelloAddress(a)
+		msg.AddAddress(ha)
+	}
+
+	// if no peer is given, we send HELLO directly to address
+	if peer == nil {
+		return c.send(ctx, addr, msg)
+	}
+	// add peer address to address list
 	if c.peers.Add(peer.String(), addr) == 1 {
 		// we added a previously unknown peer: send a HELLO
-
-		// collect endpoint addresses
-		addrList := make([]*util.Address, 0)
-		for _, epRef := range c.endpoints {
-			addrList = append(addrList, epRef.addr)
-		}
-		// new peer id: send HELLO message to newly added peer
-		node := c.local
-		var hello *blocks.HelloBlock
-		hello, err = node.HelloData(time.Hour, addrList)
-		if err != nil {
-			return
-		}
-		msg := message.NewHelloMsg(node.GetID())
-		for _, a := range hello.Addresses() {
-			ha := message.NewHelloAddress(a)
-			msg.AddAddress(ha)
-		}
 		err = c.Send(ctx, peer, msg)
 	}
 	return
