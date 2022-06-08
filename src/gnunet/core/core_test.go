@@ -199,11 +199,6 @@ func NewTestNode(t *testing.T, ctx context.Context, cfg *config.NodeConfig) (nod
 		return
 	}
 	node.peer = node.core.Peer()
-
-	// create peer object
-	if node.peer, err = NewLocalPeer(cfg); err != nil {
-		return
-	}
 	t.Logf("[%d] Node %s starting", node.id, node.peer.GetID())
 	t.Logf("[%d]   --> %s", node.id, hex.EncodeToString(node.peer.GetID().Key))
 
