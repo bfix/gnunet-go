@@ -49,11 +49,16 @@ type TransportMessage struct {
 	// Msg is a generic GNnet message
 	Msg message.Message
 
+	// Non-serialized (transient) attributes:
+
 	// Resp is an optional custom endpoint responder that can be set by
 	// endpoints for messages received from the internet if they want to
 	// handle responses directly (instead of core/transport/endpoint
 	// resolving the return path). Set to nil if not used.
 	Resp Responder
+
+	// Label for log messages during message processing
+	Label string
 }
 
 // Bytes returns the binary representation of a transport message
@@ -79,8 +84,10 @@ func NewTransportMessage(peer *util.PeerID, msg message.Message) (tm *TransportM
 		peer = util.NewPeerID(nil)
 	}
 	tm = &TransportMessage{
-		Peer: peer,
-		Msg:  msg,
+		Peer:  peer,
+		Msg:   msg,
+		Resp:  nil,
+		Label: "",
 	}
 	return
 }
