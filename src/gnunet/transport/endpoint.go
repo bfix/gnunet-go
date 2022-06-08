@@ -107,6 +107,8 @@ func (ep *PaketEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) (
 			if err != nil {
 				break
 			}
+			// label message
+			tm.Label = ep.addr.String()
 			// send transport message to handler
 			go func() {
 				hdlr <- tm
@@ -143,8 +145,10 @@ func (ep *PaketEndpoint) read() (tm *TransportMessage, err error) {
 	}
 	// return transport message
 	return &TransportMessage{
-		Peer: peer,
-		Msg:  msg,
+		Peer:  peer,
+		Msg:   msg,
+		Resp:  nil,
+		Label: "",
 	}, nil
 }
 
