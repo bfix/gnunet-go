@@ -115,7 +115,8 @@ func (m *ModuleImpl) Run(
 			select {
 			// Handle events
 			case event := <-m.ch:
-				hdlr(ctx, event)
+				hCtx := context.WithValue(ctx, "label", event.Label)
+				hdlr(hCtx, event)
 
 			// wait for terminate signal
 			case <-ctx.Done():
