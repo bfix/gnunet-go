@@ -84,10 +84,11 @@ func (f *EventFilter) CheckMsgType(mt uint16) bool {
 
 // Event sent to listeners
 type Event struct {
-	ID   int                 // event type
-	Peer *util.PeerID        // remote peer
-	Msg  message.Message     // GNUnet message (can be nil)
-	Resp transport.Responder // reply handler (can be nil)
+	ID    int                 // event type
+	Peer  *util.PeerID        // remote peer
+	Msg   message.Message     // GNUnet message (can be nil)
+	Resp  transport.Responder // reply handler (can be nil)
+	Label string              // event label (can be empty)
 }
 
 //----------------------------------------------------------------------
