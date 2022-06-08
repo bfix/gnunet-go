@@ -158,13 +158,12 @@ func NewCore(ctx context.Context, node *config.NodeConfig) (c *Core, err error) 
 				switch msg := tm.Msg.(type) {
 				case *message.HelloMsg:
 					// keep peer addresses
-					for _, addr := range msg.Addresses {
-						a := &util.Address{
-							Netw:    addr.Transport,
-							Address: addr.Address,
-							Expires: addr.ExpireOn,
-						}
-						c.Learn(ctx, msg.PeerID, a)
+					aList, err := msg.Addresses()
+					if err != nil {
+						break
+					}
+					for _, addr := range aList {
+						c.Learn(ctx, tm.Peer, addr.Wrap())
 					}
 					// generate EV_CONNECT event
 					ev = &Event{
@@ -250,10 +249,12 @@ func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addr *util.Address)
 		return
 	}
 	msg := message.NewHelloMsg(node.GetID())
+	var aList []*message.HelloAddress
 	for _, a := range hello.Addresses() {
 		ha := message.NewHelloAddress(a)
-		msg.AddAddress(ha)
+		aList = append(aList, ha)
 	}
+	msg.SetAddresses(aList)
 
 	// if no peer is given, we send HELLO directly to address
 	if peer == nil {

@@ -19,9 +19,11 @@
 package core
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"gnunet/config"
+	"gnunet/transport"
 	"gnunet/util"
 	"testing"
 	"time"
@@ -235,6 +237,12 @@ func NewTestNode(t *testing.T, ctx context.Context, cfg *config.NodeConfig) (nod
 				case EV_MESSAGE:
 					t.Logf("[%d] <<< Msg from %s of type %d", node.id, ev.Peer, ev.Msg.Header().MsgType)
 					t.Logf("[%d] <<<    --> %s", node.id, ev.Msg.String())
+					wrt := new(bytes.Buffer)
+					if err := transport.WriteMessageDirect(wrt, ev.Msg); err == nil {
+						t.Logf("[%d] <<<    %s", node.id, hex.EncodeToString(wrt.Bytes()))
+					} else {
+						t.Logf("[%d] <<<    Error %s", node.id, err.Error())
+					}
 				}
 
 			// handle termination signal
