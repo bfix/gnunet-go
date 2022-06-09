@@ -25,6 +25,7 @@ import (
 	"gnunet/config"
 	"gnunet/transport"
 	"gnunet/util"
+	"log"
 	"testing"
 	"time"
 )
@@ -167,6 +168,64 @@ func TestCoreUPNP(t *testing.T) {
 }
 
 //----------------------------------------------------------------------
+// Test Go node with DHTU GNUnet nodes
+//----------------------------------------------------------------------
+
+var testDHTU = false
+
+func TestDHTU(t *testing.T) {
+	// skip test on demand
+	if !testDHTU {
+		return
+	}
+	// convert arguments
+	var (
+		rId   *util.PeerID
+		rAddr *util.Address
+		err   error
+	)
+	if rAddr, err = util.ParseAddress("ip+udp://172.17.0.4:10000"); err != nil {
+		t.Fatal(err)
+	}
+	// configuration data
+	var (
+		peerCfg = &config.NodeConfig{
+			Name:        "p1",
+			PrivateSeed: "iYK1wSi5XtCP774eNFk1LYXqKlOPEpwKBw+2/bMkE24=",
+			Endpoints: []*config.EndpointConfig{
+				{
+					ID:      "p1",
+					Network: "ip+udp",
+					Address: "172.17.0.1",
+					Port:    2086,
+					TTL:     86400,
+				},
+			},
+		}
+	)
+	// setup execution context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+		time.Sleep(time.Second)
+	}()
+
+	// create and run node
+	node, err := NewTestNode(t, ctx, peerCfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer node.Shutdown()
+
+	// learn bootstrap address (triggers HELLO)
+	node.Learn(ctx, rId, rAddr)
+
+	// run forever
+	var ch chan struct{}
+	<-ch
+}
+
+//----------------------------------------------------------------------
 // create and run a node with given spec
 //----------------------------------------------------------------------
 
@@ -183,7 +242,11 @@ func (n *TestNode) Shutdown() {
 }
 
 func (n *TestNode) Learn(ctx context.Context, peer *util.PeerID, addr *util.Address) {
-	n.t.Logf("[%d] Learning %s for %s", n.id, addr.StringAll(), peer.String())
+	label := "@"
+	if peer != nil {
+		label = peer.String()
+	}
+	n.t.Logf("[%d] Learning %s for %s", n.id, addr.StringAll(), label)
 	if err := n.core.Learn(ctx, peer, addr); err != nil {
 		n.t.Log("Learn: " + err.Error())
 	}
