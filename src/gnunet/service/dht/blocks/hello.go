@@ -74,7 +74,7 @@ func (h *HelloBlock) Addresses() []*util.Address {
 // ParseHelloURL parses a HELLO URL of the following form:
 //     gnunet://hello/<PeerID>/<signature>/<expire>?<addrs>
 // The addresses are encoded.
-func ParseHelloURL(u string) (h *HelloBlock, err error) {
+func ParseHelloURL(u string, checkExpiry bool) (h *HelloBlock, err error) {
 	// check and trim prefix
 	if !strings.HasPrefix(u, helloPrefix) {
 		err = fmt.Errorf("invalid HELLO-URL prefix: '%s'", u)
@@ -116,7 +116,7 @@ func ParseHelloURL(u string) (h *HelloBlock, err error) {
 		return
 	}
 	h.Expire = util.NewAbsoluteTimeEpoch(exp)
-	if h.Expire.Expired() {
+	if checkExpiry && h.Expire.Expired() {
 		err = ErrHelloExpired
 		return
 	}

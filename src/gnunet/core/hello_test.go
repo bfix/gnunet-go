@@ -56,10 +56,10 @@ var (
 )
 
 func TestHelloURLDirect(t *testing.T) {
-	if _, err := blocks.ParseHelloURL(helloURLFail); err == nil {
+	if _, err := blocks.ParseHelloURL(helloURLFail, false); err == nil {
 		t.Fatal("no error on bad HELLO URL")
 	}
-	if _, err := blocks.ParseHelloURL(helloURLOK); err != nil {
+	if _, err := blocks.ParseHelloURL(helloURLOK, false); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -89,7 +89,7 @@ func TestHelloURL(t *testing.T) {
 	// convert to and from HELLO URL
 	url1 := hd.URL()
 	t.Log(">>> " + url1)
-	hd2, err := blocks.ParseHelloURL(url1)
+	hd2, err := blocks.ParseHelloURL(url1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
