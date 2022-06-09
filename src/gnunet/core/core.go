@@ -146,58 +146,61 @@ func NewCore(ctx context.Context, node *config.NodeConfig) (c *Core, err error) 
 		}
 	}
 	// run message pump
-	go func() {
-		// wait for incoming messages
-		for {
-			select {
-			// get (next) message from transport
-			case tm := <-c.incoming:
-				var ev *Event
+	go c.pump(ctx)
+	return
+}
 
-				// inspect message for peer state events
-				switch msg := tm.Msg.(type) {
-				case *message.HelloMsg:
-					// keep peer addresses
-					aList, err := msg.Addresses()
-					if err != nil {
-						break
-					}
-					for _, addr := range aList {
-						c.Learn(ctx, tm.Peer, addr.Wrap())
-					}
-					// generate EV_CONNECT event
-					ev = &Event{
-						ID:   EV_CONNECT,
-						Peer: tm.Peer,
-						Msg:  msg,
-					}
-					c.dispatch(ev)
+// message pump for core
+func (c *Core) pump(ctx context.Context) {
+	// wait for incoming messages
+	for {
+		select {
+		// get (next) message from transport
+		case tm := <-c.incoming:
+			var ev *Event
+
+			// inspect message for peer state events
+			switch msg := tm.Msg.(type) {
+			case *message.HelloMsg:
+				// keep peer addresses
+				aList, err := msg.Addresses()
+				if err != nil {
+					break
 				}
-				// set default responder (core) if no custom responder
-				// is defined by the receiving endpoint.
-				resp := tm.Resp
-				if resp == nil {
-					resp = &transport.TransportResponder{
-						Peer:    tm.Peer,
-						SendFcn: c.Send,
-					}
+				for _, addr := range aList {
+					c.Learn(ctx, tm.Peer, addr.Wrap())
 				}
-				// generate EV_MESSAGE event
+				// generate EV_CONNECT event
 				ev = &Event{
-					ID:   EV_MESSAGE,
+					ID:   EV_CONNECT,
 					Peer: tm.Peer,
-					Msg:  tm.Msg,
-					Resp: tm.Resp,
+					Msg:  msg,
 				}
 				c.dispatch(ev)
-
-			// wait for termination
-			case <-ctx.Done():
-				return
 			}
+			// set default responder (core) if no custom responder
+			// is defined by the receiving endpoint.
+			resp := tm.Resp
+			if resp == nil {
+				resp = &transport.TransportResponder{
+					Peer:    tm.Peer,
+					SendFcn: c.Send,
+				}
+			}
+			// generate EV_MESSAGE event
+			ev = &Event{
+				ID:   EV_MESSAGE,
+				Peer: tm.Peer,
+				Msg:  tm.Msg,
+				Resp: tm.Resp,
+			}
+			c.dispatch(ev)
+
+		// wait for termination
+		case <-ctx.Done():
+			return
 		}
-	}()
-	return
+	}
 }
 
 // Shutdown all core-related processes.
@@ -237,7 +240,7 @@ func (c *Core) send(ctx context.Context, addr *util.Address, msg message.Message
 
 // Learn a (new) address for peer
 func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addr *util.Address) (err error) {
-	// assemble HELLO message:
+	// assemble our own HELLO message:
 	addrList := make([]*util.Address, 0)
 	for _, epRef := range c.endpoints {
 		addrList = append(addrList, epRef.addr)
