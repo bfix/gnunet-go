@@ -42,27 +42,31 @@ var (
 		},
 	}
 
-	helloURLFail = "gnunet://hello" +
-		"/6SR91X40JHTTSKTEY04KC920MDJBVDDNJ9Y2KPVY1RJK40KC1SVG" +
-		"/7H3BX1XDYXKXDR20X1GPCYY1CT68GGH1CC9FSDBW4MZ4H5GFB3K7PMJZTEWK3NVVJ0FXBBG6QFBWFM233F5YTQZGZ8JV5MEPNBWP800" +
-		"/1654953178" +
-		"?ip+udp=127.0.0.1%3A10000" +
-		"&ip+udp=172.17.0.4%3A10000" +
-		"&ip+udp=%5B%3A%3Affff%3A172.17.0.4%5D%3A10000"
-
-	helloURLOK = "gnunet://hello" +
-		"/A02QJQ93GPBFVPJ4ZEY3JTS4HS00NG5PZBM7VXR0P9CRP18MZTN0" +
-		"/TJR1PYY8M7EJAT8Y4ABDAFM318ATEJ87EJ6SXHCDJF03F1AAPNDXA51MDJ6D5PZ0YB17NPAD0GR60V34100BQT2YGWP46CER4HCT21G" +
-		"/1654782536" +
-		"?ip+udp=172.17.0.1%3A2086"
+	helloURL = []string{
+		"gnunet://hello" +
+			"/RBVQWST48N9YDVHYM7KYR1YDBZN7X4KG1SJJZHGHGX5HFHX5P010" +
+			"/Y4YEXZBBKS1HFGGHZW5QWQTX20QJ5BBEQZB8PNA85VCASRR60P741X28E8HS6P20HQED43RAQFADJTVREFQ37W1YQFN29TCC2AT4R2R" +
+			"/1654964519" +
+			"?ip+udp=127.0.0.1%3A10000" +
+			"&ip+udp=192.168.178.50%3A10000" +
+			"&ip+udp=%5B%3A%3A1%5D%3A10000" +
+			"&ip+udp=%5B2001%3A1620%3Afe9%3A0%3A7285%3Ac2ff%3Afe62%3Ab4c9%5D%3A10000" +
+			"&ip+udp=%5Bfe80%3A%3A7285%3Ac2ff%3Afe62%3Ab4c9%5D%3A10000",
+		"gnunet://hello" +
+			"/6SR91X40JHTTSKTEY04KC920MDJBVDDNJ9Y2KPVY1RJK40KC1SVG" +
+			"/7H3BX1XDYXKXDR20X1GPCYY1CT68GGH1CC9FSDBW4MZ4H5GFB3K7PMJZTEWK3NVVJ0FXBBG6QFBWFM233F5YTQZGZ8JV5MEPNBWP800" +
+			"/1654953178" +
+			"?ip+udp=127.0.0.1%3A10000" +
+			"&ip+udp=172.17.0.4%3A10000" +
+			"&ip+udp=%5B%3A%3Affff%3A172.17.0.4%5D%3A10000",
+	}
 )
 
 func TestHelloURLDirect(t *testing.T) {
-	if _, err := blocks.ParseHelloURL(helloURLFail, false); err == nil {
-		t.Fatal("no error on bad HELLO URL")
-	}
-	if _, err := blocks.ParseHelloURL(helloURLOK, false); err != nil {
-		t.Fatal(err)
+	for _, hu := range helloURL {
+		if _, err := blocks.ParseHelloURL(hu, false); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 
@@ -90,14 +94,14 @@ func TestHelloURL(t *testing.T) {
 
 	// convert to and from HELLO URL
 	url1 := hd.URL()
-	t.Log(">>> " + url1)
 	hd2, err := blocks.ParseHelloURL(url1, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	url2 := hd2.URL()
-	t.Log("<<< " + url2)
 	if url1 != url2 {
+		t.Log(">>> " + url1)
+		t.Log("<<< " + url2)
 		t.Fatal("urls don't match")
 	}
 }

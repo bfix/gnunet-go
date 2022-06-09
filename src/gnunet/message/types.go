@@ -193,6 +193,10 @@ const (
 	DHT_MONITOR_START            = 153 // Request information about transiting messages
 	DHT_MONITOR_STOP             = 154 // Stop information about transiting messages
 	DHT_CLIENT_GET_RESULTS_KNOWN = 156 // Certain results are already known to the client, filter those.
+	DHT_P2P_HELLO                = 157 // HELLO advertising a neighbours addresses.
+	DHT_CORE                     = 158 // Encapsulation of DHT messages in CORE service.
+	DHT_CLIENT_HELLO_URL         = 159 // HELLO URL send between client and service (in either direction).
+	DHT_CLIENT_HELLO_GET         = 161 // Client requests DHT service's HELLO URL.
 
 	//------------------------------------------------------------------
 	// HOSTLIST message types

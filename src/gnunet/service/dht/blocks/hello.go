@@ -24,6 +24,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"gnunet/enums"
 	"gnunet/util"
 	"net/url"
 	"strconv"
@@ -167,8 +168,8 @@ func (h *HelloBlock) finalize() (err error) {
 	if h.addrs == nil {
 		// read addresses from the binary representation
 		pos := 0
+		h.addrs = make([]*util.Address, 0)
 		for {
-			h.addrs = make([]*util.Address, 0)
 			var as string
 			as, pos = util.ReadCString(h.AddrBin, pos)
 			if pos == -1 {
@@ -184,7 +185,7 @@ func (h *HelloBlock) finalize() (err error) {
 		// generate binary representation of addresses
 		wrt := new(bytes.Buffer)
 		for _, a := range h.addrs {
-			wrt.WriteString(a.String())
+			wrt.WriteString(a.URI())
 			wrt.WriteByte(0)
 		}
 		h.AddrBin = wrt.Bytes()
@@ -259,7 +260,7 @@ func (h *HelloBlock) signedData() []byte {
 	// get address block in bytes
 	hAddr := sha512.Sum512(h.AddrBin)
 	var size uint32 = 80
-	var purpose uint32 = 40
+	var purpose uint32 = enums.SIG_HELLO
 
 	// assemble signed data
 	buf := new(bytes.Buffer)

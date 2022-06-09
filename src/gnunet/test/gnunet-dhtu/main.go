@@ -25,9 +25,14 @@ import (
 	"fmt"
 	"gnunet/config"
 	"gnunet/core"
+	"gnunet/service"
+	"gnunet/service/dht"
 	"gnunet/util"
 	"log"
+	"net/rpc"
 	"time"
+
+	"github.com/bfix/gospel/logger"
 )
 
 //----------------------------------------------------------------------
@@ -39,14 +44,18 @@ func main() {
 	var (
 		remoteId   string
 		remoteAddr string
-		localAddr  string
-		localPort  int
+		cfgFile    string
 	)
+	flag.StringVar(&cfgFile, "c", "gnunet-config.json", "configuration file")
 	flag.StringVar(&remoteId, "i", "", "peer id of remote node")
 	flag.StringVar(&remoteAddr, "a", "", "address of remote node")
-	flag.StringVar(&localAddr, "l", "127.0.0.1", "listening address of local node")
-	flag.IntVar(&localPort, "p", 2086, "port of local node")
 	flag.Parse()
+
+	// read configuration file and set missing arguments.
+	if err := config.ParseConfig(cfgFile); err != nil {
+		logger.Printf(logger.ERROR, "[gnunet-dhtu] Invalid configuration file: %s\n", err.Error())
+		return
+	}
 
 	// convert arguments
 	var (
@@ -65,23 +74,6 @@ func main() {
 		rId = util.NewPeerID(buf)
 	}
 
-	// configuration data
-	var (
-		peerCfg = &config.NodeConfig{
-			Name:        "p1",
-			PrivateSeed: "iYK1wSi5XtCP774eNFk1LYXqKlOPEpwKBw+2/bMkE24=",
-			Endpoints: []*config.EndpointConfig{
-				{
-					ID:      "p1",
-					Network: "ip+udp",
-					Address: localAddr,
-					Port:    localPort,
-					TTL:     86400,
-				},
-			},
-		}
-	)
-
 	// setup execution context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
@@ -90,24 +82,21 @@ func main() {
 	}()
 
 	// create and run node
-	node, err := NewTestNode(ctx, peerCfg)
+	node, err := NewTestNode(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer node.Shutdown()
 
 	// show our HELLO URL
-	as := fmt.Sprintf("%s://%s:%d",
-		peerCfg.Endpoints[0].Network,
-		peerCfg.Endpoints[0].Address,
-		peerCfg.Endpoints[0].Port,
-	)
+	ep := config.Cfg.Local.Endpoints[0]
+	as := fmt.Sprintf("%s://%s:%d", ep.Network, ep.Address, ep.Port)
 	listen, err := util.ParseAddress(as)
 	if err != nil {
 		log.Fatal(err)
 	}
 	aList := []*util.Address{listen}
-	log.Println("HELLO: " + node.HelloURL(aList))
+	logger.Println(logger.INFO, "HELLO: "+node.HelloURL(aList))
 
 	// learn bootstrap address (triggers HELLO)
 	node.Learn(ctx, rId, rAddr)
@@ -150,20 +139,35 @@ func (n *TestNode) Learn(ctx context.Context, peer *util.PeerID, addr *util.Addr
 	}
 }
 
-func NewTestNode(ctx context.Context, cfg *config.NodeConfig) (node *TestNode, err error) {
+func NewTestNode(ctx context.Context) (node *TestNode, err error) {
 
 	// create test node
 	node = new(TestNode)
 	node.id = util.NextID()
 
 	// create core service
-	if node.core, err = core.NewCore(ctx, cfg); err != nil {
+	if node.core, err = core.NewCore(ctx, config.Cfg.Local); err != nil {
 		return
 	}
 	node.peer = node.core.Peer()
 	log.Printf("[%d] Node %s starting", node.id, node.peer.GetID())
 	log.Printf("[%d]   --> %s", node.id, hex.EncodeToString(node.peer.GetID().Key))
 
+	// start a new DHT service
+	dht, err := dht.NewService(ctx, node.core)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// start JSON-RPC server on request
+	var rpc *rpc.Server
+	if rpc, err = service.StartRPC(ctx, config.Cfg.RPC.Endpoint); err != nil {
+		logger.Printf(logger.ERROR, "[gnunet-dhtu] RPC failed to start: %s", err.Error())
+		return
+	}
+	dht.InitRPC(rpc)
+
+	// start listening on the network
 	list, err := node.core.Addresses()
 	if err != nil {
 		log.Fatal(err)
@@ -178,7 +182,7 @@ func NewTestNode(ctx context.Context, cfg *config.NodeConfig) (node *TestNode, e
 
 	// register as event listener
 	incoming := make(chan *core.Event)
-	node.core.Register(cfg.Name, core.NewListener(incoming, nil))
+	node.core.Register(config.Cfg.Local.Name, core.NewListener(incoming, nil))
 
 	// heart beat
 	tick := time.NewTicker(5 * time.Minute)
