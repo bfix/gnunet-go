@@ -21,6 +21,7 @@ package blocks
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"gnunet/util"
 	"net/url"
@@ -29,6 +30,12 @@ import (
 
 	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/data"
+)
+
+// HELLO-related errors
+var (
+	ErrHelloExpired   = errors.New("expired HELLO")
+	ErrHelloSignature = errors.New("failed HELLO signature")
 )
 
 //----------------------------------------------------------------------
@@ -108,6 +115,10 @@ func ParseHelloURL(u string) (h *HelloBlock, err error) {
 		return
 	}
 	h.Expire = util.NewAbsoluteTimeEpoch(exp)
+	if h.Expire.Expired() {
+		err = ErrHelloExpired
+		return
+	}
 
 	// (5) process addresses.
 	h.addrs = make([]*util.Address, 0)
@@ -125,6 +136,16 @@ func ParseHelloURL(u string) (h *HelloBlock, err error) {
 			return
 		}
 		h.addrs = append(h.addrs, addr)
+	}
+
+	// check signature
+	var ok bool
+	if ok, err = h.Verify(); err != nil {
+		return
+	}
+	if !ok {
+		err = ErrHelloSignature
+		return
 	}
 
 	// (6) generate raw address data so block is complete
@@ -220,11 +241,20 @@ func (h *HelloBlock) Sign(prv *ed25519.PrivateKey) (err error) {
 
 // signedData assembles a data block for sign and verify operations.
 func (h *HelloBlock) signedData() []byte {
+	// get address block in bytes
 	buf := new(bytes.Buffer)
-	buf.Write(h.PeerID.Key)
-	binary.Write(buf, binary.BigEndian, h.Expire)
 	for _, a := range h.addrs {
 		buf.Write(a.Address)
 	}
+	hAddr := buf.Bytes()
+	var size uint32 = uint32(16 + len(hAddr))
+	var purpose uint32 = 40
+
+	// assemble signed data
+	buf = new(bytes.Buffer)
+	binary.Write(buf, binary.BigEndian, size)
+	binary.Write(buf, binary.BigEndian, purpose)
+	binary.Write(buf, binary.BigEndian, h.Expire.Epoch()*1000000)
+	buf.Write(hAddr)
 	return buf.Bytes()
 }
