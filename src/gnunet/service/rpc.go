@@ -20,27 +20,31 @@ package service
 
 import (
 	"context"
-	"gnunet/config"
 	"net/http"
+	"net/rpc"
 	"time"
 
 	"github.com/bfix/gospel/logger"
 	"github.com/gorilla/mux"
 )
 
+//----------------------------------------------------------------------
 // JSON-RPC interface for services to be used as the primary client API
 // for perform, manage and monitor GNUnet activities.
-
-// Router for JSON-RPC requests
-var Router = mux.NewRouter()
-var srv *http.Server
+//----------------------------------------------------------------------
 
 // StartRPC the JSON-RPC server. It can be terminated by context
-func StartRPC(ctx context.Context) error {
+func StartRPC(ctx context.Context, endpoint string) (srvRPC *rpc.Server, err error) {
+
+	// setup RPC request handler
+	router := mux.NewRouter()
+	srvRPC = rpc.NewServer()
+	router.HandleFunc("/", srvRPC.ServeHTTP)
+
 	// instantiate a server and run it
-	srv = &http.Server{
-		Handler:      Router,
-		Addr:         config.Cfg.RPC.Endpoint,
+	srv := &http.Server{
+		Handler:      router,
+		Addr:         endpoint,
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
@@ -58,11 +62,5 @@ func StartRPC(ctx context.Context) error {
 			}
 		}
 	}()
-	return nil
-}
-
-// RegisterRPC a JSON-RPC path in a service-specific processor
-func RegisterRPC(m Module) {
-	path, hdlr := m.RPC()
-	Router.HandleFunc(path, hdlr)
+	return
 }

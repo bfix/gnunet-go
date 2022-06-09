@@ -18,13 +18,29 @@
 
 package dht
 
-import "net/http"
+import (
+	"net/rpc"
+	"time"
+)
 
 //----------------------------------------------------------------------
 
-// RPC returns the route and handler function for a JSON-RPC request
-func (m *Module) RPC() (string, func(http.ResponseWriter, *http.Request)) {
-	return "/gns/", func(wrt http.ResponseWriter, req *http.Request) {
-		wrt.Write([]byte(`{"msg": "This is DHT" }`))
+type DHTCommand struct{}
+
+type DHTStats struct {
+	Started time.Time
+}
+
+func (c *DHTCommand) Status(stats *DHTStats) error {
+	*stats = DHTStats{
+		Started: time.Now(),
 	}
+	return nil
+}
+
+//----------------------------------------------------------------------
+
+// InitRPC registers RPC commands for the module
+func (m *Module) InitRPC(srv *rpc.Server) {
+	srv.Register(new(DHTCommand))
 }

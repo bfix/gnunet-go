@@ -21,6 +21,7 @@ package main
 import (
 	"context"
 	"flag"
+	"net/rpc"
 	"os"
 	"os/signal"
 	"strings"
@@ -97,7 +98,7 @@ func main() {
 		return
 	}
 
-	// start JSON-RPC server on request
+	// handle command-line arguments for RPC
 	if len(rpcEndp) > 0 {
 		parts := strings.Split(rpcEndp, ":")
 		if parts[0] != "tcp" {
@@ -105,11 +106,15 @@ func main() {
 			return
 		}
 		config.Cfg.RPC.Endpoint = parts[1]
-		if err = service.StartRPC(ctx); err != nil {
+	}
+	// start JSON-RPC server on request
+	if ep := config.Cfg.RPC.Endpoint; len(ep) > 0 {
+		var rpc *rpc.Server
+		if rpc, err = service.StartRPC(ctx, ep); err != nil {
 			logger.Printf(logger.ERROR, "[revocation] RPC failed to start: %s", err.Error())
 			return
 		}
-		service.RegisterRPC(rvc)
+		rvc.InitRPC(rpc)
 	}
 
 	// handle OS signals

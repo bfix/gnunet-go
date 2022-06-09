@@ -21,6 +21,7 @@ package main
 import (
 	"context"
 	"flag"
+	"net/rpc"
 	"os"
 	"os/signal"
 	"strings"
@@ -90,14 +91,18 @@ func main() {
 	defer c.Shutdown()
 
 	// start a new DHT service
-	dht := dht.NewService(ctx, c)
-	srv := service.NewSocketHandler("dht", dht)
+	var dhtSrv service.Service
+	if dhtSrv, err = dht.NewService(ctx, c); err != nil {
+		logger.Printf(logger.ERROR, "[dht] failed to create DHT service: %s\n", err.Error())
+		return
+	}
+	srv := service.NewSocketHandler("dht", dhtSrv)
 	if err = srv.Start(ctx, socket, params); err != nil {
 		logger.Printf(logger.ERROR, "[dht] Failed to start DHT service: '%s'", err.Error())
 		return
 	}
 
-	// start JSON-RPC server on request
+	// handle command-line arguments for RPC
 	if len(rpcEndp) > 0 {
 		parts := strings.Split(rpcEndp, ":")
 		if parts[0] != "tcp" {
@@ -105,11 +110,15 @@ func main() {
 			return
 		}
 		config.Cfg.RPC.Endpoint = parts[1]
-		if err = service.StartRPC(ctx); err != nil {
+	}
+	// start JSON-RPC server on request
+	if ep := config.Cfg.RPC.Endpoint; len(ep) > 0 {
+		var rpc *rpc.Server
+		if rpc, err = service.StartRPC(ctx, ep); err != nil {
 			logger.Printf(logger.ERROR, "[dht] RPC failed to start: %s", err.Error())
 			return
 		}
-		service.RegisterRPC(dht)
+		dhtSrv.InitRPC(rpc)
 	}
 
 	// handle OS signals

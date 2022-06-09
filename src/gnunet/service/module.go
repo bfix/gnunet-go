@@ -23,7 +23,7 @@ import (
 	"gnunet/core"
 	"gnunet/message"
 	"gnunet/transport"
-	"net/http"
+	"net/rpc"
 	"time"
 )
 
@@ -65,8 +65,8 @@ type Module interface {
 	// Import functions by name
 	Import(map[string]any)
 
-	// RPC returns the route and handler for JSON-RPC requests
-	RPC() (string, func(http.ResponseWriter, *http.Request))
+	// InitRPC registers RPC commands for the module
+	InitRPC(*rpc.Server)
 
 	// Filter returns the event filter for the module
 	Filter() *core.EventFilter

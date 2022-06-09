@@ -16,7 +16,7 @@
 //
 // SPDX-License-Identifier: AGPL3.0-or-later
 
-package gns
+package revocation
 
 import "net/rpc"
 

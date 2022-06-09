@@ -49,16 +49,15 @@ type Module struct {
 
 // NewModule returns a new module instance. It initializes the storage
 // mechanism for persistence.
-func NewModule(ctx context.Context, c *core.Core) (m *Module) {
+func NewModule(ctx context.Context, c *core.Core) (m *Module, err error) {
 	// create permanent storage handler
-	store, err := service.NewDHTStore(config.Cfg.DHT.Storage)
-	if err != nil {
-		return nil
+	var store, cache service.DHTStore
+	if store, err = service.NewDHTStore(config.Cfg.DHT.Storage); err != nil {
+		return
 	}
 	// create cache handler
-	cache, err := service.NewDHTStore(config.Cfg.DHT.Cache)
-	if err != nil {
-		return nil
+	if cache, err = service.NewDHTStore(config.Cfg.DHT.Cache); err != nil {
+		return
 	}
 	// create routing table
 	rt := NewRoutingTable(NewPeerAddress(c.PeerID()))
@@ -74,7 +73,6 @@ func NewModule(ctx context.Context, c *core.Core) (m *Module) {
 	// register as listener for core events
 	listener := m.Run(ctx, m.event, m.Filter(), 15*time.Minute, m.heartbeat)
 	c.Register("dht", listener)
-
 	return
 }
 

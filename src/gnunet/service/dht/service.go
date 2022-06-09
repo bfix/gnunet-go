@@ -48,13 +48,16 @@ type Service struct {
 }
 
 // NewService creates a new DHT service instance
-func NewService(ctx context.Context, c *core.Core) service.Service {
-	mod := NewModule(ctx, c)
+func NewService(ctx context.Context, c *core.Core) (service.Service, error) {
+	mod, err := NewModule(ctx, c)
+	if err != nil {
+		return nil, err
+	}
 	srv := &Service{
 		Module: *mod,
 	}
 	srv.ProcessFcn = srv.HandleMessage
-	return srv
+	return srv, nil
 }
 
 // ServeClient processes a client channel.
