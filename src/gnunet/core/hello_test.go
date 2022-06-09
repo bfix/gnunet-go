@@ -42,15 +42,24 @@ var (
 		},
 	}
 
-	helloURL = "gnunet://hello" +
+	helloURLFail = "gnunet://hello" +
 		"/A02QJQ93GPBFVPJ4ZEY3JTS4HS00NG5PZBM7VXR0P9CRP18MZTN0" +
 		"/SBNGD3ZDMZ953GZ4JXMKEKHG1EFADE6SVGQ7ZJXGM95H387T4BYZT87TC8D6G22ZRRNDZT83K6KZQS6TR59SMNZ9MZJK6533XTDJW0G" +
 		"/1654780105" +
 		"?ip+udp=172.17.0.1%3A2086"
+
+	helloURLOK = "gnunet://hello" +
+		"/A02QJQ93GPBFVPJ4ZEY3JTS4HS00NG5PZBM7VXR0P9CRP18MZTN0" +
+		"/TJR1PYY8M7EJAT8Y4ABDAFM318ATEJ87EJ6SXHCDJF03F1AAPNDXA51MDJ6D5PZ0YB17NPAD0GR60V34100BQT2YGWP46CER4HCT21G" +
+		"/1654782536" +
+		"?ip+udp=172.17.0.1%3A2086"
 )
 
 func TestHelloURLDirect(t *testing.T) {
-	if _, err := blocks.ParseHelloURL(helloURL); err != nil {
+	if _, err := blocks.ParseHelloURL(helloURLFail); err == nil {
+		t.Fatal("no error on bad HELLO URL")
+	}
+	if _, err := blocks.ParseHelloURL(helloURLOK); err != nil {
 		t.Fatal(err)
 	}
 }
