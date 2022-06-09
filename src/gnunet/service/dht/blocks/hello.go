@@ -111,15 +111,17 @@ func ParseHelloURL(u string) (h *HelloBlock, err error) {
 
 	// (5) process addresses.
 	h.addrs = make([]*util.Address, 0)
-	var ua string
 	for _, a := range strings.Split(q[1], "&") {
-		// unescape URL query
-		if ua, err = url.QueryUnescape(a); err != nil {
+		// reformat to standard address format
+		ap := strings.SplitN(a, "=", 2)
+		var q string
+		if q, err = url.QueryUnescape(ap[1]); err != nil {
 			return
 		}
+		as := ap[0] + "://" + q
 		// parse address and append it to list
 		var addr *util.Address
-		if addr, err = util.ParseAddress(ua); err != nil {
+		if addr, err = util.ParseAddress(as); err != nil {
 			return
 		}
 		h.addrs = append(h.addrs, addr)
@@ -177,7 +179,9 @@ func (h *HelloBlock) URL() string {
 		if i > 0 {
 			u += "&"
 		}
-		u += url.QueryEscape(a.URI())
+		au := a.URI()
+		p := strings.SplitN(au, "://", 2)
+		u += p[0] + "=" + url.QueryEscape(p[1])
 	}
 	return u
 }

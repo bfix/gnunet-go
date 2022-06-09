@@ -138,11 +138,11 @@ func NewHelloMsg(peer *util.PeerID) *HelloMsg {
 	}
 	// return empty HelloMessage
 	return &HelloMsg{
-		MsgSize:     40,
-		MsgType:     HELLO,
-		FriendsOnly: 0,
-		Peer:        peer,
-		AddrList:    make([]byte, 0),
+		MsgSize:     40,              // size without 'AddrList'
+		MsgType:     HELLO,           // HELLO (17)
+		FriendsOnly: 0,               // not used here
+		Peer:        peer,            // associated peer
+		AddrList:    make([]byte, 0), // list of addresses
 	}
 }
 

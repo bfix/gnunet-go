@@ -30,8 +30,8 @@ var (
 		"/BNMDFN6HJCPWSPNBSEC06MC1K8QN1Z2DHRQSRXDTFR7FTBD4JHN" +
 		"BJ2RJAAEZ31FWG1Q3PMN3PXGZQ3Q7NTNEKQZFA7TE2Y46FM8E20R" +
 		"/1653499308" +
-		"?" + url.QueryEscape("r5n+ip+udp://1.2.3.4:6789") +
-		"&" + url.QueryEscape("gnunet+tcp://12.3.4.5:1453")
+		"?r5n+ip+udp=" + url.QueryEscape("1.2.3.4:6789") +
+		"&gnunet+tcp=" + url.QueryEscape("12.3.4.5:1453")
 )
 
 func TestHelloURL(t *testing.T) {
