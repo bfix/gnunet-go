@@ -20,6 +20,7 @@ package blocks
 
 import (
 	"bytes"
+	"crypto/sha512"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -138,6 +139,9 @@ func ParseHelloURL(u string) (h *HelloBlock, err error) {
 		h.addrs = append(h.addrs, addr)
 	}
 
+	// (6) generate raw address data so block is complete
+	h.finalize()
+
 	// check signature
 	var ok bool
 	if ok, err = h.Verify(); err != nil {
@@ -145,11 +149,7 @@ func ParseHelloURL(u string) (h *HelloBlock, err error) {
 	}
 	if !ok {
 		err = ErrHelloSignature
-		return
 	}
-
-	// (6) generate raw address data so block is complete
-	h.finalize()
 	return
 }
 
@@ -242,19 +242,15 @@ func (h *HelloBlock) Sign(prv *ed25519.PrivateKey) (err error) {
 // signedData assembles a data block for sign and verify operations.
 func (h *HelloBlock) signedData() []byte {
 	// get address block in bytes
-	buf := new(bytes.Buffer)
-	for _, a := range h.addrs {
-		buf.Write(a.Address)
-	}
-	hAddr := buf.Bytes()
-	var size uint32 = uint32(16 + len(hAddr))
+	hAddr := sha512.Sum512(h.AddrBin)
+	var size uint32 = 80
 	var purpose uint32 = 40
 
 	// assemble signed data
-	buf = new(bytes.Buffer)
+	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.BigEndian, size)
 	binary.Write(buf, binary.BigEndian, purpose)
 	binary.Write(buf, binary.BigEndian, h.Expire.Epoch()*1000000)
-	buf.Write(hAddr)
+	buf.Write(hAddr[:])
 	return buf.Bytes()
 }
