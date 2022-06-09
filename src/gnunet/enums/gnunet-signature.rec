@@ -1,0 +1,183 @@
+# -*- mode: rec -*-
+#
+# Registry for GNUnet Signature purposes
+#
+
+%rec: SignaturePurpose
+%key: Number
+%type: Number int
+%mandatory: Number
+%typedef: Name_t regexp /^[ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_][ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_]*$/
+%type: Name Name_t
+%unique: Name
+%mandatory: Name
+%mandatory: Comment
+%allowed: Subsystem
+%sort: Number Name
+
+
+Number: 0
+Name: TEST
+Comment: Test signature, not valid for anything other than writing a test. (Note that the signature verification code will accept this value).
+Subsystem: GNUnet
+
+Number: 1
+Name: TRANSPORT_PONG_OWN
+Comment: Signature for confirming that this peer uses a particular address.
+Subsystem: GNUnet-TRANSPORT
+
+Number: 2
+Name: TRANSPORT_DISCONNECT
+Comment: Signature for confirming that this peer intends to disconnect.
+Subsystem: GNUnet-TRANSPORT
+
+Number: 3
+Name: REVOCATION
+Comment: Signature for confirming a key revocation.
+Subsystem: GNUnet-Revocation
+
+Number: 4
+Name: NAMESPACE_ADVERTISEMENT
+Comment: Signature for a namespace/pseudonym advertisement (by the namespace owner).
+Subsystem: GNUnet-FS
+
+Number: 5
+Name: PEER_PLACEMENT
+Comment: Signature by which a peer affirms that it is providing a certain bit of content for use in LOCation URIs.
+Subsystem: GNUnet-FS
+
+Number: 6
+Name: DHT_HOP
+Comment: Signature by which a peer affirms that it forwarded a message in the DHT.
+Subsystem: GNUnet-DHT
+
+Number: 7
+Name: HELLO
+Comment: Signature by which a peer affirms its address.
+Subsystem: GNUnet-HELLO
+
+
+Number: 11
+Name: DNS_RECORD
+Comment: Signature on a GNUNET_DNS_Advertisement.
+Subsystem: GNUnet-DNS+Exit
+
+Number: 12
+Name: CHAT_MESSAGE
+Comment: Signature of a chat message.
+Subsystem: GNUnet-MESSENGER
+
+Number: 13
+Name: CHAT_RECEIPT
+Comment: Signature of confirmation receipt for a chat message.
+Subsystem: GNUnet-MESSENGER
+
+Number: 14
+Name: NSE_SEND
+Comment: Signature of a network size estimate message.
+Subsystem: GNUnet-NSE
+
+Number: 15
+Name: GNS_RECORD_SIGN
+Comment: Signature of a gnunet naming system record block
+Subsystem: GNUnet-GNSRECORD
+
+Number: 16
+Name: SET_ECC_KEY
+Comment: Purpose is to set a session key.
+Subsystem: GNUnet-CORE
+
+Number: 17
+Name: FS_UBLOCK
+Comment: UBlock Signature, done using DSS, not ECC
+Subsystem: GNUnet-FS
+
+Number: 18
+Name: REGEX_ACCEPT
+Comment: Accept state in regex DFA.  Peer affirms that it offers the matching service.
+Subsystem: GNUnet-REGEX
+
+Number: 20
+Name: CONVERSATION_RING
+Comment: Signature of a conversation ring.
+Subsystem: GNUnet-CONVERSATION
+
+Number: 21
+Name: SECRETSHARING_DKG1
+Comment: Signature for the first round of distributed key generation.
+Subsystem: GNUnet-SECRETSHARING
+
+Number: 22
+Name: SECRETSHARING_DKG2
+Comment: Signature for the second round of distributed key generation.
+Subsystem: GNUnet-SECRETSHARING
+
+Number: 23
+Name: SECRETSHARING_DECRYPTION
+Comment: Signature for the cooperative decryption.
+Subsystem: GNUnet-SECRETSHARING
+
+Number: 27
+Name: RECLAIM_CODE_SIGN
+Comment: Signature for a GNUid Ticket
+Subsystem: Reclaim
+
+Number: 28
+Name: DELEGATE
+Comment: Signature for a GNUnet credential
+Subsystem: Reclaim
+
+Number: 29
+Name: TRANSPORT_ADDRESS
+Comment: Signature by a peer affirming that this is one of its addresses for the given time period.
+Subsystem: GNUnet-TRANSPORT
+
+Number: 30
+Name: TRANSPORT_EPHEMERAL
+Comment: Signature by a peer affirming that the given ephemeral key is currently in use by that peer's transport service.
+Subsystem: GNUnet-TRANSPORT
+
+Number: 31
+Name: COMMUNICATOR_TCP_HANDSHAKE
+Comment: Signature used by TCP communicator handshake.
+Subsystem: GNUnet-TRANSPORT-TCP
+
+Number: 32
+Name: COMMUNICATOR_TCP_REKEY
+Comment: Signature used by TCP communicator rekey.
+Subsystem: GNUnet-TRANSPORT-TCP
+
+Number: 33
+Name: COMMUNICATOR_UDP_HANDSHAKE
+Comment: Signature used by UDP communicator handshake.
+Subsystem: GNUnet-TRANSPORT-UDP
+
+Number: 34
+Name: COMMUNICATOR_UDP_BROADCAST
+Comment: Signature used by UDP broadcasts.
+Subsystem: GNUnet-TRANSPORT-UDP
+
+Number: 35
+Name: TRANSPORT_CHALLENGE
+Comment: Signature by a peer affirming that it received a challenge (and stating how long it expects the address on which the challenge was received to remain valid).
+Subsystem: GNUnet-TRANSPORT
+
+Number: 36
+Name: TRANSPORT_DV_HOP
+Comment: Signature by a peer affirming that it is on a DV path.
+Subsystem: GNUnet-TRANSPORT
+
+Number: 37
+Name: TRANSPORT_DV_INITIATOR
+Comment: Signature by a peer affirming that it originated the DV path.
+Subsystem: GNUnet-TRANSPORT
+
+Number: 38
+Name: CADET_CONNECTION_INITIATOR
+Comment: Signature by a peer that like to create a connection.
+Subsystem: GNUnet-CADET
+
+Number: 39
+Name: COMMUNICATOR_TCP_HANDSHAKE_ACK
+Comment: Signature by a peer sending back the nonce received at initial handshake.
+Subsystem: GNUnet-TRANSPORT-TCP

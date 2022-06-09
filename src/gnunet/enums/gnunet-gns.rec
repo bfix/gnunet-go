@@ -1,0 +1,132 @@
+# -*- mode: rec -*-
+#
+# Registry for GNU Name System record types
+#
+
+%rec: RecordType
+%key: Number
+%type: Number int
+%mandatory: Number
+%typedef: Name_t regexp /^[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-][abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-]*$/
+%type: Name Name_t
+%unique: Name
+%mandatory: Name
+%mandatory: Comment
+%allowed: Contact
+%allowed: References
+%sort: Number Name Contact References
+
+Number: 65536
+Name: PKEY
+Comment: GNS zone transfer
+References: LSD0001
+
+Number: 65537
+Name: NICK
+Comment: GNS nick names
+References: LSD0001
+
+Number: 65538
+Name: LEHO
+Comment: legacy hostnames
+References: LSD0001
+
+Number: 65539
+Name: VPN
+Comment: VPN resolution
+References: LSD0001
+
+Number: 65540
+Name: GNS2DNS
+Comment: Delegation to DNS
+References: LSD0001
+
+Number: 65541
+Name: BOX
+Comment: Boxed records (see TLSA/SRV handling in GNS)
+References: LSD0001
+
+Number: 65542
+Name: PLACE
+Comment: social place for SecuShare
+Contact: lynx@gnunet.org
+
+Number: 65543
+Name: PHONE
+Comment: Endpoint for conversation
+Contact: grothoff@gnunet.org
+
+Number: 65544
+Name: RECLAIM_ATTRIBUTE
+Comment: identity attribute
+Contact: schanzen@gnunet.org
+
+Number: 65545
+Name: RECLAIM_TICKET
+Comment: local ticket reference
+Contact: schanzen@gnunet.org
+
+Number: 65548
+Name: DELEGATE
+Comment: For ABD policies
+Contact: schanzen@gnunet.org
+
+Number: 65549
+Name: ATTRIBUTE
+Comment: For ABD reverse lookups
+Contact: schanzen@gnunet.org
+
+Number: 65550
+Name: RECLAIM_ATTRIBUTE_REF
+Comment: for reclaim records
+Contact: schanzen@gnunet.org
+
+Number: 65551
+Name: REDIRECT
+Comment: Resolver redirects
+Contact: LSD0001
+
+Number: 65552
+Name: RECLAIM_OIDC_CLIENT
+Comment: For reclaim OIDC client names.
+Contact: schanzen@gnunet.org
+
+Number: 65553
+Name: RECLAIM_OIDC_REDIRECT
+Comment: Used reclaimID OIDC client redirect URIs.
+Contact: schanzen@gnunet.org
+
+
+Number: 65554
+Name: RECLAIM_CREDENTIAL
+Comment: Record type for an attribute attestation (e.g. JWT).
+Contact: schanzen@gnunet.org
+
+Number: 65555
+Name: RECLAIM_PRESENTATION
+Comment: Record type for a presentation of a credential.
+Contact: schanzen@gnunet.org
+
+Number: 65556
+Name: EDKEY
+Comment: Record type for EDKEY zone delegations.
+
+Number: 65557
+Name: ERIS_READ_CAPABILITY
+Comment: Encoding for Robust Immutable Storage (ERIS) binary read capability
+References: http://purl.org/eris
+
+Number: 65558
+Name: MESSENGER_ROOM_ENTRY
+Comment: Record type to share an entry of a messenger room
+Contact: thejackimonster@gmail.com
+
+Number: 65559
+Name: TOMBSTONE
+Comment: Record type to indicate a previously delete record (PRIVATE only)
+Contact: gnunet-developers@gnunet.org
+
+Number: 65560
+Name: MESSENGER_ROOM_DETAILS
+Comment: Record type to store details about a messenger room
+Contact: thejackimonster@gmail.com

@@ -1,0 +1,102 @@
+# -*- mode: rec -*-
+#
+# Registry for GNU Name System record types
+#
+
+%rec: BlockType
+%key: Number
+%type: Number int
+%mandatory: Number
+%typedef: Name_t regexp /^[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-][abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-]*$/
+%type: Name Name_t
+%unique: Name
+%mandatory: Name
+%mandatory: Comment
+%allowed: Contact
+%allowed: References
+%sort: Number Name Contact References
+
+Number: 0
+Name: ANY
+Comment: Identifier for any block.
+References: None
+
+Number: 1
+Name: FS_DBLOCK
+Comment: Data block (leaf) in the CHK tree.
+References: None
+
+Number: 2
+Name: FS_IBLOCK
+Comment: Inner block in the CHK tree.
+References: None
+
+Number: 6
+Name: FS_ONDEMAND
+Comment: Type of a block representing a block to be encoded on demand from disk. Should never appear on the network directly.
+References: None
+
+Number: 7
+Name: DHT_HELLO
+Comment: Type of a block that contains a HELLO for a peer.
+References: None
+
+Number: 8
+Name: TEST
+Comment: Block for testing.
+References: None
+
+Number: 9
+Name: FS_UBLOCK
+Comment: Type of a block representing any type of search result (universal).
+References: None
+
+Number: 10
+Name: DNS
+Comment: Block for storing DNS exit service advertisements.
+References: None
+
+Number: 11
+Name: GNS_NAMERECORD
+Comment: Block for storing GNS record data.
+References: None
+
+Number: 12
+Name: REVOCATION
+Comment: Block type for a revocation message by which a key is revoked.
+References: None
+
+Number: 13
+Name: DHT_URL_HELLO
+Comment: Type of a block that contains a DHT-NG HELLO for a peer.
+References: None
+
+Number: 22
+Name: REGEX
+Comment: Block to store a cadet regex state
+References: None
+
+Number: 23
+Name: REGEX_ACCEPT
+Comment: Block to store a cadet regex accepting state
+References: None
+
+Number: 24
+Name: SET_TEST
+Comment: Block for testing set/consensus.  If first byte of the block is non-zero, the block is considered invalid.
+References: None
+
+Number: 25
+Name: CONSENSUS_ELEMENT
+Comment: Block type for consensus elements. Contains either special marker elements or a nested block.
+References: None
+
+Number: 26
+Name: SETI_TEST
+Comment: Block for testing set intersection.  If first byte of the block is non-zero, the block is considered invalid.
+References: None
+
+Number: 27
+Name: SETU_TEST
+Comment: Block for testing set union.  If first byte of the block is non-zero, the block is considered invalid.
+References: None
