@@ -118,7 +118,7 @@ func TestRevocationRFC(t *testing.T) {
 	sigBlock := &SignedRevData{
 		Purpose: &crypto.SignaturePurpose{
 			Size:    uint32(20 + revData.ZoneKeySig.KeySize()),
-			Purpose: enums.SIG_REVOCATION,
+			Purpose: uint32(enums.SIG_REVOCATION),
 		},
 		Timestamp: revData.Timestamp,
 		ZoneKey:   &revData.ZoneKeySig.ZoneKey,

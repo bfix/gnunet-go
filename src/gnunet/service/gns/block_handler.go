@@ -46,7 +46,7 @@ var (
 
 // Mapping of RR types to BlockHandler instanciation functions
 var (
-	customHandler = map[int]HdlrInst{
+	customHandler = map[enums.GNSType]HdlrInst{
 		enums.GNS_TYPE_PKEY:      NewZoneHandler,
 		enums.GNS_TYPE_EDKEY:     NewZoneHandler,
 		enums.GNS_TYPE_GNS2DNS:   NewGns2DnsHandler,
@@ -76,7 +76,7 @@ type BlockHandler interface {
 	// resource records in the same block. 'cm' maps the resource type
 	// to an integer count (how many records of a type are present in the
 	// GNS block).
-	Coexist(cm util.Counter[int]) bool
+	Coexist(cm util.Counter[enums.GNSType]) bool
 
 	// Records returns a list of RR of the given types associated with
 	// the custom handler
@@ -102,8 +102,8 @@ type BlockHandler interface {
 
 // BlockHandlerList is a list of block handlers instantiated.
 type BlockHandlerList struct {
-	list   map[int]BlockHandler // list of handler instances
-	counts util.Counter[int]    // count number of RRs by type
+	list   map[enums.GNSType]BlockHandler // list of handler instances
+	counts util.Counter[enums.GNSType]    // count number of RRs by type
 }
 
 // NewBlockHandlerList instantiates an a list of active block handlers
@@ -111,8 +111,8 @@ type BlockHandlerList struct {
 func NewBlockHandlerList(records []*message.ResourceRecord, labels []string) (*BlockHandlerList, []*message.ResourceRecord, error) {
 	// initialize block handler list
 	hl := &BlockHandlerList{
-		list:   make(map[int]BlockHandler),
-		counts: make(util.Counter[int]),
+		list:   make(map[enums.GNSType]BlockHandler),
+		counts: make(util.Counter[enums.GNSType]),
 	}
 
 	// first pass: build list of shadow records in this block
@@ -153,11 +153,11 @@ func NewBlockHandlerList(records []*message.ResourceRecord, labels []string) (*B
 			logger.Printf(logger.DBG, "[gns] handler_list: skip %v\n", rec)
 			continue
 		}
-		rrType := int(rec.Type)
+		rrType := enums.GNSType(rec.Type)
 		hl.counts.Add(rrType)
 
 		// check for custom handler type
-		if creat, ok := customHandler[rrType]; ok {
+		if creat, ok := customHandler[enums.GNSType(rrType)]; ok {
 			// check if a handler for given type already exists
 			var (
 				hdlr BlockHandler
@@ -194,7 +194,7 @@ func NewBlockHandlerList(records []*message.ResourceRecord, labels []string) (*B
 // GetHandler returns a BlockHandler for the given GNS block type.
 // If more than one type is given, the first matching hanlder is
 // returned.
-func (hl *BlockHandlerList) GetHandler(types ...int) BlockHandler {
+func (hl *BlockHandlerList) GetHandler(types ...enums.GNSType) BlockHandler {
 	for _, t := range types {
 		// return handler for given type if it exists
 		if hdlr, ok := hl.list[t]; ok {
@@ -260,7 +260,7 @@ func (h *ZoneKeyHandler) AddRecord(rec *message.ResourceRecord, labels []string)
 
 // Coexist return a flag indicating how a resource record of a given type
 // is to be treated (see BlockHandler interface)
-func (h *ZoneKeyHandler) Coexist(cm util.Counter[int]) bool {
+func (h *ZoneKeyHandler) Coexist(cm util.Counter[enums.GNSType]) bool {
 	// only one type (GNS_TYPE_PKEY) is present
 	return len(cm) == 1 && cm.Num(enums.GNS_TYPE_PKEY) == 1
 }
@@ -292,7 +292,7 @@ type Gns2DnsHandler struct {
 
 // NewGns2DnsHandler returns a new BlockHandler instance
 func NewGns2DnsHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, error) {
-	if int(rec.Type) != enums.GNS_TYPE_GNS2DNS {
+	if enums.GNSType(rec.Type) != enums.GNS_TYPE_GNS2DNS {
 		return nil, ErrInvalidRecordType
 	}
 	h := &Gns2DnsHandler{
@@ -308,7 +308,7 @@ func NewGns2DnsHandler(rec *message.ResourceRecord, labels []string) (BlockHandl
 
 // AddRecord inserts a GNS2DNS record into the handler.
 func (h *Gns2DnsHandler) AddRecord(rec *message.ResourceRecord, labels []string) error {
-	if int(rec.Type) != enums.GNS_TYPE_GNS2DNS {
+	if enums.GNSType(rec.Type) != enums.GNS_TYPE_GNS2DNS {
 		return ErrInvalidRecordType
 	}
 	logger.Printf(logger.DBG, "[gns] GNS2DNS data: %s\n", hex.EncodeToString(rec.Data))
@@ -335,7 +335,7 @@ func (h *Gns2DnsHandler) AddRecord(rec *message.ResourceRecord, labels []string)
 
 // Coexist return a flag indicating how a resource record of a given type
 // is to be treated (see BlockHandler interface)
-func (h *Gns2DnsHandler) Coexist(cm util.Counter[int]) bool {
+func (h *Gns2DnsHandler) Coexist(cm util.Counter[enums.GNSType]) bool {
 	// only one type (GNS_TYPE_GNS2DNS) is present
 	return len(cm) == 1 && cm.Num(enums.GNS_TYPE_GNS2DNS) > 0
 }
@@ -367,7 +367,7 @@ type BoxHandler struct {
 
 // NewBoxHandler returns a new BlockHandler instance
 func NewBoxHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, error) {
-	if int(rec.Type) != enums.GNS_TYPE_BOX {
+	if enums.GNSType(rec.Type) != enums.GNS_TYPE_BOX {
 		return nil, ErrInvalidRecordType
 	}
 	h := &BoxHandler{
@@ -381,7 +381,7 @@ func NewBoxHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, 
 
 // AddRecord inserts a BOX record into the handler.
 func (h *BoxHandler) AddRecord(rec *message.ResourceRecord, labels []string) error {
-	if int(rec.Type) != enums.GNS_TYPE_BOX {
+	if enums.GNSType(rec.Type) != enums.GNS_TYPE_BOX {
 		return ErrInvalidRecordType
 	}
 	logger.Printf(logger.DBG, "[box-rr] for labels %v\n", labels)
@@ -405,7 +405,7 @@ func (h *BoxHandler) AddRecord(rec *message.ResourceRecord, labels []string) err
 
 // Coexist return a flag indicating how a resource record of a given type
 // is to be treated (see BlockHandler interface)
-func (h *BoxHandler) Coexist(cm util.Counter[int]) bool {
+func (h *BoxHandler) Coexist(cm util.Counter[enums.GNSType]) bool {
 	// anything goes...
 	return true
 }
@@ -414,7 +414,7 @@ func (h *BoxHandler) Coexist(cm util.Counter[int]) bool {
 func (h *BoxHandler) Records(kind RRTypeList) *message.RecordSet {
 	rs := message.NewRecordSet()
 	for _, box := range h.boxes {
-		if kind.HasType(int(box.Type)) {
+		if kind.HasType(enums.GNSType(box.Type)) {
 			// valid box found: assemble new resource record.
 			rr := new(message.ResourceRecord)
 			rr.Expires = box.rec.Expires
@@ -445,7 +445,7 @@ type LehoHandler struct {
 
 // NewLehoHandler returns a new BlockHandler instance
 func NewLehoHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, error) {
-	if int(rec.Type) != enums.GNS_TYPE_LEHO {
+	if enums.GNSType(rec.Type) != enums.GNS_TYPE_LEHO {
 		return nil, ErrInvalidRecordType
 	}
 	h := &LehoHandler{
@@ -459,7 +459,7 @@ func NewLehoHandler(rec *message.ResourceRecord, labels []string) (BlockHandler,
 
 // AddRecord inserts a LEHO record into the handler.
 func (h *LehoHandler) AddRecord(rec *message.ResourceRecord, labels []string) error {
-	if int(rec.Type) != enums.GNS_TYPE_LEHO {
+	if enums.GNSType(rec.Type) != enums.GNS_TYPE_LEHO {
 		return ErrInvalidRecordType
 	}
 	h.name = string(rec.Data)
@@ -469,7 +469,7 @@ func (h *LehoHandler) AddRecord(rec *message.ResourceRecord, labels []string) er
 
 // Coexist return a flag indicating how a resource record of a given type
 // is to be treated (see BlockHandler interface)
-func (h *LehoHandler) Coexist(cm util.Counter[int]) bool {
+func (h *LehoHandler) Coexist(cm util.Counter[enums.GNSType]) bool {
 	// requires exactly one LEHO and any number of other records.
 	return cm.Num(enums.GNS_TYPE_LEHO) == 1
 }
@@ -500,7 +500,7 @@ type CnameHandler struct {
 
 // NewCnameHandler returns a new BlockHandler instance
 func NewCnameHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, error) {
-	if int(rec.Type) != enums.GNS_TYPE_DNS_CNAME {
+	if enums.GNSType(rec.Type) != enums.GNS_TYPE_DNS_CNAME {
 		return nil, ErrInvalidRecordType
 	}
 	h := &CnameHandler{
@@ -514,7 +514,7 @@ func NewCnameHandler(rec *message.ResourceRecord, labels []string) (BlockHandler
 
 // AddRecord inserts a CNAME record into the handler.
 func (h *CnameHandler) AddRecord(rec *message.ResourceRecord, labels []string) error {
-	if int(rec.Type) != enums.GNS_TYPE_DNS_CNAME {
+	if enums.GNSType(rec.Type) != enums.GNS_TYPE_DNS_CNAME {
 		return ErrInvalidRecordType
 	}
 	if h.rec != nil {
@@ -527,7 +527,7 @@ func (h *CnameHandler) AddRecord(rec *message.ResourceRecord, labels []string) e
 
 // Coexist return a flag indicating how a resource record of a given type
 // is to be treated (see BlockHandler interface)
-func (h *CnameHandler) Coexist(cm util.Counter[int]) bool {
+func (h *CnameHandler) Coexist(cm util.Counter[enums.GNSType]) bool {
 	// only a single CNAME allowed
 	return len(cm) == 1 && cm.Num(enums.GNS_TYPE_DNS_CNAME) == 1
 }
@@ -557,7 +557,7 @@ type VpnHandler struct {
 
 // NewVpnHandler returns a new BlockHandler instance
 func NewVpnHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, error) {
-	if int(rec.Type) != enums.GNS_TYPE_VPN {
+	if enums.GNSType(rec.Type) != enums.GNS_TYPE_VPN {
 		return nil, ErrInvalidRecordType
 	}
 	h := &VpnHandler{}
@@ -569,7 +569,7 @@ func NewVpnHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, 
 
 // AddRecord inserts a VPN record into the handler.
 func (h *VpnHandler) AddRecord(rec *message.ResourceRecord, labels []string) error {
-	if int(rec.Type) != enums.GNS_TYPE_VPN {
+	if enums.GNSType(rec.Type) != enums.GNS_TYPE_VPN {
 		return ErrInvalidRecordType
 	}
 	if h.rec != nil {
@@ -581,7 +581,7 @@ func (h *VpnHandler) AddRecord(rec *message.ResourceRecord, labels []string) err
 
 // Coexist return a flag indicating how a resource record of a given type
 // is to be treated (see BlockHandler interface)
-func (h *VpnHandler) Coexist(cm util.Counter[int]) bool {
+func (h *VpnHandler) Coexist(cm util.Counter[enums.GNSType]) bool {
 	// anything goes
 	return true
 }

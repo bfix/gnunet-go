@@ -158,7 +158,7 @@ func (rd *RevData) Sign(skey *crypto.ZonePrivate) (err error) {
 	sigBlock := &SignedRevData{
 		Purpose: &crypto.SignaturePurpose{
 			Size:    uint32(20 + rd.ZoneKeySig.KeySize()),
-			Purpose: enums.SIG_REVOCATION,
+			Purpose: uint32(enums.SIG_REVOCATION),
 		},
 		Timestamp: rd.Timestamp,
 		ZoneKey:   &rd.ZoneKeySig.ZoneKey,
@@ -180,7 +180,7 @@ func (rd *RevData) Verify(withSig bool) (zbits float64, rc int) {
 		sigBlock := &SignedRevData{
 			Purpose: &crypto.SignaturePurpose{
 				Size:    uint32(20 + rd.ZoneKeySig.KeySize()),
-				Purpose: enums.SIG_REVOCATION,
+				Purpose: uint32(enums.SIG_REVOCATION),
 			},
 			Timestamp: rd.Timestamp,
 			ZoneKey:   &rd.ZoneKeySig.ZoneKey,

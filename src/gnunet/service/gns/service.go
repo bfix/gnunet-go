@@ -138,7 +138,7 @@ func (s *Service) HandleMessage(ctx context.Context, msg message.Message, back t
 			}()
 
 			label := m.GetName()
-			kind := NewRRTypeList(int(m.Type))
+			kind := NewRRTypeList(enums.GNSType(m.Type))
 			recset, err := s.Resolve(ctx, label, m.Zone, kind, int(m.Options), 0)
 			if err != nil {
 				logger.Printf(logger.ERROR, "[gns%s] Failed to lookup block: %s\n", label, err.Error())
@@ -161,7 +161,7 @@ func (s *Service) HandleMessage(ctx context.Context, msg message.Message, back t
 					logger.Printf(logger.DBG, "[gns%s] Record #%d: %v\n", label, i, rec)
 
 					// is this the record type we are looking for?
-					if rec.Type == m.Type || int(m.Type) == enums.GNS_TYPE_ANY {
+					if rec.Type == m.Type || enums.GNSType(m.Type) == enums.GNS_TYPE_ANY {
 						// add it to the response message
 						resp.AddRecord(rec)
 					}
@@ -278,7 +278,7 @@ func (s *Service) LookupNamecache(ctx context.Context, query *blocks.GNSQuery) (
 		block.DerivedKeySig = m.DerivedKeySig
 		sb := new(blocks.SignedGNSBlockData)
 		sb.Purpose = new(crypto.SignaturePurpose)
-		sb.Purpose.Purpose = enums.SIG_GNS_RECORD_SIGN
+		sb.Purpose.Purpose = uint32(enums.SIG_GNS_RECORD_SIGN)
 		sb.Purpose.Size = uint32(16 + len(m.EncData))
 		sb.Expire = m.Expire
 		sb.Data = m.EncData
@@ -413,7 +413,7 @@ func (s *Service) LookupDHT(ctx context.Context, query blocks.Query) (block bloc
 			break
 		}
 		// check if result is of requested type
-		if int(m.Type) != enums.BLOCK_TYPE_GNS_NAMERECORD {
+		if enums.BlockType(m.Type) != enums.BLOCK_TYPE_GNS_NAMERECORD {
 			logger.Println(logger.ERROR, "[gns] DHT response has wrong type")
 			break
 		}

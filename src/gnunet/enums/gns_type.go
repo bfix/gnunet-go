@@ -46,6 +46,27 @@ const (
 	GNS_TYPE_DNS_CAA                GNSType = 257   // [RFC6844] Certification Authority Authorization
 	GNS_TYPE_DNS_TA                 GNSType = 32768 // [–] DNSSEC Trust Authorities
 	GNS_TYPE_DNS_DLV                GNSType = 32769 // [RFC4431] DNSSEC Lookaside Validation record
-{{ range $i, $kv := . }}GNS_TYPE_{{.Name}} GNSType = {{.Number}} // {{.Comment}}
-{{ end }}
+GNS_TYPE_PKEY GNSType = 65536 // GNS zone transfer
+GNS_TYPE_NICK GNSType = 65537 // GNS nick names
+GNS_TYPE_LEHO GNSType = 65538 // legacy hostnames
+GNS_TYPE_VPN GNSType = 65539 // VPN resolution
+GNS_TYPE_GNS2DNS GNSType = 65540 // Delegation to DNS
+GNS_TYPE_BOX GNSType = 65541 // Boxed records (see TLSA/SRV handling in GNS)
+GNS_TYPE_PLACE GNSType = 65542 // social place for SecuShare
+GNS_TYPE_PHONE GNSType = 65543 // Endpoint for conversation
+GNS_TYPE_RECLAIM_ATTRIBUTE GNSType = 65544 // identity attribute
+GNS_TYPE_RECLAIM_TICKET GNSType = 65545 // local ticket reference
+GNS_TYPE_DELEGATE GNSType = 65548 // For ABD policies
+GNS_TYPE_ATTRIBUTE GNSType = 65549 // For ABD reverse lookups
+GNS_TYPE_RECLAIM_ATTRIBUTE_REF GNSType = 65550 // for reclaim records
+GNS_TYPE_REDIRECT GNSType = 65551 // Resolver redirects
+GNS_TYPE_RECLAIM_OIDC_CLIENT GNSType = 65552 // For reclaim OIDC client names.
+GNS_TYPE_RECLAIM_OIDC_REDIRECT GNSType = 65553 // Used reclaimID OIDC client redirect URIs.
+GNS_TYPE_RECLAIM_CREDENTIAL GNSType = 65554 // Record type for an attribute attestation (e.g. JWT).
+GNS_TYPE_RECLAIM_PRESENTATION GNSType = 65555 // Record type for a presentation of a credential.
+GNS_TYPE_EDKEY GNSType = 65556 // Record type for EDKEY zone delegations.
+GNS_TYPE_ERIS_READ_CAPABILITY GNSType = 65557 // Encoding for Robust Immutable Storage (ERIS) binary read capability
+GNS_TYPE_MESSENGER_ROOM_ENTRY GNSType = 65558 // Record type to share an entry of a messenger room
+GNS_TYPE_TOMBSTONE GNSType = 65559 // Record type to indicate a previously delete record (PRIVATE only)
+
 )

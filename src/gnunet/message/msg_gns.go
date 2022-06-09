@@ -154,7 +154,7 @@ type ResourceRecord struct {
 // String returns a human-readable representation of the message.
 func (r *ResourceRecord) String() string {
 	return fmt.Sprintf("GNSResourceRecord{type=%s,expire=%s,flags=%d,size=%d}",
-		enums.GNS_TYPE[int(r.Type)], r.Expires, r.Flags, r.Size)
+		enums.GNSType(r.Type).String(), r.Expires, r.Flags, r.Size)
 }
 
 // LookupResultMsg is a response message for a GNS name lookup request

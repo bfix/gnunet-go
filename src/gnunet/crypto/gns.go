@@ -148,7 +148,7 @@ var (
 	ZONE_EDKEY = uint32(enums.GNS_TYPE_EDKEY)
 
 	// register available zone types for BlockHandler
-	ZoneTypes = []int{
+	ZoneTypes = []enums.GNSType{
 		enums.GNS_TYPE_PKEY,
 		enums.GNS_TYPE_EDKEY,
 	}

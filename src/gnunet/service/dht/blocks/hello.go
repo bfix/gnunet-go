@@ -260,7 +260,7 @@ func (h *HelloBlock) signedData() []byte {
 	// get address block in bytes
 	hAddr := sha512.Sum512(h.AddrBin)
 	var size uint32 = 80
-	var purpose uint32 = enums.SIG_HELLO
+	purpose := uint32(enums.SIG_HELLO)
 
 	// assemble signed data
 	buf := new(bytes.Buffer)

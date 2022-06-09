@@ -46,10 +46,10 @@ var (
 //----------------------------------------------------------------------
 
 // RRTypeList is a list of integers representing RR types.
-type RRTypeList []int
+type RRTypeList []enums.GNSType
 
 // NewRRTypeList initializes a new type list with given type values
-func NewRRTypeList(args ...int) (res RRTypeList) {
+func NewRRTypeList(args ...enums.GNSType) (res RRTypeList) {
 	for _, val := range args {
 		// if GNS_TYPE_ANY is encountered, it becomes the sole type
 		if val == enums.GNS_TYPE_ANY {
@@ -74,7 +74,7 @@ func (tl RRTypeList) IsAny() bool {
 }
 
 // HasType returns true if the type is included in the list
-func (tl RRTypeList) HasType(t int) bool {
+func (tl RRTypeList) HasType(t enums.GNSType) bool {
 	// return true if type is GNS_TYPE_ANY
 	if tl[0] == enums.GNS_TYPE_ANY {
 		return true
@@ -164,7 +164,7 @@ func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *message.Reco
 		set := message.NewRecordSet()
 		for _, record := range in.Answer {
 			// check if answer record is of requested type
-			if kind.HasType(int(record.Header().Rrtype)) {
+			if kind.HasType(enums.GNSType(record.Header().Rrtype)) {
 				// get wire-format of resource record
 				buf := make([]byte, 2048)
 				n, err := dns.PackRR(record, buf, 0, nil, false)
@@ -230,7 +230,7 @@ func (gns *Module) ResolveDNS(
 			// traverse resource records for 'A' and 'AAAA' records.
 		rec_loop:
 			for _, rec := range set.Records {
-				switch int(rec.Type) {
+				switch enums.GNSType(rec.Type) {
 				case enums.GNS_TYPE_DNS_AAAA:
 					addr = net.IP(rec.Data)
 					// we prefer IPv6

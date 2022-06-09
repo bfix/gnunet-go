@@ -338,7 +338,7 @@ func (m *Module) ResolveRelative(
 	set = message.NewRecordSet()
 	for _, rec := range records {
 		// is this the record type we are looking for?
-		if kind.HasType(int(rec.Type)) {
+		if kind.HasType(enums.GNSType(rec.Type)) {
 			// add it to the result
 			if rec = hdlrs.FinalizeRecord(rec); rec != nil {
 				set.AddRecord(rec)
@@ -361,7 +361,7 @@ func (m *Module) ResolveRelative(
 	// asking for explicitly.
 	if set.Count > 0 {
 		for _, rec := range records {
-			if !kind.HasType(int(rec.Type)) && (int(rec.Flags)&enums.GNS_FLAG_SUPPL) != 0 {
+			if !kind.HasType(enums.GNSType(rec.Type)) && (int(rec.Flags)&enums.GNS_FLAG_SUPPL) != 0 {
 				set.AddRecord(rec)
 			}
 		}
