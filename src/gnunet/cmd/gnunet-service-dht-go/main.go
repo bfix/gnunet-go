@@ -29,7 +29,6 @@ import (
 
 	"gnunet/config"
 	"gnunet/core"
-	"gnunet/rpc"
 	"gnunet/service"
 	"gnunet/service/dht"
 
@@ -106,11 +105,11 @@ func main() {
 			return
 		}
 		config.Cfg.RPC.Endpoint = parts[1]
-		if err = rpc.Start(ctx); err != nil {
+		if err = service.StartRPC(ctx); err != nil {
 			logger.Printf(logger.ERROR, "[dht] RPC failed to start: %s", err.Error())
 			return
 		}
-		rpc.Register(dht)
+		service.RegisterRPC(dht)
 	}
 
 	// handle OS signals

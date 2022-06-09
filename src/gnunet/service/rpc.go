@@ -1,5 +1,5 @@
 // This file is part of gnunet-go, a GNUnet-implementation in Golang.
-// Copyright (C) 2019, 2020 Bernd Fix  >Y<
+// Copyright (C) 2019-2022 Bernd Fix  >Y<
 //
 // gnunet-go is free software: you can redistribute it and/or modify it
 // under the terms of the GNU Affero General Public License as published
@@ -16,12 +16,11 @@
 //
 // SPDX-License-Identifier: AGPL3.0-or-later
 
-package rpc
+package service
 
 import (
 	"context"
 	"gnunet/config"
-	"gnunet/service"
 	"net/http"
 	"time"
 
@@ -29,12 +28,15 @@ import (
 	"github.com/gorilla/mux"
 )
 
+// JSON-RPC interface for services to be used as the primary client API
+// for perform, manage and monitor GNUnet activities.
+
 // Router for JSON-RPC requests
 var Router = mux.NewRouter()
 var srv *http.Server
 
-// Start the JSON-RPC server. It can be terminated by context
-func Start(ctx context.Context) error {
+// StartRPC the JSON-RPC server. It can be terminated by context
+func StartRPC(ctx context.Context) error {
 	// instantiate a server and run it
 	srv = &http.Server{
 		Handler:      Router,
@@ -59,8 +61,8 @@ func Start(ctx context.Context) error {
 	return nil
 }
 
-// Register a JSON-RPC path in a service-specific processor
-func Register(m service.Module) {
+// RegisterRPC a JSON-RPC path in a service-specific processor
+func RegisterRPC(m Module) {
 	path, hdlr := m.RPC()
 	Router.HandleFunc(path, hdlr)
 }

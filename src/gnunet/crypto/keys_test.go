@@ -1,5 +1,5 @@
 // This file is part of gnunet-go, a GNUnet-implementation in Golang.
-// Copyright (C) 2019, 2020 Bernd Fix  >Y<
+// Copyright (C) 2019-2022 Bernd Fix  >Y<
 //
 // gnunet-go is free software: you can redistribute it and/or modify it
 // under the terms of the GNU Affero General Public License as published
@@ -23,9 +23,10 @@ import (
 	"encoding/hex"
 	"testing"
 
+	"gnunet/util"
+
 	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/math"
-	"gnunet/util"
 )
 
 var (

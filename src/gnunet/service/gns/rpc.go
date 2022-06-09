@@ -1,5 +1,5 @@
 // This file is part of gnunet-go, a GNUnet-implementation in Golang.
-// Copyright (C) 2019-2022 Bernd Fix  >Y<
+// Copyright (C) 2022 Bernd Fix  >Y<
 //
 // gnunet-go is free software: you can redistribute it and/or modify it
 // under the terms of the GNU Affero General Public License as published
@@ -16,24 +16,15 @@
 //
 // SPDX-License-Identifier: AGPL3.0-or-later
 
-package util
+package gns
 
-import (
-	"fmt"
-)
+import "net/http"
 
-var scale = " kMGTPEO"
+//----------------------------------------------------------------------
 
-// Scale1024 returns an integer value (e.g. a size) as a human-readable
-// string with scales: a size of 183467245 would result in "174,967M"
-func Scale1024(n uint64) string {
-	v := float64(n)
-	var i int
-	for i = 0; v > 1024; i++ {
-		v /= 1024
+// RPC returns the route and handler function for a JSON-RPC request
+func (m *Module) RPC() (string, func(http.ResponseWriter, *http.Request)) {
+	return "/gns/", func(wrt http.ResponseWriter, req *http.Request) {
+		wrt.Write([]byte(`{"msg": "This is GNS" }`))
 	}
-	if i == 0 {
-		return fmt.Sprintf("%d", n)
-	}
-	return fmt.Sprintf("%.3f%c", v, scale[i])
 }

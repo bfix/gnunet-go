@@ -1,5 +1,5 @@
 // This file is part of gnunet-go, a GNUnet-implementation in Golang.
-// Copyright (C) 2019, 2020 Bernd Fix  >Y<
+// Copyright (C) 2019-2022 Bernd Fix  >Y<
 //
 // gnunet-go is free software: you can redistribute it and/or modify it
 // under the terms of the GNU Affero General Public License as published
@@ -21,7 +21,6 @@ package gns
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"gnunet/config"
@@ -486,13 +485,4 @@ func (m *Module) records(buf []byte) ([]*message.ResourceRecord, error) {
 		return nil, err
 	}
 	return rs.Records, nil
-}
-
-//----------------------------------------------------------------------
-
-// RPC returns the route and handler function for a JSON-RPC request
-func (m *Module) RPC() (string, func(http.ResponseWriter, *http.Request)) {
-	return "/gns/", func(wrt http.ResponseWriter, req *http.Request) {
-		wrt.Write([]byte(`{"msg": "This is GNS" }`))
-	}
 }

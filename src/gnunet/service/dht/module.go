@@ -1,5 +1,5 @@
 // This file is part of gnunet-go, a GNUnet-implementation in Golang.
-// Copyright (C) 2019, 2020 Bernd Fix  >Y<
+// Copyright (C) 2019-2022 Bernd Fix  >Y<
 //
 // gnunet-go is free software: you can redistribute it and/or modify it
 // under the terms of the GNU Affero General Public License as published
@@ -25,7 +25,6 @@ import (
 	"gnunet/message"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
-	"net/http"
 	"time"
 )
 
@@ -163,13 +162,4 @@ func (m *Module) Export(fcn map[string]any) {
 // Import functions
 func (m *Module) Import(fcm map[string]any) {
 	// nothing to import now.
-}
-
-//----------------------------------------------------------------------
-
-// RPC returns the route and handler function for a JSON-RPC request
-func (m *Module) RPC() (string, func(http.ResponseWriter, *http.Request)) {
-	return "/gns/", func(wrt http.ResponseWriter, req *http.Request) {
-		wrt.Write([]byte(`{"msg": "This is DHT" }`))
-	}
 }
