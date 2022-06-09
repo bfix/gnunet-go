@@ -28,7 +28,7 @@ import (
 //----------------------------------------------------------------------
 
 // AbsoluteTime refers to a unique point in time.
-// The value is the elapsed time in milliseconds (Unix epoch), so no timestamp
+// The value is the elapsed time in microseconds (Unix epoch), so no timestamp
 // before January 1st, 1970 is possible (not a restriction for GNUnet).
 type AbsoluteTime struct {
 	Val uint64 `order:"big"`
