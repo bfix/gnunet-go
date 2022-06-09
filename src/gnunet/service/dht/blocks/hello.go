@@ -165,8 +165,23 @@ func ParseHelloFromBytes(buf []byte) (h *HelloBlock, err error) {
 // finalize block data (generate dependent fields)
 func (h *HelloBlock) finalize() (err error) {
 	if h.addrs == nil {
-		err = data.Unmarshal(h.addrs, h.AddrBin)
+		// read addresses from the binary representation
+		pos := 0
+		for {
+			h.addrs = make([]*util.Address, 0)
+			var as string
+			as, pos = util.ReadCString(h.AddrBin, pos)
+			if pos == -1 {
+				break
+			}
+			var addr *util.Address
+			if addr, err = util.ParseAddress(as); err != nil {
+				return
+			}
+			h.addrs = append(h.addrs, addr)
+		}
 	} else if h.AddrBin == nil {
+		// generate binary representation of addresses
 		wrt := new(bytes.Buffer)
 		for _, a := range h.addrs {
 			wrt.WriteString(a.String())
