@@ -79,7 +79,7 @@ type KVStore Store[string, string]
 // NewDHTStore creates a new storage handler with given spec
 // for use with DHT queries and blocks
 func NewDHTStore(spec string) (DHTStore, error) {
-	specs := strings.SplitN(spec, ":", 2)
+	specs := strings.Split(spec, ":")
 	if len(specs) < 2 {
 		return nil, ErrStoreInvalidSpec
 	}
