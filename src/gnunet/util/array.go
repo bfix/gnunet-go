@@ -120,3 +120,15 @@ func StringList(b []byte) []string {
 	}
 	return res
 }
+
+// ReadCString reads a \0-terminate string from a buffer starting at the
+// specified position. Returns the string and the new position (-1 for end
+// of buffer reached)
+func ReadCString(buf []byte, pos int) (string, int) {
+	for idx := pos; idx < len(buf); idx++ {
+		if buf[idx] == 0 {
+			return string(buf[pos:idx]), idx + 1
+		}
+	}
+	return "", -1
+}
