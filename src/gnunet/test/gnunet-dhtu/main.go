@@ -22,6 +22,7 @@ import (
 	"context"
 	"encoding/hex"
 	"flag"
+	"fmt"
 	"gnunet/config"
 	"gnunet/core"
 	"gnunet/util"
@@ -30,10 +31,9 @@ import (
 )
 
 //----------------------------------------------------------------------
-// Test Go node with locally ruuning GNUnet nodes
+// Test Go node with DHTU GNUnet nodes
 //----------------------------------------------------------------------
 
-// TestCoreSimple test a two node network
 func main() {
 	// handle command-line arguments
 	var (
@@ -96,6 +96,19 @@ func main() {
 	}
 	defer node.Shutdown()
 
+	// show our HELLO URL
+	as := fmt.Sprintf("%s://%s:%d",
+		peerCfg.Endpoints[0].Network,
+		peerCfg.Endpoints[0].Address,
+		peerCfg.Endpoints[0].Port,
+	)
+	listen, err := util.ParseAddress(as)
+	if err != nil {
+		log.Fatal(err)
+	}
+	aList := []*util.Address{listen}
+	log.Println("HELLO: " + node.HelloURL(aList))
+
 	// learn bootstrap address (triggers HELLO)
 	node.Learn(ctx, rId, rAddr)
 
@@ -117,6 +130,13 @@ type TestNode struct {
 
 func (n *TestNode) Shutdown() {
 	n.core.Shutdown()
+}
+func (n *TestNode) HelloURL(a []*util.Address) string {
+	hd, err := n.peer.HelloData(time.Hour, a)
+	if err != nil {
+		return ""
+	}
+	return hd.URL()
 }
 
 func (n *TestNode) Learn(ctx context.Context, peer *util.PeerID, addr *util.Address) {
