@@ -65,11 +65,13 @@ func main() {
 		err   error
 	)
 	if rAddr, err = util.ParseAddress(remoteAddr); err != nil {
-		log.Fatal(err)
+		logger.Printf(logger.ERROR, err.Error())
+		return
 	}
 	if len(remoteId) > 0 {
 		if buf, err = util.DecodeStringToBinary(remoteId, 32); err != nil {
-			log.Fatal(err)
+			logger.Printf(logger.ERROR, err.Error())
+			return
 		}
 		rId = util.NewPeerID(buf)
 	}
@@ -84,7 +86,8 @@ func main() {
 	// create and run node
 	node, err := NewTestNode(ctx)
 	if err != nil {
-		log.Fatal(err)
+		logger.Printf(logger.ERROR, err.Error())
+		return
 	}
 	defer node.Shutdown()
 
@@ -93,7 +96,8 @@ func main() {
 	as := fmt.Sprintf("%s://%s:%d", ep.Network, ep.Address, ep.Port)
 	listen, err := util.ParseAddress(as)
 	if err != nil {
-		log.Fatal(err)
+		logger.Printf(logger.ERROR, err.Error())
+		return
 	}
 	aList := []*util.Address{listen}
 	logger.Println(logger.INFO, "HELLO: "+node.HelloURL(aList))
@@ -133,9 +137,9 @@ func (n *TestNode) Learn(ctx context.Context, peer *util.PeerID, addr *util.Addr
 	if peer != nil {
 		label = peer.String()
 	}
-	log.Printf("[%d] Learning %s for %s", n.id, addr.StringAll(), label)
+	logger.Printf(logger.INFO, "[%d] Learning %s for %s", n.id, addr.StringAll(), label)
 	if err := n.core.Learn(ctx, peer, addr); err != nil {
-		log.Println("Learn: " + err.Error())
+		logger.Println(logger.INFO, "Learn: "+err.Error())
 	}
 }
 
@@ -150,8 +154,8 @@ func NewTestNode(ctx context.Context) (node *TestNode, err error) {
 		return
 	}
 	node.peer = node.core.Peer()
-	log.Printf("[%d] Node %s starting", node.id, node.peer.GetID())
-	log.Printf("[%d]   --> %s", node.id, hex.EncodeToString(node.peer.GetID().Key))
+	logger.Printf(logger.INFO, "[%d] Node %s starting", node.id, node.peer.GetID())
+	logger.Printf(logger.INFO, "[%d]   --> %s", node.id, hex.EncodeToString(node.peer.GetID().Key))
 
 	// start a new DHT service
 	dht, err := dht.NewService(ctx, node.core)
@@ -177,7 +181,7 @@ func NewTestNode(ctx context.Context) (node *TestNode, err error) {
 		if node.addr, err = util.ParseAddress(s); err != nil {
 			continue
 		}
-		log.Printf("[%d] Listening on %s", node.id, s)
+		logger.Printf(logger.INFO, "[%d] Listening on %s", node.id, s)
 	}
 
 	// register as event listener
@@ -195,22 +199,22 @@ func NewTestNode(ctx context.Context) (node *TestNode, err error) {
 			case ev := <-incoming:
 				switch ev.ID {
 				case core.EV_CONNECT:
-					log.Printf("[%d] <<< Peer %s connected", node.id, ev.Peer)
+					logger.Printf(logger.INFO, "[%d] <<< Peer %s connected", node.id, ev.Peer)
 				case core.EV_DISCONNECT:
-					log.Printf("[%d] <<< Peer %s diconnected", node.id, ev.Peer)
+					logger.Printf(logger.INFO, "[%d] <<< Peer %s diconnected", node.id, ev.Peer)
 				case core.EV_MESSAGE:
-					log.Printf("[%d] <<< Msg from %s of type %d", node.id, ev.Peer, ev.Msg.Header().MsgType)
-					log.Printf("[%d] <<<    --> %s", node.id, ev.Msg.String())
+					logger.Printf(logger.INFO, "[%d] <<< Msg from %s of type %d", node.id, ev.Peer, ev.Msg.Header().MsgType)
+					logger.Printf(logger.INFO, "[%d] <<<    --> %s", node.id, ev.Msg.String())
 				}
 
 			// handle termination signal
 			case <-ctx.Done():
-				log.Printf("[%d] Shutting down node", node.id)
+				logger.Printf(logger.INFO, "[%d] Shutting down node", node.id)
 				return
 
 			// handle heart beat
 			case now := <-tick.C:
-				log.Printf("[%d] Heart beat at %s", node.id, now.String())
+				logger.Printf(logger.INFO, "[%d] Heart beat at %s", node.id, now.String())
 			}
 		}
 	}()
