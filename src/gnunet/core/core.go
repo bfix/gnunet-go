@@ -38,6 +38,7 @@ import (
 var (
 	ErrCoreNoUpnpDyn  = errors.New("no dynamic port with UPnP")
 	ErrCoreNoEndpAddr = errors.New("no endpoint for address")
+	ErrCoreNotSent    = errors.New("message not sent")
 )
 
 //----------------------------------------------------------------------
@@ -69,6 +70,9 @@ type Core struct {
 
 	// List of registered endpoints
 	endpoints map[string]*EndpointRef
+
+	// last HELLO message used; re-create if expired
+	lastHello *message.HelloDHTMsg
 }
 
 //----------------------------------------------------------------------
@@ -159,12 +163,13 @@ func (c *Core) pump(ctx context.Context) {
 		select {
 		// get (next) message from transport
 		case tm := <-c.incoming:
-			var ev *Event
+			logger.Printf(logger.DBG, "[core] Message received from %s: %s", tm.Peer, transport.Dump(tm.Msg, "json"))
 
 			// inspect message for peer state events
+			var ev *Event
 			switch msg := tm.Msg.(type) {
 			case *message.HelloDHTMsg:
-				logger.Println(logger.INFO, "[core] Received HELLO message: "+msg.String())
+
 				// verify integrity of message
 				if ok, err := msg.Verify(tm.Peer); !ok || err != nil {
 					logger.Println(logger.WARN, "[core] Received invalid DHT_P2P_HELLO message")
@@ -176,9 +181,11 @@ func (c *Core) pump(ctx context.Context) {
 					logger.Println(logger.WARN, "[core] Failed to parse addresses from DHT_P2P_HELLO message")
 					break
 				}
-				for _, addr := range aList {
-					c.Learn(ctx, tm.Peer, addr)
+				if err := c.Learn(ctx, tm.Peer, aList); err != nil {
+					logger.Println(logger.WARN, "[core] Failed to learn addresses from DHT_P2P_HELLO message: "+err.Error())
+					break
 				}
+
 				// generate EV_CONNECT event
 				ev = &Event{
 					ID:   EV_CONNECT,
@@ -222,21 +229,34 @@ func (c *Core) Shutdown() {
 
 // Send is a function that allows the local peer to send a protocol
 // message to a remote peer.
-func (c *Core) Send(ctx context.Context, peer *util.PeerID, msg message.Message) error {
-	// get peer label (id or "@")
-	label := "@"
-	if peer != nil {
-		label = peer.String()
-	}
+func (c *Core) Send(ctx context.Context, peer *util.PeerID, msg message.Message) (err error) {
 	// TODO: select best endpoint protocol for transport; now fixed to IP+UDP
 	netw := "ip+udp"
-	addrs := c.peers.Get(label, netw)
-	if len(addrs) == 0 {
-		return ErrCoreNoEndpAddr
+
+	// try all addresses for peer
+	aList := c.peers.Get(peer.String(), netw)
+	maybe := false // message may be sent...
+	for _, addr := range aList {
+		logger.Printf(logger.WARN, "[core] Trying to send to %s", addr.URI())
+		// send message to address
+		if err = c.send(ctx, addr, msg); err != nil {
+			// if it is possible that the message was not sent, try next address
+			if err != transport.ErrEndpMaybeSent {
+				logger.Printf(logger.WARN, "[core] Failed to send to %s: %s", addr.URI(), err.Error())
+			} else {
+				maybe = true
+			}
+			continue
+		}
+		// one successful send is enough
+		return
 	}
-	// TODO: select best address; curently selects first
-	addr := addrs[0]
-	return c.send(ctx, addr, msg)
+	if maybe {
+		err = transport.ErrEndpMaybeSent
+	} else {
+		err = ErrCoreNotSent
+	}
+	return
 }
 
 // send message directly to address
@@ -247,50 +267,80 @@ func (c *Core) send(ctx context.Context, addr *util.Address, msg message.Message
 	return c.trans.Send(ctx, addr, tm)
 }
 
-// Learn a (new) address for peer
-func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addr *util.Address) (err error) {
-	// assemble our own HELLO message:
-	addrList := make([]*util.Address, 0)
-	for _, epRef := range c.endpoints {
-		addrList = append(addrList, epRef.addr)
+// Learn (new) addresses for peer
+func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addrs []*util.Address) (err error) {
+	// learn all addresses for peer
+	newPeer := false
+	for _, addr := range addrs {
+		logger.Printf(logger.INFO, "[core] Learning %s for %s (expires %s)", addr.URI(), peer, addr.Expires)
+		newPeer = (c.peers.Add(peer.String(), addr) == 1) || newPeer
 	}
-	node := c.local
-	var hello *blocks.HelloBlock
-	hello, err = node.HelloData(time.Hour, addrList)
-	if err != nil {
+	// new peer detected?
+	if newPeer {
+		// we added a previously unknown peer: send a HELLO
+		var msg *message.HelloDHTMsg
+		if msg, err = c.getHello(); err != nil {
+			return
+		}
+		logger.Printf(logger.INFO, "[core] Sending HELLO to %s: %s", peer, msg)
+		err = c.Send(ctx, peer, msg)
+		// no error if the message might have been sent
+		if err == transport.ErrEndpMaybeSent {
+			err = nil
+		}
+	}
+	return
+}
+
+// Send the currently active HELLO to given network address
+func (c *Core) SendHello(ctx context.Context, addr *util.Address) (err error) {
+	// get (buffered) HELLO
+	var msg *message.HelloDHTMsg
+	if msg, err = c.getHello(); err != nil {
 		return
 	}
-	msg := message.NewHelloDHTMsg()
-	msg.NumAddr = uint16(len(hello.Addresses()))
-	msg.SetAddresses(hello.Addresses())
-	if err = msg.Sign(c.local.prv); err != nil {
-		return err
-	}
-	/*
+	logger.Printf(logger.INFO, "[core] Sending HELLO to %s: %s", addr.URI(), msg)
+	return c.send(ctx, addr, msg)
+}
+
+// get the recent HELLO if it is defined and not expired;
+// create a new HELLO otherwise.
+func (c *Core) getHello() (msg *message.HelloDHTMsg, err error) {
+	if c.lastHello == nil || c.lastHello.Expires.Expired() {
+		// assemble new HELLO message
+		addrList := make([]*util.Address, 0)
+		for _, epRef := range c.endpoints {
+			addrList = append(addrList, epRef.addr)
+		}
+		node := c.local
+		var hello *blocks.HelloBlock
+		hello, err = node.HelloData(time.Hour, addrList)
+		if err != nil {
+			return
+		}
+		msg = message.NewHelloDHTMsg()
+		msg.NumAddr = uint16(len(hello.Addresses()))
+		msg.SetAddresses(hello.Addresses())
+		if err = msg.Sign(c.local.prv); err != nil {
+			return
+		}
+		// save for later use
+		c.lastHello = msg
+
 		// DEBUG
 		var ok bool
 		if ok, err = msg.Verify(c.PeerID()); !ok || err != nil {
 			if !ok {
-				err = errors.New("failed to verify DHT_P2P_HELLO")
+				err = errors.New("[core] failed to verify own HELLO")
 			}
 			logger.Println(logger.ERROR, err.Error())
+			return
 		}
-		wrt := new(bytes.Buffer)
-		transport.WriteMessageDirect(wrt, msg)
-		logger.Println(logger.DBG, "DHT_P2P_HELLO: "+hex.EncodeToString(wrt.Bytes()))
-	*/
-
-	// if no peer is given, we send HELLO directly to address
-	if peer == nil {
-		return c.send(ctx, addr, msg)
+		logger.Println(logger.DBG, "[core] New HELLO: "+transport.Dump(msg, "json"))
+		return
 	}
-	// add peer address to address list
-	if c.peers.Add(peer.String(), addr) == 1 {
-		// we added a previously unknown peer: send a HELLO
-		logger.Printf(logger.INFO, "[core] Sending HELLO to %s: %s", peer, msg)
-		err = c.Send(ctx, peer, msg)
-	}
-	return
+	// we have a valid HELLO for re-use.
+	return c.lastHello, nil
 }
 
 // Addresses returns the list of listening endpoint addresses
@@ -320,14 +370,6 @@ func (c *Core) PeerID() *util.PeerID {
 // When the connection attempt is successful, information on the new
 // peer is offered through the PEER_CONNECTED signal.
 func (c *Core) TryConnect(peer *util.PeerID, addr net.Addr) error {
-	// select endpoint for address
-	if ep := c.findEndpoint(peer, addr); ep == nil {
-		return transport.ErrTransNoEndpoint
-	}
-	return nil
-}
-
-func (c *Core) findEndpoint(peer *util.PeerID, addr net.Addr) transport.Endpoint {
 	return nil
 }
 
