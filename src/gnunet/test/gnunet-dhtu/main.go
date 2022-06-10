@@ -38,6 +38,9 @@ import (
 
 //----------------------------------------------------------------------
 // Test Go node with DHTU GNUnet nodes
+//
+// N.B.: THIS TEST ONLY COVERS THE BASIC MESSAGE EXCHANGE LEVEL; NO
+// MESSAGE PROCESSING EXCEPT FOR HELLO MESSAGES WILL TAKE PLACE.
 //----------------------------------------------------------------------
 
 func main() {
