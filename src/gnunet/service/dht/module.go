@@ -26,6 +26,8 @@ import (
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
 	"time"
+
+	"github.com/bfix/gospel/logger"
 )
 
 //======================================================================
@@ -107,13 +109,23 @@ func (m *Module) Put(ctx context.Context, key blocks.Query, block blocks.Block) 
 // Filter returns the event filter for the module
 func (m *Module) Filter() *core.EventFilter {
 	f := core.NewEventFilter()
+	// events we are interested in
 	f.AddEvent(core.EV_CONNECT)
 	f.AddEvent(core.EV_DISCONNECT)
+
+	// messages we are interested in:
+	// (1) DHT messages
 	f.AddMsgType(message.DHT_CLIENT_GET)
 	f.AddMsgType(message.DHT_CLIENT_GET_RESULTS_KNOWN)
 	f.AddMsgType(message.DHT_CLIENT_GET_STOP)
 	f.AddMsgType(message.DHT_CLIENT_PUT)
 	f.AddMsgType(message.DHT_CLIENT_RESULT)
+	// (2) DHT_P2P messages
+	f.AddMsgType(message.DHT_P2P_PUT)
+	f.AddMsgType(message.DHT_P2P_GET)
+	f.AddMsgType(message.DHT_P2P_RESULT)
+	f.AddMsgType(message.DHT_P2P_HELLO)
+
 	return f
 }
 
@@ -123,15 +135,18 @@ func (m *Module) event(ctx context.Context, ev *core.Event) {
 	// New peer connected:
 	case core.EV_CONNECT:
 		// Add peer to routing table
+		logger.Printf(logger.INFO, "[dht] Peer %s connected", ev.Peer)
 		m.rtable.Add(NewPeerAddress(ev.Peer))
 
 	// Peer disconnected:
 	case core.EV_DISCONNECT:
 		// Remove peer from routing table
+		logger.Printf(logger.INFO, "[dht] Peer %s disconnected", ev.Peer)
 		m.rtable.Remove(NewPeerAddress(ev.Peer))
 
 	// Message received.
 	case core.EV_MESSAGE:
+		logger.Printf(logger.INFO, "[dht] Message received: %s", ev.Msg.String())
 		// process message (if applicable)
 		if m.ProcessFcn != nil {
 			m.ProcessFcn(ctx, ev.Msg, ev.Resp)
