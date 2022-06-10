@@ -31,3 +31,5 @@ const (
 )
 
 //go:generate go run generate.go gnunet-dht.rec gnunet-dht.tpl dht_block_type.go
+
+//go:generate stringer -type=BlockType dht_block_type.go

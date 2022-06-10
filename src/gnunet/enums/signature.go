@@ -19,3 +19,5 @@
 package enums
 
 //go:generate go run generate.go gnunet-signature.rec gnunet-signature.tpl signature_purpose.go
+
+//go:generate stringer -type=SigPurpose signature_purpose.go
