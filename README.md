@@ -30,6 +30,7 @@ Go v1.18+ is required to compile the code.
 git clone https://github.com/bfix/gnunet-go
 cd gnunet-go/src/gnunet
 go mod tidy
+go generate ./...
 go install ./...
 go test ./...
 ```
@@ -56,6 +57,19 @@ Use `./build.sh` to build the executables (services and utilities, see
 below). The resulting programs are stored in `${GOPATH}/bin`.
 
 To run the unit tests, use `./test.sh`. 
+
+#### `./src/gnunet/enums`
+
+Changes in GANA definitions for block types, GNS record types and signature
+purpose values can be imported by copying the recfiles (GNU recutils) from
+GANA into this folder:
+
+* gnunet-dht.rec
+* gnunet-gns.rec
+* gnunet-signature.rec
+
+After updating the recfiles, you need to run `go generate ./...` to generate
+the new source files.
 
 ### `./src/gnunet/cmd`
 
