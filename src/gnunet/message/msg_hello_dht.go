@@ -78,12 +78,13 @@ func (m *HelloDHTMsg) Addresses() (list []*util.Address, err error) {
 		if addr, err = util.ParseAddress(as); err != nil {
 			return
 		}
+		addr.Expires = m.Expires
 		list = append(list, addr)
 		num++
 	}
 	// check numbers
 	if num != int(m.NumAddr) {
-		logger.Printf(logger.WARN, "[HelloDHTMsg] Number of addresses doesn't match (got %d, expected %d)", num, m.NumAddr)
+		logger.Printf(logger.WARN, "[HelloDHTMsg] Number of addresses does not match (got %d, expected %d)", num, m.NumAddr)
 	}
 	return
 }
