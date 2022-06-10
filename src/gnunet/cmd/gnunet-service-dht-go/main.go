@@ -32,6 +32,8 @@ import (
 	"gnunet/core"
 	"gnunet/service"
 	"gnunet/service/dht"
+	"gnunet/service/dht/blocks"
+	"gnunet/util"
 
 	"github.com/bfix/gospel/logger"
 )
@@ -72,7 +74,7 @@ func main() {
 		socket = config.Cfg.GNS.Service.Socket
 	}
 	params := make(map[string]string)
-	if len(param) == 0 {
+	if len(param) > 0 {
 		for _, p := range strings.Split(param, ",") {
 			kv := strings.SplitN(p, "=", 2)
 			params[kv[0]] = kv[1]
@@ -119,6 +121,33 @@ func main() {
 			return
 		}
 		dhtSrv.InitRPC(rpc)
+	}
+
+	// handle bootstrap: collect known addresses
+	bsList := make([]*util.Address, 0)
+	for _, bs := range config.Cfg.Bootstrap.Nodes {
+		// check for HELLO URL
+		if strings.HasPrefix(bs, "gnunet://hello/") {
+			var hb *blocks.HelloBlock
+			if hb, err = blocks.ParseHelloURL(bs, true); err != nil {
+				logger.Printf(logger.ERROR, "[dht] failed bootstrap HELLO URL %s: %s", bs, err.Error())
+				continue
+			}
+			// append HELLO addresses
+			bsList = append(bsList, hb.Addresses()...)
+		} else {
+			// parse address directly
+			var addr *util.Address
+			if addr, err = util.ParseAddress(bs); err != nil {
+				logger.Printf(logger.ERROR, "[dht] failed bootstrap address %s: %s", bs, err.Error())
+				continue
+			}
+			bsList = append(bsList, addr)
+		}
+	}
+	// send HELLO to all bootstrap addresses
+	for _, addr := range bsList {
+		c.SendHello(ctx, addr)
 	}
 
 	// handle OS signals
