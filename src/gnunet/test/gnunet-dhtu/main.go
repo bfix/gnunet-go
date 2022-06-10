@@ -20,13 +20,14 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"gnunet/config"
 	"gnunet/core"
+	"gnunet/message"
 	"gnunet/service"
 	"gnunet/service/dht"
+	"gnunet/transport"
 	"gnunet/util"
 	"log"
 	"net/rpc"
@@ -41,39 +42,24 @@ import (
 
 func main() {
 	// handle command-line arguments
-	var (
-		remoteId   string
-		remoteAddr string
-		cfgFile    string
-	)
+	var remoteAddr string
+	var cfgFile string
 	flag.StringVar(&cfgFile, "c", "gnunet-config.json", "configuration file")
-	flag.StringVar(&remoteId, "i", "", "peer id of remote node")
 	flag.StringVar(&remoteAddr, "a", "", "address of remote node")
 	flag.Parse()
 
 	// read configuration file and set missing arguments.
 	if err := config.ParseConfig(cfgFile); err != nil {
-		logger.Printf(logger.ERROR, "[gnunet-dhtu] Invalid configuration file: %s\n", err.Error())
+		logger.Printf(logger.ERROR, "[node] Invalid configuration file: %s\n", err.Error())
 		return
 	}
 
 	// convert arguments
-	var (
-		rId   *util.PeerID
-		rAddr *util.Address
-		buf   []byte
-		err   error
-	)
+	var rAddr *util.Address
+	var err error
 	if rAddr, err = util.ParseAddress(remoteAddr); err != nil {
-		logger.Printf(logger.ERROR, err.Error())
+		logger.Println(logger.ERROR, err.Error())
 		return
-	}
-	if len(remoteId) > 0 {
-		if buf, err = util.DecodeStringToBinary(remoteId, 32); err != nil {
-			logger.Printf(logger.ERROR, err.Error())
-			return
-		}
-		rId = util.NewPeerID(buf)
 	}
 
 	// setup execution context
@@ -86,7 +72,7 @@ func main() {
 	// create and run node
 	node, err := NewTestNode(ctx)
 	if err != nil {
-		logger.Printf(logger.ERROR, err.Error())
+		logger.Println(logger.ERROR, err.Error())
 		return
 	}
 	defer node.Shutdown()
@@ -96,14 +82,17 @@ func main() {
 	as := fmt.Sprintf("%s://%s:%d", ep.Network, ep.Address, ep.Port)
 	listen, err := util.ParseAddress(as)
 	if err != nil {
-		logger.Printf(logger.ERROR, err.Error())
+		logger.Println(logger.ERROR, err.Error())
 		return
 	}
 	aList := []*util.Address{listen}
-	logger.Println(logger.INFO, "HELLO: "+node.HelloURL(aList))
+	logger.Println(logger.INFO, "[node] --> "+node.HelloURL(aList))
 
-	// learn bootstrap address (triggers HELLO)
-	node.Learn(ctx, rId, rAddr)
+	// send HELLO to bootstrap address
+	if err = node.SendHello(ctx, rAddr); err != nil && err != transport.ErrEndpMaybeSent {
+		logger.Println(logger.ERROR, "[node] failed to send HELLO: "+err.Error())
+		return
+	}
 
 	// run forever
 	var ch chan struct{}
@@ -125,22 +114,15 @@ func (n *TestNode) Shutdown() {
 	n.core.Shutdown()
 }
 func (n *TestNode) HelloURL(a []*util.Address) string {
-	hd, err := n.peer.HelloData(time.Hour, a)
+	hd, err := n.peer.HelloData(message.HelloAddressExpiration, a)
 	if err != nil {
 		return ""
 	}
 	return hd.URL()
 }
 
-func (n *TestNode) Learn(ctx context.Context, peer *util.PeerID, addr *util.Address) {
-	label := "@"
-	if peer != nil {
-		label = peer.String()
-	}
-	logger.Printf(logger.INFO, "[%d] Learning %s for %s", n.id, addr.StringAll(), label)
-	if err := n.core.Learn(ctx, peer, addr); err != nil {
-		logger.Println(logger.INFO, "Learn: "+err.Error())
-	}
+func (n *TestNode) SendHello(ctx context.Context, addr *util.Address) error {
+	return n.core.SendHello(ctx, addr)
 }
 
 func NewTestNode(ctx context.Context) (node *TestNode, err error) {
@@ -154,8 +136,7 @@ func NewTestNode(ctx context.Context) (node *TestNode, err error) {
 		return
 	}
 	node.peer = node.core.Peer()
-	logger.Printf(logger.INFO, "[%d] Node %s starting", node.id, node.peer.GetID())
-	logger.Printf(logger.INFO, "[%d]   --> %s", node.id, hex.EncodeToString(node.peer.GetID().Key))
+	logger.Printf(logger.INFO, "[node] Node %s starting", node.peer.GetID())
 
 	// start a new DHT service
 	dht, err := dht.NewService(ctx, node.core)
@@ -166,7 +147,7 @@ func NewTestNode(ctx context.Context) (node *TestNode, err error) {
 	// start JSON-RPC server on request
 	var rpc *rpc.Server
 	if rpc, err = service.StartRPC(ctx, config.Cfg.RPC.Endpoint); err != nil {
-		logger.Printf(logger.ERROR, "[gnunet-dhtu] RPC failed to start: %s", err.Error())
+		logger.Printf(logger.ERROR, "[node] RPC failed to start: %s", err.Error())
 		return
 	}
 	dht.InitRPC(rpc)
@@ -181,7 +162,7 @@ func NewTestNode(ctx context.Context) (node *TestNode, err error) {
 		if node.addr, err = util.ParseAddress(s); err != nil {
 			continue
 		}
-		logger.Printf(logger.INFO, "[%d] Listening on %s", node.id, s)
+		logger.Printf(logger.INFO, "[node] Listening on %s", s)
 	}
 
 	// register as event listener
@@ -199,22 +180,22 @@ func NewTestNode(ctx context.Context) (node *TestNode, err error) {
 			case ev := <-incoming:
 				switch ev.ID {
 				case core.EV_CONNECT:
-					logger.Printf(logger.INFO, "[%d] <<< Peer %s connected", node.id, ev.Peer)
+					logger.Printf(logger.INFO, "[node] <<< Peer %s connected", ev.Peer)
 				case core.EV_DISCONNECT:
-					logger.Printf(logger.INFO, "[%d] <<< Peer %s diconnected", node.id, ev.Peer)
+					logger.Printf(logger.INFO, "[node] <<< Peer %s diconnected", ev.Peer)
 				case core.EV_MESSAGE:
-					logger.Printf(logger.INFO, "[%d] <<< Msg from %s of type %d", node.id, ev.Peer, ev.Msg.Header().MsgType)
-					logger.Printf(logger.INFO, "[%d] <<<    --> %s", node.id, ev.Msg.String())
+					logger.Printf(logger.INFO, "[node] <<< Msg from %s of type %d", ev.Peer, ev.Msg.Header().MsgType)
+					logger.Printf(logger.INFO, "[node] <<<    --> %s", ev.Msg.String())
 				}
 
 			// handle termination signal
 			case <-ctx.Done():
-				logger.Printf(logger.INFO, "[%d] Shutting down node", node.id)
+				logger.Println(logger.INFO, "[node] Shutting down node")
 				return
 
 			// handle heart beat
 			case now := <-tick.C:
-				logger.Printf(logger.INFO, "[%d] Heart beat at %s", node.id, now.String())
+				logger.Printf(logger.INFO, "[node] Heart beat at %s", now.String())
 			}
 		}
 	}()
