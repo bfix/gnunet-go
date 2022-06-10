@@ -52,10 +52,10 @@ const helloPrefix = "gnunet://hello/"
 // All addresses expire at the same time /this different from HELLO
 // messages (see message.HeeloMsg).
 type HelloBlock struct {
-	PeerID    *util.PeerID         ``         // peer identifier
-	Signature *ed25519.EdSignature ``         // signature
-	Expire    util.AbsoluteTime    ``         // Expiration date
-	AddrBin   []byte               `size:"*"` // raw address data
+	PeerID    *util.PeerID      ``          // peer identifier
+	Signature []byte            `size:"64"` // signature
+	Expire    util.AbsoluteTime ``          // Expiration date
+	AddrBin   []byte            `size:"*"`  // raw address data
 
 	// transient attributes
 	addrs []*util.Address // cooked address data
@@ -101,10 +101,7 @@ func ParseHelloURL(u string, checkExpiry bool) (h *HelloBlock, err error) {
 	h.PeerID = util.NewPeerID(buf)
 
 	// (2) parse signature
-	if buf, err = util.DecodeStringToBinary(p[1], 64); err != nil {
-		return
-	}
-	if h.Signature, err = ed25519.NewEdSignatureFromBytes(buf); err != nil {
+	if h.Signature, err = util.DecodeStringToBinary(p[1], 64); err != nil {
 		return
 	}
 
@@ -209,7 +206,7 @@ func (h *HelloBlock) URL() string {
 	u := fmt.Sprintf("%s%s/%s/%d?",
 		helloPrefix,
 		h.PeerID.String(),
-		util.EncodeBinaryToString(h.Signature.Bytes()),
+		util.EncodeBinaryToString(h.Signature),
 		h.Expire.Epoch(),
 	)
 	for i, a := range h.addrs {
@@ -227,7 +224,7 @@ func (h *HelloBlock) URL() string {
 // timestamp is ignored in the comparision.
 func (h *HelloBlock) Equals(g *HelloBlock) bool {
 	if !h.PeerID.Equals(g.PeerID) ||
-		!util.Equals(h.Signature.Bytes(), g.Signature.Bytes()) ||
+		!util.Equals(h.Signature, g.Signature) ||
 		len(h.addrs) != len(g.addrs) {
 		return false
 	}
@@ -243,21 +240,29 @@ func (h *HelloBlock) Equals(g *HelloBlock) bool {
 func (h *HelloBlock) Verify() (bool, error) {
 	// assemble signed data and public key
 	sd := h.signedData()
-	pub := ed25519.NewPublicKeyFromBytes(h.PeerID.Key)
-	return pub.EdVerify(sd, h.Signature)
+	pub := h.PeerID.PublicKey()
+	sig, err := ed25519.NewEdSignatureFromBytes(h.Signature)
+	if err != nil {
+		return false, err
+	}
+	return pub.EdVerify(sd, sig)
 }
 
 // Sign the HELLO data with private key
-func (h *HelloBlock) Sign(prv *ed25519.PrivateKey) (err error) {
+func (h *HelloBlock) Sign(prv *ed25519.PrivateKey) error {
 	// assemble signed data
 	sd := h.signedData()
-	h.Signature, err = prv.EdSign(sd)
-	return
+	sig, err := prv.EdSign(sd)
+	if err != nil {
+		return err
+	}
+	h.Signature = sig.Bytes()
+	return nil
 }
 
 // signedData assembles a data block for sign and verify operations.
 func (h *HelloBlock) signedData() []byte {
-	// get address block in bytes
+	// hash address block
 	hAddr := sha512.Sum512(h.AddrBin)
 	var size uint32 = 80
 	purpose := uint32(enums.SIG_HELLO)
