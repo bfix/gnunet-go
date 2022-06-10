@@ -86,7 +86,7 @@ func (m *EphemeralKeyMsg) Header() *Header {
 
 // Public extracts the public key of an announcing peer.
 func (m *EphemeralKeyMsg) Public() *ed25519.PublicKey {
-	return ed25519.NewPublicKeyFromBytes(m.SignedBlock.PeerID.Key)
+	return m.SignedBlock.PeerID.PublicKey()
 }
 
 // Verify the integrity of the message data using the public key of the
