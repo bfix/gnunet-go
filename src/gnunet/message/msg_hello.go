@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"gnunet/util"
 	"io"
+	"time"
 )
 
 //----------------------------------------------------------------------
@@ -38,10 +39,16 @@ type HelloAddress struct {
 
 // NewHelloAddress create a new HELLO address from the given address
 func NewHelloAddress(a *util.Address) *HelloAddress {
+	// use default expiration time, but adjust it if address expires earlier
+	exp := util.NewAbsoluteTime(time.Now().Add(HelloAddressExpiration))
+	if exp.Compare(a.Expires) > 0 {
+		exp = a.Expires
+	}
+	// convert address
 	addr := &HelloAddress{
 		transport: a.Netw,
 		addrSize:  uint16(len(a.Address)),
-		expires:   a.Expires,
+		expires:   exp,
 		address:   make([]byte, len(a.Address)),
 	}
 	copy(addr.address, a.Address)
