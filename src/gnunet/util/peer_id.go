@@ -18,7 +18,11 @@
 
 package util
 
-import "bytes"
+import (
+	"bytes"
+
+	"github.com/bfix/gospel/crypto/ed25519"
+)
 
 // PeerID is the 32-byte binary representation od a Ed25519 key
 type PeerID struct {
@@ -48,4 +52,8 @@ func (p *PeerID) Equals(q *PeerID) bool {
 // String returns a human-readable representation of a peer id.
 func (p *PeerID) String() string {
 	return EncodeBinaryToString(p.Key)
+}
+
+func (p *PeerID) PublicKey() *ed25519.PublicKey {
+	return ed25519.NewPublicKeyFromBytes(p.Key)
 }
