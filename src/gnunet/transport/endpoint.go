@@ -107,8 +107,10 @@ func (ep *PaketEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) (
 	ep.netw = ep.conn.LocalAddr().Network()
 
 	// run watch dog for termination
+	active := true
 	go func() {
 		<-ctx.Done()
+		active = false
 		ep.conn.Close()
 	}()
 	// run go routine to handle messages from clients
@@ -117,7 +119,11 @@ func (ep *PaketEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) (
 			// read next message
 			tm, err := ep.read()
 			if err != nil {
-				logger.Println(logger.DBG, "[pkt_ep] read failed: "+err.Error())
+				// leave go routine if already dead
+				if !active {
+					return
+				}
+				logger.Println(logger.WARN, "[pkt_ep] read failed: "+err.Error())
 				// gracefully ignore unknown message types
 				if strings.HasPrefix(err.Error(), "unknown message type") {
 					continue
