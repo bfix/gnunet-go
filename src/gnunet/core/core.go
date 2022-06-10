@@ -177,7 +177,7 @@ func (c *Core) pump(ctx context.Context) {
 					break
 				}
 				for _, addr := range aList {
-					c.Learn(ctx, tm.Peer, addr.Wrap())
+					c.Learn(ctx, tm.Peer, addr)
 				}
 				// generate EV_CONNECT event
 				ev = &Event{
@@ -261,13 +261,24 @@ func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addr *util.Address)
 		return
 	}
 	msg := message.NewHelloDHTMsg()
-	var aList []*message.HelloAddress
 	msg.NumAddr = uint16(len(hello.Addresses()))
-	for _, a := range hello.Addresses() {
-		ha := message.NewHelloAddress(a)
-		aList = append(aList, ha)
+	msg.SetAddresses(hello.Addresses())
+	if err = msg.Sign(c.local.prv); err != nil {
+		return err
 	}
-	msg.SetAddresses(aList)
+	/*
+		// DEBUG
+		var ok bool
+		if ok, err = msg.Verify(c.PeerID()); !ok || err != nil {
+			if !ok {
+				err = errors.New("failed to verify DHT_P2P_HELLO")
+			}
+			logger.Println(logger.ERROR, err.Error())
+		}
+		wrt := new(bytes.Buffer)
+		transport.WriteMessageDirect(wrt, msg)
+		logger.Println(logger.DBG, "DHT_P2P_HELLO: "+hex.EncodeToString(wrt.Bytes()))
+	*/
 
 	// if no peer is given, we send HELLO directly to address
 	if peer == nil {
@@ -276,6 +287,7 @@ func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addr *util.Address)
 	// add peer address to address list
 	if c.peers.Add(peer.String(), addr) == 1 {
 		// we added a previously unknown peer: send a HELLO
+		logger.Printf(logger.INFO, "[core] Sending HELLO to %s: %s", peer, msg)
 		err = c.Send(ctx, peer, msg)
 	}
 	return
