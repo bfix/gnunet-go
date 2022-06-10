@@ -29,6 +29,8 @@ import (
 	"net"
 	"strings"
 	"time"
+
+	"github.com/bfix/gospel/logger"
 )
 
 //----------------------------------------------------------------------
@@ -161,10 +163,17 @@ func (c *Core) pump(ctx context.Context) {
 
 			// inspect message for peer state events
 			switch msg := tm.Msg.(type) {
-			case *message.HelloMsg:
+			case *message.HelloDHTMsg:
+				logger.Println(logger.INFO, "[core] Received HELLO message: "+msg.String())
+				// verify integrity of message
+				if ok, err := msg.Verify(tm.Peer); !ok || err != nil {
+					logger.Println(logger.WARN, "[core] Received invalid DHT_P2P_HELLO message")
+					break
+				}
 				// keep peer addresses
 				aList, err := msg.Addresses()
 				if err != nil {
+					logger.Println(logger.WARN, "[core] Failed to parse addresses from DHT_P2P_HELLO message")
 					break
 				}
 				for _, addr := range aList {
@@ -251,8 +260,9 @@ func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addr *util.Address)
 	if err != nil {
 		return
 	}
-	msg := message.NewHelloMsg(node.GetID())
+	msg := message.NewHelloDHTMsg()
 	var aList []*message.HelloAddress
+	msg.NumAddr = uint16(len(hello.Addresses()))
 	for _, a := range hello.Addresses() {
 		ha := message.NewHelloAddress(a)
 		aList = append(aList, ha)
