@@ -25,6 +25,11 @@ import (
 	"gnunet/message"
 	"gnunet/util"
 	"net"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/bfix/gospel/logger"
 )
 
 var (
@@ -34,6 +39,8 @@ var (
 	ErrEndpExists           = errors.New("endpoint exists")
 	ErrEndpNoAddress        = errors.New("no address for endpoint")
 	ErrEndpNoConnection     = errors.New("no connection on endpoint")
+	ErrEndpMaybeSent        = errors.New("message may have been sent - cant know")
+	ErrEndpWriteShort       = errors.New("write too short")
 )
 
 // Endpoint represents a local endpoint that can send and receive messages.
@@ -78,9 +85,11 @@ func NewEndpoint(addr net.Addr) (ep Endpoint, err error) {
 // PacketEndpoint for packet-oriented network protocols
 type PaketEndpoint struct {
 	id   int            // endpoint identifier
+	netw string         // network identifier ("udp", "udp4", "udp6", ...)
 	addr net.Addr       // endpoint address
 	conn net.PacketConn // packet connection
 	buf  []byte         // buffer for read/write operations
+	mtx  sync.Mutex     // mutex for send operations
 }
 
 // Run packet endpoint: send incoming messages to the handler.
@@ -94,6 +103,9 @@ func (ep *PaketEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) (
 	// use the actual listening address
 	ep.addr = util.NewAddress(xproto, ep.conn.LocalAddr().String())
 
+	// save more information to detect compatible send-to addresses
+	ep.netw = ep.conn.LocalAddr().Network()
+
 	// run watch dog for termination
 	go func() {
 		<-ctx.Done()
@@ -105,6 +117,11 @@ func (ep *PaketEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) (
 			// read next message
 			tm, err := ep.read()
 			if err != nil {
+				logger.Println(logger.DBG, "[pkt_ep] read failed: "+err.Error())
+				// gracefully ignore unknown message types
+				if strings.HasPrefix(err.Error(), "unknown message type") {
+					continue
+				}
 				break
 			}
 			// label message
@@ -154,19 +171,27 @@ func (ep *PaketEndpoint) read() (tm *TransportMessage, err error) {
 
 // Send message to address from endpoint
 func (ep *PaketEndpoint) Send(ctx context.Context, addr net.Addr, msg *TransportMessage) (err error) {
+	// only one sender at a time
+	ep.mtx.Lock()
+	defer ep.mtx.Unlock()
+
 	// check for valid connection
 	if ep.conn == nil {
 		return ErrEndpNoConnection
 	}
+
 	// resolve target address
 	var a *net.UDPAddr
-	a, err = net.ResolveUDPAddr(EpProtocol(addr.Network()), addr.String())
+	if a, err = net.ResolveUDPAddr(EpProtocol(addr.Network()), addr.String()); err != nil {
+		return
+	}
 
 	// get message content (TransportMessage)
 	var buf []byte
 	if buf, err = msg.Bytes(); err != nil {
 		return
 	}
+
 	// handle extended protocol:
 	switch ep.addr.Network() {
 	case "ip+udp":
@@ -176,8 +201,18 @@ func (ep *PaketEndpoint) Send(ctx context.Context, addr net.Addr, msg *Transport
 		// unknown protocol
 		return ErrEndpProtocolUnknown
 	}
-	_, err = ep.conn.WriteTo(buf, a)
-	return
+
+	// timeout after 1 second
+	if err = ep.conn.SetWriteDeadline(time.Now().Add(time.Second)); err != nil {
+		logger.Println(logger.DBG, "[pkt_ep] SetWriteDeadline failed: "+err.Error())
+		return
+	}
+	var n int
+	n, err = ep.conn.WriteTo(buf, a)
+	if n != len(buf) {
+		err = ErrEndpWriteShort
+	}
+	return ErrEndpMaybeSent
 }
 
 // Address returms the
@@ -188,6 +223,23 @@ func (ep *PaketEndpoint) Address() net.Addr {
 // CanSendTo returns true if the endpoint can sent to address
 func (ep *PaketEndpoint) CanSendTo(addr net.Addr) (ok bool) {
 	ok = EpProtocol(addr.Network()) == EpProtocol(ep.addr.Network())
+	if ok {
+		// try to convert addr to compatible type
+		switch ep.netw {
+		case "udp", "udp4", "udp6":
+			var ua *net.UDPAddr
+			var err error
+			if ua, err = net.ResolveUDPAddr(ep.netw, addr.String()); err != nil {
+				ok = false
+			}
+			logger.Printf(logger.DBG, "[pkt_ep] %s + %v -> %v (%v)", ep.netw, addr, ua, ok)
+		default:
+			logger.Printf(logger.DBG, "[pkt_ep] unknown network %s", ep.netw)
+			ok = false
+		}
+	} else {
+		logger.Printf(logger.DBG, "[pkt_ep] protocol mismatch %s -- %s", EpProtocol(addr.Network()), EpProtocol(ep.addr.Network()))
+	}
 	return
 }
 
