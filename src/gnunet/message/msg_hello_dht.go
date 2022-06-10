@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"gnunet/enums"
 	"gnunet/util"
-	"io"
 	"time"
 
 	"github.com/bfix/gospel/crypto/ed25519"
@@ -67,49 +66,58 @@ func NewHelloDHTMsg() *HelloDHTMsg {
 }
 
 // Addresses returns the list of HelloAddress
-func (m *HelloDHTMsg) Addresses() (list []*HelloAddress, err error) {
-	rdr := bytes.NewReader(m.AddrList)
-	var addr *HelloAddress
-	num := 0
+func (m *HelloDHTMsg) Addresses() (list []*util.Address, err error) {
+	var addr *util.Address
+	var as string
+	num, pos := 0, 0
 	for {
-		// parse address from stream
-		if addr, err = ParseHelloAddr(rdr); err != nil {
-			// end of stream: no more addresses
-			if err == io.EOF {
-				err = nil
-			}
-			// check numbers
-			if num != int(m.NumAddr) {
-				logger.Printf(logger.WARN, "[HelloDHTMsg] Number of addresses doesn't match (got %d, expected %d)", num, m.NumAddr)
-			}
+		// parse address string from stream
+		if as, pos = util.ReadCString(m.AddrList, pos); pos == -1 {
+			break
+		}
+		if addr, err = util.ParseAddress(as); err != nil {
 			return
 		}
 		list = append(list, addr)
 		num++
 	}
+	// check numbers
+	if num != int(m.NumAddr) {
+		logger.Printf(logger.WARN, "[HelloDHTMsg] Number of addresses doesn't match (got %d, expected %d)", num, m.NumAddr)
+	}
+	return
+}
+
+// SetAddresses adds addresses to the HELLO message.
+func (m *HelloDHTMsg) SetAddresses(list []*util.Address) {
+	// write addresses as blob and track earliest expiration
+	exp := util.NewAbsoluteTime(time.Now().Add(HelloAddressExpiration))
+	wrt := new(bytes.Buffer)
+	for _, addr := range list {
+		// check if address expires before current expire
+		if exp.Compare(addr.Expires) > 0 {
+			exp = addr.Expires
+		}
+		n, _ := wrt.Write([]byte(addr.URI()))
+		wrt.WriteByte(0)
+		m.MsgSize += uint16(n + 1)
+	}
+	m.AddrList = wrt.Bytes()
+	m.Expires = exp
+	m.NumAddr = uint16(len(list))
 }
 
 // String returns a human-readable representation of the message.
 func (m *HelloDHTMsg) String() string {
-	return fmt.Sprintf("HelloDHTMsg{expire:%s,addrs=%d}", m.Expires, m.NumAddr)
-}
-
-// SetAddresses adds addresses to the HELLO message.
-func (m *HelloDHTMsg) SetAddresses(list []*HelloAddress) {
-	// write addresses as blob and track earliest expiration
-	exp := util.AbsoluteTimeNever()
-	wrt := new(bytes.Buffer)
-	for _, addr := range list {
-		// check if address expires before current expire
-		if _, after := exp.Diff(addr.expires); !after {
-			exp = addr.expires
+	addrs, _ := m.Addresses()
+	aList := ""
+	for i, a := range addrs {
+		if i > 0 {
+			aList += ","
 		}
-		n, _ := wrt.Write(addr.Bytes())
-		m.MsgSize += uint16(n)
-		m.NumAddr++
+		aList += a.URI()
 	}
-	m.AddrList = wrt.Bytes()
-	m.Expires = exp
+	return fmt.Sprintf("HelloDHTMsg{expire:%s,addrs=%d:[%s]}", m.Expires, m.NumAddr, aList)
 }
 
 // Header returns the message header in a separate instance.
@@ -127,6 +135,18 @@ func (m *HelloDHTMsg) Verify(peer *util.PeerID) (bool, error) {
 		return false, err
 	}
 	return pub.EdVerify(sd, sig)
+}
+
+// Sign the HELLO data with private key
+func (m *HelloDHTMsg) Sign(prv *ed25519.PrivateKey) error {
+	// assemble signed data
+	sd := m.signedData()
+	sig, err := prv.EdSign(sd)
+	if err != nil {
+		return err
+	}
+	m.Signature = sig.Bytes()
+	return nil
 }
 
 // signedData assembles a data block for sign and verify operations.
