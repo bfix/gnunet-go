@@ -11,7 +11,7 @@
             {
                 "id": "test",
                 "network": "ip+udp",
-                "address": "upnp:192.168.178.1",
+                "address": "upnp:192.168.134.1",
                 "port": 6666,
                 "ttl": 86400
             }
@@ -28,8 +28,12 @@
                 "perm": "0770"
             }
         },
-        "storage": "dht_file_store+/var/lib/gnunet/dht/store",
-        "cache": "dht_file_cache+/var/lib/gnunet/dht/cache+1000"
+        "storage": {
+            "mode": "file",
+            "cache": false,
+            "path": "/var/lib/gnunet/dht/store",
+            "maxGB": 10
+        }
     },
     "gns": {
         "service": {
@@ -48,7 +52,13 @@
                 "perm": "0770"
             }
         },
-        "storage": "dht_file_cache:/var/lib/gnunet/namecache:1000"
+        "storage": {
+            "mode": "file",
+            "cache": true,
+            "path": "/var/lib/gnunet/namecache",
+            "num": 1000,
+            "expire": 43200
+        }
     },
     "revocation": {
         "service": {
@@ -57,7 +67,12 @@
                 "perm": "0770"
             }
         },
-        "storage": "redis:localhost:6397::15"
+        "storage": {
+            "mode": "redis",
+            "addr": "localhost:6397",
+            "passwd": "",
+            "id": 15
+        }
     },
     "rpc": {
         "endpoint": "tcp:127.0.0.1:80"

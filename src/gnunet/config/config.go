@@ -94,14 +94,33 @@ type GNSConfig struct {
 }
 
 //----------------------------------------------------------------------
+// Generic parameter configuration (handle any key/value settings)
+//----------------------------------------------------------------------
+
+// ParameterConfig handle arbitrary values for a key strings. This necessary
+// e.g. in the 'Storage' configuration, as custom storage implementations
+// require different sets of parameters.
+type ParameterConfig map[string]any
+
+// Get a parameter value with given type 'V'
+func GetParam[V any](params ParameterConfig, key string) (i V, ok bool) {
+	var v any
+	if v, ok = params[key]; ok {
+		if i, ok = v.(V); ok {
+			return
+		}
+	}
+	return
+}
+
+//----------------------------------------------------------------------
 // DHT configuration
 //----------------------------------------------------------------------
 
 // DHTConfig contains parameters for the distributed hash table (DHT)
 type DHTConfig struct {
-	Service *ServiceConfig `json:"service"` // socket for DHT service
-	Storage string         `json:"storage"` // filesystem storage location
-	Cache   string         `json:"cache"`   // key/value cache
+	Service *ServiceConfig  `json:"service"` // socket for DHT service
+	Storage ParameterConfig `json:"storage"` // filesystem storage location
 }
 
 //----------------------------------------------------------------------
@@ -110,8 +129,8 @@ type DHTConfig struct {
 
 // NamecacheConfig contains parameters for the local name cache
 type NamecacheConfig struct {
-	Service *ServiceConfig `json:"service"` // socket for Namecache service
-	Storage string         `json:"storage"` // key/value cache
+	Service *ServiceConfig  `json:"service"` // socket for Namecache service
+	Storage ParameterConfig `json:"storage"` // key/value cache
 }
 
 //----------------------------------------------------------------------
@@ -120,8 +139,8 @@ type NamecacheConfig struct {
 
 // RevocationConfig contains parameters for the key revocation service
 type RevocationConfig struct {
-	Service *ServiceConfig `json:"service"` // socket for Revocation service
-	Storage string         `json:"storage"` // persistance mechanism for revocation data
+	Service *ServiceConfig  `json:"service"` // socket for Revocation service
+	Storage ParameterConfig `json:"storage"` // persistance mechanism for revocation data
 }
 
 //----------------------------------------------------------------------
