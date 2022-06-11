@@ -48,13 +48,14 @@ func StartRPC(ctx context.Context, endpoint string) (srvRPC *rpc.Server, err err
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
+	// start listening
 	go func() {
-		// start listening
-		go func() {
-			if err := srv.ListenAndServe(); err != nil {
-				logger.Printf(logger.WARN, "[RPC] Server listen failed: %s", err.Error())
-			}
-		}()
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+			logger.Printf(logger.WARN, "[RPC] Server listen failed: %s", err.Error())
+		}
+	}()
+	// wait for shutdown
+	go func() {
 		select {
 		case <-ctx.Done():
 			if err := srv.Shutdown(context.Background()); err != nil {
