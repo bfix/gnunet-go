@@ -31,7 +31,7 @@ type DHTStats struct {
 	Started time.Time
 }
 
-func (c *DHTCommand) Status(stats *DHTStats) error {
+func (c *DHTCommand) Status(mode int, stats *DHTStats) error {
 	*stats = DHTStats{
 		Started: time.Now(),
 	}
