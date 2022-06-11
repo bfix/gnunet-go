@@ -134,7 +134,7 @@ func (s *Service) HandleMessage(ctx context.Context, msg message.Message, back t
 		//----------------------------------------------------------
 		// UNKNOWN message type received
 		//----------------------------------------------------------
-		logger.Printf(logger.ERROR, "[dht%s] Unhandled message of type (%d)\n", label, msg.Header().MsgType)
+		logger.Printf(logger.ERROR, "[dht-%s] Unhandled message of type (%d)\n", label, msg.Header().MsgType)
 		return false
 	}
 	return true
