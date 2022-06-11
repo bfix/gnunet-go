@@ -57,10 +57,6 @@ func NewModule(ctx context.Context, c *core.Core) (m *Module, err error) {
 	if store, err = service.NewDHTStore(config.Cfg.DHT.Storage); err != nil {
 		return
 	}
-	// create cache handler
-	if cache, err = service.NewDHTStore(config.Cfg.DHT.Cache); err != nil {
-		return
-	}
 	// create routing table
 	rt := NewRoutingTable(NewPeerAddress(c.PeerID()))
 
