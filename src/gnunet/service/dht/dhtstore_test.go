@@ -20,9 +20,10 @@ package dht
 
 import (
 	"encoding/hex"
+	"gnunet/config"
 	"gnunet/crypto"
 	"gnunet/service"
-	blocks "gnunet/service/dht/blocks"
+	"gnunet/service/dht/blocks"
 	"math/rand"
 	"testing"
 )
@@ -37,8 +38,15 @@ const (
 // each block from storage and checks for matching hash.
 func TestDHTFilesStore(t *testing.T) {
 
+	// test configuration
+	cfg := make(config.ParameterConfig)
+	cfg["mode"] = "file"
+	cfg["cache"] = false
+	cfg["path"] = "/var/lib/gnunet/dht/store"
+	cfg["maxGB"] = 10
+
 	// create file store
-	fs, err := service.NewFileCache("/var/lib/gnunet/dht/cache", "100")
+	fs, err := service.NewFileStore(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,33 +56,30 @@ func TestDHTFilesStore(t *testing.T) {
 	// First round: save blocks
 	for i := 0; i < fsNumBlocks; i++ {
 		// generate random block
-		size := 20 // 1024 + rand.Intn(62000)
+		size := 1024 + rand.Intn(62000)
 		buf := make([]byte, size)
 		rand.Read(buf)
 		val := blocks.NewGenericBlock(buf)
 		// generate associated key
 		k := crypto.Hash(buf).Bits
 		key := blocks.NewGenericQuery(k)
-		t.Logf("> %d: %s -- %s", i, hex.EncodeToString(k), hex.EncodeToString(buf))
 
 		// store block
 		if err := fs.Put(key, val); err != nil {
 			t.Fatal(err)
 		}
-
 		// remember key
 		keys = append(keys, key)
 	}
 
 	// Second round: retrieve blocks and check
-	for i, key := range keys {
+	for _, key := range keys {
 		// get block
 		val, err := fs.Get(key)
 		if err != nil {
 			t.Fatal(err)
 		}
 		buf := val.Data()
-		t.Logf("< %d: %s -- %s", i, hex.EncodeToString(key.Key().Bits), hex.EncodeToString(buf))
 
 		// re-create key
 		k := crypto.Hash(buf)
