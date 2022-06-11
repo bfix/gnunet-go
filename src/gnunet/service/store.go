@@ -30,6 +30,7 @@ import (
 	"gnunet/crypto"
 	"gnunet/service/dht/blocks"
 	"gnunet/util"
+	"io"
 	"io/ioutil"
 	"os"
 	"sort"
@@ -178,10 +179,14 @@ func NewFileStore(spec config.ParameterConfig) (DHTStore, error) {
 			dec := gob.NewDecoder(fp)
 			for {
 				hdr := new(FileHeader)
-				if dec.Decode(hdr) == nil {
-					fs.files[hdr.key] = hdr
-					fs.totalSize += hdr.size
+				if dec.Decode(hdr) != nil {
+					if err != io.EOF {
+						return nil, err
+					}
+					break
 				}
+				fs.files[hdr.key] = hdr
+				fs.totalSize += hdr.size
 			}
 			fp.Close()
 		}
