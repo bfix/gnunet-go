@@ -167,6 +167,17 @@ func (rt *RoutingTable) Remove(p *PeerAddress) bool {
 	return false
 }
 
+// Contains checks if a peer is available in the routing table
+func (rt *RoutingTable) Contains(p *PeerAddress) bool {
+	// ensure readable map
+	rt.lock(true)
+	defer rt.unlock(true)
+
+	// check for peer in internal list
+	_, ok := rt.list[p]
+	return ok
+}
+
 //----------------------------------------------------------------------
 
 // Process a function f in the locked context of a routing table
