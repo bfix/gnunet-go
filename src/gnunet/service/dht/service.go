@@ -24,9 +24,7 @@ import (
 	"io"
 
 	"gnunet/core"
-	"gnunet/message"
 	"gnunet/service"
-	"gnunet/transport"
 
 	"github.com/bfix/gospel/logger"
 )
@@ -56,7 +54,6 @@ func NewService(ctx context.Context, c *core.Core) (service.Service, error) {
 	srv := &Service{
 		Module: *mod,
 	}
-	srv.ProcessFcn = srv.HandleMessage
 	return srv, nil
 }
 
@@ -93,49 +90,4 @@ loop:
 	// cancel all tasks running for this session/connection
 	logger.Printf(logger.INFO, "[dht:%d] Start closing session...\n", id)
 	cancel()
-}
-
-// HandleMessage handles a DHT request/response message. If the transport channel
-// is nil, responses are send directly via the transport layer.
-func (s *Service) HandleMessage(ctx context.Context, msg message.Message, back transport.Responder) bool {
-	// assemble log label
-	label := ""
-	if v := ctx.Value("label"); v != nil {
-		label = v.(string)
-	}
-	// process message
-	switch msg.(type) {
-	case *message.DHTClientPutMsg:
-		//----------------------------------------------------------
-		// DHT PUT
-		//----------------------------------------------------------
-
-	case *message.DHTClientGetMsg:
-		//----------------------------------------------------------
-		// DHT GET
-		//----------------------------------------------------------
-
-	case *message.DHTClientGetResultsKnownMsg:
-		//----------------------------------------------------------
-		// DHT GET-RESULTS-KNOWN
-		//----------------------------------------------------------
-
-	case *message.DHTClientGetStopMsg:
-		//----------------------------------------------------------
-		// DHT GET-STOP
-		//----------------------------------------------------------
-
-	case *message.DHTClientResultMsg:
-		//----------------------------------------------------------
-		// DHT RESULT
-		//----------------------------------------------------------
-
-	default:
-		//----------------------------------------------------------
-		// UNKNOWN message type received
-		//----------------------------------------------------------
-		logger.Printf(logger.ERROR, "[dht-%s] Unhandled message of type (%d)\n", label, msg.Header().MsgType)
-		return false
-	}
-	return true
 }

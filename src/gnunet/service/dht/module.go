@@ -25,6 +25,8 @@ import (
 	"gnunet/message"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
+	"gnunet/transport"
+	"gnunet/util"
 	"time"
 
 	"github.com/bfix/gospel/logger"
@@ -46,7 +48,8 @@ type Module struct {
 	cache service.DHTStore // transient block cache
 	core  *core.Core       // reference to core services
 
-	rtable *RoutingTable // routing table
+	rtable     *RoutingTable                 // routing table
+	helloCache map[string]*blocks.HelloBlock // HELLO block cache
 }
 
 // NewModule returns a new module instance. It initializes the storage
@@ -110,17 +113,17 @@ func (m *Module) Filter() *core.EventFilter {
 	f.AddEvent(core.EV_DISCONNECT)
 
 	// messages we are interested in:
-	// (1) DHT messages
+	// (1) DHT_P2P messages
+	f.AddMsgType(message.DHT_P2P_PUT)
+	f.AddMsgType(message.DHT_P2P_GET)
+	f.AddMsgType(message.DHT_P2P_RESULT)
+	f.AddMsgType(message.DHT_P2P_HELLO)
+	// (2) DHT messages (legacy, not implemented)
 	f.AddMsgType(message.DHT_CLIENT_GET)
 	f.AddMsgType(message.DHT_CLIENT_GET_RESULTS_KNOWN)
 	f.AddMsgType(message.DHT_CLIENT_GET_STOP)
 	f.AddMsgType(message.DHT_CLIENT_PUT)
 	f.AddMsgType(message.DHT_CLIENT_RESULT)
-	// (2) DHT_P2P messages
-	f.AddMsgType(message.DHT_P2P_PUT)
-	f.AddMsgType(message.DHT_P2P_GET)
-	f.AddMsgType(message.DHT_P2P_RESULT)
-	f.AddMsgType(message.DHT_P2P_HELLO)
 
 	return f
 }
@@ -139,19 +142,75 @@ func (m *Module) event(ctx context.Context, ev *core.Event) {
 		// Remove peer from routing table
 		logger.Printf(logger.INFO, "[dht] Peer %s disconnected", ev.Peer)
 		m.rtable.Remove(NewPeerAddress(ev.Peer))
+		// delete from HELLO cache
+		delete(m.helloCache, ev.Peer.String())
 
 	// Message received.
 	case core.EV_MESSAGE:
 		logger.Printf(logger.INFO, "[dht] Message received: %s", ev.Msg.String())
-		// process message (if applicable)
-		if m.ProcessFcn != nil {
-			m.ProcessFcn(ctx, ev.Msg, ev.Resp)
+
+		// handle HELLO messages directly (we need to do it here because the
+		// standard processing has no access to the PeerID of the sender as
+		// it is not part of the message).
+		if ev.Msg.Header().MsgType == message.DHT_P2P_HELLO {
+			msg := ev.Msg.(*message.DHTP2PHelloMsg)
+
+			// check if peer is in routing table
+			if !m.rtable.Contains(NewPeerAddress(ev.Peer)) {
+				logger.Println(logger.WARN, "[dht] DHT_P2P_HELLO from unregistered peer -- discarded")
+				return
+			}
+
+			// verify integrity of message
+			if ok, err := msg.Verify(ev.Peer); !ok || err != nil {
+				logger.Println(logger.WARN, "[dht] Received invalid DHT_P2P_HELLO message")
+				return
+			}
+			// keep peer addresses in core for transport
+			aList, err := msg.Addresses()
+			if err != nil {
+				logger.Println(logger.WARN, "[dht] Failed to parse addresses from DHT_P2P_HELLO message")
+				return
+			}
+			if err := m.core.Learn(ctx, ev.Peer, aList); err != nil {
+				logger.Println(logger.WARN, "[dht] Failed to learn addresses from DHT_P2P_HELLO message: "+err.Error())
+				return
+			}
+
+			// cache HELLO block if applicable
+			k := ev.Peer.String()
+			isNew := true
+			if hb, ok := m.helloCache[k]; ok {
+				// cache entry exists: is the HELLO message more recent?
+				_, isNew = hb.Expire.Diff(msg.Expires)
+			}
+			// we need to cache a new(er) HELLO
+			if isNew {
+				m.helloCache[k] = &blocks.HelloBlock{
+					PeerID:    ev.Peer,
+					Signature: util.Clone(msg.Signature),
+					Expire:    msg.Expires,
+					AddrBin:   util.Clone(msg.AddrList),
+				}
+			}
+			return
+		}
+		// process message
+		if !m.HandleMessage(ctx, ev.Msg, ev.Resp) {
+			logger.Println(logger.WARN, "[dht] Message NOT handled!")
 		}
 	}
 }
 
 // Heartbeat handler for periodic tasks
 func (m *Module) heartbeat(ctx context.Context) {
+
+	// drop expired entries from the HELLO cache
+	for key, hb := range m.helloCache {
+		if hb.Expire.Expired() {
+			delete(m.helloCache, key)
+		}
+	}
 	// update the estimated network size
 	m.rtable.l2nse = m.core.L2NSE()
 
@@ -159,6 +218,8 @@ func (m *Module) heartbeat(ctx context.Context) {
 	m.rtable.heartbeat(ctx)
 }
 
+//----------------------------------------------------------------------
+// Inter-module linkage helpers
 //----------------------------------------------------------------------
 
 // Export functions
@@ -170,5 +231,91 @@ func (m *Module) Export(fcn map[string]any) {
 
 // Import functions
 func (m *Module) Import(fcm map[string]any) {
-	// nothing to import now.
+	// nothing to import for now.
+}
+
+//----------------------------------------------------------------------
+// Handle DHT messages from the network
+//----------------------------------------------------------------------
+
+// HandleMessage handles a DHT request/response message. Responses are sent
+// to the specified responder.
+func (m *Module) HandleMessage(ctx context.Context, msg message.Message, back transport.Responder) bool {
+	// assemble log label
+	label := "dht"
+	if v := ctx.Value("label"); v != nil {
+		label = "dht-" + v.(string)
+	}
+	// process message
+	switch m := msg.(type) {
+
+	case *message.DHTP2PGetMsg:
+		//----------------------------------------------------------
+		// DHT-P2P GET
+		//----------------------------------------------------------
+		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-GET message", label)
+
+		// validate query (based on block type reqested)
+		validator, ok := blocks.BlockQueryValidation[m.MsgType]
+		if ok {
+			if !validator(m.Query, m.XQuery) {
+				logger.Printf(logger.INFO, "[%s] DHT-P2P-GET message invalid -- discarded", label)
+				return false
+			}
+		}
+
+	case *message.DHTP2PPutMsg:
+		//----------------------------------------------------------
+		// DHT-P2P PUT
+		//----------------------------------------------------------
+		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-PUT message", label)
+
+	case *message.DHTP2PResultMsg:
+		//----------------------------------------------------------
+		// DHT RESULT
+		//----------------------------------------------------------
+		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-RESULT message", label)
+
+	//--------------------------------------------------------------
+	// Legacy message types (not implemented)
+	//--------------------------------------------------------------
+
+	case *message.DHTClientPutMsg:
+		//----------------------------------------------------------
+		// DHT PUT
+		//----------------------------------------------------------
+		logger.Printf(logger.INFO, "[%s] Handling DHTClientPut message", label)
+
+	case *message.DHTClientGetMsg:
+		//----------------------------------------------------------
+		// DHT GET
+		//----------------------------------------------------------
+		logger.Printf(logger.INFO, "[%s] Handling DHTClientGet message", label)
+
+	case *message.DHTClientGetResultsKnownMsg:
+		//----------------------------------------------------------
+		// DHT GET-RESULTS-KNOWN
+		//----------------------------------------------------------
+		logger.Printf(logger.INFO, "[%s] Handling DHTClientGetResultsKnown message", label)
+
+	case *message.DHTClientGetStopMsg:
+		//----------------------------------------------------------
+		// DHT GET-STOP
+		//----------------------------------------------------------
+		logger.Printf(logger.INFO, "[%s] Handling DHTClientGetStop message", label)
+
+	case *message.DHTClientResultMsg:
+		//----------------------------------------------------------
+		// DHT RESULT
+		//----------------------------------------------------------
+		logger.Printf(logger.INFO, "[%s] Handling DHTClientResult message", label)
+
+	default:
+		//----------------------------------------------------------
+		// UNKNOWN message type received
+		//----------------------------------------------------------
+		logger.Printf(logger.ERROR, "[%s] Unhandled message of type (%d)\n", label, msg.Header().MsgType)
+		return false
+	}
+	return true
 }

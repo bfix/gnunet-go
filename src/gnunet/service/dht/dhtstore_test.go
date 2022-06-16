@@ -62,7 +62,7 @@ func TestDHTFilesStore(t *testing.T) {
 		val := blocks.NewGenericBlock(buf)
 		// generate associated key
 		k := crypto.Hash(buf).Bits
-		key := blocks.NewGenericQuery(k)
+		key := blocks.NewGenericQuery(k, blocks.DHT_BLOCK_ANY)
 
 		// store block
 		if err := fs.Put(key, val); err != nil {
