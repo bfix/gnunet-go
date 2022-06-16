@@ -24,6 +24,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/util"
 	"net/url"
@@ -190,17 +191,6 @@ func (h *HelloBlock) finalize() (err error) {
 	return
 }
 
-/*
-// Message returns the corresponding HELLO message to be sent to peers.
-func (h *HelloBlock) Message() *message.HelloMsg {
-	msg := message.NewHelloMsg(h.PeerID)
-	for _, a := range h.addrs {
-		msg.AddAddress(message.NewHelloAddress(a, h.Expire))
-	}
-	return msg
-}
-*/
-
 // URL returns the HELLO URL for the data.
 func (h *HelloBlock) URL() string {
 	u := fmt.Sprintf("%s%s/%s/%d?",
@@ -274,4 +264,11 @@ func (h *HelloBlock) signedData() []byte {
 	binary.Write(buf, binary.BigEndian, h.Expire.Epoch()*1000000)
 	buf.Write(hAddr[:])
 	return buf.Bytes()
+}
+
+// ValidateHelloBlockQuery validates query parameters for a
+// DHT-GET request for HELLO blocks.
+func ValidateHelloBlockQuery(key *crypto.HashCode, xquery []byte) bool {
+	// no xquery parameters allowed.
+	return len(xquery) == 0
 }

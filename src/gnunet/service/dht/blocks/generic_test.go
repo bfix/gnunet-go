@@ -25,36 +25,29 @@ import (
 
 // Test parameter handling for queries
 func TestQueryParams(t *testing.T) {
-	q := NewGenericQuery(nil)
+	q := NewGenericQuery(nil, DHT_BLOCK_ANY)
 
 	// set parameters
 	var (
-		btype uint16 = DHT_BLOCK_ANY
 		flags uint32 = 0
 		name  string = "Test"
 		data         = make([]byte, 8)
 	)
-	q.Set("btype", btype)
 	q.Set("flags", flags)
 	q.Set("name", name)
 	q.Set("data", data)
 
 	// get parameters
 	var (
-		t_btype uint16
 		t_flags uint32
 		t_name  string
 		t_data  []byte
 	)
-	q.Get("btype", &t_btype)
 	q.Get("flags", &t_flags)
 	q.Get("name", &t_name)
 	q.Get("data", &t_data)
 
 	// check for unchanged data
-	if btype != t_btype {
-		t.Fatal("btype mismatch")
-	}
 	if flags != t_flags {
 		t.Fatal("flags mismatch")
 	}

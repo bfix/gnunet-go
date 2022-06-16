@@ -39,6 +39,9 @@ type Query interface {
 	// Key returns the DHT key for a block
 	Key() *crypto.HashCode
 
+	// Type returns the requested block type
+	Type() uint16
+
 	// Get retrieves the value of a named query parameter. The value is
 	// unchanged if the key is not in the map or if the value in the map
 	// has an incompatible type.
@@ -97,6 +100,9 @@ type GenericQuery struct {
 	// Key for repository queries (local/remote)
 	key *crypto.HashCode
 
+	// block type requested
+	btype uint16
+
 	// query parameters (binary value representation)
 	params map[string][]byte
 }
@@ -104,6 +110,11 @@ type GenericQuery struct {
 // Key interface method implementation
 func (q *GenericQuery) Key() *crypto.HashCode {
 	return q.key
+}
+
+// Type returns the requested block type
+func (q *GenericQuery) Type() uint16 {
+	return q.btype
 }
 
 // Get retrieves the value of a named query parameter
@@ -139,13 +150,14 @@ func (q *GenericQuery) Decrypt(b Block) error {
 
 // String returns the human-readable representation of a block
 func (q *GenericQuery) String() string {
-	return fmt.Sprintf("GenericQuery{key=%s}", hex.EncodeToString(q.Key().Bits))
+	return fmt.Sprintf("GenericQuery{btype=%d,key=%s}", q.btype, hex.EncodeToString(q.Key().Bits))
 }
 
 // NewGenericQuery creates a simple Query from hash code.
-func NewGenericQuery(buf []byte) *GenericQuery {
+func NewGenericQuery(key []byte, btype uint16) *GenericQuery {
 	return &GenericQuery{
-		key:    crypto.NewHashCode(buf),
+		key:    crypto.NewHashCode(key),
+		btype:  btype,
 		params: make(map[string][]byte),
 	}
 }

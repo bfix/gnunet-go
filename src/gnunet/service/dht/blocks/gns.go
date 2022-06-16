@@ -94,7 +94,7 @@ func NewGNSQuery(zkey *crypto.ZoneKey, label string) *GNSQuery {
 	pd, _ := zkey.Derive(label, "gns")
 	gq := crypto.Hash(pd.Bytes()).Bits
 	return &GNSQuery{
-		GenericQuery: *NewGenericQuery(gq),
+		GenericQuery: *NewGenericQuery(gq, DHT_BLOCK_GNS),
 		Zone:         zkey,
 		Label:        label,
 		derived:      pd,
