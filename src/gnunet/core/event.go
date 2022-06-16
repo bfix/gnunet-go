@@ -19,6 +19,7 @@
 package core
 
 import (
+	"fmt"
 	"gnunet/message"
 	"gnunet/transport"
 	"gnunet/util"
@@ -82,6 +83,8 @@ func (f *EventFilter) CheckMsgType(mt uint16) bool {
 	return ok
 }
 
+//----------------------------------------------------------------------
+
 // Event sent to listeners
 type Event struct {
 	ID    int                 // event type
@@ -89,6 +92,19 @@ type Event struct {
 	Msg   message.Message     // GNUnet message (can be nil)
 	Resp  transport.Responder // reply handler (can be nil)
 	Label string              // event label (can be empty)
+}
+
+// String returns a human-readable representation of an event.
+func (e *Event) String() string {
+	s := "Event{"
+	if len(e.Label) > 0 {
+		s += "label=" + e.Label + ","
+	}
+	s += fmt.Sprintf("id=%d,peer=%s", e.ID, e.Peer)
+	if e.Msg != nil {
+		s += fmt.Sprintf(",msg=%d", e.Msg.Header().MsgType)
+	}
+	return s + "}"
 }
 
 //----------------------------------------------------------------------
