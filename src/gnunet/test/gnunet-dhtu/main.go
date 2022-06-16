@@ -44,6 +44,11 @@ import (
 //----------------------------------------------------------------------
 
 func main() {
+	defer func() {
+		logger.Println(logger.INFO, "[main] Shutting down...")
+		logger.Flush()
+	}()
+
 	// handle command-line arguments
 	var remoteAddr string
 	var cfgFile string
@@ -52,12 +57,14 @@ func main() {
 	flag.Parse()
 
 	// read configuration file and set missing arguments.
+	logger.Println(logger.INFO, "[main] Parsing configuration...")
 	if err := config.ParseConfig(cfgFile); err != nil {
-		logger.Printf(logger.ERROR, "[node] Invalid configuration file: %s\n", err.Error())
+		logger.Printf(logger.ERROR, "[main] Invalid configuration file: %s\n", err.Error())
 		return
 	}
 
 	// convert arguments
+	logger.Println(logger.INFO, "[main] Converting remote peer address...")
 	var rAddr *util.Address
 	var err error
 	if rAddr, err = util.ParseAddress(remoteAddr); err != nil {
@@ -73,6 +80,7 @@ func main() {
 	}()
 
 	// create and run node
+	logger.Println(logger.INFO, "[main] Starting DHTU node...")
 	node, err := NewTestNode(ctx)
 	if err != nil {
 		logger.Println(logger.ERROR, err.Error())
@@ -89,11 +97,11 @@ func main() {
 		return
 	}
 	aList := []*util.Address{listen}
-	logger.Println(logger.INFO, "[node] --> "+node.HelloURL(aList))
+	logger.Println(logger.INFO, "[main] --> "+node.HelloURL(aList))
 
 	// send HELLO to bootstrap address
 	if err = node.SendHello(ctx, rAddr); err != nil && err != transport.ErrEndpMaybeSent {
-		logger.Println(logger.ERROR, "[node] failed to send HELLO: "+err.Error())
+		logger.Println(logger.ERROR, "[main] failed to send HELLO: "+err.Error())
 		return
 	}
 
