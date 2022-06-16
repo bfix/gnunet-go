@@ -40,7 +40,7 @@ var (
 
 func (i BlockType) String() string {
 	switch {
-	case 0 <= i && i <= 2:
+	case i <= 2:
 		return _BlockType_name_0[_BlockType_index_0[i]:_BlockType_index_0[i+1]]
 	case 6 <= i && i <= 13:
 		i -= 6

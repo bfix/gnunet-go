@@ -2,7 +2,7 @@
 
 package enums
 
-type BlockType int
+type BlockType uint16
 
 // DHT block types
 const (
