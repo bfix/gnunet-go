@@ -62,8 +62,6 @@ func NewService(ctx context.Context, c *core.Core) service.Service {
 	srv := &Service{
 		Module: *mod,
 	}
-	srv.ProcessFcn = srv.HandleMessage
-
 	// set external function references (external services)
 	srv.LookupLocal = srv.LookupNamecache
 	srv.StoreLocal = srv.StoreNamecache

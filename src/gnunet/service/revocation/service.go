@@ -47,7 +47,6 @@ func NewService(ctx context.Context, c *core.Core) service.Service {
 	srv := &Service{
 		Module: *mod,
 	}
-	srv.ProcessFcn = srv.HandleMessage
 	return srv
 }
 
