@@ -70,6 +70,7 @@ func NewModule(ctx context.Context, c *core.Core) (m *Module, err error) {
 		cache:      cache,
 		core:       c,
 		rtable:     rt,
+		helloCache: make(map[string]*blocks.HelloBlock),
 	}
 	// register as listener for core events
 	listener := m.Run(ctx, m.event, m.Filter(), 15*time.Minute, m.heartbeat)
@@ -230,7 +231,7 @@ func (m *Module) Export(fcn map[string]any) {
 }
 
 // Import functions
-func (m *Module) Import(fcm map[string]any) {
+func (m *Module) Import(fcn map[string]any) {
 	// nothing to import for now.
 }
 
@@ -244,7 +245,9 @@ func (m *Module) HandleMessage(ctx context.Context, msg message.Message, back tr
 	// assemble log label
 	label := "dht"
 	if v := ctx.Value("label"); v != nil {
-		label = "dht-" + v.(string)
+		if s := v.(string); len(s) > 0 {
+			label = "dht-" + s
+		}
 	}
 	// process message
 	switch m := msg.(type) {
