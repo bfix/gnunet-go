@@ -66,8 +66,18 @@ func NewEmptyMessage(msgType uint16) (Message, error) {
 		return NewDHTClientResultMsg(nil), nil
 	case DHT_CLIENT_GET_RESULTS_KNOWN:
 		return NewDHTClientGetResultsKnownMsg(nil), nil
+
+	//------------------------------------------------------------------
+	// DHT-P2P
+	//------------------------------------------------------------------
 	case DHT_P2P_HELLO:
-		return NewHelloDHTMsg(), nil
+		return NewDHTP2PHelloMsg(), nil
+	case DHT_P2P_GET:
+		return NewDHTP2PGetMsg(), nil
+	case DHT_P2P_PUT:
+		return NewDHTP2PPutMsg(), nil
+	case DHT_P2P_RESULT:
+		return NewDHTP2PResultMsg(), nil
 
 	//------------------------------------------------------------------
 	// GNS
