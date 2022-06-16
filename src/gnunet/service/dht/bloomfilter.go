@@ -30,7 +30,7 @@ import (
 
 // BloomFilter parameter
 var (
-	bfNumBits = 128
+	bfNumBits = 128 * 8
 	bfHash    = sha512.New
 )
 
