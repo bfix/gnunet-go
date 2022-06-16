@@ -22,6 +22,7 @@ import (
 	"context"
 	"gnunet/config"
 	"gnunet/core"
+	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
@@ -259,7 +260,7 @@ func (m *Module) HandleMessage(ctx context.Context, msg message.Message, back tr
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-GET message", label)
 
 		// validate query (based on block type reqested)
-		validator, ok := blocks.BlockQueryValidation[m.MsgType]
+		validator, ok := blocks.BlockQueryValidation[enums.BlockType(m.MsgType)]
 		if ok {
 			if !validator(m.Query, m.XQuery) {
 				logger.Printf(logger.INFO, "[%s] DHT-P2P-GET message invalid -- discarded", label)

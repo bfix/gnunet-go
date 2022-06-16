@@ -20,12 +20,13 @@ package blocks
 
 import (
 	"bytes"
+	"gnunet/enums"
 	"testing"
 )
 
 // Test parameter handling for queries
 func TestQueryParams(t *testing.T) {
-	q := NewGenericQuery(nil, DHT_BLOCK_ANY)
+	q := NewGenericQuery(nil, enums.BLOCK_TYPE_ANY)
 
 	// set parameters
 	var (

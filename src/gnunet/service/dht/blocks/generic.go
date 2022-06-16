@@ -24,6 +24,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"gnunet/crypto"
+	"gnunet/enums"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/data"
@@ -154,10 +155,10 @@ func (q *GenericQuery) String() string {
 }
 
 // NewGenericQuery creates a simple Query from hash code.
-func NewGenericQuery(key []byte, btype uint16) *GenericQuery {
+func NewGenericQuery(key []byte, btype enums.BlockType) *GenericQuery {
 	return &GenericQuery{
 		key:    crypto.NewHashCode(key),
-		btype:  btype,
+		btype:  uint16(btype),
 		params: make(map[string][]byte),
 	}
 }
@@ -202,7 +203,7 @@ func (b *GenericBlock) Verify() error {
 func NewGenericBlock(buf []byte) *GenericBlock {
 	return &GenericBlock{
 		block:  util.Clone(buf),
-		btype:  DHT_BLOCK_ANY,            // unknown block type
-		expire: util.AbsoluteTimeNever(), // never expires
+		btype:  uint16(enums.BLOCK_TYPE_ANY), // unknown block type
+		expire: util.AbsoluteTimeNever(),     // never expires
 	}
 }

@@ -20,6 +20,7 @@ package blocks
 
 import (
 	"gnunet/crypto"
+	"gnunet/enums"
 
 	"github.com/bfix/gospel/crypto/ed25519"
 )
@@ -33,15 +34,15 @@ type ValidateBlockQuery func(key *crypto.HashCode, xquery []byte) bool
 
 // BlockQueryValidation is a map of block query validation implementations
 // for supported block types.
-var BlockQueryValidation map[uint16]ValidateBlockQuery
+var BlockQueryValidation map[enums.BlockType]ValidateBlockQuery
 
 // initializer function
 func init() {
 	// create map instance
-	BlockQueryValidation = make(map[uint16]ValidateBlockQuery)
+	BlockQueryValidation = make(map[enums.BlockType]ValidateBlockQuery)
 
 	// add validation functions
-	BlockQueryValidation[DHT_BLOCK_HELLO] = ValidateHelloBlockQuery
+	BlockQueryValidation[enums.BLOCK_TYPE_DHT_URL_HELLO] = ValidateHelloBlockQuery
 }
 
 //----------------------------------------------------------------------

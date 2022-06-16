@@ -22,6 +22,7 @@ import (
 	"errors"
 	"fmt"
 	"gnunet/crypto"
+	"gnunet/enums"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/data"
@@ -94,7 +95,7 @@ func NewGNSQuery(zkey *crypto.ZoneKey, label string) *GNSQuery {
 	pd, _ := zkey.Derive(label, "gns")
 	gq := crypto.Hash(pd.Bytes()).Bits
 	return &GNSQuery{
-		GenericQuery: *NewGenericQuery(gq, DHT_BLOCK_GNS),
+		GenericQuery: *NewGenericQuery(gq, enums.BLOCK_TYPE_GNS_NAMERECORD),
 		Zone:         zkey,
 		Label:        label,
 		derived:      pd,

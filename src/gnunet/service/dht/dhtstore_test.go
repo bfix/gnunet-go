@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"gnunet/config"
 	"gnunet/crypto"
+	"gnunet/enums"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
 	"math/rand"
@@ -62,7 +63,7 @@ func TestDHTFilesStore(t *testing.T) {
 		val := blocks.NewGenericBlock(buf)
 		// generate associated key
 		k := crypto.Hash(buf).Bits
-		key := blocks.NewGenericQuery(k, blocks.DHT_BLOCK_ANY)
+		key := blocks.NewGenericQuery(k, enums.BLOCK_TYPE_ANY)
 
 		// store block
 		if err := fs.Put(key, val); err != nil {

@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"gnunet/config"
 	"gnunet/crypto"
+	"gnunet/enums"
 	"gnunet/service/dht/blocks"
 	"gnunet/util"
 	"io"
@@ -277,7 +278,7 @@ func (s *FileStore) Put(query blocks.Query, block blocks.Block) (err error) {
 func (s *FileStore) Get(query blocks.Query) (block blocks.Block, err error) {
 	// get requested block type
 	var (
-		btype  uint16            = blocks.DHT_BLOCK_ANY
+		btype  uint16            = uint16(enums.BLOCK_TYPE_ANY)
 		blkt   uint16            // actual block type
 		expire util.AbsoluteTime // expiration date
 		data   []byte            // block data
@@ -293,7 +294,7 @@ func (s *FileStore) Get(query blocks.Query) (block blocks.Block, err error) {
 	}
 	// read block data
 	if err = binary.Read(file, binary.BigEndian, &blkt); err == nil {
-		if btype != blocks.DHT_BLOCK_ANY && btype != blkt {
+		if btype != uint16(enums.BLOCK_TYPE_ANY) && btype != blkt {
 			// block types not matching
 			return
 		}
