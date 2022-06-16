@@ -145,6 +145,10 @@ func TestCoreUPNP(t *testing.T) {
 	// create and run nodes
 	node1, err := NewTestNode(t, ctx, peer1Cfg)
 	if err != nil {
+		if err == transport.ErrTransNoUPNP {
+			t.Log("No UPnP available -- skipping test")
+			return
+		}
 		t.Fatal(err)
 	}
 	defer node1.Shutdown()

@@ -32,6 +32,7 @@ import (
 // Trnsport layer error codes
 var (
 	ErrTransNoEndpoint = errors.New("no matching endpoint found")
+	ErrTransNoUPNP     = errors.New("no UPnP available")
 )
 
 //======================================================================
@@ -185,11 +186,20 @@ func (t *Transport) AddEndpoint(ctx context.Context, addr *util.Address) (ep End
 // ForwardOpen returns a local address for listening that will receive traffic
 // from a port forward handled by UPnP on the router.
 func (t *Transport) ForwardOpen(protocol, param string, port int) (id, local, remote string, err error) {
+	// check for available UPnP
+	if t.upnp == nil {
+		err = ErrTransNoUPNP
+		return
+	}
 	// no parameters currently defined, so just do the assignment.
 	return t.upnp.Assign(protocol, port)
 }
 
 // ForwardClose closes a specific port forwarding
 func (t *Transport) ForwardClose(id string) error {
+	// check for available UPnP
+	if t.upnp == nil {
+		return ErrTransNoUPNP
+	}
 	return t.upnp.Unassign(id)
 }
