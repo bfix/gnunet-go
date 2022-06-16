@@ -98,12 +98,12 @@ func (addr *PeerAddress) Distance(p *PeerAddress) (*math.Int, int) {
 // distance to the reference address, so smaller index means
 // "nearer" to the reference address.
 type RoutingTable struct {
-	ref       *PeerAddress              // reference address for distance
-	buckets   []*Bucket                 // list of buckets
-	list      map[*PeerAddress]struct{} // keep list of peers
-	mtx       sync.RWMutex              // lock for write operations
-	l2nse     float64                   // log2 of estimated network size
-	inProcess bool                      // flag if Process() is running
+	ref       *PeerAddress            // reference address for distance
+	buckets   []*Bucket               // list of buckets
+	list      map[string]*PeerAddress // keep list of peers
+	mtx       sync.RWMutex            // lock for write operations
+	l2nse     float64                 // log2 of estimated network size
+	inProcess bool                    // flag if Process() is running
 }
 
 // NewRoutingTable creates a new routing table for the reference address.
@@ -111,7 +111,7 @@ func NewRoutingTable(ref *PeerAddress) *RoutingTable {
 	// create routing table
 	rt := &RoutingTable{
 		ref:       ref,
-		list:      make(map[*PeerAddress]struct{}),
+		list:      make(map[string]*PeerAddress),
 		buckets:   make([]*Bucket, numBuckets),
 		l2nse:     0.,
 		inProcess: false,
@@ -135,14 +135,14 @@ func (rt *RoutingTable) Add(p *PeerAddress) bool {
 	defer rt.unlock(false)
 
 	// check if peer is already known
-	if _, ok := rt.list[p]; ok {
+	if _, ok := rt.list[p.String()]; ok {
 		return false
 	}
 
 	// compute distance (bucket index) and insert address.
 	_, idx := p.Distance(rt.ref)
 	if rt.buckets[idx].Add(p) {
-		rt.list[p] = struct{}{}
+		rt.list[p.String()] = p
 		return true
 	}
 	// Full bucket: we did not add the address to the routing table.
@@ -159,11 +159,11 @@ func (rt *RoutingTable) Remove(p *PeerAddress) bool {
 	// compute distance (bucket index) and remove entry from bucket
 	_, idx := p.Distance(rt.ref)
 	if rt.buckets[idx].Remove(p) {
-		delete(rt.list, p)
+		delete(rt.list, p.String())
 		return true
 	}
 	// remove from internal list
-	delete(rt.list, p)
+	delete(rt.list, p.String())
 	return false
 }
 
@@ -174,7 +174,7 @@ func (rt *RoutingTable) Contains(p *PeerAddress) bool {
 	defer rt.unlock(true)
 
 	// check for peer in internal list
-	_, ok := rt.list[p]
+	_, ok := rt.list[p.String()]
 	return ok
 }
 
@@ -226,11 +226,11 @@ func (rt *RoutingTable) SelectRandomPeer(bf *PeerBloomFilter) *PeerAddress {
 	// select random entry from list
 	if size := len(rt.list); size > 0 {
 		idx := rand.Intn(size)
-		for k := range rt.list {
+		for _, p := range rt.list {
 			if idx == 0 {
 				// mark peer as used
-				k.lastUsed = util.AbsoluteTimeNow()
-				return k
+				p.lastUsed = util.AbsoluteTimeNow()
+				return p
 			}
 			idx--
 		}
@@ -284,14 +284,14 @@ func (rt *RoutingTable) heartbeat(ctx context.Context) {
 	// check for dead or expired peers
 	timeout := util.NewRelativeTime(3 * time.Hour)
 	if err := rt.Process(func() error {
-		for addr := range rt.list {
-			if addr.connected {
+		for _, p := range rt.list {
+			if p.connected {
 				continue
 			}
 			// check if we can/need to drop a peer
-			drop := timeout.Compare(addr.lastSeen.Elapsed()) < 0
-			if drop || timeout.Compare(addr.lastUsed.Elapsed()) < 0 {
-				rt.Remove(addr)
+			drop := timeout.Compare(p.lastSeen.Elapsed()) < 0
+			if drop || timeout.Compare(p.lastUsed.Elapsed()) < 0 {
+				rt.Remove(p)
 			}
 		}
 		return nil
