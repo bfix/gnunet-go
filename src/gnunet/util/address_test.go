@@ -37,17 +37,24 @@ func TestAddrList(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// test peer
+	peer := NewPeerID(nil)
 	// allocate AddrList
 	addrL := NewPeerAddrList()
 	for _, addr := range addrA {
-		rc := addrL.Add("2BHV4BN8736W5W3CJNXY2S9WABWTGH35QMFG4BPCWBH7DNBCFC60", addr)
+		rc := addrL.Add(peer, addr)
 		t.Logf("added %s (%d)", addr.URI(), rc)
 	}
 
 	// check list
 	t.Log("checking list...")
-	list := addrL.Get("2BHV4BN8736W5W3CJNXY2S9WABWTGH35QMFG4BPCWBH7DNBCFC60", "ip+udp")
-	t.Logf("got: %v", list)
+	list := addrL.Get(peer, "ip+udp")
+	for i, addr := range list {
+		t.Logf("got: %s", addr.URI())
+		if addr != addrA[i] {
+			t.Errorf("address mismatch at index %d", i)
+		}
+	}
 	if len(list) != len(addrS) {
 		t.Fatal("list size not matching")
 	}
