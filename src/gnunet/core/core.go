@@ -68,11 +68,14 @@ type Core struct {
 	// list of known peers with addresses
 	peers *util.PeerAddrList
 
+	// list of connected peers
+	connected *util.Map[string, bool]
+
 	// List of registered endpoints
 	endpoints map[string]*EndpointRef
 
 	// last HELLO message used; re-create if expired
-	lastHello *message.HelloDHTMsg
+	lastHello *message.DHTP2PHelloMsg
 }
 
 //----------------------------------------------------------------------
@@ -93,6 +96,7 @@ func NewCore(ctx context.Context, node *config.NodeConfig) (c *Core, err error) 
 		listeners: make(map[string]*Listener),
 		trans:     transport.NewTransport(ctx, node.Name, incoming),
 		peers:     util.NewPeerAddrList(),
+		connected: util.NewMap[string, bool](),
 		endpoints: make(map[string]*EndpointRef),
 	}
 	// add all local peer endpoints to transport.
@@ -165,35 +169,19 @@ func (c *Core) pump(ctx context.Context) {
 		case tm := <-c.incoming:
 			logger.Printf(logger.DBG, "[core] Message received from %s: %s", tm.Peer, transport.Dump(tm.Msg, "json"))
 
-			// inspect message for peer state events
-			var ev *Event
-			switch msg := tm.Msg.(type) {
-			case *message.HelloDHTMsg:
-
-				// verify integrity of message
-				if ok, err := msg.Verify(tm.Peer); !ok || err != nil {
-					logger.Println(logger.WARN, "[core] Received invalid DHT_P2P_HELLO message")
-					break
-				}
-				// keep peer addresses
-				aList, err := msg.Addresses()
-				if err != nil {
-					logger.Println(logger.WARN, "[core] Failed to parse addresses from DHT_P2P_HELLO message")
-					break
-				}
-				if err := c.Learn(ctx, tm.Peer, aList); err != nil {
-					logger.Println(logger.WARN, "[core] Failed to learn addresses from DHT_P2P_HELLO message: "+err.Error())
-					break
-				}
-
-				// generate EV_CONNECT event
-				ev = &Event{
+			// check if peer is already connected (has an entry in PeerAddrist)
+			_, connected := c.connected.Get(tm.Peer.String())
+			if !connected {
+				// no: generate EV_CONNECT event
+				c.dispatch(&Event{
 					ID:   EV_CONNECT,
 					Peer: tm.Peer,
-					Msg:  msg,
-				}
-				c.dispatch(ev)
+					Msg:  tm.Msg,
+				})
+				// mark connected
+				c.connected.Put(tm.Peer.String(), true)
 			}
+
 			// set default responder (core) if no custom responder
 			// is defined by the receiving endpoint.
 			resp := tm.Resp
@@ -204,13 +192,12 @@ func (c *Core) pump(ctx context.Context) {
 				}
 			}
 			// generate EV_MESSAGE event
-			ev = &Event{
+			c.dispatch(&Event{
 				ID:   EV_MESSAGE,
 				Peer: tm.Peer,
 				Msg:  tm.Msg,
 				Resp: tm.Resp,
-			}
-			c.dispatch(ev)
+			})
 
 		// wait for termination
 		case <-ctx.Done():
@@ -234,7 +221,7 @@ func (c *Core) Send(ctx context.Context, peer *util.PeerID, msg message.Message)
 	netw := "ip+udp"
 
 	// try all addresses for peer
-	aList := c.peers.Get(peer.String(), netw)
+	aList := c.peers.Get(peer, netw)
 	maybe := false // message may be sent...
 	for _, addr := range aList {
 		logger.Printf(logger.WARN, "[core] Trying to send to %s", addr.URI())
@@ -273,12 +260,12 @@ func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addrs []*util.Addre
 	newPeer := false
 	for _, addr := range addrs {
 		logger.Printf(logger.INFO, "[core] Learning %s for %s (expires %s)", addr.URI(), peer, addr.Expires)
-		newPeer = (c.peers.Add(peer.String(), addr) == 1) || newPeer
+		newPeer = (c.peers.Add(peer, addr) == 1) || newPeer
 	}
 	// new peer detected?
 	if newPeer {
 		// we added a previously unknown peer: send a HELLO
-		var msg *message.HelloDHTMsg
+		var msg *message.DHTP2PHelloMsg
 		if msg, err = c.getHello(); err != nil {
 			return
 		}
@@ -295,7 +282,7 @@ func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addrs []*util.Addre
 // Send the currently active HELLO to given network address
 func (c *Core) SendHello(ctx context.Context, addr *util.Address) (err error) {
 	// get (buffered) HELLO
-	var msg *message.HelloDHTMsg
+	var msg *message.DHTP2PHelloMsg
 	if msg, err = c.getHello(); err != nil {
 		return
 	}
@@ -305,7 +292,7 @@ func (c *Core) SendHello(ctx context.Context, addr *util.Address) (err error) {
 
 // get the recent HELLO if it is defined and not expired;
 // create a new HELLO otherwise.
-func (c *Core) getHello() (msg *message.HelloDHTMsg, err error) {
+func (c *Core) getHello() (msg *message.DHTP2PHelloMsg, err error) {
 	if c.lastHello == nil || c.lastHello.Expires.Expired() {
 		// assemble new HELLO message
 		addrList := make([]*util.Address, 0)
@@ -318,7 +305,7 @@ func (c *Core) getHello() (msg *message.HelloDHTMsg, err error) {
 		if err != nil {
 			return
 		}
-		msg = message.NewHelloDHTMsg()
+		msg = message.NewDHTP2PHelloMsg()
 		msg.NumAddr = uint16(len(hello.Addresses()))
 		msg.SetAddresses(hello.Addresses())
 		if err = msg.Sign(c.local.prv); err != nil {
