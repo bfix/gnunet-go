@@ -58,7 +58,7 @@ func main() {
 	flag.StringVar(&cfgFile, "c", "gnunet-config.json", "GNUnet configuration file")
 	flag.StringVar(&socket, "s", "", "GNS service socket")
 	flag.StringVar(&param, "p", "", "socket parameters (<key>=<value>,...)")
-	flag.IntVar(&logLevel, "L", logger.INFO, "DHT log level (default: INFO)")
+	flag.IntVar(&logLevel, "L", logger.DBG, "DHT log level (default: DBG)")
 	flag.StringVar(&rpcEndp, "R", "", "JSON-RPC endpoint (default: none)")
 	flag.Parse()
 
