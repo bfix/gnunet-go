@@ -172,14 +172,13 @@ func (c *Core) pump(ctx context.Context) {
 			// check if peer is already connected (has an entry in PeerAddrist)
 			_, connected := c.connected.Get(tm.Peer.String())
 			if !connected {
-				// no: generate EV_CONNECT event
+				// no: mark connected
+				c.connected.Put(tm.Peer.String(), true)
+				// generate EV_CONNECT event
 				c.dispatch(&Event{
 					ID:   EV_CONNECT,
 					Peer: tm.Peer,
-					Msg:  tm.Msg,
 				})
-				// mark connected
-				c.connected.Put(tm.Peer.String(), true)
 			}
 
 			// set default responder (core) if no custom responder
@@ -224,7 +223,7 @@ func (c *Core) Send(ctx context.Context, peer *util.PeerID, msg message.Message)
 	aList := c.peers.Get(peer, netw)
 	maybe := false // message may be sent...
 	for _, addr := range aList {
-		logger.Printf(logger.WARN, "[core] Trying to send to %s", addr.URI())
+		logger.Printf(logger.INFO, "[core] Trying to send to %s", addr.URI())
 		// send message to address
 		if err = c.send(ctx, addr, msg); err != nil {
 			// if it is possible that the message was not sent, try next address
@@ -405,11 +404,12 @@ func (c *Core) Unregister(name string) *Listener {
 
 // internal: dispatch event to listeners
 func (c *Core) dispatch(ev *Event) {
+	logger.Printf(logger.DBG, "Dispatching %v...", ev)
 	// dispatch event to listeners
 	for _, l := range c.listeners {
 		if l.filter.CheckEvent(ev.ID) {
-			mt := ev.Msg.Header().MsgType
 			if ev.ID == EV_MESSAGE {
+				mt := ev.Msg.Header().MsgType
 				if mt != 0 && !l.filter.CheckMsgType(mt) {
 					// skip event
 					return
