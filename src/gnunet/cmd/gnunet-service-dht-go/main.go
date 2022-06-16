@@ -71,7 +71,7 @@ func main() {
 	// apply configuration
 	logger.SetLogLevel(logLevel)
 	if len(socket) == 0 {
-		socket = config.Cfg.GNS.Service.Socket
+		socket = config.Cfg.DHT.Service.Socket
 	}
 	params := make(map[string]string)
 	if len(param) > 0 {
@@ -80,7 +80,7 @@ func main() {
 			params[kv[0]] = kv[1]
 		}
 	} else {
-		params = config.Cfg.GNS.Service.Params
+		params = config.Cfg.DHT.Service.Params
 	}
 
 	// instantiate core service
