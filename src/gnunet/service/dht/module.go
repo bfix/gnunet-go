@@ -20,6 +20,7 @@ package dht
 
 import (
 	"context"
+	"errors"
 	"gnunet/config"
 	"gnunet/core"
 	"gnunet/enums"
@@ -51,6 +52,7 @@ type Module struct {
 
 	rtable     *RoutingTable                 // routing table
 	helloCache map[string]*blocks.HelloBlock // HELLO block cache
+	lastHello  *message.DHTP2PHelloMsg       // last HELLO message used; re-create if expired
 }
 
 // NewModule returns a new module instance. It initializes the storage
@@ -174,9 +176,18 @@ func (m *Module) event(ctx context.Context, ev *core.Event) {
 				logger.Println(logger.WARN, "[dht] Failed to parse addresses from DHT_P2P_HELLO message")
 				return
 			}
-			if err := m.core.Learn(ctx, ev.Peer, aList); err != nil {
-				logger.Println(logger.WARN, "[dht] Failed to learn addresses from DHT_P2P_HELLO message: "+err.Error())
-				return
+			if newPeer := m.core.Learn(ctx, ev.Peer, aList); newPeer {
+				// we added a previously unknown peer: send a HELLO
+				var msg *message.DHTP2PHelloMsg
+				if msg, err = m.getHello(); err != nil {
+					return
+				}
+				logger.Printf(logger.INFO, "[core] Sending HELLO to %s: %s", ev.Peer, msg)
+				err = m.core.Send(ctx, ev.Peer, msg)
+				// no error if the message might have been sent
+				if err == transport.ErrEndpMaybeSent {
+					err = nil
+				}
 			}
 
 			// cache HELLO block if applicable
@@ -218,6 +229,61 @@ func (m *Module) heartbeat(ctx context.Context) {
 
 	// run heartbeat for routing table
 	m.rtable.heartbeat(ctx)
+}
+
+// Send the currently active HELLO to given network address
+func (m *Module) SendHello(ctx context.Context, addr *util.Address) (err error) {
+	// get (buffered) HELLO
+	var msg *message.DHTP2PHelloMsg
+	if msg, err = m.getHello(); err != nil {
+		return
+	}
+	logger.Printf(logger.INFO, "[core] Sending HELLO to %s: %s", addr.URI(), msg)
+	return m.core.SendToAddr(ctx, addr, msg)
+}
+
+// get the recent HELLO if it is defined and not expired;
+// create a new HELLO otherwise.
+func (m *Module) getHello() (msg *message.DHTP2PHelloMsg, err error) {
+	if m.lastHello == nil || m.lastHello.Expires.Expired() {
+		// assemble new (signed) HELLO block
+		var addrList []*util.Address
+		if addrList, err = m.core.Addresses(); err != nil {
+			return
+		}
+		// assemble HELLO data
+		hb := new(blocks.HelloBlock)
+		hb.PeerID = m.core.PeerID()
+		hb.Expire = util.NewAbsoluteTime(time.Now().Add(time.Hour))
+		hb.SetAddresses(addrList)
+
+		// sign HELLO block
+		if err = m.core.Sign(hb); err != nil {
+			return
+		}
+		// assemble HELLO message
+		msg = message.NewDHTP2PHelloMsg()
+		msg.SetAddresses(hb.Addresses())
+		if err = m.core.Sign(msg); err != nil {
+			return
+		}
+		// save for later use
+		m.lastHello = msg
+
+		// DEBUG
+		var ok bool
+		if ok, err = msg.Verify(m.core.PeerID()); !ok || err != nil {
+			if !ok {
+				err = errors.New("failed to verify own HELLO")
+			}
+			logger.Println(logger.ERROR, err.Error())
+			return
+		}
+		logger.Println(logger.DBG, "[dht] New HELLO: "+transport.Dump(msg, "json"))
+		return
+	}
+	// we have a valid HELLO for re-use.
+	return m.lastHello, nil
 }
 
 //----------------------------------------------------------------------

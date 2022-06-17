@@ -251,9 +251,7 @@ func (n *TestNode) Learn(ctx context.Context, peer *util.PeerID, addr *util.Addr
 		label = peer.String()
 	}
 	n.t.Logf("[%d] Learning %s for %s", n.id, addr.StringAll(), label)
-	if err := n.core.Learn(ctx, peer, []*util.Address{addr}); err != nil {
-		n.t.Log("Learn: " + err.Error())
-	}
+	n.core.Learn(ctx, peer, []*util.Address{addr})
 }
 
 func NewTestNode(t *testing.T, ctx context.Context, cfg *config.NodeConfig) (node *TestNode, err error) {

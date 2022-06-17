@@ -23,13 +23,12 @@ import (
 	"errors"
 	"gnunet/config"
 	"gnunet/message"
-	"gnunet/service/dht/blocks"
 	"gnunet/transport"
 	"gnunet/util"
 	"net"
 	"strings"
-	"time"
 
+	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/logger"
 )
 
@@ -73,9 +72,6 @@ type Core struct {
 
 	// List of registered endpoints
 	endpoints map[string]*EndpointRef
-
-	// last HELLO message used; re-create if expired
-	lastHello *message.DHTP2PHelloMsg
 }
 
 //----------------------------------------------------------------------
@@ -225,7 +221,7 @@ func (c *Core) Send(ctx context.Context, peer *util.PeerID, msg message.Message)
 	for _, addr := range aList {
 		logger.Printf(logger.INFO, "[core] Trying to send to %s", addr.URI())
 		// send message to address
-		if err = c.send(ctx, addr, msg); err != nil {
+		if err = c.SendToAddr(ctx, addr, msg); err != nil {
 			// if it is possible that the message was not sent, try next address
 			if err != transport.ErrEndpMaybeSent {
 				logger.Printf(logger.WARN, "[core] Failed to send to %s: %s", addr.URI(), err.Error())
@@ -245,8 +241,8 @@ func (c *Core) Send(ctx context.Context, peer *util.PeerID, msg message.Message)
 	return
 }
 
-// send message directly to address
-func (c *Core) send(ctx context.Context, addr *util.Address, msg message.Message) error {
+// SendToAddr message directly to address
+func (c *Core) SendToAddr(ctx context.Context, addr *util.Address, msg message.Message) error {
 	// assemble transport message
 	tm := transport.NewTransportMessage(c.PeerID(), msg)
 	// send on transport
@@ -254,79 +250,14 @@ func (c *Core) send(ctx context.Context, addr *util.Address, msg message.Message
 }
 
 // Learn (new) addresses for peer
-func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addrs []*util.Address) (err error) {
+func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addrs []*util.Address) (newPeer bool) {
 	// learn all addresses for peer
-	newPeer := false
+	newPeer = false
 	for _, addr := range addrs {
 		logger.Printf(logger.INFO, "[core] Learning %s for %s (expires %s)", addr.URI(), peer, addr.Expires)
 		newPeer = (c.peers.Add(peer, addr) == 1) || newPeer
 	}
-	// new peer detected?
-	if newPeer {
-		// we added a previously unknown peer: send a HELLO
-		var msg *message.DHTP2PHelloMsg
-		if msg, err = c.getHello(); err != nil {
-			return
-		}
-		logger.Printf(logger.INFO, "[core] Sending HELLO to %s: %s", peer, msg)
-		err = c.Send(ctx, peer, msg)
-		// no error if the message might have been sent
-		if err == transport.ErrEndpMaybeSent {
-			err = nil
-		}
-	}
 	return
-}
-
-// Send the currently active HELLO to given network address
-func (c *Core) SendHello(ctx context.Context, addr *util.Address) (err error) {
-	// get (buffered) HELLO
-	var msg *message.DHTP2PHelloMsg
-	if msg, err = c.getHello(); err != nil {
-		return
-	}
-	logger.Printf(logger.INFO, "[core] Sending HELLO to %s: %s", addr.URI(), msg)
-	return c.send(ctx, addr, msg)
-}
-
-// get the recent HELLO if it is defined and not expired;
-// create a new HELLO otherwise.
-func (c *Core) getHello() (msg *message.DHTP2PHelloMsg, err error) {
-	if c.lastHello == nil || c.lastHello.Expires.Expired() {
-		// assemble new HELLO message
-		addrList := make([]*util.Address, 0)
-		for _, epRef := range c.endpoints {
-			addrList = append(addrList, epRef.addr)
-		}
-		node := c.local
-		var hello *blocks.HelloBlock
-		hello, err = node.HelloData(time.Hour, addrList)
-		if err != nil {
-			return
-		}
-		msg = message.NewDHTP2PHelloMsg()
-		msg.NumAddr = uint16(len(hello.Addresses()))
-		msg.SetAddresses(hello.Addresses())
-		if err = msg.Sign(c.local.prv); err != nil {
-			return
-		}
-		// save for later use
-		c.lastHello = msg
-
-		// DEBUG
-		var ok bool
-		if ok, err = msg.Verify(c.PeerID()); !ok || err != nil {
-			if !ok {
-				err = errors.New("[core] failed to verify own HELLO")
-			}
-			logger.Println(logger.ERROR, err.Error())
-			return
-		}
-		logger.Println(logger.DBG, "[core] New HELLO: "+transport.Dump(msg, "json"))
-		return
-	}
-	// we have a valid HELLO for re-use.
-	return c.lastHello, nil
 }
 
 // Addresses returns the list of listening endpoint addresses
@@ -347,6 +278,18 @@ func (c *Core) Peer() *Peer {
 // PeerID returns the peer id of the local node.
 func (c *Core) PeerID() *util.PeerID {
 	return c.local.GetID()
+}
+
+//----------------------------------------------------------------------
+
+// Signable interface for objects that can get signed by peer
+type Signable interface {
+	Sign(*ed25519.PrivateKey) error
+}
+
+// Sign a signable onject with private peer key
+func (c *Core) Sign(obj Signable) error {
+	return obj.Sign(c.local.prv)
 }
 
 //----------------------------------------------------------------------

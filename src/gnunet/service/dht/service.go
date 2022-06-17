@@ -46,7 +46,7 @@ type Service struct {
 }
 
 // NewService creates a new DHT service instance
-func NewService(ctx context.Context, c *core.Core) (service.Service, error) {
+func NewService(ctx context.Context, c *core.Core) (*Service, error) {
 	mod, err := NewModule(ctx, c)
 	if err != nil {
 		return nil, err
