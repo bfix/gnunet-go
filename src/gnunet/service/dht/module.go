@@ -326,13 +326,17 @@ func (m *Module) HandleMessage(ctx context.Context, msg message.Message, back tr
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-GET message", label)
 
 		// validate query (based on block type reqested)
-		validator, ok := blocks.BlockQueryValidation[enums.BlockType(m.MsgType)]
+		btype := enums.BlockType(m.BType)
+		validator, ok := blocks.BlockQueryValidation[btype]
 		if ok {
 			if !validator(m.Query, m.XQuery) {
-				logger.Printf(logger.INFO, "[%s] DHT-P2P-GET message invalid -- discarded", label)
+				logger.Printf(logger.WARN, "[%s] DHT-P2P-GET message invalid -- discarded", label)
 				return false
 			}
+		} else {
+			logger.Printf(logger.INFO, "[%s] No validator defined for block type %s", label, btype.String())
 		}
+		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-GET message done", label)
 
 	case *message.DHTP2PPutMsg:
 		//----------------------------------------------------------
