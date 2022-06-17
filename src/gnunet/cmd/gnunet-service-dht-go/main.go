@@ -93,7 +93,7 @@ func main() {
 	defer c.Shutdown()
 
 	// start a new DHT service
-	var dhtSrv service.Service
+	var dhtSrv *dht.Service
 	if dhtSrv, err = dht.NewService(ctx, c); err != nil {
 		logger.Printf(logger.ERROR, "[dht] failed to create DHT service: %s\n", err.Error())
 		return
@@ -147,7 +147,7 @@ func main() {
 	}
 	// send HELLO to all bootstrap addresses
 	for _, addr := range bsList {
-		c.SendHello(ctx, addr)
+		dhtSrv.SendHello(ctx, addr)
 	}
 
 	// handle OS signals
