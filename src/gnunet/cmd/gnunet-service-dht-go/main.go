@@ -125,7 +125,7 @@ func main() {
 
 	// handle bootstrap: collect known addresses
 	bsList := make([]*util.Address, 0)
-	for _, bs := range config.Cfg.Bootstrap.Nodes {
+	for _, bs := range config.Cfg.Network.Bootstrap {
 		// check for HELLO URL
 		if strings.HasPrefix(bs, "gnunet://hello/") {
 			var hb *blocks.HelloBlock

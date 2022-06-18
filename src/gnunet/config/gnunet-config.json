@@ -1,8 +1,9 @@
 {
-    "bootstrap": {
-        "nodes": [
+    "network": {
+        "bootstrap": [
             "gnunet://hello/7KTBJ90340HF1Q2GB0A57E2XJER4FDHX8HP5GHEB9125VPWPD27G/BNMDFN6HJCPWSPNBSEC06MC1K8QN1Z2DHRQSRXDTFR7FTBD4JHNBJ2RJAAEZ31FWG1Q3PMN3PXGZQ3Q7NTNEKQZFA7TE2Y46FM8E20R/1653499308?r5n+ip+udp=127.0.0.1%3A7654"
-        ]
+        ],
+        "numPeers": 10
     },
     "local": {
         "name": "ygng",
@@ -33,6 +34,9 @@
             "cache": false,
             "path": "/var/lib/gnunet/dht/store",
             "maxGB": 10
+        },
+        "routing": {
+            "peerTTL": 10800
         }
     },
     "gns": {

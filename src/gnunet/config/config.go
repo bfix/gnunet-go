@@ -56,12 +56,13 @@ type NodeConfig struct {
 }
 
 //----------------------------------------------------------------------
-// Bootstrap configuration
+// Network configuration
 //----------------------------------------------------------------------
 
-// BootstrapConfig holds parameters for the initial connection to the network.
-type BootstrapConfig struct {
-	Nodes []string `json:"nodes"` // bootstrap nodes
+// NetworkConfig holds parameters for the initial connection to the network.
+type NetworkConfig struct {
+	Bootstrap []string `json:"bootstrap"` // bootstrap nodes
+	NumPeers  int      `json:"numPeers"`  // estimated number of peers (0 = use NSE)
 }
 
 //----------------------------------------------------------------------
@@ -121,6 +122,12 @@ func GetParam[V any](params ParameterConfig, key string) (i V, ok bool) {
 type DHTConfig struct {
 	Service *ServiceConfig  `json:"service"` // socket for DHT service
 	Storage ParameterConfig `json:"storage"` // filesystem storage location
+	Routing *RoutingConfig  `json:"routing"` // routing table configuration
+}
+
+// RoutingConfig holds parameters for routing tables
+type RoutingConfig struct {
+	PeerTTL int `json:"peerTTL"` // time-out for peers in table
 }
 
 //----------------------------------------------------------------------
@@ -153,7 +160,7 @@ type Environment map[string]string
 // Config is the aggregated configuration for GNUnet.
 type Config struct {
 	Local      *NodeConfig       `json:"local"`
-	Bootstrap  *BootstrapConfig  `json:"bootstrap"`
+	Network    *NetworkConfig    `json:"network"`
 	Env        Environment       `json:"environ"`
 	RPC        *RPCConfig        `json:"rpc"`
 	DHT        *DHTConfig        `json:"dht"`
