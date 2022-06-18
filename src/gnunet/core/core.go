@@ -27,6 +27,7 @@ import (
 	"gnunet/util"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/logger"
@@ -175,6 +176,8 @@ func (c *Core) pump(ctx context.Context) {
 					ID:   EV_CONNECT,
 					Peer: tm.Peer,
 				})
+				// grace period for connection signal
+				time.Sleep(time.Second)
 			}
 
 			// set default responder (core) if no custom responder
