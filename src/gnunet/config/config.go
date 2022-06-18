@@ -120,9 +120,10 @@ func GetParam[V any](params ParameterConfig, key string) (i V, ok bool) {
 
 // DHTConfig contains parameters for the distributed hash table (DHT)
 type DHTConfig struct {
-	Service *ServiceConfig  `json:"service"` // socket for DHT service
-	Storage ParameterConfig `json:"storage"` // filesystem storage location
-	Routing *RoutingConfig  `json:"routing"` // routing table configuration
+	Service   *ServiceConfig  `json:"service"`   // socket for DHT service
+	Storage   ParameterConfig `json:"storage"`   // filesystem storage location
+	Routing   *RoutingConfig  `json:"routing"`   // routing table configuration
+	Heartbeat int             `json:"heartbeat"` // heartbeat intervall
 }
 
 // RoutingConfig holds parameters for routing tables

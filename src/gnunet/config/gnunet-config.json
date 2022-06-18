@@ -37,7 +37,8 @@
         },
         "routing": {
             "peerTTL": 10800
-        }
+        },
+        "heartbeat": 900
     },
     "gns": {
         "service": {
