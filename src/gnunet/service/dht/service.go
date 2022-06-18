@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"io"
 
+	"gnunet/config"
 	"gnunet/core"
 	"gnunet/service"
 
@@ -46,8 +47,8 @@ type Service struct {
 }
 
 // NewService creates a new DHT service instance
-func NewService(ctx context.Context, c *core.Core) (*Service, error) {
-	mod, err := NewModule(ctx, c)
+func NewService(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (*Service, error) {
+	mod, err := NewModule(ctx, c, cfg)
 	if err != nil {
 		return nil, err
 	}

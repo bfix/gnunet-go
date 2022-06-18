@@ -57,14 +57,14 @@ type Module struct {
 
 // NewModule returns a new module instance. It initializes the storage
 // mechanism for persistence.
-func NewModule(ctx context.Context, c *core.Core) (m *Module, err error) {
+func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Module, err error) {
 	// create permanent storage handler
 	var store, cache service.DHTStore
-	if store, err = service.NewDHTStore(config.Cfg.DHT.Storage); err != nil {
+	if store, err = service.NewDHTStore(cfg.Storage); err != nil {
 		return
 	}
 	// create routing table
-	rt := NewRoutingTable(NewPeerAddress(c.PeerID()))
+	rt := NewRoutingTable(NewPeerAddress(c.PeerID()), cfg.Routing)
 
 	// return module instance
 	m = &Module{
@@ -76,7 +76,8 @@ func NewModule(ctx context.Context, c *core.Core) (m *Module, err error) {
 		helloCache: make(map[string]*blocks.HelloBlock),
 	}
 	// register as listener for core events
-	listener := m.Run(ctx, m.event, m.Filter(), 15*time.Minute, m.heartbeat)
+	pulse := time.Duration(cfg.Heartbeat) * time.Second
+	listener := m.Run(ctx, m.event, m.Filter(), pulse, m.heartbeat)
 	c.Register("dht", listener)
 	return
 }
@@ -225,7 +226,7 @@ func (m *Module) heartbeat(ctx context.Context) {
 		}
 	}
 	// update the estimated network size
-	m.rtable.l2nse = m.core.L2NSE()
+	m.rtable.l2nse = m.L2NSE()
 
 	// run heartbeat for routing table
 	m.rtable.heartbeat(ctx)
@@ -268,6 +269,7 @@ func (m *Module) getHello() (msg *message.DHTP2PHelloMsg, err error) {
 		if err = m.core.Sign(msg); err != nil {
 			return
 		}
+
 		// save for later use
 		m.lastHello = msg
 
@@ -393,4 +395,12 @@ func (m *Module) HandleMessage(ctx context.Context, msg message.Message, back tr
 		return false
 	}
 	return true
+}
+
+// L2NSE is ESTIMATE_NETWORK_SIZE(), a procedure that provides estimates
+// on the base-2 logarithm of the network size L2NSE, that is the base-2
+// logarithm number of peers in the network, for use by the routing
+// algorithm.
+func (m *Module) L2NSE() float64 {
+	return 3.
 }

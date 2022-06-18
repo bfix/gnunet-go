@@ -94,7 +94,7 @@ func main() {
 
 	// start a new DHT service
 	var dhtSrv *dht.Service
-	if dhtSrv, err = dht.NewService(ctx, c); err != nil {
+	if dhtSrv, err = dht.NewService(ctx, c, config.Cfg.DHT); err != nil {
 		logger.Printf(logger.ERROR, "[dht] failed to create DHT service: %s\n", err.Error())
 		return
 	}
