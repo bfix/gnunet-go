@@ -229,7 +229,7 @@ func (h *HelloBlock) Equals(g *HelloBlock) bool {
 // Verify the integrity of the HELLO data
 func (h *HelloBlock) Verify() (bool, error) {
 	// assemble signed data and public key
-	sd := h.signedData()
+	sd := h.SignedData()
 	pub := h.PeerID.PublicKey()
 	sig, err := ed25519.NewEdSignatureFromBytes(h.Signature)
 	if err != nil {
@@ -238,20 +238,14 @@ func (h *HelloBlock) Verify() (bool, error) {
 	return pub.EdVerify(sd, sig)
 }
 
-// Sign the HELLO data with private key
-func (h *HelloBlock) Sign(prv *ed25519.PrivateKey) error {
-	// assemble signed data
-	sd := h.signedData()
-	sig, err := prv.EdSign(sd)
-	if err != nil {
-		return err
-	}
+// SetSignature stores a signature in the the HELLO block
+func (h *HelloBlock) SetSignature(sig *ed25519.EdSignature) error {
 	h.Signature = sig.Bytes()
 	return nil
 }
 
-// signedData assembles a data block for sign and verify operations.
-func (h *HelloBlock) signedData() []byte {
+// SignedData assembles a data block for sign and verify operations.
+func (h *HelloBlock) SignedData() []byte {
 	// hash address block
 	hAddr := sha512.Sum512(h.AddrBin)
 	var size uint32 = 80

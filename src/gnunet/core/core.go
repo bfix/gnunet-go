@@ -287,12 +287,21 @@ func (c *Core) PeerID() *util.PeerID {
 
 // Signable interface for objects that can get signed by peer
 type Signable interface {
-	Sign(*ed25519.PrivateKey) error
+	// SignedData returns the byte array to be signed
+	SignedData() []byte
+
+	// SetSignature returns the signature to the signable object
+	SetSignature(*ed25519.EdSignature) error
 }
 
 // Sign a signable onject with private peer key
 func (c *Core) Sign(obj Signable) error {
-	return obj.Sign(c.local.prv)
+	sd := obj.SignedData()
+	sig, err := c.local.prv.EdSign(sd)
+	if err != nil {
+		return err
+	}
+	return obj.SetSignature(sig)
 }
 
 //----------------------------------------------------------------------
@@ -321,14 +330,6 @@ func (c *Core) Hold(peer *util.PeerID) {}
 // it merely removes the preference to preserve the connection that was
 // established by HOLD().
 func (c *Core) Drop(peer *util.PeerID) {}
-
-// L2NSE is ESTIMATE_NETWORK_SIZE(), a procedure that provides estimates
-// on the base-2 logarithm of the network size L2NSE, that is the base-2
-// logarithm number of peers in the network, for use by the routing
-// algorithm.
-func (c *Core) L2NSE() float64 {
-	return 0.
-}
 
 //----------------------------------------------------------------------
 // Event listener and event dispatch.

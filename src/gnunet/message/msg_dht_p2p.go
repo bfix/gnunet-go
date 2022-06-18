@@ -224,7 +224,7 @@ func (m *DHTP2PHelloMsg) Header() *Header {
 // Verify the message signature
 func (m *DHTP2PHelloMsg) Verify(peer *util.PeerID) (bool, error) {
 	// assemble signed data and public key
-	sd := m.signedData()
+	sd := m.SignedData()
 	pub := peer.PublicKey()
 	sig, err := ed25519.NewEdSignatureFromBytes(m.Signature)
 	if err != nil {
@@ -233,20 +233,14 @@ func (m *DHTP2PHelloMsg) Verify(peer *util.PeerID) (bool, error) {
 	return pub.EdVerify(sd, sig)
 }
 
-// Sign the HELLO data with private key
-func (m *DHTP2PHelloMsg) Sign(prv *ed25519.PrivateKey) error {
-	// assemble signed data
-	sd := m.signedData()
-	sig, err := prv.EdSign(sd)
-	if err != nil {
-		return err
-	}
+// SetSignature stores a signature in the the HELLO block
+func (m *DHTP2PHelloMsg) SetSignature(sig *ed25519.EdSignature) error {
 	m.Signature = sig.Bytes()
 	return nil
 }
 
-// signedData assembles a data block for sign and verify operations.
-func (m *DHTP2PHelloMsg) signedData() []byte {
+// SignedData assembles a data block for sign and verify operations.
+func (m *DHTP2PHelloMsg) SignedData() []byte {
 	// hash address block
 	hAddr := sha512.Sum512(m.AddrList)
 	var size uint32 = 80

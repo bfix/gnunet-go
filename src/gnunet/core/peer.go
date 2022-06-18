@@ -107,7 +107,12 @@ func (p *Peer) HelloData(ttl time.Duration, a []*util.Address) (h *blocks.HelloB
 	h.SetAddresses(a)
 
 	// sign data
-	err = h.Sign(p.prv)
+	sd := h.SignedData()
+	var sig *ed25519.EdSignature
+	if sig, err = p.prv.EdSign(sd); err != nil {
+		return
+	}
+	err = h.SetSignature(sig)
 	return
 }
 
