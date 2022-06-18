@@ -137,8 +137,9 @@ func (t AbsoluteTime) Compare(t2 AbsoluteTime) int {
 // Relative time
 //----------------------------------------------------------------------
 
-// RelativeTime is a timestamp defined relative to the current time.
-// It actually is more like a duration than a time...
+// RelativeTime is a timestamp defined relative to an AbsoluteTime.
+// It is measured in microseconds and is actually more like a duration
+// than a time...
 type RelativeTime struct {
 	Val uint64 `order:"big"`
 }
@@ -146,7 +147,7 @@ type RelativeTime struct {
 // NewRelativeTime is initialized with a given duration.
 func NewRelativeTime(d time.Duration) RelativeTime {
 	return RelativeTime{
-		Val: uint64(d.Milliseconds()),
+		Val: uint64(d.Microseconds()),
 	}
 }
 
@@ -155,7 +156,7 @@ func (t RelativeTime) String() string {
 	if t.Val == math.MaxUint64 {
 		return "Forever"
 	}
-	return time.Duration(t.Val * 1000).String()
+	return time.Duration(t.Val * 1000000).String()
 }
 
 // Add two durations
