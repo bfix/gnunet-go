@@ -153,17 +153,17 @@ func (m *Module) event(ctx context.Context, ev *core.Event) {
 	case core.EV_MESSAGE:
 		logger.Printf(logger.INFO, "[dht] Message received: %s", ev.Msg.String())
 
+		// check if peer is in routing table (connected peer)
+		if !m.rtable.Contains(NewPeerAddress(ev.Peer)) {
+			logger.Printf(logger.WARN, "[dht] message %d from unregistered peer -- discarded", ev.Msg.Header().MsgType)
+			return
+		}
+
 		// handle HELLO messages directly (we need to do it here because the
 		// standard processing has no access to the PeerID of the sender as
 		// it is not part of the message).
 		if ev.Msg.Header().MsgType == message.DHT_P2P_HELLO {
 			msg := ev.Msg.(*message.DHTP2PHelloMsg)
-
-			// check if peer is in routing table
-			if !m.rtable.Contains(NewPeerAddress(ev.Peer)) {
-				logger.Println(logger.WARN, "[dht] DHT_P2P_HELLO from unregistered peer -- discarded")
-				return
-			}
 
 			// verify integrity of message
 			if ok, err := msg.Verify(ev.Peer); !ok || err != nil {
@@ -254,7 +254,7 @@ func (m *Module) getHello() (msg *message.DHTP2PHelloMsg, err error) {
 		// assemble HELLO data
 		hb := new(blocks.HelloBlock)
 		hb.PeerID = m.core.PeerID()
-		hb.Expire = util.NewAbsoluteTime(time.Now().Add(time.Hour))
+		hb.Expire = util.NewAbsoluteTime(time.Now().Add(message.HelloAddressExpiration))
 		hb.SetAddresses(addrList)
 
 		// sign HELLO block
@@ -263,6 +263,7 @@ func (m *Module) getHello() (msg *message.DHTP2PHelloMsg, err error) {
 		}
 		// assemble HELLO message
 		msg = message.NewDHTP2PHelloMsg()
+		msg.Expires = hb.Expire
 		msg.SetAddresses(hb.Addresses())
 		if err = m.core.Sign(msg); err != nil {
 			return
@@ -330,7 +331,7 @@ func (m *Module) HandleMessage(ctx context.Context, msg message.Message, back tr
 		validator, ok := blocks.BlockQueryValidation[btype]
 		if ok {
 			if !validator(m.Query, m.XQuery) {
-				logger.Printf(logger.WARN, "[%s] DHT-P2P-GET message invalid -- discarded", label)
+				logger.Printf(logger.WARN, "[%s] DHT-P2P-GET invalid query -- discarded", label)
 				return false
 			}
 		} else {
