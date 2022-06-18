@@ -91,7 +91,6 @@ func TestRT(t *testing.T) {
 
 	// actions:
 	connected := func(task *Entry, e int64, msg string) {
-		task.addr.connected = true
 		rt.Add(task.addr)
 		task.online = true
 		task.last = e

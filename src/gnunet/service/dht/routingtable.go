@@ -51,10 +51,9 @@ const (
 // PeerAddress is the identifier for a peer in the DHT network.
 // It is the SHA-512 hash of the PeerID (public Ed25519 key).
 type PeerAddress struct {
-	addr      [sizeAddr]byte    // hash value as bytes
-	connected bool              // is peer connected?
-	lastSeen  util.AbsoluteTime // time the peer was last seen
-	lastUsed  util.AbsoluteTime // time the peer was last used
+	addr     [sizeAddr]byte    // hash value as bytes
+	lastSeen util.AbsoluteTime // time the peer was last seen
+	lastUsed util.AbsoluteTime // time the peer was last used
 }
 
 // NewPeerAddress returns the DHT address of a peer.
@@ -134,18 +133,26 @@ func (rt *RoutingTable) Add(p *PeerAddress) bool {
 	rt.lock(false)
 	defer rt.unlock(false)
 
+	k := p.String()
+	logger.Printf(logger.DBG, "[RT] Add(%s)", k)
+
 	// check if peer is already known
-	if _, ok := rt.list[p.String()]; ok {
+	if px, ok := rt.list[k]; ok {
+		logger.Println(logger.DBG, "[RT] --> already known")
+		px.lastSeen = util.AbsoluteTimeNow()
 		return false
 	}
 
 	// compute distance (bucket index) and insert address.
 	_, idx := p.Distance(rt.ref)
 	if rt.buckets[idx].Add(p) {
-		rt.list[p.String()] = p
+		logger.Println(logger.DBG, "[RT] --> entry added")
+		p.lastUsed = util.AbsoluteTimeNow()
+		rt.list[k] = p
 		return true
 	}
 	// Full bucket: we did not add the address to the routing table.
+	logger.Println(logger.DBG, "[RT] --> bucket full -- discarded")
 	return false
 }
 
@@ -156,14 +163,19 @@ func (rt *RoutingTable) Remove(p *PeerAddress) bool {
 	rt.lock(false)
 	defer rt.unlock(false)
 
+	k := p.String()
+	logger.Printf(logger.DBG, "[RT] Remove(%s)", k)
+
 	// compute distance (bucket index) and remove entry from bucket
 	_, idx := p.Distance(rt.ref)
 	if rt.buckets[idx].Remove(p) {
-		delete(rt.list, p.String())
+		logger.Println(logger.DBG, "[RT] --> entry removed from bucket and internal list")
+		delete(rt.list, k)
 		return true
 	}
 	// remove from internal list
-	delete(rt.list, p.String())
+	logger.Println(logger.DBG, "[RT] --> entry removed from internal list only")
+	delete(rt.list, k)
 	return false
 }
 
@@ -173,8 +185,20 @@ func (rt *RoutingTable) Contains(p *PeerAddress) bool {
 	rt.lock(true)
 	defer rt.unlock(true)
 
+	k := p.String()
+	logger.Printf(logger.DBG, "[RT] Contains(%s)?", k)
+
 	// check for peer in internal list
-	_, ok := rt.list[p.String()]
+	px, ok := rt.list[k]
+	if !ok {
+		logger.Println(logger.DBG, "[RT] --> NOT found in current list:")
+		for e := range rt.list {
+			logger.Printf(logger.DBG, "[RT]    * %s", e)
+		}
+	} else {
+		logger.Println(logger.DBG, "[RT] --> found in current list")
+		px.lastSeen = util.AbsoluteTimeNow()
+	}
 	return ok
 }
 
@@ -285,9 +309,6 @@ func (rt *RoutingTable) heartbeat(ctx context.Context) {
 	timeout := util.NewRelativeTime(3 * time.Hour)
 	if err := rt.Process(func() error {
 		for _, p := range rt.list {
-			if p.connected {
-				continue
-			}
 			// check if we can/need to drop a peer
 			drop := timeout.Compare(p.lastSeen.Elapsed()) < 0
 			if drop || timeout.Compare(p.lastUsed.Elapsed()) < 0 {
