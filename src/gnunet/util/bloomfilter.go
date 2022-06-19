@@ -16,7 +16,7 @@
 //
 // SPDX-License-Identifier: AGPL3.0-or-later
 
-package dht
+package util
 
 import (
 	"bytes"
@@ -24,31 +24,52 @@ import (
 	"encoding/binary"
 )
 
-//======================================================================
-// Generic BloomFilter
-//======================================================================
-
-// BloomFilter parameter
-var (
-	bfNumBits = 128 * 8
-	bfHash    = sha512.New
-)
-
 // BloomFilter is a space-efficient probabilistic datastructure to test if
 // an element is part of a set of elementsis defined as a string of bits
-// always initially empty.
+// always initially empty. An optional mutator can be used to additionally
+// "randomize" the computation of the bloomfilter while remaining deterministic.
 type BloomFilter struct {
-	data []byte // filter bits
-	salt []byte // salt for hashing
+	Data    []byte // filter bits
+	mutator []byte // mutator data (transient)
 }
 
-// NewBloomFilter cretes a new filter using the specified salt. An unused
-// salt is set to nil.
-func NewBloomFilter(salt []byte) *BloomFilter {
+// NewBloomFilter creates a new empty filter of given size (8*n bits).
+func NewBloomFilter(n int) *BloomFilter {
 	return &BloomFilter{
-		data: make([]byte, (bfNumBits+7)/8),
-		salt: salt,
+		Data:    make([]byte, n),
+		mutator: nil,
 	}
+}
+
+// NewBloomFilterFromBytes creates a new BloomFilter from a binary
+// representation: 'data' is the concatenaion 'mutator|bloomfilter' where
+// 'mSize' is the size of the mutator in bytes. If 'msize' is 0, no
+// mutator is used.
+func NewBloomFilterFromBytes(data []byte, mSize int) *BloomFilter {
+	bf := &BloomFilter{
+		Data:    Clone(data[mSize:]),
+		mutator: nil,
+	}
+	if mSize > 0 {
+		bf.SetMutator(data[:mSize])
+	}
+	return bf
+}
+
+// SetMutator to define a mutator for randomization.
+func (bf *BloomFilter) SetMutator(m any) {
+	var data []byte
+	switch v := m.(type) {
+	case uint32:
+		buf := new(bytes.Buffer)
+		binary.Write(buf, binary.BigEndian, v)
+		data = buf.Bytes()
+	case []byte:
+		data = Clone(v)
+	}
+	h := sha512.Sum512(data)
+	bf.mutator = make([]byte, 64)
+	copy(bf.mutator, h[:])
 }
 
 // Add entry (binary representation):
@@ -57,7 +78,7 @@ func NewBloomFilter(salt []byte) *BloomFilter {
 // within bf and set to 1.
 func (bf *BloomFilter) Add(e []byte) {
 	for _, idx := range bf.indices(e) {
-		bf.data[idx/8] |= (1 << (idx % 7))
+		bf.Data[idx/8] |= (1 << (idx % 7))
 	}
 }
 
@@ -67,7 +88,7 @@ func (bf *BloomFilter) Add(e []byte) {
 // Otherwise, the element is not considered to be in the Bloom filter.
 func (bf *BloomFilter) Contains(e []byte) bool {
 	for _, idx := range bf.indices(e) {
-		if bf.data[idx/8]&(1<<(idx%7)) == 0 {
+		if bf.Data[idx/8]&(1<<(idx%7)) == 0 {
 			return false
 		}
 	}
@@ -79,45 +100,21 @@ func (bf *BloomFilter) Contains(e []byte) bool {
 // The resulting byte string is interpreted as a list of 16 32-bit integers
 // in network byte order.
 func (bf *BloomFilter) indices(e []byte) []int {
-	// hash the entry (with optional salt prepended)
-	hsh := bfHash()
-	if bf.salt != nil {
-		hsh.Write(bf.salt)
+	// hash the entry
+	h := sha512.Sum512(e)
+	// apply mutator if available
+	if bf.mutator != nil {
+		for i := range h {
+			h[i] ^= bf.mutator[i]
+		}
 	}
-	hsh.Write(e)
-	h := hsh.Sum(nil)
-
 	// compute the indices for the entry
-	idx := make([]int, len(h)/2)
-	buf := bytes.NewReader(h)
+	size := 8 * len(bf.Data)
+	idx := make([]int, 32)
+	buf := bytes.NewReader(h[:])
 	for i := range idx {
 		binary.Read(buf, binary.BigEndian, &idx[i])
+		idx[i] %= size
 	}
 	return idx
-}
-
-//======================================================================
-// BloomFilter for peer addresses
-//======================================================================
-
-// PeerBloomFilter implements specific Add/Contains functions.
-type PeerBloomFilter struct {
-	BloomFilter
-}
-
-// NewPeerBloomFilter creates a new filter for peer addresses.
-func NewPeerBloomFilter() *PeerBloomFilter {
-	return &PeerBloomFilter{
-		BloomFilter: *NewBloomFilter(nil),
-	}
-}
-
-// Add peer address to the filter.
-func (bf *PeerBloomFilter) Add(p *PeerAddress) {
-	bf.BloomFilter.Add(p.addr[:])
-}
-
-// Contains returns true if the peer address is most likely to be included.
-func (bf *PeerBloomFilter) Contains(p *PeerAddress) bool {
-	return bf.BloomFilter.Contains(p.addr[:])
 }
