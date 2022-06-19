@@ -29,14 +29,14 @@ import (
 // always initially empty. An optional mutator can be used to additionally
 // "randomize" the computation of the bloomfilter while remaining deterministic.
 type BloomFilter struct {
-	Data    []byte // filter bits
+	Bits    []byte // filter bits
 	mutator []byte // mutator data (transient)
 }
 
 // NewBloomFilter creates a new empty filter of given size (8*n bits).
 func NewBloomFilter(n int) *BloomFilter {
 	return &BloomFilter{
-		Data:    make([]byte, n),
+		Bits:    make([]byte, n),
 		mutator: nil,
 	}
 }
@@ -47,7 +47,7 @@ func NewBloomFilter(n int) *BloomFilter {
 // mutator is used.
 func NewBloomFilterFromBytes(data []byte, mSize int) *BloomFilter {
 	bf := &BloomFilter{
-		Data:    Clone(data[mSize:]),
+		Bits:    Clone(data[mSize:]),
 		mutator: nil,
 	}
 	if mSize > 0 {
@@ -78,7 +78,7 @@ func (bf *BloomFilter) SetMutator(m any) {
 // within bf and set to 1.
 func (bf *BloomFilter) Add(e []byte) {
 	for _, idx := range bf.indices(e) {
-		bf.Data[idx/8] |= (1 << (idx % 7))
+		bf.Bits[idx/8] |= (1 << (idx % 7))
 	}
 }
 
@@ -88,7 +88,7 @@ func (bf *BloomFilter) Add(e []byte) {
 // Otherwise, the element is not considered to be in the Bloom filter.
 func (bf *BloomFilter) Contains(e []byte) bool {
 	for _, idx := range bf.indices(e) {
-		if bf.Data[idx/8]&(1<<(idx%7)) == 0 {
+		if bf.Bits[idx/8]&(1<<(idx%7)) == 0 {
 			return false
 		}
 	}
@@ -99,7 +99,7 @@ func (bf *BloomFilter) Contains(e []byte) bool {
 // The element e is prepended with a salt (pütional) and hashed using SHA-512.
 // The resulting byte string is interpreted as a list of 16 32-bit integers
 // in network byte order.
-func (bf *BloomFilter) indices(e []byte) []int {
+func (bf *BloomFilter) indices(e []byte) []uint32 {
 	// hash the entry
 	h := sha512.Sum512(e)
 	// apply mutator if available
@@ -109,8 +109,8 @@ func (bf *BloomFilter) indices(e []byte) []int {
 		}
 	}
 	// compute the indices for the entry
-	size := 8 * len(bf.Data)
-	idx := make([]int, 32)
+	size := uint32(8 * len(bf.Bits))
+	idx := make([]uint32, 16)
 	buf := bytes.NewReader(h[:])
 	for i := range idx {
 		binary.Read(buf, binary.BigEndian, &idx[i])
