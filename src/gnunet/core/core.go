@@ -20,6 +20,7 @@ package core
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"gnunet/config"
 	"gnunet/message"
@@ -297,10 +298,12 @@ type Signable interface {
 // Sign a signable onject with private peer key
 func (c *Core) Sign(obj Signable) error {
 	sd := obj.SignedData()
+	logger.Printf(logger.DBG, "[core] Siging data '%s'", hex.EncodeToString(sd))
 	sig, err := c.local.prv.EdSign(sd)
 	if err != nil {
 		return err
 	}
+	logger.Printf(logger.DBG, "[core] --> signature '%s'", hex.EncodeToString(sig.Bytes()))
 	return obj.SetSignature(sig)
 }
 
