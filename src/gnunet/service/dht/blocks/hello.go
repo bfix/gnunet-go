@@ -260,9 +260,43 @@ func (h *HelloBlock) SignedData() []byte {
 	return buf.Bytes()
 }
 
+//----------------------------------------------------------------------
+
+type HelloBlockHandler struct{}
+
 // ValidateHelloBlockQuery validates query parameters for a
 // DHT-GET request for HELLO blocks.
-func ValidateHelloBlockQuery(key *crypto.HashCode, xquery []byte) bool {
+func (bh *HelloBlockHandler) ValidateBlockQuery(key *crypto.HashCode, xquery []byte) bool {
 	// no xquery parameters allowed.
 	return len(xquery) == 0
+}
+
+// SetupResultFilter is used to setup an empty result filter. The arguments
+// are the set of results that must be filtered at the initiator, and a
+// MUTATOR value which MAY be used to deterministically re-randomize
+// probabilistic data structures.
+func (bh *HelloBlockHandler) SetupResultFilter(filterSize int, mutator uint32) []byte {
+	return nil
+}
+
+// FilterResult is used to filter results against specific queries. This
+// function does not check the validity of the block itself or that it
+// matches the given key, as this must have been checked earlier. Thus,
+// locally stored blocks from previously observed ResultMessages and
+// PutMessages use this function to perform filtering based on the request
+// parameters of a particular GET operation. Possible values for the
+// FilterEvaluationResult are defined above. If the main evaluation result
+// is RF_MORE, the function also returns and updated result filter where
+// the block is added to the set of filtered replies. An implementation is
+// not expected to actually differenciate between the RF_DUPLICATE and
+// RF_IRRELEVANT return values: in both cases the block is ignored for
+// this query.
+func (bh *HelloBlockHandler) FilterResult(b Block, key *crypto.HashCode, rf []byte, xQuery []byte) ([]byte, []byte) {
+	return nil, nil
+}
+
+// ValidateBlockStoreRequest is used to evaluate a block payload as part of
+// PutMessage and ResultMessage processing.
+func (bh *HelloBlockHandler) ValidateBlockStoreRequest(b Block) bool {
+	return false
 }

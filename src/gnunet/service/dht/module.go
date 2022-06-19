@@ -330,9 +330,9 @@ func (m *Module) HandleMessage(ctx context.Context, msg message.Message, back tr
 
 		// validate query (based on block type reqested)
 		btype := enums.BlockType(m.BType)
-		validator, ok := blocks.BlockQueryValidation[btype]
+		blockHdlr, ok := blocks.BlockHandlers[btype]
 		if ok {
-			if !validator(m.Query, m.XQuery) {
+			if !blockHdlr.ValidateBlockQuery(m.Query, m.XQuery) {
 				logger.Printf(logger.WARN, "[%s] DHT-P2P-GET invalid query -- discarded", label)
 				return false
 			}
