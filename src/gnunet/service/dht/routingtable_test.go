@@ -43,7 +43,7 @@ type Entry struct {
 
 // test data
 var (
-	cfg = &config.NodeConfig{
+	nodeCfg = &config.NodeConfig{
 		PrivateSeed: "YGoe6XFH3XdvFRl+agx9gIzPTvxA229WFdkazEMdcOs=",
 		Endpoints: []*config.EndpointConfig{
 			{
@@ -52,6 +52,9 @@ var (
 				Port:    6666,
 			},
 		},
+	}
+	rtCfg = &config.RoutingConfig{
+		PeerTTL: 10800,
 	}
 )
 
@@ -71,11 +74,11 @@ func TestRT(t *testing.T) {
 	}
 
 	// create routing table and start command handler
-	local, err := core.NewLocalPeer(cfg)
+	local, err := core.NewLocalPeer(nodeCfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	rt := NewRoutingTable(NewPeerAddress(local.GetID()))
+	rt := NewRoutingTable(NewPeerAddress(local.GetID()), rtCfg)
 
 	// create a task list
 	tasks := make([]*Entry, NUMP)
@@ -135,7 +138,7 @@ func TestRT(t *testing.T) {
 
 	// execute some routing functions on remaining table
 	k := genRemotePeer()
-	bf := NewPeerBloomFilter()
+	bf := util.NewBloomFilter(128)
 	n := rt.SelectClosestPeer(k, bf)
 	t.Logf("Closest: %s -> %s\n", k, n)
 

@@ -23,6 +23,7 @@ import (
 	"context"
 	"crypto/sha512"
 	"encoding/hex"
+	"gnunet/config"
 	"gnunet/util"
 	"math/rand"
 	"sync"
@@ -103,10 +104,11 @@ type RoutingTable struct {
 	mtx       sync.RWMutex            // lock for write operations
 	l2nse     float64                 // log2 of estimated network size
 	inProcess bool                    // flag if Process() is running
+	cfg       *config.RoutingConfig   // routing parameters
 }
 
 // NewRoutingTable creates a new routing table for the reference address.
-func NewRoutingTable(ref *PeerAddress) *RoutingTable {
+func NewRoutingTable(ref *PeerAddress, cfg *config.RoutingConfig) *RoutingTable {
 	// create routing table
 	rt := &RoutingTable{
 		ref:       ref,
@@ -114,6 +116,7 @@ func NewRoutingTable(ref *PeerAddress) *RoutingTable {
 		buckets:   make([]*Bucket, numBuckets),
 		l2nse:     0.,
 		inProcess: false,
+		cfg:       cfg,
 	}
 	// fill buckets
 	for i := range rt.buckets {
@@ -222,7 +225,7 @@ func (rt *RoutingTable) Process(f func() error, readonly bool) error {
 //----------------------------------------------------------------------
 
 // SelectClosestPeer for a given peer address and bloomfilter.
-func (rt *RoutingTable) SelectClosestPeer(p *PeerAddress, bf *PeerBloomFilter) (n *PeerAddress) {
+func (rt *RoutingTable) SelectClosestPeer(p *PeerAddress, bf *util.BloomFilter) (n *PeerAddress) {
 	// no writer allowed
 	rt.mtx.RLock()
 	defer rt.mtx.RUnlock()
@@ -242,7 +245,7 @@ func (rt *RoutingTable) SelectClosestPeer(p *PeerAddress, bf *PeerBloomFilter) (
 
 // SelectRandomPeer returns a random address from table (that is not
 // included in the bloomfilter)
-func (rt *RoutingTable) SelectRandomPeer(bf *PeerBloomFilter) *PeerAddress {
+func (rt *RoutingTable) SelectRandomPeer(bf *util.BloomFilter) *PeerAddress {
 	// no writer allowed
 	rt.mtx.RLock()
 	defer rt.mtx.RUnlock()
@@ -265,7 +268,7 @@ func (rt *RoutingTable) SelectRandomPeer(bf *PeerBloomFilter) *PeerAddress {
 // SelectPeer selects a neighbor depending on the number of hops parameter.
 // If hops < NSE this function MUST return SelectRandomPeer() and
 // SelectClosestpeer() otherwise.
-func (rt *RoutingTable) SelectPeer(p *PeerAddress, hops int, bf *PeerBloomFilter) *PeerAddress {
+func (rt *RoutingTable) SelectPeer(p *PeerAddress, hops int, bf *util.BloomFilter) *PeerAddress {
 	if float64(hops) < rt.l2nse {
 		return rt.SelectRandomPeer(bf)
 	}
@@ -273,8 +276,8 @@ func (rt *RoutingTable) SelectPeer(p *PeerAddress, hops int, bf *PeerBloomFilter
 }
 
 // IsClosestPeer returns true if p is the closest peer for k. Peers with a
-// positive test in the Bloom filter  are not considered.
-func (rt *RoutingTable) IsClosestPeer(p, k *PeerAddress, bf *PeerBloomFilter) bool {
+// positive test in the Bloom filter are not considered.
+func (rt *RoutingTable) IsClosestPeer(p, k *PeerAddress, bf *util.BloomFilter) bool {
 	n := rt.SelectClosestPeer(k, bf)
 	return n.Equals(p)
 }
@@ -306,18 +309,20 @@ func (rt *RoutingTable) ComputeOutDegree(repl, hop int) int {
 func (rt *RoutingTable) heartbeat(ctx context.Context) {
 
 	// check for dead or expired peers
-	timeout := util.NewRelativeTime(3 * time.Hour)
+	logger.Println(logger.DBG, "[dht] RT heartbeat...")
+	timeout := util.NewRelativeTime(time.Duration(rt.cfg.PeerTTL) * time.Second)
 	if err := rt.Process(func() error {
 		for _, p := range rt.list {
 			// check if we can/need to drop a peer
 			drop := timeout.Compare(p.lastSeen.Elapsed()) < 0
 			if drop || timeout.Compare(p.lastUsed.Elapsed()) < 0 {
+				logger.Printf(logger.DBG, "[RT] removing %v: %v, %v", p, p.lastSeen.Elapsed(), p.lastUsed.Elapsed())
 				rt.Remove(p)
 			}
 		}
 		return nil
 	}, false); err != nil {
-		logger.Println(logger.ERROR, "[dht] RT heartbeat: "+err.Error())
+		logger.Println(logger.ERROR, "[dht] RT heartbeat failed: "+err.Error())
 	}
 }
 
@@ -397,14 +402,14 @@ func (b *Bucket) Remove(p *PeerAddress) bool {
 
 // SelectClosestPeer returns the entry with minimal distance to the given
 // peer address; entries included in the bloom flter are ignored.
-func (b *Bucket) SelectClosestPeer(p *PeerAddress, bf *PeerBloomFilter) (n *PeerAddress, dist *math.Int) {
+func (b *Bucket) SelectClosestPeer(p *PeerAddress, bf *util.BloomFilter) (n *PeerAddress, dist *math.Int) {
 	// no writer allowed
 	b.rwlock.RLock()
 	defer b.rwlock.RUnlock()
 
 	for _, addr := range b.list {
 		// skip addresses in bloomfilter
-		if bf.Contains(addr) {
+		if bf.Contains(addr.addr[:]) {
 			continue
 		}
 		// check for shorter distance
