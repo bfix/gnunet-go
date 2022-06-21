@@ -83,7 +83,8 @@ loop:
 		logger.Printf(logger.INFO, "[dht:%d:%d] Received request: %v\n", id, reqID, msg)
 
 		// handle message
-		s.HandleMessage(context.WithValue(ctx, "label", fmt.Sprintf(":%d:%d", id, reqID)), msg, mc)
+		valueCtx := context.WithValue(ctx, "label", fmt.Sprintf(":%d:%d", id, reqID))
+		s.HandleMessage(valueCtx, nil, msg, mc)
 	}
 	// close client connection
 	mc.Close()

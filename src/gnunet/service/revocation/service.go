@@ -27,6 +27,7 @@ import (
 	"gnunet/message"
 	"gnunet/service"
 	"gnunet/transport"
+	"gnunet/util"
 
 	"github.com/bfix/gospel/logger"
 )
@@ -74,7 +75,8 @@ func (s *Service) ServeClient(ctx context.Context, id int, mc *service.Connectio
 		logger.Printf(logger.INFO, "[revocation:%d:%d] Received request: %v\n", id, reqID, msg)
 
 		// handle message
-		s.HandleMessage(context.WithValue(ctx, "label", fmt.Sprintf(":%d:%d", id, reqID)), msg, mc)
+		valueCtx := context.WithValue(ctx, "label", fmt.Sprintf(":%d:%d", id, reqID))
+		s.HandleMessage(valueCtx, nil, msg, mc)
 	}
 	// close client connection
 	mc.Close()
@@ -85,7 +87,7 @@ func (s *Service) ServeClient(ctx context.Context, id int, mc *service.Connectio
 }
 
 // Handle a single incoming message
-func (s *Service) HandleMessage(ctx context.Context, msg message.Message, back transport.Responder) bool {
+func (s *Service) HandleMessage(ctx context.Context, sender *util.PeerID, msg message.Message, back transport.Responder) bool {
 	// assemble log label
 	label := ""
 	if v := ctx.Value("label"); v != nil {

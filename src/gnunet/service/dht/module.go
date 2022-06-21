@@ -27,6 +27,7 @@ import (
 	"gnunet/message"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
+	"gnunet/service/dht/filter"
 	"gnunet/transport"
 	"gnunet/util"
 	"time"
@@ -159,58 +160,8 @@ func (m *Module) event(ctx context.Context, ev *core.Event) {
 			logger.Printf(logger.WARN, "[dht] message %d from unregistered peer -- discarded", ev.Msg.Header().MsgType)
 			return
 		}
-
-		// handle HELLO messages directly (we need to do it here because the
-		// standard processing has no access to the PeerID of the sender as
-		// it is not part of the message).
-		if ev.Msg.Header().MsgType == message.DHT_P2P_HELLO {
-			msg := ev.Msg.(*message.DHTP2PHelloMsg)
-
-			// verify integrity of message
-			if ok, err := msg.Verify(ev.Peer); !ok || err != nil {
-				logger.Println(logger.WARN, "[dht] Received invalid DHT_P2P_HELLO message")
-				return
-			}
-			// keep peer addresses in core for transport
-			aList, err := msg.Addresses()
-			if err != nil {
-				logger.Println(logger.WARN, "[dht] Failed to parse addresses from DHT_P2P_HELLO message")
-				return
-			}
-			if newPeer := m.core.Learn(ctx, ev.Peer, aList); newPeer {
-				// we added a previously unknown peer: send a HELLO
-				var msg *message.DHTP2PHelloMsg
-				if msg, err = m.getHello(); err != nil {
-					return
-				}
-				logger.Printf(logger.INFO, "[core] Sending HELLO to %s: %s", ev.Peer, msg)
-				err = m.core.Send(ctx, ev.Peer, msg)
-				// no error if the message might have been sent
-				if err == transport.ErrEndpMaybeSent {
-					err = nil
-				}
-			}
-
-			// cache HELLO block if applicable
-			k := ev.Peer.String()
-			isNew := true
-			if hb, ok := m.helloCache[k]; ok {
-				// cache entry exists: is the HELLO message more recent?
-				_, isNew = hb.Expire.Diff(msg.Expires)
-			}
-			// we need to cache a new(er) HELLO
-			if isNew {
-				m.helloCache[k] = &blocks.HelloBlock{
-					PeerID:    ev.Peer,
-					Signature: util.Clone(msg.Signature),
-					Expire:    msg.Expires,
-					AddrBin:   util.Clone(msg.AddrList),
-				}
-			}
-			return
-		}
 		// process message
-		if !m.HandleMessage(ctx, ev.Msg, ev.Resp) {
+		if !m.HandleMessage(ctx, ev.Peer, ev.Msg, ev.Resp) {
 			logger.Println(logger.WARN, "[dht] Message NOT handled!")
 		}
 	}
@@ -282,7 +233,7 @@ func (m *Module) getHello() (msg *message.DHTP2PHelloMsg, err error) {
 			logger.Println(logger.ERROR, err.Error())
 			return
 		}
-		logger.Println(logger.DBG, "[dht] New HELLO: "+transport.Dump(msg, "json"))
+		logger.Println(logger.DBG, "[dht] New HELLO: "+transport.Dump(msg, "hex"))
 		return
 	}
 	// we have a valid HELLO for re-use.
@@ -311,7 +262,7 @@ func (m *Module) Import(fcn map[string]any) {
 
 // HandleMessage handles a DHT request/response message. Responses are sent
 // to the specified responder.
-func (m *Module) HandleMessage(ctx context.Context, msg message.Message, back transport.Responder) bool {
+func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg message.Message, back transport.Responder) bool {
 	// assemble log label
 	label := "dht"
 	if v := ctx.Value("label"); v != nil {
@@ -320,7 +271,7 @@ func (m *Module) HandleMessage(ctx context.Context, msg message.Message, back tr
 		}
 	}
 	// process message
-	switch m := msg.(type) {
+	switch msgT := msg.(type) {
 
 	case *message.DHTP2PGetMsg:
 		//----------------------------------------------------------
@@ -328,13 +279,21 @@ func (m *Module) HandleMessage(ctx context.Context, msg message.Message, back tr
 		//----------------------------------------------------------
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-GET message", label)
 
-		// validate query (based on block type reqested)
-		btype := enums.BlockType(m.BType)
+		// parse result filter
+		rf := filter.NewBloomFilterFromBytes(msgT.ResFilter, true)
+
+		// validate query (based on block type requested)
+		btype := enums.BlockType(msgT.BType)
 		blockHdlr, ok := blocks.BlockHandlers[btype]
 		if ok {
-			if !blockHdlr.ValidateBlockQuery(m.Query, m.XQuery) {
+			// validate block query
+			if !blockHdlr.ValidateBlockQuery(msgT.Query, msgT.XQuery) {
 				logger.Printf(logger.WARN, "[%s] DHT-P2P-GET invalid query -- discarded", label)
 				return false
+			}
+			// check if sender peer is in result filter
+			if !rf.Contains(sender.Key) {
+				logger.Printf(logger.WARN, "[dht] Sender not in result filter")
 			}
 		} else {
 			logger.Printf(logger.INFO, "[%s] No validator defined for block type %s", label, btype.String())
@@ -349,9 +308,60 @@ func (m *Module) HandleMessage(ctx context.Context, msg message.Message, back tr
 
 	case *message.DHTP2PResultMsg:
 		//----------------------------------------------------------
-		// DHT RESULT
+		// DHT-P2P RESULT
 		//----------------------------------------------------------
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-RESULT message", label)
+
+	case *message.DHTP2PHelloMsg:
+		//----------------------------------------------------------
+		// DHT-P2P HELLO
+		//----------------------------------------------------------
+		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-HELLO message", label)
+
+		// verify integrity of message
+		if ok, err := msgT.Verify(sender); !ok || err != nil {
+			logger.Println(logger.WARN, "[dht] Received invalid DHT_P2P_HELLO message")
+			if err != nil {
+				logger.Println(logger.ERROR, "[dht] --> "+err.Error())
+			}
+			return false
+		}
+		// keep peer addresses in core for transport
+		aList, err := msgT.Addresses()
+		if err != nil {
+			logger.Println(logger.ERROR, "[dht] Failed to parse addresses from DHT_P2P_HELLO message")
+			return false
+		}
+		if newPeer := m.core.Learn(ctx, sender, aList); newPeer {
+			// we added a previously unknown peer: send a HELLO
+			var msgOut *message.DHTP2PHelloMsg
+			if msgOut, err = m.getHello(); err != nil {
+				return false
+			}
+			logger.Printf(logger.INFO, "[dht] Sending HELLO to %s: %s", sender, msgOut)
+			err = m.core.Send(ctx, sender, msgOut)
+			// no error if the message might have been sent
+			if err == transport.ErrEndpMaybeSent {
+				err = nil
+			}
+		}
+
+		// cache HELLO block if applicable
+		k := sender.String()
+		isNew := true
+		if hb, ok := m.helloCache[k]; ok {
+			// cache entry exists: is the HELLO message more recent?
+			_, isNew = hb.Expire.Diff(msgT.Expires)
+		}
+		// we need to cache a new(er) HELLO
+		if isNew {
+			m.helloCache[k] = &blocks.HelloBlock{
+				PeerID:    sender,
+				Signature: util.Clone(msgT.Signature),
+				Expire:    msgT.Expires,
+				AddrBin:   util.Clone(msgT.AddrList),
+			}
+		}
 
 	//--------------------------------------------------------------
 	// Legacy message types (not implemented)

@@ -42,7 +42,7 @@ type Service interface {
 	// Handle a single incoming message (either locally from a socket
 	// connection or from Transport). Response messages can be send
 	// via a Responder. Returns true if message was processed.
-	HandleMessage(ctx context.Context, msg message.Message, resp transport.Responder) bool
+	HandleMessage(ctx context.Context, sender *util.PeerID, msg message.Message, resp transport.Responder) bool
 }
 
 // SocketHandler handles incoming connections on the local service socket.
