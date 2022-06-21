@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"gnunet/crypto"
 	"gnunet/enums"
+	"gnunet/service/dht/filter"
 	"gnunet/util"
 	"time"
 
@@ -42,33 +43,33 @@ import (
 //----------------------------------------------------------------------
 
 type DHTP2PGetMsg struct {
-	MsgSize   uint16            `order:"big"`   // total size of message
-	MsgType   uint16            `order:"big"`   // DHT_P2P_GET (147)
-	BType     uint32            `order:"big"`   // content type of the payload
-	Flags     uint16            `order:"big"`   // processing flags
-	HopCount  uint16            `order:"big"`   // number of hops so far
-	ReplLevel uint16            `order:"big"`   // Replication level
-	RfSize    uint16            `order:"big"`   // size of result filter
-	PeerBF    *util.BloomFilter ``              // bloomfilter to prevent loops
-	Query     *crypto.HashCode  ``              // query hash
-	ResFilter []byte            `size:"RfSize"` // result filter
-	XQuery    []byte            `size:"*"`      // extended query
+	MsgSize   uint16              `order:"big"`   // total size of message
+	MsgType   uint16              `order:"big"`   // DHT_P2P_GET (147)
+	BType     uint32              `order:"big"`   // content type of the payload
+	Flags     uint16              `order:"big"`   // processing flags
+	HopCount  uint16              `order:"big"`   // number of hops so far
+	ReplLevel uint16              `order:"big"`   // Replication level
+	RfSize    uint16              `order:"big"`   // size of result filter
+	PeerBF    *filter.BloomFilter ``              // bloomfilter to prevent loops
+	Query     *crypto.HashCode    ``              // query hash
+	ResFilter []byte              `size:"RfSize"` // result filter
+	XQuery    []byte              `size:"*"`      // extended query
 }
 
 // NewDHTP2PGetMsg creates an empty DHT-P2P-Get message
 func NewDHTP2PGetMsg() *DHTP2PGetMsg {
 	return &DHTP2PGetMsg{
-		MsgSize:   208,                      // message size without ResFiter and XQuery
-		MsgType:   DHT_P2P_GET,              // DHT_P2P_GET (147)
-		BType:     0,                        // no block type defined
-		Flags:     0,                        // no flags defined
-		HopCount:  0,                        // no hops
-		ReplLevel: 0,                        // no replication level defined
-		RfSize:    0,                        // no result filter
-		PeerBF:    util.NewBloomFilter(128), // allocate bloom filter
-		Query:     crypto.NewHashCode(nil),  // empty Query hash
-		ResFilter: nil,                      // empty result filter
-		XQuery:    nil,                      // empty XQuery
+		MsgSize:   208,                        // message size without ResFiter and XQuery
+		MsgType:   DHT_P2P_GET,                // DHT_P2P_GET (147)
+		BType:     0,                          // no block type defined
+		Flags:     0,                          // no flags defined
+		HopCount:  0,                          // no hops
+		ReplLevel: 0,                          // no replication level defined
+		RfSize:    0,                          // no result filter
+		PeerBF:    filter.NewBloomFilter(128), // allocate bloom filter
+		Query:     crypto.NewHashCode(nil),    // empty Query hash
+		ResFilter: nil,                        // empty result filter
+		XQuery:    nil,                        // empty XQuery
 	}
 }
 

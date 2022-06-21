@@ -21,6 +21,7 @@ package dht
 import (
 	"gnunet/config"
 	"gnunet/core"
+	"gnunet/service/dht/filter"
 	"gnunet/util"
 	"math/rand"
 	"testing"
@@ -138,7 +139,7 @@ func TestRT(t *testing.T) {
 
 	// execute some routing functions on remaining table
 	k := genRemotePeer()
-	bf := util.NewBloomFilter(128)
+	bf := filter.NewBloomFilter(128)
 	n := rt.SelectClosestPeer(k, bf)
 	t.Logf("Closest: %s -> %s\n", k, n)
 

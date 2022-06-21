@@ -16,12 +16,13 @@
 //
 // SPDX-License-Identifier: AGPL3.0-or-later
 
-package util
+package filter
 
 import (
 	"bytes"
 	"crypto/sha512"
 	"encoding/binary"
+	"gnunet/util"
 )
 
 // BloomFilter is a space-efficient probabilistic datastructure to test if
@@ -29,26 +30,34 @@ import (
 // always initially empty. An optional mutator can be used to additionally
 // "randomize" the computation of the bloomfilter while remaining deterministic.
 type BloomFilter struct {
-	Bits    []byte // filter bits
-	mutator []byte // mutator data (transient)
+	Bits []byte // filter bits
+
+	// transient attributes
+	mInput []byte // mutator input
+	mData  []byte // mutator data
 }
 
 // NewBloomFilter creates a new empty filter of given size (8*n bits).
 func NewBloomFilter(n int) *BloomFilter {
 	return &BloomFilter{
-		Bits:    make([]byte, n),
-		mutator: nil,
+		Bits:   make([]byte, n),
+		mInput: nil,
+		mData:  nil,
 	}
 }
 
 // NewBloomFilterFromBytes creates a new BloomFilter from a binary
-// representation: 'data' is the concatenaion 'mutator|bloomfilter' where
-// 'mSize' is the size of the mutator in bytes. If 'msize' is 0, no
-// mutator is used.
-func NewBloomFilterFromBytes(data []byte, mSize int) *BloomFilter {
+// representation: 'data' is the concatenaion 'mutator|bloomfilter'.
+// If 'withMutator' is false, no mutator is used.
+func NewBloomFilterFromBytes(data []byte, withMutator bool) *BloomFilter {
+	// handle mutator input
+	mSize := 0
+	if withMutator {
+		mSize = 4
+	}
 	bf := &BloomFilter{
-		Bits:    Clone(data[mSize:]),
-		mutator: nil,
+		Bits:  util.Clone(data[mSize:]),
+		mData: nil,
 	}
 	if mSize > 0 {
 		bf.SetMutator(data[:mSize])
@@ -56,20 +65,32 @@ func NewBloomFilterFromBytes(data []byte, mSize int) *BloomFilter {
 	return bf
 }
 
-// SetMutator to define a mutator for randomization.
+// SetMutator to define a mutator for randomization. If 'm' is nil,
+// the mutator is removed from the filter (use with care!)
 func (bf *BloomFilter) SetMutator(m any) {
-	var data []byte
+	// handle mutator input
 	switch v := m.(type) {
 	case uint32:
 		buf := new(bytes.Buffer)
 		binary.Write(buf, binary.BigEndian, v)
-		data = buf.Bytes()
+		bf.mInput = buf.Bytes()
 	case []byte:
-		data = Clone(v)
+		bf.mInput = make([]byte, 4)
+		util.CopyAlignedBlock(bf.mInput, v)
+	case nil:
+		bf.mInput = nil
+		bf.mData = nil
+		return
 	}
-	h := sha512.Sum512(data)
-	bf.mutator = make([]byte, 64)
-	copy(bf.mutator, h[:])
+	// generate mutator bytes
+	h := sha512.New()
+	h.Write(bf.mInput)
+	bf.mData = h.Sum(nil)
+}
+
+// Mutator returns the mutator input as a 4-byte array
+func (bf *BloomFilter) Mutator() []byte {
+	return bf.mInput
 }
 
 // Add entry (binary representation):
@@ -103,9 +124,9 @@ func (bf *BloomFilter) indices(e []byte) []uint32 {
 	// hash the entry
 	h := sha512.Sum512(e)
 	// apply mutator if available
-	if bf.mutator != nil {
+	if bf.mData != nil {
 		for i := range h {
-			h[i] ^= bf.mutator[i]
+			h[i] ^= bf.mData[i]
 		}
 	}
 	// compute the indices for the entry
