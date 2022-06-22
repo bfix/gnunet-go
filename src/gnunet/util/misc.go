@@ -154,6 +154,24 @@ func (m *Map[K, V]) unlock(readonly bool) {
 }
 
 //----------------------------------------------------------------------
+// Parameter set with string keys and variable value types
+//----------------------------------------------------------------------
+
+// ParameterSet with string keys and variable value types
+type ParameterSet map[string]any
+
+// Get a parameter value with given type 'V'
+func GetParam[V any](params ParameterSet, key string) (i V, ok bool) {
+	var v any
+	if v, ok = params[key]; ok {
+		if i, ok = v.(V); ok {
+			return
+		}
+	}
+	return
+}
+
+//----------------------------------------------------------------------
 // additional helpers
 //----------------------------------------------------------------------
 

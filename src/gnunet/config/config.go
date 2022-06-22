@@ -21,6 +21,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"gnunet/util"
 	"io/ioutil"
 	"reflect"
 	"regexp"
@@ -95,35 +96,15 @@ type GNSConfig struct {
 }
 
 //----------------------------------------------------------------------
-// Generic parameter configuration (handle any key/value settings)
-//----------------------------------------------------------------------
-
-// ParameterConfig handle arbitrary values for a key strings. This necessary
-// e.g. in the 'Storage' configuration, as custom storage implementations
-// require different sets of parameters.
-type ParameterConfig map[string]any
-
-// Get a parameter value with given type 'V'
-func GetParam[V any](params ParameterConfig, key string) (i V, ok bool) {
-	var v any
-	if v, ok = params[key]; ok {
-		if i, ok = v.(V); ok {
-			return
-		}
-	}
-	return
-}
-
-//----------------------------------------------------------------------
 // DHT configuration
 //----------------------------------------------------------------------
 
 // DHTConfig contains parameters for the distributed hash table (DHT)
 type DHTConfig struct {
-	Service   *ServiceConfig  `json:"service"`   // socket for DHT service
-	Storage   ParameterConfig `json:"storage"`   // filesystem storage location
-	Routing   *RoutingConfig  `json:"routing"`   // routing table configuration
-	Heartbeat int             `json:"heartbeat"` // heartbeat intervall
+	Service   *ServiceConfig    `json:"service"`   // socket for DHT service
+	Storage   util.ParameterSet `json:"storage"`   // filesystem storage location
+	Routing   *RoutingConfig    `json:"routing"`   // routing table configuration
+	Heartbeat int               `json:"heartbeat"` // heartbeat intervall
 }
 
 // RoutingConfig holds parameters for routing tables
@@ -137,8 +118,8 @@ type RoutingConfig struct {
 
 // NamecacheConfig contains parameters for the local name cache
 type NamecacheConfig struct {
-	Service *ServiceConfig  `json:"service"` // socket for Namecache service
-	Storage ParameterConfig `json:"storage"` // key/value cache
+	Service *ServiceConfig    `json:"service"` // socket for Namecache service
+	Storage util.ParameterSet `json:"storage"` // key/value cache
 }
 
 //----------------------------------------------------------------------
@@ -147,8 +128,8 @@ type NamecacheConfig struct {
 
 // RevocationConfig contains parameters for the key revocation service
 type RevocationConfig struct {
-	Service *ServiceConfig  `json:"service"` // socket for Revocation service
-	Storage ParameterConfig `json:"storage"` // persistance mechanism for revocation data
+	Service *ServiceConfig    `json:"service"` // socket for Revocation service
+	Storage util.ParameterSet `json:"storage"` // persistance mechanism for revocation data
 }
 
 //----------------------------------------------------------------------
