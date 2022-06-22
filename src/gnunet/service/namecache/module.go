@@ -24,6 +24,7 @@ import (
 	"gnunet/core"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
+	"gnunet/service/store"
 )
 
 //======================================================================
@@ -38,7 +39,7 @@ import (
 type Module struct {
 	service.ModuleImpl
 
-	cache service.DHTStore // transient block cache
+	cache store.DHTStore // transient block cache
 }
 
 // NewModule creates a new module instance.
@@ -46,7 +47,7 @@ func NewModule(ctx context.Context, c *core.Core) (m *Module) {
 	m = &Module{
 		ModuleImpl: *service.NewModuleImpl(),
 	}
-	m.cache, _ = service.NewDHTStore(config.Cfg.Namecache.Storage)
+	m.cache, _ = store.NewDHTStore(config.Cfg.Namecache.Storage)
 	return
 }
 

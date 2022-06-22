@@ -25,6 +25,7 @@ import (
 	"gnunet/crypto"
 	"gnunet/message"
 	"gnunet/service"
+	"gnunet/service/store"
 	"gnunet/util"
 	"net/http"
 
@@ -44,7 +45,7 @@ type Module struct {
 	service.ModuleImpl
 
 	bloomf *data.BloomFilter // bloomfilter for fast revocation check
-	kvs    service.KVStore   // storage for known revocations
+	kvs    store.KVStore     // storage for known revocations
 }
 
 // NewModule returns an initialized revocation module
@@ -55,7 +56,7 @@ func NewModule(ctx context.Context, c *core.Core) (m *Module) {
 	}
 	init := func() (err error) {
 		// Initialize access to revocation data storage
-		if m.kvs, err = service.NewKVStore(config.Cfg.Revocation.Storage); err != nil {
+		if m.kvs, err = store.NewKVStore(config.Cfg.Revocation.Storage); err != nil {
 			return
 		}
 		// traverse the storage and build bloomfilter for all keys
