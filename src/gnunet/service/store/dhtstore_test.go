@@ -16,22 +16,21 @@
 //
 // SPDX-License-Identifier: AGPL3.0-or-later
 
-package dht
+package store
 
 import (
 	"encoding/hex"
-	"gnunet/config"
 	"gnunet/crypto"
 	"gnunet/enums"
-	"gnunet/service"
 	"gnunet/service/dht/blocks"
+	"gnunet/util"
 	"math/rand"
 	"testing"
 )
 
 // test constants
 const (
-	fsNumBlocks = 5
+	fsNumBlocks = 40
 )
 
 // TestDHTFileStore generates 'fsNumBlocks' fully-random blocks
@@ -40,14 +39,14 @@ const (
 func TestDHTFilesStore(t *testing.T) {
 
 	// test configuration
-	cfg := make(config.ParameterConfig)
+	cfg := make(util.ParameterSet)
 	cfg["mode"] = "file"
 	cfg["cache"] = false
 	cfg["path"] = "/var/lib/gnunet/dht/store"
 	cfg["maxGB"] = 10
 
 	// create file store
-	fs, err := service.NewFileStore(cfg)
+	fs, err := NewFileStore(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +62,7 @@ func TestDHTFilesStore(t *testing.T) {
 		val := blocks.NewGenericBlock(buf)
 		// generate associated key
 		k := crypto.Hash(buf).Bits
-		key := blocks.NewGenericQuery(k, enums.BLOCK_TYPE_ANY)
+		key := blocks.NewGenericQuery(k, enums.BLOCK_TYPE_ANY, 0)
 
 		// store block
 		if err := fs.Put(key, val); err != nil {

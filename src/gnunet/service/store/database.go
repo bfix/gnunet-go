@@ -16,12 +16,13 @@
 //
 // SPDX-License-Identifier: AGPL3.0-or-later
 
-package util
+package store
 
 import (
 	"context"
 	"database/sql"
 	"fmt"
+	"gnunet/util"
 	"os"
 	"strings"
 
@@ -43,7 +44,6 @@ var (
 // DbConn is a database connection suitable for executing SQL commands.
 type DbConn struct {
 	conn   *sql.Conn // connection to database instance
-	pool   *dbPool   // reference to managng pool
 	key    string    // database connect string (identifier for pool)
 	engine string    // database engine
 }
@@ -53,23 +53,23 @@ func (db *DbConn) Close() (err error) {
 	if err = db.conn.Close(); err != nil {
 		return
 	}
-	err = db.pool.remove(db.key)
+	err = DbPool.remove(db.key)
 	return
 }
 
 // QueryRow returns a single record for a query
 func (db *DbConn) QueryRow(query string, args ...any) *sql.Row {
-	return db.conn.QueryRowContext(db.pool.ctx, query, args...)
+	return db.conn.QueryRowContext(DbPool.ctx, query, args...)
 }
 
 // Query returns all matching records for a query
 func (db *DbConn) Query(query string, args ...any) (*sql.Rows, error) {
-	return db.conn.QueryContext(db.pool.ctx, query, args...)
+	return db.conn.QueryContext(DbPool.ctx, query, args...)
 }
 
 // Exec a SQL statement
 func (db *DbConn) Exec(query string, args ...any) (sql.Result, error) {
-	return db.conn.ExecContext(db.pool.ctx, query, args...)
+	return db.conn.ExecContext(DbPool.ctx, query, args...)
 }
 
 // TODO: add more SQL methods
@@ -95,15 +95,15 @@ type DbPoolEntry struct {
 func init() {
 	// construct database pool
 	DbPool = new(dbPool)
-	DbPool.insts = NewMap[string, *DbPoolEntry]()
+	DbPool.insts = util.NewMap[string, *DbPoolEntry]()
 	DbPool.ctx, DbPool.cancel = context.WithCancel(context.Background())
 }
 
 // dbPool keeps a mapping between connect string and database instance
 type dbPool struct {
-	ctx    context.Context            // connection context
-	cancel context.CancelFunc         // cancel function
-	insts  *Map[string, *DbPoolEntry] // map of database instances
+	ctx    context.Context                 // connection context
+	cancel context.CancelFunc              // cancel function
+	insts  *util.Map[string, *DbPoolEntry] // map of database instances
 }
 
 // remove a database instance from the pool based on its connect string.
