@@ -42,9 +42,10 @@ var (
 
 // DbConn is a database connection suitable for executing SQL commands.
 type DbConn struct {
-	conn *sql.Conn // connection to database instance
-	pool *dbPool   // reference to managng pool
-	key  string    // database identifier (connect string)
+	conn   *sql.Conn // connection to database instance
+	pool   *dbPool   // reference to managng pool
+	key    string    // database connect string (identifier for pool)
+	engine string    // database engine
 }
 
 // Close database connection.
@@ -139,6 +140,7 @@ func (p *dbPool) remove(key string) error {
 func (p *dbPool) Connect(spec string) (db *DbConn, err error) {
 	err = p.insts.Process(func() error {
 		// check if we have a connection to this database.
+		db = new(DbConn)
 		inst, ok := p.insts.Get(spec)
 		if !ok {
 			inst = new(DbPoolEntry)
@@ -152,7 +154,8 @@ func (p *dbPool) Connect(spec string) (db *DbConn, err error) {
 				return ErrSQLInvalidDatabaseSpec
 			}
 			// create database object
-			switch specs[0] {
+			db.engine = specs[0]
+			switch db.engine {
 			case "sqlite3":
 				// check if the database file exists
 				var fi os.FileInfo
@@ -177,7 +180,6 @@ func (p *dbPool) Connect(spec string) (db *DbConn, err error) {
 		// increment reference count
 		inst.refs++
 		// return a new connection to the database.
-		db = new(DbConn)
 		db.conn, err = inst.db.Conn(p.ctx)
 		return err
 	}, false)
