@@ -22,6 +22,7 @@ import (
 	"database/sql"
 	_ "embed"
 	"gnunet/util"
+	"os"
 )
 
 //============================================================
@@ -50,16 +51,23 @@ var initScript []byte
 
 // FileMetaDB is a SQLite3 database for block metadata
 type FileMetaDB struct {
-	conn *util.DbConn // database connection
+	conn *DbConn // database connection
 }
 
 // OpenMetaDB opens a metadata database in the given path. The name of the
 // database is "access.db".
 func OpenMetaDB(path string) (db *FileMetaDB, err error) {
 	// connect to database
-	connect := "sqlite3:" + path + "/acccess.db"
+	dbFile := path + "/acccess.db"
+	if _, err = os.Stat(path + "/acccess.db"); err != nil {
+		var file *os.File
+		if file, err = os.Create(dbFile); err != nil {
+			return
+		}
+		file.Close()
+	}
 	db = new(FileMetaDB)
-	if db.conn, err = util.DbPool.Connect(connect); err != nil {
+	if db.conn, err = DbPool.Connect("sqlite3:" + dbFile); err != nil {
 		return
 	}
 	// check for initialized database
@@ -78,7 +86,7 @@ func OpenMetaDB(path string) (db *FileMetaDB, err error) {
 // in the database; primary key is the query key
 func (db *FileMetaDB) Store(md *FileMetadata) (err error) {
 	sql := "replace into meta(qkey,btype,size,stored,expires,lastUsed,usedCount) values(?,?,?,?,?,?,?)"
-	_, err = db.conn.Exec(sql, md.key, md.btype, md.size, md.stored, md.expires, md.lastUsed, md.usedCount)
+	_, err = db.conn.Exec(sql, md.key, md.btype, md.size, md.stored.Epoch(), md.expires.Epoch(), md.lastUsed.Epoch(), md.usedCount)
 	return
 }
 
@@ -89,7 +97,11 @@ func (db *FileMetaDB) Get(key string, btype uint16) (md *FileMetadata, err error
 	md.btype = btype
 	sql := "select size,stored,expires,lastUsed,usedCount from meta where qkey=? and btype=?"
 	row := db.conn.QueryRow(sql, key, btype)
-	err = row.Scan(&md.size, &md.stored, &md.expires, &md.lastUsed, &md.usedCount)
+	var st, exp, lu uint64
+	err = row.Scan(&md.size, &st, &exp, &lu, &md.usedCount)
+	md.stored.Val = st * 1000000
+	md.expires.Val = exp * 1000000
+	md.lastUsed.Val = lu * 1000000
 	return
 }
 
@@ -112,10 +124,13 @@ func (db *FileMetaDB) Obsolete(n int) (removable []*FileMetadata, err error) {
 	}
 	var md *FileMetadata
 	for rows.Next() {
-		err = rows.Scan(&md.key, &md.btype, &md.size, &md.stored, &md.expires, &md.lastUsed, &md.usedCount)
-		if err != nil {
+		var st, exp, lu uint64
+		if err = rows.Scan(&md.key, &md.btype, &md.size, &st, &exp, &lu, &md.usedCount); err != nil {
 			return
 		}
+		md.stored.Val = st * 1000000
+		md.expires.Val = exp * 1000000
+		md.lastUsed.Val = lu * 1000000
 		removable = append(removable, md)
 	}
 	return
@@ -130,10 +145,14 @@ func (db *FileMetaDB) Traverse(f func(*FileMetadata)) error {
 	}
 	var md *FileMetadata
 	for rows.Next() {
-		err = rows.Scan(&md.key, &md.btype, &md.size, &md.stored, &md.expires, &md.lastUsed, &md.usedCount)
+		var st, exp, lu uint64
+		err = rows.Scan(&md.key, &md.btype, &md.size, &st, &exp, &lu, &md.usedCount)
 		if err != nil {
 			return err
 		}
+		md.stored.Val = st * 1000000
+		md.expires.Val = exp * 1000000
+		md.lastUsed.Val = lu * 1000000
 		// call process function
 		f(md)
 	}
