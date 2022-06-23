@@ -17,7 +17,7 @@
 -- SPDX-License-Identifier: AGPL3.0-or-later
 
 create table meta (
-    qkey      varchar(128), -- hex encoded key (SHA512 hash)
+    qkey      blob,         -- key (SHA512 hash)
 	btype     integer,      -- block type
     size      integer,      -- size of file
 	stored    integer,      -- time added to store

@@ -32,7 +32,7 @@ import (
 // FileMetadata holds information about a file (raw block data)
 // and is stored in a SQL database for faster access.
 type FileMetadata struct {
-	key       string            // storage key
+	key       []byte            // storage key
 	size      uint64            // size of file
 	btype     uint16            // block type
 	stored    util.AbsoluteTime // time added to store
@@ -91,9 +91,9 @@ func (db *FileMetaDB) Store(md *FileMetadata) (err error) {
 }
 
 // Get block metadata from database
-func (db *FileMetaDB) Get(key string, btype uint16) (md *FileMetadata, err error) {
+func (db *FileMetaDB) Get(key []byte, btype uint16) (md *FileMetadata, err error) {
 	md = new(FileMetadata)
-	md.key = key
+	md.key = util.Clone(key)
 	md.btype = btype
 	sql := "select size,stored,expires,lastUsed,usedCount from meta where qkey=? and btype=?"
 	row := db.conn.QueryRow(sql, key, btype)
@@ -106,7 +106,7 @@ func (db *FileMetaDB) Get(key string, btype uint16) (md *FileMetadata, err error
 }
 
 // Drop metadata for block from database
-func (db *FileMetaDB) Drop(key string, btype uint16) error {
+func (db *FileMetaDB) Drop(key []byte, btype uint16) error {
 	_, err := db.conn.Exec("delete from meta where qkey=? and btype=?", key, btype)
 	return err
 }
