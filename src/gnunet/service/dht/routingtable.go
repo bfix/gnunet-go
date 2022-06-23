@@ -277,9 +277,13 @@ func (rt *RoutingTable) SelectPeer(p *PeerAddress, hops int, bf *filter.BloomFil
 }
 
 // IsClosestPeer returns true if p is the closest peer for k. Peers with a
-// positive test in the Bloom filter are not considered.
+// positive test in the Bloom filter are not considered. If p is nil, our
+// reference address is used.
 func (rt *RoutingTable) IsClosestPeer(p, k *PeerAddress, bf *filter.BloomFilter) bool {
 	n := rt.SelectClosestPeer(k, bf)
+	if p == nil {
+		p = rt.ref
+	}
 	return n.Equals(p)
 }
 
