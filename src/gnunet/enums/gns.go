@@ -31,6 +31,8 @@ const (
 	GNS_LO_LOCAL_MASTER = 2 // For the rightmost label, only look in the cache.
 
 	GNS_MAX_BLOCK_SIZE = (63 * 1024) // Maximum size of a value that can be stored in a GNS block.
+
+	GNS_REPLICATION_LEVEL = 10
 )
 
 //go:generate go run generate.go gnunet-gns.rec gnunet-gns.tpl gns_type.go
