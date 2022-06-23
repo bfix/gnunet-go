@@ -42,6 +42,7 @@ import (
 // peers in the DHT.
 //----------------------------------------------------------------------
 
+// DHTP2PGetMsg wire layout
 type DHTP2PGetMsg struct {
 	MsgSize   uint16              `order:"big"`   // total size of message
 	MsgType   uint16              `order:"big"`   // DHT_P2P_GET (147)
@@ -85,13 +86,17 @@ func (m *DHTP2PGetMsg) Header() *Header {
 }
 
 //----------------------------------------------------------------------
+// DHT-P2P-PUT messages are used by other peers in the DHT to
+// request block storage.
 //----------------------------------------------------------------------
 
+// DHTP2PPutMsg wire layout
 type DHTP2PPutMsg struct {
 	MsgSize uint16 `order:"big"` // total size of message
 	MsgType uint16 `order:"big"` // DHT_P2P_PUT (146)
 }
 
+// NewDHTP2PPutMsg creates an empty new DHTP2PPutMsg
 func NewDHTP2PPutMsg() *DHTP2PPutMsg {
 	return nil
 }
@@ -107,15 +112,37 @@ func (m *DHTP2PPutMsg) Header() *Header {
 }
 
 //----------------------------------------------------------------------
+// DHT-P2P-RESULT messages are used to answer peer requests for
+// bock retrieval.
 //----------------------------------------------------------------------
 
+// DHTP2PResultMsg wire layout
 type DHTP2PResultMsg struct {
-	MsgSize uint16 `order:"big"` // total size of message
-	MsgType uint16 `order:"big"` // DHT_P2P_RESULT (148)
+	MsgSize  uint16            `order:"big"`     // total size of message
+	MsgType  uint16            `order:"big"`     // DHT_P2P_RESULT (148)
+	BType    uint32            `order:"big"`     // Block type of result
+	Reserved uint32            `order:"big"`     // Reserved for further use
+	PutPathL uint16            `order:"big"`     // size of PUTPATH field
+	GetPathL uint16            `order:"big"`     // size of GETPATH field
+	Expires  util.AbsoluteTime ``                // expiration date
+	Query    *crypto.HashCode  ``                // Query key for block
+	PutPath  []byte            `size:"PutPathL"` // PUTPATH
+	GetPath  []byte            `size:"GetPathL"` // GETPATH
+	Block    []byte            `size:"*"`        // block data
 }
 
+// NewDHTP2PResultMsg creates a new empty DHTP2PResultMsg
 func NewDHTP2PResultMsg() *DHTP2PResultMsg {
-	return nil
+	return &DHTP2PResultMsg{
+		MsgSize:  104,                          // size of empty message
+		MsgType:  DHT_P2P_RESULT,               // DHT_P2P_RESULT (148)
+		BType:    uint32(enums.BLOCK_TYPE_ANY), // type of returned block
+		PutPathL: 0,                            // empty putpath
+		PutPath:  nil,                          // -"-
+		GetPathL: 0,                            // empty getpath
+		GetPath:  nil,                          // -"-
+		Block:    nil,                          // empty block
+	}
 }
 
 // String returns a human-readable representation of the message.
