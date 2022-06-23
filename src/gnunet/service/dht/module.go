@@ -27,12 +27,13 @@ import (
 	"gnunet/message"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
-	"gnunet/service/dht/filter"
+	"gnunet/service/store"
 	"gnunet/transport"
 	"gnunet/util"
 	"time"
 
 	"github.com/bfix/gospel/logger"
+	"github.com/bfix/gospel/math"
 )
 
 //======================================================================
@@ -47,9 +48,8 @@ import (
 type Module struct {
 	service.ModuleImpl
 
-	store service.DHTStore // reference to the block storage mechanism
-	cache service.DHTStore // transient block cache
-	core  *core.Core       // reference to core services
+	store store.DHTStore // reference to the block storage mechanism
+	core  *core.Core     // reference to core services
 
 	rtable     *RoutingTable                 // routing table
 	helloCache map[string]*blocks.HelloBlock // HELLO block cache
@@ -60,8 +60,8 @@ type Module struct {
 // mechanism for persistence.
 func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Module, err error) {
 	// create permanent storage handler
-	var store, cache service.DHTStore
-	if store, err = service.NewDHTStore(cfg.Storage); err != nil {
+	var storage store.DHTStore
+	if storage, err = store.NewDHTStore(cfg.Storage); err != nil {
 		return
 	}
 	// create routing table
@@ -70,8 +70,7 @@ func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Mod
 	// return module instance
 	m = &Module{
 		ModuleImpl: *service.NewModuleImpl(),
-		store:      store,
-		cache:      cache,
+		store:      storage,
 		core:       c,
 		rtable:     rt,
 		helloCache: make(map[string]*blocks.HelloBlock),
@@ -87,21 +86,12 @@ func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Mod
 
 // Get a block from the DHT ["dht:get"]
 func (m *Module) Get(ctx context.Context, query blocks.Query) (block blocks.Block, err error) {
+	return m.store.Get(query)
+}
 
-	// check if we have the requested block in cache or permanent storage.
-	block, err = m.cache.Get(query)
-	if err == nil {
-		// yes: we are done
-		return
-	}
-	block, err = m.store.Get(query)
-	if err == nil {
-		// yes: we are done
-		return
-	}
-	// retrieve the block from the DHT
-
-	return nil, nil
+// GetApprox returns the first block not excluded ["dht:getapprox"]
+func (m *Module) GetApprox(ctx context.Context, query blocks.Query, excl func(blocks.Block) bool) (block blocks.Block, err error) {
+	return m.store.GetApprox(query, excl)
 }
 
 // Put a block into the DHT ["dht:put"]
@@ -172,7 +162,7 @@ func (m *Module) heartbeat(ctx context.Context) {
 
 	// drop expired entries from the HELLO cache
 	for key, hb := range m.helloCache {
-		if hb.Expire.Expired() {
+		if hb.Expires.Expired() {
 			delete(m.helloCache, key)
 		}
 	}
@@ -206,7 +196,7 @@ func (m *Module) getHello() (msg *message.DHTP2PHelloMsg, err error) {
 		// assemble HELLO data
 		hb := new(blocks.HelloBlock)
 		hb.PeerID = m.core.PeerID()
-		hb.Expire = util.NewAbsoluteTime(time.Now().Add(message.HelloAddressExpiration))
+		hb.Expires = util.NewAbsoluteTime(time.Now().Add(message.HelloAddressExpiration))
 		hb.SetAddresses(addrList)
 
 		// sign HELLO block
@@ -215,7 +205,7 @@ func (m *Module) getHello() (msg *message.DHTP2PHelloMsg, err error) {
 		}
 		// assemble HELLO message
 		msg = message.NewDHTP2PHelloMsg()
-		msg.Expires = hb.Expire
+		msg.Expires = hb.Expires
 		msg.SetAddresses(hb.Addresses())
 		if err = m.core.Sign(msg); err != nil {
 			return
@@ -274,29 +264,101 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 	switch msgT := msg.(type) {
 
 	case *message.DHTP2PGetMsg:
-		//----------------------------------------------------------
+		//--------------------------------------------------------------
 		// DHT-P2P GET
-		//----------------------------------------------------------
+		//--------------------------------------------------------------
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-GET message", label)
 
-		// parse result filter
-		rf := filter.NewBloomFilterFromBytes(msgT.ResFilter, true)
-
-		// validate query (based on block type requested)
+		//--------------------------------------------------------------
+		// validate query (based on block type requested)  (9.4.3.1)
 		btype := enums.BlockType(msgT.BType)
-		blockHdlr, ok := blocks.BlockHandlers[btype]
-		if ok {
+		if blockHdlr, ok := blocks.BlockHandlers[btype]; ok {
 			// validate block query
 			if !blockHdlr.ValidateBlockQuery(msgT.Query, msgT.XQuery) {
 				logger.Printf(logger.WARN, "[%s] DHT-P2P-GET invalid query -- discarded", label)
 				return false
 			}
-			// check if sender peer is in result filter
-			if !rf.Contains(sender.Key) {
-				logger.Printf(logger.WARN, "[dht] Sender not in result filter")
-			}
 		} else {
 			logger.Printf(logger.INFO, "[%s] No validator defined for block type %s", label, btype.String())
+		}
+		//----------------------------------------------------------
+		// check if sender peer is in peer filter (9.4.3.2)
+		if !msgT.PeerBF.Contains(sender.Key) {
+			logger.Printf(logger.WARN, "[dht] Sender not in peer filter")
+		}
+		// parse result filter
+		var rf blocks.ResultFilter = new(blocks.PassResultFilter)
+		if msgT.ResFilter != nil && len(msgT.ResFilter) > 0 {
+			rf = blocks.NewHelloResultFilterFromBytes(msgT.ResFilter, true)
+		}
+
+		//----------------------------------------------------------
+		// check if we need to respond (9.4.3.3)
+		q := NewPeerAddress(util.NewPeerID(msgT.Query.Bits))
+		closest := m.rtable.IsClosestPeer(nil, q, msgT.PeerBF)
+		demux := int(msgT.Flags)&enums.DHT_RO_DEMULTIPLEX_EVERYWHERE != 0
+		if demux || closest {
+
+			//------------------------------------------------------
+			// query for a HELLO? (9.4.3.3a)
+			if msgT.BType == uint32(enums.BLOCK_TYPE_DHT_URL_HELLO) {
+				// iterate over cached HELLOs to find (best) match
+				var bestHB *blocks.HelloBlock
+				var bestDist *math.Int
+				for _, hb := range m.helloCache {
+					// check if block is excluded by result filter
+					if rf.Contains(hb) {
+						// yes: skip it
+						continue
+					}
+					// check for better match
+					p := NewPeerAddress(hb.PeerID)
+					d, _ := q.Distance(p)
+					if bestHB == nil || d.Cmp(bestDist) < 0 {
+						bestHB = hb
+						bestDist = d
+					}
+				}
+				// found anything in cache at all?
+				if bestHB != nil {
+					// do we have a perfect match?
+					if bestDist.Equals(math.ZERO) || demux {
+						// send best result we have
+						m.sendResult(sender, bestHB, back)
+					}
+				}
+				return true
+			}
+			//------------------------------------------------------
+			// find the closest block that has that is not filtered
+			// by the result filter
+
+			// query DHT store for exact match  (9.4.3.3c)
+			q := blocks.NewGenericQuery(msgT.Query.Bits, enums.BlockType(msgT.BType), msgT.Flags)
+			block, err := m.Get(ctx, q)
+			if err != nil {
+				logger.Printf(logger.ERROR, "[%s] Failed to get DHT block from storage: %s", label, err.Error())
+				return true
+			}
+			if rf.Contains(block) {
+				block = nil
+			}
+			// if we demultiplex, find approximate block
+			if block == nil && demux {
+				// no exact match: find approximate  (9.4.3.3b)
+				match := func(b blocks.Block) bool {
+					return rf.Contains(b)
+				}
+				block, err = m.GetApprox(ctx, q, match)
+				if err != nil {
+					logger.Printf(logger.ERROR, "[%s] Failed to get (approx.) DHT block from storage: %s", label, err.Error())
+					return true
+				}
+			}
+			// if we have a block, send it as response
+			if block != nil {
+				m.sendResult(sender, block, back)
+			}
 		}
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-GET message done", label)
 
@@ -351,14 +413,14 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 		isNew := true
 		if hb, ok := m.helloCache[k]; ok {
 			// cache entry exists: is the HELLO message more recent?
-			_, isNew = hb.Expire.Diff(msgT.Expires)
+			_, isNew = hb.Expires.Diff(msgT.Expires)
 		}
 		// we need to cache a new(er) HELLO
 		if isNew {
 			m.helloCache[k] = &blocks.HelloBlock{
 				PeerID:    sender,
 				Signature: util.Clone(msgT.Signature),
-				Expire:    msgT.Expires,
+				Expires:   msgT.Expires,
 				AddrBin:   util.Clone(msgT.AddrList),
 			}
 		}
@@ -405,6 +467,10 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 		return false
 	}
 	return true
+}
+
+func (m *Module) sendResult(peer *util.PeerID, blk blocks.Block, back transport.Responder) {
+
 }
 
 // L2NSE is ESTIMATE_NETWORK_SIZE(), a procedure that provides estimates

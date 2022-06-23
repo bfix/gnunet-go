@@ -86,6 +86,8 @@ func NewCore(ctx context.Context, node *config.NodeConfig) (c *Core, err error) 
 	if peer, err = NewLocalPeer(node); err != nil {
 		return
 	}
+	logger.Printf(logger.DBG, "[core] Local node is %s", peer.GetID().String())
+
 	// create new core instance
 	incoming := make(chan *transport.TransportMessage)
 	c = &Core{
@@ -354,7 +356,7 @@ func (c *Core) Unregister(name string) *Listener {
 
 // internal: dispatch event to listeners
 func (c *Core) dispatch(ev *Event) {
-	logger.Printf(logger.DBG, "Dispatching %v...", ev)
+	logger.Printf(logger.DBG, "[core] Dispatching %v...", ev)
 	// dispatch event to listeners
 	for _, l := range c.listeners {
 		if l.filter.CheckEvent(ev.ID) {

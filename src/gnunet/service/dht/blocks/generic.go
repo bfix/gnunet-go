@@ -19,8 +19,6 @@
 package blocks
 
 import (
-	"bytes"
-	"encoding/gob"
 	"encoding/hex"
 	"fmt"
 	"gnunet/crypto"
@@ -43,13 +41,8 @@ type Query interface {
 	// Type returns the requested block type
 	Type() uint16
 
-	// Get retrieves the value of a named query parameter. The value is
-	// unchanged if the key is not in the map or if the value in the map
-	// has an incompatible type.
-	Get(key string, value any) bool
-
-	// Set stores the value of a named query parameter
-	Set(key string, value any)
+	// Flags returns the query flags
+	Flags() uint16
 
 	// Verify the integrity of a retrieved block (optional). Override in
 	// custom query types to implement block-specific integrity checks
@@ -81,7 +74,7 @@ type Block interface {
 	// types to implement block-specific integrity checks (see GNSBlock for
 	// example). This verification is usually weaker than the verification
 	// method from a Query (see GNSBlock.Verify for explanation).
-	Verify() error
+	Verify() (bool, error)
 
 	// String returns the human-readable representation of a block
 	String() string
@@ -104,8 +97,11 @@ type GenericQuery struct {
 	// block type requested
 	btype uint16
 
-	// query parameters (binary value representation)
-	params map[string][]byte
+	// query flags
+	flags uint16
+
+	// Params holds additional query parameters
+	Params util.ParameterSet
 }
 
 // Key interface method implementation
@@ -118,23 +114,9 @@ func (q *GenericQuery) Type() uint16 {
 	return q.btype
 }
 
-// Get retrieves the value of a named query parameter
-func (q *GenericQuery) Get(key string, value any) bool {
-	data, ok := q.params[key]
-	if !ok {
-		return false
-	}
-	dec := gob.NewDecoder(bytes.NewReader(data))
-	return dec.Decode(value) != nil
-}
-
-// Set stores the value of a named query parameter
-func (q *GenericQuery) Set(key string, value any) {
-	wrt := new(bytes.Buffer)
-	enc := gob.NewEncoder(wrt)
-	if enc.Encode(value) == nil {
-		q.params[key] = wrt.Bytes()
-	}
+// Flags returns the query flags
+func (q *GenericQuery) Flags() uint16 {
+	return q.flags
 }
 
 // Verify interface method implementation
@@ -155,11 +137,12 @@ func (q *GenericQuery) String() string {
 }
 
 // NewGenericQuery creates a simple Query from hash code.
-func NewGenericQuery(key []byte, btype enums.BlockType) *GenericQuery {
+func NewGenericQuery(key []byte, btype enums.BlockType, flags uint16) *GenericQuery {
 	return &GenericQuery{
 		key:    crypto.NewHashCode(key),
 		btype:  uint16(btype),
-		params: make(map[string][]byte),
+		flags:  flags,
+		Params: make(util.ParameterSet),
 	}
 }
 
@@ -194,9 +177,9 @@ func (b *GenericBlock) String() string {
 }
 
 // Verify interface method implementation
-func (b *GenericBlock) Verify() error {
+func (b *GenericBlock) Verify() (bool, error) {
 	// no verification, no errors ;)
-	return nil
+	return true, nil
 }
 
 // NewGenericBlock creates a Block from binary data.

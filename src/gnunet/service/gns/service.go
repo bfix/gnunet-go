@@ -373,7 +373,7 @@ func (s *Service) LookupDHT(ctx context.Context, query blocks.Query) (block bloc
 	// send DHT GET request and wait for response
 	reqGet := message.NewDHTClientGetMsg(query.Key())
 	reqGet.ID = uint64(util.NextID())
-	reqGet.ReplLevel = uint32(enums.DHT_GNS_REPLICATION_LEVEL)
+	reqGet.ReplLevel = uint32(enums.GNS_REPLICATION_LEVEL)
 	reqGet.Type = uint32(enums.BLOCK_TYPE_GNS_NAMERECORD)
 	reqGet.Options = uint32(enums.DHT_RO_DEMULTIPLEX_EVERYWHERE)
 

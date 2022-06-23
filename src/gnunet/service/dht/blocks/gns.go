@@ -95,7 +95,7 @@ func NewGNSQuery(zkey *crypto.ZoneKey, label string) *GNSQuery {
 	pd, _ := zkey.Derive(label, "gns")
 	gq := crypto.Hash(pd.Bytes()).Bits
 	return &GNSQuery{
-		GenericQuery: *NewGenericQuery(gq, enums.BLOCK_TYPE_GNS_NAMERECORD),
+		GenericQuery: *NewGenericQuery(gq, enums.BLOCK_TYPE_GNS_NAMERECORD, 0),
 		Zone:         zkey,
 		Label:        label,
 		derived:      pd,
@@ -162,12 +162,11 @@ func NewBlock() *GNSBlock {
 // Only the cryptographic signature is verified; the formal correctness of
 // the association between the block and a GNS label in a GNS zone can't
 // be verified. This is only possible in Query.Verify().
-func (b *GNSBlock) Verify() (err error) {
+func (b *GNSBlock) Verify() (ok bool, err error) {
 	// verify signature
 	var buf []byte
 	if buf, err = data.Marshal(b.Body); err != nil {
 		return
 	}
-	_, err = b.DerivedKeySig.Verify(buf)
-	return
+	return b.DerivedKeySig.Verify(buf)
 }
