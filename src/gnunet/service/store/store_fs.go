@@ -124,11 +124,11 @@ func (s *FileStore) Put(query blocks.Query, block blocks.Block) (err error) {
 	}
 	// write to file for storage
 	var fp *os.File
-	var fpSize int
+	bd := block.Data()
 	if fp, err = os.Create(path + "/" + fname); err == nil {
 		defer fp.Close()
 		// write block data
-		if _, err = fp.Write(block.Data()); err != nil {
+		if _, err = fp.Write(bd); err != nil {
 			return
 		}
 	}
@@ -136,7 +136,7 @@ func (s *FileStore) Put(query blocks.Query, block blocks.Block) (err error) {
 	now := util.AbsoluteTimeNow()
 	meta := &FileMetadata{
 		key:       query.Key().Bits,
-		size:      uint64(fpSize),
+		size:      uint64(len(bd)),
 		btype:     btype,
 		expires:   expire,
 		stored:    now,
