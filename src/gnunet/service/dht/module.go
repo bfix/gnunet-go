@@ -238,6 +238,7 @@ func (m *Module) getHello() (msg *message.DHTP2PHelloMsg, err error) {
 func (m *Module) Export(fcn map[string]any) {
 	// add exported functions from module
 	fcn["dht:get"] = m.Get
+	fcn["dht:getapprox"] = m.GetApprox
 	fcn["dht:put"] = m.Put
 }
 
