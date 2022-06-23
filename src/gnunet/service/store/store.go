@@ -32,9 +32,11 @@ import (
 
 // Error messages related to the key/value-store implementations
 var (
-	ErrStoreInvalidSpec  = fmt.Errorf("Invalid Store specification")
-	ErrStoreUnknown      = fmt.Errorf("Unknown Store type")
-	ErrStoreNotAvailable = fmt.Errorf("Store not available")
+	ErrStoreInvalidSpec  = fmt.Errorf("invalid Store specification")
+	ErrStoreUnknown      = fmt.Errorf("unknown Store type")
+	ErrStoreNotAvailable = fmt.Errorf("store not available")
+	ErrStoreNoApprox     = fmt.Errorf("no approx search for store defined")
+	ErrStoreNoList       = fmt.Errorf("no key listing for store defined")
 )
 
 //------------------------------------------------------------
@@ -52,6 +54,10 @@ type Store[K, V any] interface {
 
 	// Get value with given key from storage
 	Get(key K) (V, error)
+
+	// GetApprox returns the best-matching value with given key from storage
+	// that is not excluded.
+	GetApprox(key K, excl func(V) bool) (V, error)
 
 	// List all store keys
 	List() ([]K, error)
@@ -155,14 +161,19 @@ func NewRedisStore(spec util.ParameterSet) (s KVStore, err error) {
 	return
 }
 
-// Put block into storage under given key
+// Put value into storage under given key
 func (s *RedisStore) Put(key string, value string) (err error) {
 	return s.client.Set(context.TODO(), key, value, 0).Err()
 }
 
-// Get block with given key from storage
+// Get value with given key from storage
 func (s *RedisStore) Get(key string) (value string, err error) {
 	return s.client.Get(context.TODO(), key).Result()
+}
+
+// GetApprox returns the best-matching value for given key from storage
+func (s *RedisStore) GetApprox(key string, crit func(string) bool) (value string, err error) {
+	return "", ErrStoreNoApprox
 }
 
 // List all keys in store
@@ -197,7 +208,7 @@ func (s *RedisStore) Close() error {
 
 // SQLStore for generic SQL database handling
 type SQLStore struct {
-	db *util.DbConn
+	db *DbConn
 }
 
 // NewSQLStore creates a new SQL-based key/value store.
@@ -211,7 +222,7 @@ func NewSQLStore(spec util.ParameterSet) (s KVStore, err error) {
 	kvs := new(SQLStore)
 
 	// connect to SQL database
-	kvs.db, err = util.DbPool.Connect(connect)
+	kvs.db, err = DbPool.Connect(connect)
 	if err != nil {
 		return nil, err
 	}
@@ -235,6 +246,11 @@ func (s *SQLStore) Get(key string) (value string, err error) {
 	row := s.db.QueryRow("select value from store where key=?", key)
 	err = row.Scan(&value)
 	return
+}
+
+// GetApprox returns the best-matching value for given key from storage
+func (s *SQLStore) GetApprox(key string, crit func(string) bool) (value string, err error) {
+	return "", ErrStoreNoApprox
 }
 
 // List all keys in store

@@ -21,7 +21,6 @@ package store
 import (
 	"encoding/hex"
 	"fmt"
-	"gnunet/crypto"
 	"gnunet/service/dht/blocks"
 	"gnunet/util"
 	"io/ioutil"
@@ -29,6 +28,7 @@ import (
 	"sync"
 
 	"github.com/bfix/gospel/logger"
+	"github.com/bfix/gospel/math"
 )
 
 //============================================================
@@ -117,7 +117,7 @@ func (s *FileStore) Put(query blocks.Query, block blocks.Block) (err error) {
 	expire := block.Expire()
 
 	// get path and filename from key
-	path, fname := s.expandPath(query.Key())
+	path, fname := s.expandPath(query.Key().Bits)
 	// make sure the path exists
 	if err = os.MkdirAll(path, 0755); err != nil {
 		return
@@ -135,7 +135,7 @@ func (s *FileStore) Put(query blocks.Query, block blocks.Block) (err error) {
 	// compile metadata
 	now := util.AbsoluteTimeNow()
 	meta := &FileMetadata{
-		key:       hex.EncodeToString(query.Key().Bits),
+		key:       query.Key().Bits,
 		size:      uint64(fpSize),
 		btype:     btype,
 		expires:   expire,
@@ -161,7 +161,7 @@ func (s *FileStore) Put(query blocks.Query, block blocks.Block) (err error) {
 // Get block with given key from storage
 func (s *FileStore) Get(query blocks.Query) (block blocks.Block, err error) {
 	// check if we have metadata for the query
-	key := hex.EncodeToString(query.Key().Bits)
+	key := query.Key().Bits
 	btype := query.Type()
 	var md *FileMetadata
 	if md, err = s.meta.Get(key, btype); err != nil {
@@ -170,15 +170,66 @@ func (s *FileStore) Get(query blocks.Query) (block blocks.Block, err error) {
 	// check for expired entry
 	if md.expires.Expired() {
 		err = s.dropFile(md)
+		return
 	}
+	return s.readBlock(query.Key().Bits)
+}
 
+// GetApprox returns the best-matching value with given key from storage
+// that is not excluded
+func (s *FileStore) GetApprox(key blocks.Query, excl func(blocks.Block) bool) (block blocks.Block, err error) {
+	var bestKey []byte
+	var bestBlk blocks.Block
+	var bestDist *math.Int
+	// distance function
+	dist := func(a, b []byte) *math.Int {
+		c := make([]byte, len(a))
+		for i := range a {
+			c[i] = a[i] ^ b[i]
+		}
+		return math.NewIntFromBytes(c)
+	}
+	// iterate over all keys
+	check := func(md *FileMetadata) {
+		// check for better match
+		d := dist(md.key, key.Key().Bits)
+		if bestKey == nil || d.Cmp(bestDist) < 0 {
+			// we might have a match. check block for exclusion
+			block, err = s.readBlock(md.key)
+			if err != nil {
+				logger.Printf(logger.ERROR, "[dhtstore] failed to retrieve blok for %s", hex.EncodeToString(md.key))
+				return
+			}
+			if excl(block) {
+				return
+			}
+			// remember best match
+			bestKey = md.key
+			bestBlk = block
+			bestDist = d
+		}
+	}
+	if err := s.meta.Traverse(check); err != nil {
+		return nil, err
+	}
+	return bestBlk, nil
+}
+
+// Get a list of all stored block keys (generic query).
+func (s *FileStore) List() ([]blocks.Query, error) {
+	return nil, ErrStoreNoList
+}
+
+// read block from storage for given key
+func (s *FileStore) readBlock(key []byte) (block blocks.Block, err error) {
 	// get path and filename from key
-	path, fname := s.expandPath(query.Key())
+	path, fname := s.expandPath(key)
 	// read file content (block data)
 	var file *os.File
 	if file, err = os.Open(path + "/" + fname); err != nil {
 		return
 	}
+	defer file.Close()
 	// read block data
 	var data []byte
 	if data, err = ioutil.ReadAll(file); err == nil {
@@ -187,14 +238,9 @@ func (s *FileStore) Get(query blocks.Query) (block blocks.Block, err error) {
 	return
 }
 
-// Get a list of all stored block keys (generic query).
-func (s *FileStore) List() ([]blocks.Query, error) {
-	return make([]blocks.Query, 0), nil
-}
-
 // expandPath returns the full path to the file for given key.
-func (s *FileStore) expandPath(key *crypto.HashCode) (string, string) {
-	h := hex.EncodeToString(key.Bits)
+func (s *FileStore) expandPath(key []byte) (string, string) {
+	h := hex.EncodeToString(key)
 	return fmt.Sprintf("%s/%s/%s", s.path, h[:2], h[2:4]), h[4:]
 }
 
