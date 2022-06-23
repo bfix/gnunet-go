@@ -23,15 +23,6 @@ import (
 	"gnunet/enums"
 )
 
-const (
-	RF_MORE       = iota // Valid result, and there may be more.
-	RF_LAST              // Last possible valid result.
-	RF_DUPLICATE         // Valid result, but duplicate (was filtered by the result filter).
-	RF_IRRELEVANT        // Block does not satisfy the constraints imposed by the XQuery.
-)
-
-//----------------------------------------------------------------------
-
 // BlockHandler interface defines methods specific to block types.
 type BlockHandler interface {
 
@@ -44,7 +35,7 @@ type BlockHandler interface {
 	// are the set of results that must be filtered at the initiator, and a
 	// MUTATOR value which MAY be used to deterministically re-randomize
 	// probabilistic data structures.
-	SetupResultFilter(filterSize int, mutator uint32) []byte
+	SetupResultFilter(filterSize int, mutator uint32) ResultFilter
 
 	// FilterResult is used to filter results against specific queries. This
 	// function does not check the validity of the block itself or that it
@@ -58,7 +49,7 @@ type BlockHandler interface {
 	// not expected to actually differenciate between the RF_DUPLICATE and
 	// RF_IRRELEVANT return values: in both cases the block is ignored for
 	// this query.
-	FilterResult(b Block, key *crypto.HashCode, rf []byte, xQuery []byte) ([]byte, []byte)
+	FilterResult(b Block, key *crypto.HashCode, rf ResultFilter, xQuery []byte) int
 
 	// ValidateBlockStoreRequest is used to evaluate a block payload as part of
 	// PutMessage and ResultMessage processing.

@@ -16,7 +16,7 @@
 //
 // SPDX-License-Identifier: AGPL3.0-or-later
 
-package filter
+package blocks
 
 // ResultFilter return values
 const (
@@ -38,8 +38,19 @@ const (
 type ResultFilter interface {
 
 	// Add entry (binary representation) to filter
-	Add([]byte)
+	Add(Block)
 
 	// Contains returns true if entry (binary representation) is filtered
-	Contains([]byte) bool
+	Contains(Block) bool
+}
+
+//----------------------------------------------------------------------
+
+type PassResultFilter struct{}
+
+func (rf *PassResultFilter) Add(Block) {
+}
+
+func (rf *PassResultFilter) Contains(Block) bool {
+	return false
 }

@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"gnunet/crypto"
 	"gnunet/enums"
+	"gnunet/service/dht/filter"
 	"gnunet/util"
 	"net/url"
 	"strconv"
@@ -33,6 +34,7 @@ import (
 
 	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/data"
+	"github.com/bfix/gospel/logger"
 )
 
 // HELLO-related errors
@@ -51,11 +53,11 @@ const helloPrefix = "gnunet://hello/"
 // HelloBlock is the DHT-managed block type for HELLO information.
 // It is used to create and parse HELLO URLs.
 // All addresses expire at the same time /this different from HELLO
-// messages (see message.HeeloMsg).
+// messages (see message.HelloMsg).
 type HelloBlock struct {
 	PeerID    *util.PeerID      ``          // peer identifier
 	Signature []byte            `size:"64"` // signature
-	Expire    util.AbsoluteTime ``          // Expiration date
+	Expires   util.AbsoluteTime ``          // Expiration date
 	AddrBin   []byte            `size:"*"`  // raw address data
 
 	// transient attributes
@@ -114,8 +116,8 @@ func ParseHelloURL(u string, checkExpiry bool) (h *HelloBlock, err error) {
 	if exp, err = strconv.ParseUint(q[0], 10, 64); err != nil {
 		return
 	}
-	h.Expire = util.NewAbsoluteTimeEpoch(exp)
-	if checkExpiry && h.Expire.Expired() {
+	h.Expires = util.NewAbsoluteTimeEpoch(exp)
+	if checkExpiry && h.Expires.Expired() {
 		err = ErrHelloExpired
 		return
 	}
@@ -191,13 +193,39 @@ func (h *HelloBlock) finalize() (err error) {
 	return
 }
 
+// Return the block type
+func (h *HelloBlock) Type() uint16 {
+	return uint16(enums.BLOCK_TYPE_DHT_URL_HELLO)
+}
+
+// Data returns the raw block data
+func (h *HelloBlock) Data() []byte {
+	buf, err := data.Marshal(h)
+	if err != nil {
+		logger.Println(logger.ERROR, "[hello] Failed to serialize HELLO block: "+err.Error())
+		buf = nil
+	}
+	return buf
+}
+
+// Expire returns the block expiration
+func (h *HelloBlock) Expire() util.AbsoluteTime {
+	return h.Expires
+}
+
+// String returns the human-readable representation of a block
+func (h *HelloBlock) String() string {
+	return fmt.Sprintf("HelloBlock{peer=%s,expires=%s,addrs=[%d]}",
+		h.PeerID, h.Expires, len(h.Addresses()))
+}
+
 // URL returns the HELLO URL for the data.
 func (h *HelloBlock) URL() string {
 	u := fmt.Sprintf("%s%s/%s/%d?",
 		helloPrefix,
 		h.PeerID.String(),
 		util.EncodeBinaryToString(h.Signature),
-		h.Expire.Epoch(),
+		h.Expires.Epoch(),
 	)
 	for i, a := range h.addrs {
 		if i > 0 {
@@ -255,7 +283,7 @@ func (h *HelloBlock) SignedData() []byte {
 	buf := new(bytes.Buffer)
 	binary.Write(buf, binary.BigEndian, size)
 	binary.Write(buf, binary.BigEndian, purpose)
-	binary.Write(buf, binary.BigEndian, h.Expire.Epoch()*1000000)
+	binary.Write(buf, binary.BigEndian, h.Expires.Epoch()*1000000)
 	buf.Write(hAddr[:])
 	return buf.Bytes()
 }
@@ -275,8 +303,8 @@ func (bh *HelloBlockHandler) ValidateBlockQuery(key *crypto.HashCode, xquery []b
 // are the set of results that must be filtered at the initiator, and a
 // MUTATOR value which MAY be used to deterministically re-randomize
 // probabilistic data structures.
-func (bh *HelloBlockHandler) SetupResultFilter(filterSize int, mutator uint32) []byte {
-	return nil
+func (bh *HelloBlockHandler) SetupResultFilter(filterSize int, mutator uint32) ResultFilter {
+	return NewHelloResultFilter(filterSize, mutator)
 }
 
 // FilterResult is used to filter results against specific queries. This
@@ -291,12 +319,66 @@ func (bh *HelloBlockHandler) SetupResultFilter(filterSize int, mutator uint32) [
 // not expected to actually differenciate between the RF_DUPLICATE and
 // RF_IRRELEVANT return values: in both cases the block is ignored for
 // this query.
-func (bh *HelloBlockHandler) FilterResult(b Block, key *crypto.HashCode, rf []byte, xQuery []byte) ([]byte, []byte) {
-	return nil, nil
+func (bh *HelloBlockHandler) FilterResult(b Block, key *crypto.HashCode, rf ResultFilter, xQuery []byte) int {
+	return RF_IRRELEVANT
 }
 
 // ValidateBlockStoreRequest is used to evaluate a block payload as part of
 // PutMessage and ResultMessage processing.
 func (bh *HelloBlockHandler) ValidateBlockStoreRequest(b Block) bool {
+	return false
+}
+
+//----------------------------------------------------------------------
+
+// HelloResultFilter is a result  filter implementation for HELLO blocks
+type HelloResultFilter struct {
+	bf *filter.BloomFilter
+}
+
+// NewHelloResultFilter initializes an empty resut filter
+func NewHelloResultFilter(filterSize int, mutator uint32) *HelloResultFilter {
+	// HELLO result filters are BloomFilters with a mutator
+	rf := new(HelloResultFilter)
+	rf.bf = filter.NewBloomFilter(filterSize)
+	rf.bf.SetMutator(mutator)
+	return rf
+}
+
+// NewHelloResultFilterFromBytes creates a new result filter from a binary
+// representation: 'data' is the concatenaion 'mutator|bloomfilter'.
+// If 'withMutator' is false, no mutator is used.
+func NewHelloResultFilterFromBytes(data []byte, withMutator bool) *HelloResultFilter {
+	//logger.Printf(logger.DBG, "[filter] FromBytes = %d:%s (mutator: %v)",len(data), hex.EncodeToString(data), withMutator)
+
+	// handle mutator input
+	mSize := 0
+	if withMutator {
+		mSize = 4
+	}
+	rf := new(HelloResultFilter)
+	rf.bf = &filter.BloomFilter{
+		Bits: util.Clone(data[mSize:]),
+	}
+	if mSize > 0 {
+		rf.bf.SetMutator(data[:mSize])
+	}
+	return rf
+}
+
+// Add a HELLO block to th result filter
+func (rf *HelloResultFilter) Add(b Block) {
+	if hb, ok := b.(*HelloBlock); ok {
+		h_addr := sha512.Sum512(hb.AddrBin)
+		rf.bf.Add(h_addr[:])
+	}
+}
+
+// Contains checks if a block is contained in the result filter
+func (rf *HelloResultFilter) Contains(b Block) bool {
+	if hb, ok := b.(*HelloBlock); ok {
+		h_addr := sha512.Sum512(hb.AddrBin)
+		return rf.bf.Contains(h_addr[:])
+	}
 	return false
 }
