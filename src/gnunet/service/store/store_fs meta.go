@@ -111,9 +111,14 @@ func (db *FileMetaDB) Drop(key []byte, btype uint16) error {
 	return err
 }
 
-// Obsolete collects records from the meta database that are consdered
-// "removable". Entries are rated by the value of
-// "(lifetime * size) / usedCount"
+// Used a block from store: increment usage count and lastUsed time.
+func (db *FileMetaDB) Used(key []byte, btype uint16) error {
+	_, err := db.conn.Exec("update meta set usedCount=usedCount+1,lastUsed=unixepoch() where qkey=? and btype=?", key, btype)
+	return err
+}
+
+// Obsolete collects records from the meta database that are considered
+// "removable". Entries are rated by the value of "(lifetime * size) / usedCount"
 func (db *FileMetaDB) Obsolete(n int) (removable []*FileMetadata, err error) {
 	// get obsolete records from database
 	rate := "(unixepoch()-unixepoch(stored))*size/usedCount"

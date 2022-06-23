@@ -172,6 +172,8 @@ func (s *FileStore) Get(query blocks.Query) (block blocks.Block, err error) {
 		err = s.dropFile(md)
 		return
 	}
+	// mark the block as newly used
+	s.meta.Used(key, btype)
 	return s.readBlock(query.Key().Bits)
 }
 
@@ -211,6 +213,10 @@ func (s *FileStore) GetApprox(key blocks.Query, excl func(blocks.Block) bool) (b
 	}
 	if err := s.meta.Traverse(check); err != nil {
 		return nil, err
+	}
+	if bestBlk != nil {
+		// mark the block as newly used
+		s.meta.Used(bestKey, bestBlk.Type())
 	}
 	return bestBlk, nil
 }
