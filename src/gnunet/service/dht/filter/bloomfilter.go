@@ -46,25 +46,6 @@ func NewBloomFilter(n int) *BloomFilter {
 	}
 }
 
-// NewBloomFilterFromBytes creates a new BloomFilter from a binary
-// representation: 'data' is the concatenaion 'mutator|bloomfilter'.
-// If 'withMutator' is false, no mutator is used.
-func NewBloomFilterFromBytes(data []byte, withMutator bool) *BloomFilter {
-	// handle mutator input
-	mSize := 0
-	if withMutator {
-		mSize = 4
-	}
-	bf := &BloomFilter{
-		Bits:  util.Clone(data[mSize:]),
-		mData: nil,
-	}
-	if mSize > 0 {
-		bf.SetMutator(data[:mSize])
-	}
-	return bf
-}
-
 // SetMutator to define a mutator for randomization. If 'm' is nil,
 // the mutator is removed from the filter (use with care!)
 func (bf *BloomFilter) SetMutator(m any) {
@@ -86,6 +67,8 @@ func (bf *BloomFilter) SetMutator(m any) {
 	h := sha512.New()
 	h.Write(bf.mInput)
 	bf.mData = h.Sum(nil)
+
+	//logger.Printf(logger.DBG, "[filter] Mutator %s -> %s", hex.EncodeToString(bf.mInput), hex.EncodeToString(bf.mData))
 }
 
 // Mutator returns the mutator input as a 4-byte array
@@ -137,5 +120,36 @@ func (bf *BloomFilter) indices(e []byte) []uint32 {
 		binary.Read(buf, binary.BigEndian, &idx[i])
 		idx[i] %= size
 	}
+	/*
+		// TEST:
+		count := func(d []byte) int {
+			num := 0
+			for _, v := range d {
+				var i byte
+				for i = 1; i < 128; i <<= 1 {
+					if v&i == i {
+						num++
+					}
+				}
+			}
+			return num
+		}
+		logger.Printf(logger.DBG, "[filter] bits = %d:%s (%d set)", len(bf.Bits), hex.EncodeToString(bf.Bits), count(bf.Bits))
+		logger.Printf(logger.DBG, "[filter] elem = %s", hex.EncodeToString(e))
+		logger.Printf(logger.DBG, "[filter] sha256(elem)^mutator = %s", hex.EncodeToString(h[:]))
+		logger.Printf(logger.DBG, "[filter] indices = %v", idx)
+		s := 128
+		if bf.mInput != nil {
+			s = 124
+		}
+		bft := NewBloomFilter(s)
+		if bf.mInput != nil {
+			bft.SetMutator(bf.mInput)
+		}
+		for _, i := range idx {
+			bft.Bits[i/8] |= (1 << (i % 7))
+		}
+		logger.Printf(logger.DBG, "[filter] bits' = %d:%s (%d set)", len(bft.Bits), hex.EncodeToString(bft.Bits), count(bft.Bits))
+	*/
 	return idx
 }
