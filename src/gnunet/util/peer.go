@@ -57,3 +57,41 @@ func (p *PeerID) String() string {
 func (p *PeerID) PublicKey() *ed25519.PublicKey {
 	return ed25519.NewPublicKeyFromBytes(p.Key)
 }
+
+//----------------------------------------------------------------------
+
+// PeerSignature is a EdDSA signature from the peer
+type PeerSignature struct {
+	Data []byte `size:"64"`
+}
+
+// NewPeerSignature is a EdDSA signatre with the private peer key
+func NewPeerSignature(data []byte) *PeerSignature {
+	var v []byte
+	if data == nil {
+		v = make([]byte, 64)
+	} else {
+		v = Clone(data)
+	}
+	return &PeerSignature{
+		Data: v,
+	}
+}
+
+//----------------------------------------------------------------------
+
+type PeerEphPublicKey struct {
+	Data []byte `size:"32"` // Ed25519 public key
+}
+
+func NewPeerEphPublicKey(data []byte) *PeerEphPublicKey {
+	var v []byte
+	if data == nil {
+		v = make([]byte, 64)
+	} else {
+		v = Clone(data)
+	}
+	return &PeerEphPublicKey{
+		Data: v,
+	}
+}
