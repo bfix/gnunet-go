@@ -30,6 +30,7 @@ import (
 	"gnunet/service/store"
 	"gnunet/transport"
 	"gnunet/util"
+	gmath "math"
 	"time"
 
 	"github.com/bfix/gospel/logger"
@@ -51,9 +52,8 @@ type Module struct {
 	store store.DHTStore // reference to the block storage mechanism
 	core  *core.Core     // reference to core services
 
-	rtable     *RoutingTable                 // routing table
-	helloCache map[string]*blocks.HelloBlock // HELLO block cache
-	lastHello  *message.DHTP2PHelloMsg       // last HELLO message used; re-create if expired
+	rtable    *RoutingTable           // routing table
+	lastHello *message.DHTP2PHelloMsg // last own HELLO message used; re-create if expired
 }
 
 // NewModule returns a new module instance. It initializes the storage
@@ -73,7 +73,6 @@ func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Mod
 		store:      storage,
 		core:       c,
 		rtable:     rt,
-		helloCache: make(map[string]*blocks.HelloBlock),
 	}
 	// register as listener for core events
 	pulse := time.Duration(cfg.Heartbeat) * time.Second
@@ -138,8 +137,6 @@ func (m *Module) event(ctx context.Context, ev *core.Event) {
 		// Remove peer from routing table
 		logger.Printf(logger.INFO, "[dht] Peer %s disconnected", ev.Peer)
 		m.rtable.Remove(NewPeerAddress(ev.Peer))
-		// delete from HELLO cache
-		delete(m.helloCache, ev.Peer.String())
 
 	// Message received.
 	case core.EV_MESSAGE:
@@ -159,16 +156,6 @@ func (m *Module) event(ctx context.Context, ev *core.Event) {
 
 // Heartbeat handler for periodic tasks
 func (m *Module) heartbeat(ctx context.Context) {
-
-	// drop expired entries from the HELLO cache
-	for key, hb := range m.helloCache {
-		if hb.Expires.Expired() {
-			delete(m.helloCache, key)
-		}
-	}
-	// update the estimated network size
-	m.rtable.l2nse = m.L2NSE()
-
 	// run heartbeat for routing table
 	m.rtable.heartbeat(ctx)
 }
@@ -269,6 +256,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 		// DHT-P2P GET
 		//--------------------------------------------------------------
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-GET message", label)
+		query := blocks.NewGenericQuery(msgT.Query.Bits, enums.BlockType(msgT.BType), msgT.Flags)
 
 		//--------------------------------------------------------------
 		// validate query (based on block type requested)  (9.4.3.1)
@@ -283,8 +271,8 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 			logger.Printf(logger.INFO, "[%s] No validator defined for block type %s", label, btype.String())
 		}
 		//----------------------------------------------------------
-		// check if sender peer is in peer filter (9.4.3.2)
-		if !msgT.PeerBF.Contains(sender.Key) {
+		// check if sender is in peer filter (9.4.3.2)
+		if !msgT.PeerBF.Contains(sender.Data) {
 			logger.Printf(logger.WARN, "[dht] Sender not in peer filter")
 		}
 		// parse result filter
@@ -295,48 +283,34 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 
 		//----------------------------------------------------------
 		// check if we need to respond (9.4.3.3)
-		q := NewPeerAddress(util.NewPeerID(msgT.Query.Bits))
-		closest := m.rtable.IsClosestPeer(nil, q, msgT.PeerBF)
+		addr := NewPeerAddress(util.NewPeerID(msgT.Query.Bits))
+		closest := m.rtable.IsClosestPeer(nil, addr, msgT.PeerBF)
 		demux := int(msgT.Flags)&enums.DHT_RO_DEMULTIPLEX_EVERYWHERE != 0
 		if demux || closest {
 
 			//------------------------------------------------------
 			// query for a HELLO? (9.4.3.3a)
 			if msgT.BType == uint32(enums.BLOCK_TYPE_DHT_URL_HELLO) {
-				// iterate over cached HELLOs to find (best) match
-				var bestHB *blocks.HelloBlock
-				var bestDist *math.Int
-				for _, hb := range m.helloCache {
-					// check if block is excluded by result filter
-					if rf.Contains(hb) {
-						// yes: skip it
-						continue
-					}
-					// check for better match
-					p := NewPeerAddress(hb.PeerID)
-					d, _ := q.Distance(p)
-					if bestHB == nil || d.Cmp(bestDist) < 0 {
-						bestHB = hb
-						bestDist = d
-					}
-				}
+				// iterate over cached HELLOs to find (best) match first
+				bestHB, bestDist := m.rtable.BestHello(addr, rf)
 				// found anything in cache at all?
 				if bestHB != nil {
 					// do we have a perfect match?
 					if bestDist.Equals(math.ZERO) || demux {
 						// send best result we have
-						m.sendResult(sender, bestHB, back)
+						if err := m.sendResult(ctx, query, bestHB, back); err != nil {
+							logger.Println(logger.ERROR, "[dht] Failed to send DHT result message: "+err.Error())
+						}
+						return true
 					}
 				}
-				return true
 			}
 			//------------------------------------------------------
 			// find the closest block that has that is not filtered
 			// by the result filter
 
 			// query DHT store for exact match  (9.4.3.3c)
-			q := blocks.NewGenericQuery(msgT.Query.Bits, enums.BlockType(msgT.BType), msgT.Flags)
-			block, err := m.Get(ctx, q)
+			block, err := m.Get(ctx, query)
 			if err != nil {
 				logger.Printf(logger.ERROR, "[%s] Failed to get DHT block from storage: %s", label, err.Error())
 				return true
@@ -350,7 +324,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 				match := func(b blocks.Block) bool {
 					return rf.Contains(b)
 				}
-				block, err = m.GetApprox(ctx, q, match)
+				block, err = m.GetApprox(ctx, query, match)
 				if err != nil {
 					logger.Printf(logger.ERROR, "[%s] Failed to get (approx.) DHT block from storage: %s", label, err.Error())
 					return true
@@ -358,7 +332,9 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 			}
 			// if we have a block, send it as response
 			if block != nil {
-				m.sendResult(sender, block, back)
+				if err := m.sendResult(ctx, query, block, back); err != nil {
+					logger.Println(logger.ERROR, "[dht] Failed to send DHT result message: "+err.Error())
+				}
 			}
 		}
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-GET message done", label)
@@ -412,18 +388,18 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 		// cache HELLO block if applicable
 		k := sender.String()
 		isNew := true
-		if hb, ok := m.helloCache[k]; ok {
+		if hb, ok := m.rtable.helloCache.Get(k); ok {
 			// cache entry exists: is the HELLO message more recent?
 			_, isNew = hb.Expires.Diff(msgT.Expires)
 		}
 		// we need to cache a new(er) HELLO
 		if isNew {
-			m.helloCache[k] = &blocks.HelloBlock{
+			m.rtable.helloCache.Put(k, &blocks.HelloBlock{
 				PeerID:    sender,
-				Signature: util.Clone(msgT.Signature),
+				Signature: msgT.Signature,
 				Expires:   msgT.Expires,
 				AddrBin:   util.Clone(msgT.AddrList),
-			}
+			})
 		}
 
 	//--------------------------------------------------------------
@@ -470,14 +446,20 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 	return true
 }
 
-func (m *Module) sendResult(peer *util.PeerID, blk blocks.Block, back transport.Responder) {
-
+// send a result back to caller
+func (m *Module) sendResult(ctx context.Context, query blocks.Query, blk blocks.Block, back transport.Responder) error {
+	// assemble result message
+	out := message.NewDHTP2PResultMsg()
+	out.BType = uint32(query.Type())
+	out.Expires = blk.Expire()
+	out.Query = query.Key()
+	out.Block = blk.Data()
+	out.MsgSize += uint16(len(out.Block))
+	// send message
+	return back.Send(ctx, out)
 }
 
-// L2NSE is ESTIMATE_NETWORK_SIZE(), a procedure that provides estimates
-// on the base-2 logarithm of the network size L2NSE, that is the base-2
-// logarithm number of peers in the network, for use by the routing
-// algorithm.
-func (m *Module) L2NSE() float64 {
-	return 3.
+// SetNetworkSize sets a fixed number of peers in the network
+func (m *Module) SetNetworkSize(numPeers int) {
+	m.rtable.l2nse = gmath.Log2(float64(numPeers))
 }

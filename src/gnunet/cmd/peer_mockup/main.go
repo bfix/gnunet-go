@@ -15,6 +15,7 @@ import (
 	"gnunet/message"
 	"gnunet/service"
 
+	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/logger"
 )
 
@@ -173,7 +174,8 @@ func process(ctx context.Context, ev *core.Event) {
 		mOut := local.EphKeyMsg()
 		c.Send(ctx, ev.Peer, mOut)
 		logger.Printf(logger.DBG, ">>> %s", mOut)
-		secret = crypto.SharedSecret(local.EphPrvKey(), remote.EphKeyMsg().Public())
+		pk := ed25519.NewPublicKeyFromBytes(remote.EphKeyMsg().Public().Data)
+		secret = crypto.SharedSecret(local.EphPrvKey(), pk)
 
 	default:
 		fmt.Printf("!!! %v\n", msg)

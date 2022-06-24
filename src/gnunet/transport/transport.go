@@ -66,7 +66,7 @@ type TransportMessage struct {
 func (msg *TransportMessage) Bytes() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	// serialize peer id
-	if _, err := buf.Write(msg.Peer.Key); err != nil {
+	if _, err := buf.Write(msg.Peer.Bytes()); err != nil {
 		return nil, err
 	}
 	// serialize message

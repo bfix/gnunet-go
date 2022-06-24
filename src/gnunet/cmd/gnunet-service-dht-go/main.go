@@ -104,6 +104,14 @@ func main() {
 		return
 	}
 
+	// hande network size estimation: if a fixed number of peers are present
+	// in the network config, use that value; otherwise utilize the NSE
+	// algorithm (not implemented yet)
+	numPeers := config.Cfg.Network.NumPeers
+	if numPeers != 0 {
+		dhtSrv.SetNetworkSize(numPeers)
+	}
+
 	// handle command-line arguments for RPC
 	if len(rpcEndp) > 0 {
 		parts := strings.Split(rpcEndp, ":")

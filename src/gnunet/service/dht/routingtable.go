@@ -24,6 +24,7 @@ import (
 	"crypto/sha512"
 	"encoding/hex"
 	"gnunet/config"
+	"gnunet/service/dht/blocks"
 	"gnunet/service/dht/filter"
 	"gnunet/util"
 	"math/rand"
@@ -53,6 +54,7 @@ const (
 // PeerAddress is the identifier for a peer in the DHT network.
 // It is the SHA-512 hash of the PeerID (public Ed25519 key).
 type PeerAddress struct {
+	peer     *util.PeerID      // peer identifier
 	addr     [sizeAddr]byte    // hash value as bytes
 	lastSeen util.AbsoluteTime // time the peer was last seen
 	lastUsed util.AbsoluteTime // time the peer was last used
@@ -62,8 +64,9 @@ type PeerAddress struct {
 func NewPeerAddress(peer *util.PeerID) *PeerAddress {
 	r := new(PeerAddress)
 	h := rtHash()
-	h.Write(peer.Key)
+	h.Write(peer.Data)
 	copy(r.addr[:], h.Sum(nil))
+	r.peer = peer
 	r.lastSeen = util.AbsoluteTimeNow()
 	r.lastUsed = util.AbsoluteTimeNow()
 	return r
@@ -99,25 +102,27 @@ func (addr *PeerAddress) Distance(p *PeerAddress) (*math.Int, int) {
 // distance to the reference address, so smaller index means
 // "nearer" to the reference address.
 type RoutingTable struct {
-	ref       *PeerAddress            // reference address for distance
-	buckets   []*Bucket               // list of buckets
-	list      map[string]*PeerAddress // keep list of peers
-	mtx       sync.RWMutex            // lock for write operations
-	l2nse     float64                 // log2 of estimated network size
-	inProcess bool                    // flag if Process() is running
-	cfg       *config.RoutingConfig   // routing parameters
+	ref        *PeerAddress                          // reference address for distance
+	buckets    []*Bucket                             // list of buckets
+	list       map[string]*PeerAddress               // keep list of peers
+	mtx        sync.RWMutex                          // lock for write operations
+	l2nse      float64                               // log2 of estimated network size
+	inProcess  bool                                  // flag if Process() is running
+	cfg        *config.RoutingConfig                 // routing parameters
+	helloCache *util.Map[string, *blocks.HelloBlock] // HELLO block cache
 }
 
 // NewRoutingTable creates a new routing table for the reference address.
 func NewRoutingTable(ref *PeerAddress, cfg *config.RoutingConfig) *RoutingTable {
 	// create routing table
 	rt := &RoutingTable{
-		ref:       ref,
-		list:      make(map[string]*PeerAddress),
-		buckets:   make([]*Bucket, numBuckets),
-		l2nse:     0.,
-		inProcess: false,
-		cfg:       cfg,
+		ref:        ref,
+		list:       make(map[string]*PeerAddress),
+		buckets:    make([]*Bucket, numBuckets),
+		l2nse:      -1,
+		inProcess:  false,
+		cfg:        cfg,
+		helloCache: util.NewMap[string, *blocks.HelloBlock](),
 	}
 	// fill buckets
 	for i := range rt.buckets {
@@ -171,16 +176,19 @@ func (rt *RoutingTable) Remove(p *PeerAddress) bool {
 	logger.Printf(logger.DBG, "[RT] Remove(%s)", k)
 
 	// compute distance (bucket index) and remove entry from bucket
+	rc := false
 	_, idx := p.Distance(rt.ref)
 	if rt.buckets[idx].Remove(p) {
-		logger.Println(logger.DBG, "[RT] --> entry removed from bucket and internal list")
-		delete(rt.list, k)
-		return true
+		logger.Println(logger.DBG, "[RT] --> entry removed from bucket and internal lists")
+		rc = true
+	} else {
+		// remove from internal list
+		logger.Println(logger.DBG, "[RT] --> entry removed from internal lists only")
 	}
-	// remove from internal list
-	logger.Println(logger.DBG, "[RT] --> entry removed from internal list only")
 	delete(rt.list, k)
-	return false
+	// delete from HELLO cache
+	rt.helloCache.Delete(p.peer.String())
+	return rc
 }
 
 // Contains checks if a peer is available in the routing table
@@ -329,6 +337,37 @@ func (rt *RoutingTable) heartbeat(ctx context.Context) {
 	}, false); err != nil {
 		logger.Println(logger.ERROR, "[dht] RT heartbeat failed: "+err.Error())
 	}
+
+	// drop expired entries from the HELLO cache
+	rt.helloCache.ProcessRange(func(key string, val *blocks.HelloBlock) error {
+		if val.Expires.Expired() {
+			rt.helloCache.Delete(key)
+		}
+		return nil
+	}, false)
+
+	// update the estimated network size
+	// rt.l2nse = ...
+}
+
+//----------------------------------------------------------------------
+
+func (rt *RoutingTable) BestHello(addr *PeerAddress, rf blocks.ResultFilter) (hb *blocks.HelloBlock, dist *math.Int) {
+	// iterate over cached HELLOs to find (best) match first
+	rt.helloCache.ProcessRange(func(key string, val *blocks.HelloBlock) error {
+		// check if block is excluded by result filter
+		if !rf.Contains(val) {
+			// check for better match
+			p := NewPeerAddress(val.PeerID)
+			d, _ := addr.Distance(p)
+			if hb == nil || d.Cmp(dist) < 0 {
+				hb = val
+				dist = d
+			}
+		}
+		return nil
+	}, true)
+	return
 }
 
 //----------------------------------------------------------------------

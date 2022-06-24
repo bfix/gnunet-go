@@ -136,7 +136,11 @@ func (bf *BloomFilter) indices(e []byte) []uint32 {
 		}
 		logger.Printf(logger.DBG, "[filter] bits = %d:%s (%d set)", len(bf.Bits), hex.EncodeToString(bf.Bits), count(bf.Bits))
 		logger.Printf(logger.DBG, "[filter] elem = %s", hex.EncodeToString(e))
-		logger.Printf(logger.DBG, "[filter] sha256(elem)^mutator = %s", hex.EncodeToString(h[:]))
+		if bf.mData != nil {
+			logger.Printf(logger.DBG, "[filter] sha512(elem)^mutator = %s", hex.EncodeToString(h[:]))
+		} else {
+			logger.Printf(logger.DBG, "[filter] sha512(elem) = %s", hex.EncodeToString(h[:]))
+		}
 		logger.Printf(logger.DBG, "[filter] indices = %v", idx)
 		s := 128
 		if bf.mInput != nil {

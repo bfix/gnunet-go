@@ -267,7 +267,7 @@ func NewTestNode(t *testing.T, ctx context.Context, cfg *config.NodeConfig) (nod
 	}
 	node.peer = node.core.Peer()
 	t.Logf("[%d] Node %s starting", node.id, node.peer.GetID())
-	t.Logf("[%d]   --> %s", node.id, hex.EncodeToString(node.peer.GetID().Key))
+	t.Logf("[%d]   --> %s", node.id, hex.EncodeToString(node.peer.GetID().Data))
 
 	list, err := node.core.Addresses()
 	if err != nil {

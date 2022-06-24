@@ -20,42 +20,57 @@ package util
 
 import (
 	"bytes"
-
-	"github.com/bfix/gospel/crypto/ed25519"
 )
 
-// PeerID is the 32-byte binary representation od a Ed25519 key
-type PeerID struct {
-	Key []byte `size:"32"`
+//----------------------------------------------------------------------
+// Peer public key (Ed25519 public key)
+//----------------------------------------------------------------------
+
+// PeerPublicKey is the binary representation of an Ed25519 public key
+type PeerPublicKey struct {
+	Data []byte `size:"32"` // Ed25519 public key data
 }
 
-// NewPeerID creates a new peer id from data.
-func NewPeerID(data []byte) (p *PeerID) {
-	p = &PeerID{
-		Key: make([]byte, 32),
+// NewPeerPublicKey creates a key instance from binary data
+func NewPeerPublicKey(data []byte) *PeerPublicKey {
+	pk := &PeerPublicKey{
+		Data: make([]byte, 32),
 	}
 	if data != nil {
 		if len(data) < 32 {
-			CopyAlignedBlock(p.Key, data)
+			CopyAlignedBlock(pk.Data, data)
 		} else {
-			copy(p.Key, data[:32])
+			copy(pk.Data, data[:32])
 		}
 	}
-	return
+	return pk
+}
+
+//----------------------------------------------------------------------
+// Peer identifier:
+//----------------------------------------------------------------------
+
+// PeerID is a wrpped PeerPublicKey
+type PeerID PeerPublicKey
+
+// NewPeerID creates a new peer id from data.
+func NewPeerID(data []byte) (p *PeerID) {
+	return (*PeerID)(NewPeerPublicKey(data))
 }
 
 // Equals returns true if two peer IDs match.
 func (p *PeerID) Equals(q *PeerID) bool {
-	return bytes.Equal(p.Key, q.Key)
+	return bytes.Equal(p.Data, q.Data)
 }
 
 // String returns a human-readable representation of a peer id.
 func (p *PeerID) String() string {
-	return EncodeBinaryToString(p.Key)
+	return EncodeBinaryToString(p.Data)
 }
 
-func (p *PeerID) PublicKey() *ed25519.PublicKey {
-	return ed25519.NewPublicKeyFromBytes(p.Key)
+// Bytes returns the binary representation of a peer identifier.
+func (p *PeerID) Bytes() []byte {
+	return Clone(p.Data)
 }
 
 //----------------------------------------------------------------------
@@ -74,24 +89,6 @@ func NewPeerSignature(data []byte) *PeerSignature {
 		v = Clone(data)
 	}
 	return &PeerSignature{
-		Data: v,
-	}
-}
-
-//----------------------------------------------------------------------
-
-type PeerEphPublicKey struct {
-	Data []byte `size:"32"` // Ed25519 public key
-}
-
-func NewPeerEphPublicKey(data []byte) *PeerEphPublicKey {
-	var v []byte
-	if data == nil {
-		v = make([]byte, 64)
-	} else {
-		v = Clone(data)
-	}
-	return &PeerEphPublicKey{
 		Data: v,
 	}
 }

@@ -112,7 +112,7 @@ func (p *Peer) HelloData(ttl time.Duration, a []*util.Address) (h *blocks.HelloB
 	if sig, err = p.prv.EdSign(sd); err != nil {
 		return
 	}
-	err = h.SetSignature(sig)
+	err = h.SetSignature(util.NewPeerSignature(sig.Bytes()))
 	return
 }
 
@@ -144,7 +144,7 @@ func (p *Peer) PubKey() *ed25519.PublicKey {
 // GetID returns the node ID (public key) in binary format
 func (p *Peer) GetID() *util.PeerID {
 	return &util.PeerID{
-		Key: util.Clone(p.pub.Bytes()),
+		Data: util.Clone(p.pub.Bytes()),
 	}
 }
 

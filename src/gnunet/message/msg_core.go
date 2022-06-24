@@ -36,17 +36,17 @@ type EphKeyBlock struct {
 	Purpose      *crypto.SignaturePurpose // signature purpose: SIG_ECC_KEY
 	CreateTime   util.AbsoluteTime        // Time of key creation
 	ExpireTime   util.RelativeTime        // Time to live for key
-	EphemeralKey []byte                   `size:"32"` // Ephemeral EdDSA public key
+	EphemeralKey *util.PeerPublicKey      // Ephemeral EdDSA public key
 	PeerID       *util.PeerID             // Peer identity (EdDSA public key)
 }
 
 // EphemeralKeyMsg announces a new transient key for a peer. The key is signed
 // by the issuing peer.
 type EphemeralKeyMsg struct {
-	MsgSize      uint16 `order:"big"` // total size of message
-	MsgType      uint16 `order:"big"` // CORE_EPHEMERAL_KEY (88)
-	SenderStatus uint32 `order:"big"` // enum PeerStateMachine
-	Signature    []byte `size:"64"`   // EdDSA signature
+	MsgSize      uint16              `order:"big"` // total size of message
+	MsgType      uint16              `order:"big"` // CORE_EPHEMERAL_KEY (88)
+	SenderStatus uint32              `order:"big"` // enum PeerStateMachine
+	Signature    *util.PeerSignature ``            // EdDSA signature
 	SignedBlock  *EphKeyBlock
 }
 
@@ -56,7 +56,7 @@ func NewEphemeralKeyMsg() *EphemeralKeyMsg {
 		MsgSize:      160,
 		MsgType:      CORE_EPHEMERAL_KEY,
 		SenderStatus: 1,
-		Signature:    make([]byte, 64),
+		Signature:    util.NewPeerSignature(nil),
 		SignedBlock: &EphKeyBlock{
 			Purpose: &crypto.SignaturePurpose{
 				Size:    88,
@@ -64,7 +64,7 @@ func NewEphemeralKeyMsg() *EphemeralKeyMsg {
 			},
 			CreateTime:   util.AbsoluteTimeNow(),
 			ExpireTime:   util.NewRelativeTime(12 * time.Hour),
-			EphemeralKey: make([]byte, 32),
+			EphemeralKey: util.NewPeerPublicKey(nil),
 			PeerID:       util.NewPeerID(nil),
 		},
 	}
@@ -73,8 +73,8 @@ func NewEphemeralKeyMsg() *EphemeralKeyMsg {
 // String returns a human-readable representation of the message.
 func (m *EphemeralKeyMsg) String() string {
 	return fmt.Sprintf("EphKeyMsg{peer=%s,ephkey=%s,create=%s,expire=%s,status=%d}",
-		util.EncodeBinaryToString(m.SignedBlock.PeerID.Key),
-		util.EncodeBinaryToString(m.SignedBlock.EphemeralKey),
+		util.EncodeBinaryToString(m.SignedBlock.PeerID.Data),
+		util.EncodeBinaryToString(m.SignedBlock.EphemeralKey.Data),
 		m.SignedBlock.CreateTime, m.SignedBlock.ExpireTime,
 		m.SenderStatus)
 }
@@ -85,8 +85,8 @@ func (m *EphemeralKeyMsg) Header() *Header {
 }
 
 // Public extracts the public key of an announcing peer.
-func (m *EphemeralKeyMsg) Public() *ed25519.PublicKey {
-	return m.SignedBlock.PeerID.PublicKey()
+func (m *EphemeralKeyMsg) Public() *util.PeerPublicKey {
+	return util.NewPeerPublicKey(m.SignedBlock.PeerID.Data)
 }
 
 // Verify the integrity of the message data using the public key of the
@@ -96,7 +96,7 @@ func (m *EphemeralKeyMsg) Verify(pub *ed25519.PublicKey) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	sig, err := ed25519.NewEdSignatureFromBytes(m.Signature)
+	sig, err := ed25519.NewEdSignatureFromBytes(m.Signature.Data)
 	if err != nil {
 		return false, err
 	}
@@ -107,10 +107,10 @@ func (m *EphemeralKeyMsg) Verify(pub *ed25519.PublicKey) (bool, error) {
 // key and the corresponding GNUnet message to announce the new key.
 func NewEphemeralKey(peerID []byte, ltPrv *ed25519.PrivateKey) (*ed25519.PrivateKey, *EphemeralKeyMsg, error) {
 	msg := NewEphemeralKeyMsg()
-	copy(msg.SignedBlock.PeerID.Key, peerID)
+	copy(msg.SignedBlock.PeerID.Data, peerID)
 	seed := util.NewRndArray(32)
 	prv := ed25519.NewPrivateKeyFromSeed(seed)
-	copy(msg.SignedBlock.EphemeralKey, prv.Public().Bytes())
+	copy(msg.SignedBlock.EphemeralKey.Data, prv.Public().Bytes())
 
 	data, err := data.Marshal(msg.SignedBlock)
 	if err != nil {
@@ -120,7 +120,7 @@ func NewEphemeralKey(peerID []byte, ltPrv *ed25519.PrivateKey) (*ed25519.Private
 	if err != nil {
 		return nil, nil, err
 	}
-	copy(msg.Signature, sig.Bytes())
+	copy(msg.Signature.Data, sig.Bytes())
 
 	return prv, msg, nil
 }

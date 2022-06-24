@@ -341,7 +341,7 @@ func (ep *StreamEndpoint) read(ctx context.Context, conn net.Conn) (tm *Transpor
 	case "ip+udp":
 		// parse peer id
 		peer = util.NewPeerID(nil)
-		if _, err = conn.Read(peer.Key); err != nil {
+		if _, err = conn.Read(peer.Data); err != nil {
 			return
 		}
 		// read next message from connection

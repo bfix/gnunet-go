@@ -30,7 +30,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/logger"
 )
 
@@ -294,7 +293,7 @@ type Signable interface {
 	SignedData() []byte
 
 	// SetSignature returns the signature to the signable object
-	SetSignature(*ed25519.EdSignature) error
+	SetSignature(*util.PeerSignature) error
 }
 
 // Sign a signable onject with private peer key
@@ -306,7 +305,7 @@ func (c *Core) Sign(obj Signable) error {
 		return err
 	}
 	logger.Printf(logger.DBG, "[core] --> signature '%s'", hex.EncodeToString(sig.Bytes()))
-	return obj.SetSignature(sig)
+	return obj.SetSignature(util.NewPeerSignature(sig.Bytes()))
 }
 
 //----------------------------------------------------------------------

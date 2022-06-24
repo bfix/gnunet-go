@@ -30,7 +30,7 @@ import (
 
 // test constants
 const (
-	fsNumBlocks = 35
+	fsNumBlocks = 10
 )
 
 // TestDHTFileStore generates 'fsNumBlocks' fully-random blocks
