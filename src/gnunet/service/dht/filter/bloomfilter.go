@@ -82,7 +82,7 @@ func (bf *BloomFilter) Mutator() []byte {
 // within bf and set to 1.
 func (bf *BloomFilter) Add(e []byte) {
 	for _, idx := range bf.indices(e) {
-		bf.Bits[idx/8] |= (1 << (idx % 7))
+		bf.Bits[idx/8] |= (1 << (idx % 8))
 	}
 }
 
@@ -92,7 +92,7 @@ func (bf *BloomFilter) Add(e []byte) {
 // Otherwise, the element is not considered to be in the Bloom filter.
 func (bf *BloomFilter) Contains(e []byte) bool {
 	for _, idx := range bf.indices(e) {
-		if bf.Bits[idx/8]&(1<<(idx%7)) == 0 {
+		if bf.Bits[idx/8]&(1<<(idx%8)) == 0 {
 			return false
 		}
 	}
@@ -100,9 +100,9 @@ func (bf *BloomFilter) Contains(e []byte) bool {
 }
 
 // indices returns the list of bit indices for antry e:
-// The element e is prepended with a salt (pütional) and hashed using SHA-512.
-// The resulting byte string is interpreted as a list of 16 32-bit integers
-// in network byte order.
+// The element e is hashed using SHA-512. If a mutator is present, the
+// hash values are XOR-ed. The resulting value is interpreted as a list
+// of 16 32-bit integers in network byte order.
 func (bf *BloomFilter) indices(e []byte) []uint32 {
 	// hash the entry
 	h := sha512.Sum512(e)
