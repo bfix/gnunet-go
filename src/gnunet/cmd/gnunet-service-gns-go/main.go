@@ -21,7 +21,6 @@ package main
 import (
 	"context"
 	"flag"
-	"net/rpc"
 	"os"
 	"os/signal"
 	"strings"
@@ -109,8 +108,8 @@ func main() {
 	}
 	// start JSON-RPC server on request
 	if ep := config.Cfg.RPC.Endpoint; len(ep) > 0 {
-		var rpc *rpc.Server
-		if rpc, err = service.StartRPC(ctx, ep); err != nil {
+		var rpc *service.JRPCServer
+		if rpc, err = service.RunRPCServer(ctx, ep); err != nil {
 			logger.Printf(logger.ERROR, "[gns] RPC failed to start: %s", err.Error())
 			return
 		}

@@ -21,24 +21,35 @@ package service
 import (
 	"context"
 	"net/http"
-	"net/rpc"
 	"time"
 
 	"github.com/bfix/gospel/logger"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/rpc/v2"
+	"github.com/gorilla/rpc/v2/json2"
 )
+
+//----------------------------------------------------------------------
+//----------------------------------------------------------------------
+
+// JRPCServer for JSON-RPC handling (wrapper to keep type in our package)
+type JRPCServer struct {
+	*rpc.Server
+}
 
 //----------------------------------------------------------------------
 // JSON-RPC interface for services to be used as the primary client API
 // for perform, manage and monitor GNUnet activities.
 //----------------------------------------------------------------------
 
-// StartRPC the JSON-RPC server. It can be terminated by context
-func StartRPC(ctx context.Context, endpoint string) (srvRPC *rpc.Server, err error) {
+// RunRPCServer runs the JSON-RPC server. It can be terminated by context only.
+func RunRPCServer(ctx context.Context, endpoint string) (srvRPC *JRPCServer, err error) {
+
+	srvRPC = &JRPCServer{rpc.NewServer()}
+	srvRPC.RegisterCodec(json2.NewCodec(), "application/json")
 
 	// setup RPC request handler
 	router := mux.NewRouter()
-	srvRPC = rpc.NewServer()
 	router.HandleFunc("/", srvRPC.ServeHTTP)
 
 	// instantiate a server and run it
@@ -51,7 +62,7 @@ func StartRPC(ctx context.Context, endpoint string) (srvRPC *rpc.Server, err err
 	// start listening
 	go func() {
 		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-			logger.Printf(logger.WARN, "[RPC] Server listen failed: %s", err.Error())
+			logger.Printf(logger.WARN, "[rpc] server listen failed: %s", err.Error())
 		}
 	}()
 	// wait for shutdown
@@ -59,7 +70,7 @@ func StartRPC(ctx context.Context, endpoint string) (srvRPC *rpc.Server, err err
 		select {
 		case <-ctx.Done():
 			if err := srv.Shutdown(context.Background()); err != nil {
-				logger.Printf(logger.WARN, "[RPC] Server shutdownn failed: %s", err.Error())
+				logger.Printf(logger.WARN, "[rpc] server shutdownn failed: %s", err.Error())
 			}
 		}
 	}()

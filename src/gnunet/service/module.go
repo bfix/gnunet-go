@@ -21,7 +21,6 @@ package service
 import (
 	"context"
 	"gnunet/core"
-	"net/rpc"
 	"time"
 )
 
@@ -64,7 +63,7 @@ type Module interface {
 	Import(map[string]any)
 
 	// InitRPC registers RPC commands for the module
-	InitRPC(*rpc.Server)
+	InitRPC(*JRPCServer)
 
 	// Filter returns the event filter for the module
 	Filter() *core.EventFilter

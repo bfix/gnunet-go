@@ -18,10 +18,10 @@
 
 package revocation
 
-import "net/rpc"
+import "gnunet/service"
 
 //----------------------------------------------------------------------
 
 // InitRPC registers RPC commands for the module
-func (m *Module) InitRPC(srv *rpc.Server) {
+func (m *Module) InitRPC(srv *service.JRPCServer) {
 }

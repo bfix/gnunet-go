@@ -19,21 +19,42 @@
 package dht
 
 import (
-	"net/rpc"
-	"time"
+	"gnunet/service"
+	"net/http"
 )
 
 //----------------------------------------------------------------------
 
-type DHTCommand struct{}
+// DHTService is a type for DHT-related JSON-RPC requests
+type DHTService struct{}
 
-type DHTStats struct {
-	Started time.Time
+// local instance of service
+var dhtRPC = &DHTService{}
+
+//----------------------------------------------------------------------
+// Command "DHT.Status"
+//----------------------------------------------------------------------
+
+// DHTStatusRequest is a status request for specific information addressed
+// by name(s)
+type DHTStatusRequest struct {
+	Topics []string `json:"topics"`
 }
 
-func (c *DHTCommand) Status(mode int, stats *DHTStats) error {
-	*stats = DHTStats{
-		Started: time.Now(),
+type DHTStatusResponse struct {
+	Messages map[string]string `json:"messages"`
+}
+
+func (s *DHTService) Status(r *http.Request, req *DHTStatusRequest, reply *DHTStatusResponse) error {
+	out := make(map[string]string)
+	for _, topic := range req.Topics {
+		switch topic {
+		case "echo":
+			out[topic] = "echo test"
+		}
+	}
+	*reply = DHTStatusResponse{
+		Messages: out,
 	}
 	return nil
 }
@@ -41,6 +62,6 @@ func (c *DHTCommand) Status(mode int, stats *DHTStats) error {
 //----------------------------------------------------------------------
 
 // InitRPC registers RPC commands for the module
-func (m *Module) InitRPC(srv *rpc.Server) {
-	srv.Register(new(DHTCommand))
+func (m *Module) InitRPC(srv *service.JRPCServer) {
+	srv.RegisterService(dhtRPC, "DHT")
 }
