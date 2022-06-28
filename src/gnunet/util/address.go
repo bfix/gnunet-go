@@ -27,10 +27,10 @@ import (
 
 // Address specifies how a peer is reachable on the network.
 type Address struct {
-	Netw    string       ``            // network protocol
-	Options uint32       `order:"big"` // address options
-	Expires AbsoluteTime ``            // expiration date for address
-	Address []byte       `size:"*"`    // address data (protocol-dependent)
+	Netw    string       // network protocol
+	Options uint32       // address options
+	Expires AbsoluteTime // expiration date for address
+	Address []byte       // address data (protocol-dependent)
 }
 
 // NewAddress returns a new Address for the given transport and specs
@@ -43,6 +43,8 @@ func NewAddress(transport string, addr string) *Address {
 	}
 }
 
+// NewAddressWrap returns new address from net.Addr with no options
+// or expiry date.
 func NewAddressWrap(addr net.Addr) *Address {
 	return &Address{
 		Netw:    addr.Network(),
@@ -53,7 +55,7 @@ func NewAddressWrap(addr net.Addr) *Address {
 }
 
 // ParseAddress translates a GNUnet address string like
-// "r5n+ip+udp://1.2.3.4:6789" or "gnunet+tcp://12.3.4.5/".
+// "ip+udp://1.2.3.4:6789" or "gnunet+tcp://12.3.4.5/".
 // It can also handle standard strings like "udp:127.0.0.1:6735".
 func ParseAddress(s string) (addr *Address, err error) {
 	p := strings.SplitN(s, ":", 2)
@@ -70,11 +72,6 @@ func (a *Address) Equals(b *Address) bool {
 	return a.Netw == b.Netw &&
 		a.Options == b.Options &&
 		bytes.Equal(a.Address, b.Address)
-}
-
-// StringAll returns a human-readable representation of an address.
-func (a *Address) StringAll() string {
-	return a.Netw + "://" + string(a.Address)
 }
 
 // implement net.Addr interface methods:
@@ -97,24 +94,6 @@ func (a *Address) URI() string {
 }
 func URI(network string, addr []byte) string {
 	return network + "://" + string(addr)
-}
-
-//----------------------------------------------------------------------
-
-// IPAddress (can be IPv4 or IPv6 or a DNS name)
-type IPAddress struct {
-	Host []byte `size:"*-2"`
-	Port uint16 `order:"big"`
-}
-
-// NewIPAddress creates a new instance for a given host and port.
-func NewIPAddress(host []byte, port uint16) *IPAddress {
-	ip := &IPAddress{
-		Host: make([]byte, len(host)),
-		Port: port,
-	}
-	copy(ip.Host, host)
-	return ip
 }
 
 //----------------------------------------------------------------------
