@@ -36,16 +36,20 @@ var dhtRPC = &DHTService{}
 //----------------------------------------------------------------------
 
 // DHTStatusRequest is a status request for specific information addressed
-// by name(s)
+// by topic(s)
 type DHTStatusRequest struct {
 	Topics []string `json:"topics"`
 }
 
+// DHTStatusResponse is a response to a status request. It returns information
+// on each topic requested.
 type DHTStatusResponse struct {
 	Messages map[string]string `json:"messages"`
 }
 
+// Status requests information by topic(s).
 func (s *DHTService) Status(r *http.Request, req *DHTStatusRequest, reply *DHTStatusResponse) error {
+	// assemble information on topic(s)
 	out := make(map[string]string)
 	for _, topic := range req.Topics {
 		switch topic {
@@ -53,6 +57,7 @@ func (s *DHTService) Status(r *http.Request, req *DHTStatusRequest, reply *DHTSt
 			out[topic] = "echo test"
 		}
 	}
+	// set reply
 	*reply = DHTStatusResponse{
 		Messages: out,
 	}
