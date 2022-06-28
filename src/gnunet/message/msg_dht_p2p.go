@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"gnunet/crypto"
 	"gnunet/enums"
+	"gnunet/service/dht/blocks"
 	"gnunet/service/dht/filter"
 	"gnunet/util"
 	"time"
@@ -149,6 +150,25 @@ func (m *DHTP2PGetMsg) String() string {
 // Header returns the message header in a separate instance.
 func (m *DHTP2PGetMsg) Header() *Header {
 	return &Header{m.MsgSize, m.MsgType}
+}
+
+// Clone message
+func (m *DHTP2PGetMsg) Update(pf *filter.BloomFilter, rf blocks.ResultFilter, hop uint16) *DHTP2PGetMsg {
+	buf := rf.Bytes()
+	ns := uint16(len(buf))
+	return &DHTP2PGetMsg{
+		MsgSize:   m.MsgSize - m.RfSize + ns,
+		MsgType:   DHT_P2P_GET,
+		BType:     m.BType,
+		Flags:     m.Flags,
+		HopCount:  hop,
+		ReplLevel: m.ReplLevel,
+		RfSize:    ns,
+		PeerBF:    pf.Clone(),
+		Query:     m.Query,
+		ResFilter: buf,
+		XQuery:    util.Clone(m.XQuery),
+	}
 }
 
 //----------------------------------------------------------------------
