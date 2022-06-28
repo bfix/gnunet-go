@@ -24,10 +24,10 @@ import (
 	"crypto/sha512"
 	"encoding/hex"
 	"gnunet/config"
+	"gnunet/crypto"
 	"gnunet/service/dht/blocks"
 	"gnunet/service/dht/filter"
 	"gnunet/util"
-	"math/rand"
 	"sync"
 	"time"
 
@@ -55,7 +55,7 @@ const (
 // It is the SHA-512 hash of the PeerID (public Ed25519 key).
 type PeerAddress struct {
 	peer     *util.PeerID      // peer identifier
-	addr     [sizeAddr]byte    // hash value as bytes
+	addr     []byte            // hash value as bytes
 	lastSeen util.AbsoluteTime // time the peer was last seen
 	lastUsed util.AbsoluteTime // time the peer was last used
 }
@@ -65,11 +65,21 @@ func NewPeerAddress(peer *util.PeerID) *PeerAddress {
 	r := new(PeerAddress)
 	h := rtHash()
 	h.Write(peer.Data)
-	copy(r.addr[:], h.Sum(nil))
+	r.addr = h.Sum(nil)
 	r.peer = peer
 	r.lastSeen = util.AbsoluteTimeNow()
 	r.lastUsed = util.AbsoluteTimeNow()
 	return r
+}
+
+// NewQueryAddress returns a wrapped peer address for a query key
+func NewQueryAddress(key *crypto.HashCode) *PeerAddress {
+	return &PeerAddress{
+		peer:     nil,
+		addr:     util.Clone(key.Bits),
+		lastSeen: util.AbsoluteTimeNow(),
+		lastUsed: util.AbsoluteTimeNow(),
+	}
 }
 
 // String returns a human-readble representation of an address.
@@ -102,10 +112,11 @@ func (addr *PeerAddress) Distance(p *PeerAddress) (*math.Int, int) {
 // distance to the reference address, so smaller index means
 // "nearer" to the reference address.
 type RoutingTable struct {
+	sync.RWMutex
+
 	ref        *PeerAddress                          // reference address for distance
 	buckets    []*Bucket                             // list of buckets
-	list       map[string]*PeerAddress               // keep list of peers
-	mtx        sync.RWMutex                          // lock for write operations
+	list       *util.Map[string, *PeerAddress]       // keep list of peers
 	l2nse      float64                               // log2 of estimated network size
 	inProcess  bool                                  // flag if Process() is running
 	cfg        *config.RoutingConfig                 // routing parameters
@@ -117,7 +128,7 @@ func NewRoutingTable(ref *PeerAddress, cfg *config.RoutingConfig) *RoutingTable 
 	// create routing table
 	rt := &RoutingTable{
 		ref:        ref,
-		list:       make(map[string]*PeerAddress),
+		list:       util.NewMap[string, *PeerAddress](),
 		buckets:    make([]*Bucket, numBuckets),
 		l2nse:      -1,
 		inProcess:  false,
@@ -138,15 +149,11 @@ func NewRoutingTable(ref *PeerAddress, cfg *config.RoutingConfig) *RoutingTable 
 // Add new peer address to routing table.
 // Returns true if the entry was added, false otherwise.
 func (rt *RoutingTable) Add(p *PeerAddress) bool {
-	// ensure one write and no readers
-	rt.lock(false)
-	defer rt.unlock(false)
-
 	k := p.String()
 	logger.Printf(logger.DBG, "[RT] Add(%s)", k)
 
 	// check if peer is already known
-	if px, ok := rt.list[k]; ok {
+	if px, ok := rt.list.Get(k); ok {
 		logger.Println(logger.DBG, "[RT] --> already known")
 		px.lastSeen = util.AbsoluteTimeNow()
 		return false
@@ -157,7 +164,7 @@ func (rt *RoutingTable) Add(p *PeerAddress) bool {
 	if rt.buckets[idx].Add(p) {
 		logger.Println(logger.DBG, "[RT] --> entry added")
 		p.lastUsed = util.AbsoluteTimeNow()
-		rt.list[k] = p
+		rt.list.Put(k, p)
 		return true
 	}
 	// Full bucket: we did not add the address to the routing table.
@@ -168,10 +175,6 @@ func (rt *RoutingTable) Add(p *PeerAddress) bool {
 // Remove peer address from routing table.
 // Returns true if the entry was removed, false otherwise.
 func (rt *RoutingTable) Remove(p *PeerAddress) bool {
-	// ensure one write and no readers
-	rt.lock(false)
-	defer rt.unlock(false)
-
 	k := p.String()
 	logger.Printf(logger.DBG, "[RT] Remove(%s)", k)
 
@@ -185,7 +188,7 @@ func (rt *RoutingTable) Remove(p *PeerAddress) bool {
 		// remove from internal list
 		logger.Println(logger.DBG, "[RT] --> entry removed from internal lists only")
 	}
-	delete(rt.list, k)
+	rt.list.Delete(k)
 	// delete from HELLO cache
 	rt.helloCache.Delete(p.peer.String())
 	return rc
@@ -193,20 +196,17 @@ func (rt *RoutingTable) Remove(p *PeerAddress) bool {
 
 // Contains checks if a peer is available in the routing table
 func (rt *RoutingTable) Contains(p *PeerAddress) bool {
-	// ensure readable map
-	rt.lock(true)
-	defer rt.unlock(true)
-
 	k := p.String()
 	logger.Printf(logger.DBG, "[RT] Contains(%s)?", k)
 
 	// check for peer in internal list
-	px, ok := rt.list[k]
+	px, ok := rt.list.Get(k)
 	if !ok {
 		logger.Println(logger.DBG, "[RT] --> NOT found in current list:")
-		for e := range rt.list {
-			logger.Printf(logger.DBG, "[RT]    * %s", e)
-		}
+		rt.list.ProcessRange(func(key string, val *PeerAddress) error {
+			logger.Printf(logger.DBG, "[RT]    * %s", val)
+			return nil
+		}, true)
 	} else {
 		logger.Println(logger.DBG, "[RT] --> found in current list")
 		px.lastSeen = util.AbsoluteTimeNow()
@@ -236,8 +236,8 @@ func (rt *RoutingTable) Process(f func() error, readonly bool) error {
 // SelectClosestPeer for a given peer address and bloomfilter.
 func (rt *RoutingTable) SelectClosestPeer(p *PeerAddress, bf *filter.BloomFilter) (n *PeerAddress) {
 	// no writer allowed
-	rt.mtx.RLock()
-	defer rt.mtx.RUnlock()
+	rt.RLock()
+	defer rt.RUnlock()
 
 	// find closest address
 	var dist *math.Int
@@ -254,24 +254,19 @@ func (rt *RoutingTable) SelectClosestPeer(p *PeerAddress, bf *filter.BloomFilter
 
 // SelectRandomPeer returns a random address from table (that is not
 // included in the bloomfilter)
-func (rt *RoutingTable) SelectRandomPeer(bf *filter.BloomFilter) *PeerAddress {
+func (rt *RoutingTable) SelectRandomPeer(bf *filter.BloomFilter) (p *PeerAddress) {
 	// no writer allowed
-	rt.mtx.RLock()
-	defer rt.mtx.RUnlock()
+	rt.RLock()
+	defer rt.RUnlock()
 
 	// select random entry from list
-	if size := len(rt.list); size > 0 {
-		idx := rand.Intn(size)
-		for _, p := range rt.list {
-			if idx == 0 {
-				// mark peer as used
-				p.lastUsed = util.AbsoluteTimeNow()
-				return p
-			}
-			idx--
-		}
+	var ok bool
+	if _, p, ok = rt.list.GetRandom(); !ok {
+		return nil
 	}
-	return nil
+	// mark peer as used
+	p.lastUsed = util.AbsoluteTimeNow()
+	return
 }
 
 // SelectPeer selects a neighbor depending on the number of hops parameter.
@@ -299,7 +294,7 @@ func (rt *RoutingTable) IsClosestPeer(p, k *PeerAddress, bf *filter.BloomFilter)
 // The arguments are the desired replication level, the hop count of the message so far,
 // and the base-2 logarithm of the current network size estimate (L2NSE) as provided by the
 // underlay. The result is the non-negative number of next hops to select.
-func (rt *RoutingTable) ComputeOutDegree(repl, hop int) int {
+func (rt *RoutingTable) ComputeOutDegree(repl, hop uint16) int {
 	hf := float64(hop)
 	if hf > 4*rt.l2nse {
 		return 0
@@ -325,15 +320,15 @@ func (rt *RoutingTable) heartbeat(ctx context.Context) {
 	logger.Println(logger.DBG, "[dht] RT heartbeat...")
 	timeout := util.NewRelativeTime(time.Duration(rt.cfg.PeerTTL) * time.Second)
 	if err := rt.Process(func() error {
-		for _, p := range rt.list {
+		return rt.list.ProcessRange(func(k string, p *PeerAddress) error {
 			// check if we can/need to drop a peer
 			drop := timeout.Compare(p.lastSeen.Elapsed()) < 0
 			if drop || timeout.Compare(p.lastUsed.Elapsed()) < 0 {
 				logger.Printf(logger.DBG, "[RT] removing %v: %v, %v", p, p.lastSeen.Elapsed(), p.lastUsed.Elapsed())
 				rt.Remove(p)
 			}
-		}
-		return nil
+			return nil
+		}, false)
 	}, false); err != nil {
 		logger.Println(logger.ERROR, "[dht] RT heartbeat failed: "+err.Error())
 	}
@@ -370,15 +365,25 @@ func (rt *RoutingTable) BestHello(addr *PeerAddress, rf blocks.ResultFilter) (hb
 	return
 }
 
+// CacheHello adds a HELLO block to the list of cached entries.
+func (rt *RoutingTable) CacheHello(hb *blocks.HelloBlock) {
+	rt.helloCache.Put(hb.PeerID.String(), hb)
+}
+
+// GetHello returns a HELLO block for key k (if available)
+func (rt *RoutingTable) GetHello(k string) (*blocks.HelloBlock, bool) {
+	return rt.helloCache.Get(k)
+}
+
 //----------------------------------------------------------------------
 
 // lock with given mode (if not in processing function)
 func (rt *RoutingTable) lock(readonly bool) {
 	if !rt.inProcess {
 		if readonly {
-			rt.mtx.RLock()
+			rt.RLock()
 		} else {
-			rt.mtx.Lock()
+			rt.Lock()
 		}
 	}
 }
@@ -387,9 +392,9 @@ func (rt *RoutingTable) lock(readonly bool) {
 func (rt *RoutingTable) unlock(readonly bool) {
 	if !rt.inProcess {
 		if readonly {
-			rt.mtx.RUnlock()
+			rt.RUnlock()
 		} else {
-			rt.mtx.Unlock()
+			rt.Unlock()
 		}
 	}
 }
@@ -400,8 +405,9 @@ func (rt *RoutingTable) unlock(readonly bool) {
 
 // Bucket holds peer entries with approx. same distance from node
 type Bucket struct {
-	list   []*PeerAddress
-	rwlock sync.RWMutex
+	sync.RWMutex
+
+	list []*PeerAddress // list of peer addresses in bucket.
 }
 
 // NewBucket creates a new entry list of given size
@@ -415,8 +421,8 @@ func NewBucket(n int) *Bucket {
 // Returns true if entry is added, false otherwise.
 func (b *Bucket) Add(p *PeerAddress) bool {
 	// only one writer and no readers
-	b.rwlock.Lock()
-	defer b.rwlock.Unlock()
+	b.Lock()
+	defer b.Unlock()
 
 	// check for free space in bucket
 	if len(b.list) < numK {
@@ -424,6 +430,7 @@ func (b *Bucket) Add(p *PeerAddress) bool {
 		b.list = append(b.list, p)
 		return true
 	}
+	// full bucket: no further additions
 	return false
 }
 
@@ -431,8 +438,8 @@ func (b *Bucket) Add(p *PeerAddress) bool {
 // Returns true if entry is removed (found), false otherwise.
 func (b *Bucket) Remove(p *PeerAddress) bool {
 	// only one writer and no readers
-	b.rwlock.Lock()
-	defer b.rwlock.Unlock()
+	b.Lock()
+	defer b.Unlock()
 
 	for i, pe := range b.list {
 		if pe.Equals(p) {
@@ -448,8 +455,8 @@ func (b *Bucket) Remove(p *PeerAddress) bool {
 // peer address; entries included in the bloom flter are ignored.
 func (b *Bucket) SelectClosestPeer(p *PeerAddress, bf *filter.BloomFilter) (n *PeerAddress, dist *math.Int) {
 	// no writer allowed
-	b.rwlock.RLock()
-	defer b.rwlock.RUnlock()
+	b.RLock()
+	defer b.RUnlock()
 
 	for _, addr := range b.list {
 		// skip addresses in bloomfilter
