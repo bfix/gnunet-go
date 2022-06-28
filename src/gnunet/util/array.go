@@ -33,6 +33,11 @@ var (
 
 // Clone creates a new array of same content as the argument.
 func Clone[T []E, E any](d T) T {
+	// handle nil slices
+	if d == nil {
+		return nil
+	}
+	// create copy
 	r := make(T, len(d))
 	copy(r, d)
 	return r
