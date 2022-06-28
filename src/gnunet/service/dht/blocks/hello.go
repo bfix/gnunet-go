@@ -321,7 +321,11 @@ func (bh *HelloBlockHandler) SetupResultFilter(filterSize int, mutator uint32) R
 // RF_IRRELEVANT return values: in both cases the block is ignored for
 // this query.
 func (bh *HelloBlockHandler) FilterResult(b Block, key *crypto.HashCode, rf ResultFilter, xQuery []byte) int {
-	return RF_IRRELEVANT
+	if rf.Contains(b) {
+		return RF_DUPLICATE
+	}
+	rf.Add(b)
+	return RF_LAST
 }
 
 // ValidateBlockStoreRequest is used to evaluate a block payload as part of
@@ -382,4 +386,9 @@ func (rf *HelloResultFilter) Contains(b Block) bool {
 		return rf.bf.Contains(h_addr[:])
 	}
 	return false
+}
+
+// Bytes returns a binary representation of a HELLO result filter
+func (rf *HelloResultFilter) Bytes() []byte {
+	return rf.bf.Bytes()
 }

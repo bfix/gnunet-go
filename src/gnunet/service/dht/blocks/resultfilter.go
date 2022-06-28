@@ -42,6 +42,9 @@ type ResultFilter interface {
 
 	// Contains returns true if entry (binary representation) is filtered
 	Contains(Block) bool
+
+	// Bytes returns the binary representation of a result filter
+	Bytes() []byte
 }
 
 //----------------------------------------------------------------------
@@ -53,4 +56,8 @@ func (rf *PassResultFilter) Add(Block) {
 
 func (rf *PassResultFilter) Contains(Block) bool {
 	return false
+}
+
+func (rf *PassResultFilter) Bytes() []byte {
+	return nil
 }
