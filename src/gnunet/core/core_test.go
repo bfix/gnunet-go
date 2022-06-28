@@ -250,7 +250,7 @@ func (n *TestNode) Learn(ctx context.Context, peer *util.PeerID, addr *util.Addr
 	if peer != nil {
 		label = peer.String()
 	}
-	n.t.Logf("[%d] Learning %s for %s", n.id, addr.StringAll(), label)
+	n.t.Logf("[%d] Learning %s for %s", n.id, addr.URI(), label)
 	n.core.Learn(ctx, peer, []*util.Address{addr})
 }
 
