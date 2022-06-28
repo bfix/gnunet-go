@@ -25,7 +25,6 @@ import (
 	"gnunet/util"
 	"io/ioutil"
 	"os"
-	"sync"
 
 	"github.com/bfix/gospel/logger"
 	"github.com/bfix/gospel/math"
@@ -51,7 +50,6 @@ type FileStore struct {
 	cacheMeta []*FileMetadata // cached metadata
 	wrPos     int             // write position in cyclic list
 	size      int             // size of cache (number of entries)
-	mtx       sync.Mutex      // serialize operations (prune)
 }
 
 // NewFileStore instantiates a new file storage.

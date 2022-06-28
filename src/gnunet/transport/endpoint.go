@@ -84,12 +84,13 @@ func NewEndpoint(addr net.Addr) (ep Endpoint, err error) {
 
 // PacketEndpoint for packet-oriented network protocols
 type PaketEndpoint struct {
+	sync.Mutex
+
 	id   int            // endpoint identifier
 	netw string         // network identifier ("udp", "udp4", "udp6", ...)
 	addr net.Addr       // endpoint address
 	conn net.PacketConn // packet connection
 	buf  []byte         // buffer for read/write operations
-	mtx  sync.Mutex     // mutex for send operations
 }
 
 // Run packet endpoint: send incoming messages to the handler.
@@ -178,8 +179,8 @@ func (ep *PaketEndpoint) read() (tm *TransportMessage, err error) {
 // Send message to address from endpoint
 func (ep *PaketEndpoint) Send(ctx context.Context, addr net.Addr, msg *TransportMessage) (err error) {
 	// only one sender at a time
-	ep.mtx.Lock()
-	defer ep.mtx.Unlock()
+	ep.Lock()
+	defer ep.Unlock()
 
 	// check for valid connection
 	if ep.conn == nil {
