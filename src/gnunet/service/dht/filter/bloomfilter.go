@@ -76,6 +76,25 @@ func (bf *BloomFilter) Mutator() []byte {
 	return bf.mInput
 }
 
+// Bytes returns the binary representation of a bloom filter
+func (bf *BloomFilter) Bytes() []byte {
+	var buf []byte
+	if bf.mInput != nil {
+		buf = append(buf, bf.mInput...)
+	}
+	buf = append(buf, bf.Bits...)
+	return buf
+}
+
+// Clone a bloom filter instance
+func (bf *BloomFilter) Clone() *BloomFilter {
+	return &BloomFilter{
+		Bits:   util.Clone(bf.Bits),
+		mInput: util.Clone(bf.mInput),
+		mData:  util.Clone(bf.mData),
+	}
+}
+
 // Add entry (binary representation):
 // When adding an element to the Bloom filter bf using BF-SET(bf,e), each
 // integer n of the mapping M(e) is interpreted as a bit offset n mod L
