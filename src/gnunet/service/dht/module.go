@@ -261,7 +261,9 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 		//--------------------------------------------------------------
 		// validate query (based on block type requested)  (9.4.3.1)
 		btype := enums.BlockType(msgT.BType)
-		if blockHdlr, ok := blocks.BlockHandlers[btype]; ok {
+		blockHdlr, ok := blocks.BlockHandlers[btype]
+		var block blocks.Block
+		if ok {
 			// validate block query
 			if !blockHdlr.ValidateBlockQuery(msgT.Query, msgT.XQuery) {
 				logger.Printf(logger.WARN, "[%s] DHT-P2P-GET invalid query -- discarded", label)
@@ -280,6 +282,8 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 		if msgT.ResFilter != nil && len(msgT.ResFilter) > 0 {
 			rf = blocks.NewHelloResultFilterFromBytes(msgT.ResFilter, true)
 		}
+		// clone peer filter
+		pf := msgT.PeerBF.Clone()
 
 		//----------------------------------------------------------
 		// check if we need to respond (9.4.3.3)
@@ -292,16 +296,20 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 			// query for a HELLO? (9.4.3.3a)
 			if msgT.BType == uint32(enums.BLOCK_TYPE_DHT_URL_HELLO) {
 				// iterate over cached HELLOs to find (best) match first
-				bestHB, bestDist := m.rtable.BestHello(addr, rf)
-				// found anything in cache at all?
-				if bestHB != nil {
+				var dist *math.Int
+				if block, dist = m.rtable.BestHello(addr, rf); block != nil {
 					// do we have a perfect match?
-					if bestDist.Equals(math.ZERO) || demux {
-						// send best result we have
-						if err := m.sendResult(ctx, query, bestHB, back); err != nil {
-							logger.Println(logger.ERROR, "[dht] Failed to send DHT result message: "+err.Error())
+					match := dist.Equals(math.ZERO)
+					if match || demux {
+						// send best result we have if that is not in the result filter
+						if !rf.Contains(block) {
+							logger.Println(logger.INFO, "[dht] sending DHT result message to caller")
+							if err := m.sendResult(ctx, query, block, back); err != nil {
+								logger.Println(logger.ERROR, "[dht] Failed to send DHT result message: "+err.Error())
+							}
+						} else {
+							block = nil
 						}
-						return true
 					}
 				}
 			}
@@ -319,7 +327,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 				block = nil
 			}
 			// if we demultiplex, find approximate block
-			if block == nil && demux {
+			if block == nil || demux {
 				// no exact match: find approximate  (9.4.3.3b)
 				match := func(b blocks.Block) bool {
 					return rf.Contains(b)
@@ -332,8 +340,42 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 			}
 			// if we have a block, send it as response
 			if block != nil {
+				logger.Println(logger.INFO, "[dht] sending DHT result message to caller")
 				if err := m.sendResult(ctx, query, block, back); err != nil {
 					logger.Println(logger.ERROR, "[dht] Failed to send DHT result message: "+err.Error())
+				}
+			}
+		}
+		// check if we need to forward message
+		forward := false
+		if block != nil && blockHdlr != nil {
+			switch blockHdlr.FilterResult(block, query.Key(), rf, msgT.XQuery) {
+			case blocks.RF_LAST:
+				// no need for further results
+			case blocks.RF_MORE:
+				// possibly more results
+				forward = true
+			case blocks.RF_DUPLICATE, blocks.RF_IRRELEVANT:
+				// do not forward
+			}
+		}
+		if forward {
+			// build updated GET message
+			pf.Add(m.core.PeerID().Bytes())
+			outMsg := msgT.Update(pf, rf, msgT.HopCount+1)
+
+			// forward to number of peers
+			numForward := m.rtable.ComputeOutDegree(msgT.ReplLevel, msgT.HopCount)
+			key := NewQueryAddress(query.Key())
+			for n := 0; n < numForward; n++ {
+				if p := m.rtable.SelectClosestPeer(key, pf); p != nil {
+					logger.Printf(logger.INFO, "[dht] forward DHT get message to %s", p.String())
+					if err := back.Send(ctx, outMsg); err != nil {
+						logger.Println(logger.ERROR, "[dht] Failed to forward DHT get message: "+err.Error())
+					}
+					pf.Add(p.addr)
+				} else {
+					break
 				}
 			}
 		}
@@ -388,13 +430,13 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 		// cache HELLO block if applicable
 		k := sender.String()
 		isNew := true
-		if hb, ok := m.rtable.helloCache.Get(k); ok {
+		if hb, ok := m.rtable.GetHello(k); ok {
 			// cache entry exists: is the HELLO message more recent?
 			_, isNew = hb.Expires.Diff(msgT.Expires)
 		}
 		// we need to cache a new(er) HELLO
 		if isNew {
-			m.rtable.helloCache.Put(k, &blocks.HelloBlock{
+			m.rtable.CacheHello(&blocks.HelloBlock{
 				PeerID:    sender,
 				Signature: msgT.Signature,
 				Expires:   msgT.Expires,
