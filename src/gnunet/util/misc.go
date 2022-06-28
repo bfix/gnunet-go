@@ -20,7 +20,6 @@ package util
 
 import (
 	"strings"
-	"sync"
 )
 
 //----------------------------------------------------------------------
@@ -49,108 +48,6 @@ func (cm Counter[T]) Num(i T) int {
 		count = 0
 	}
 	return count
-}
-
-//----------------------------------------------------------------------
-// Thread-safe map implementation
-//----------------------------------------------------------------------
-
-// Map keys to values
-type Map[K comparable, V any] struct {
-	list      map[K]V
-	mtx       sync.RWMutex
-	inProcess bool
-}
-
-// NewMap allocates a new mapping.
-func NewMap[K comparable, V any]() *Map[K, V] {
-	return &Map[K, V]{
-		list:      make(map[K]V),
-		inProcess: false,
-	}
-}
-
-//----------------------------------------------------------------------
-
-// Process a function in the locked map context. Calls
-// to other map functions in 'f' will skip their locks.
-func (m *Map[K, V]) Process(f func() error, readonly bool) error {
-	// handle locking
-	m.lock(readonly)
-	m.inProcess = true
-	defer func() {
-		m.inProcess = false
-		m.unlock(readonly)
-	}()
-	// function call in unlocked environment
-	return f()
-}
-
-// Process a ranged function in the locked map context. Calls
-// to other map functions in 'f' will skip their locks.
-func (m *Map[K, V]) ProcessRange(f func(key K, value V) error, readonly bool) error {
-	// handle locking
-	m.lock(readonly)
-	m.inProcess = true
-	defer func() {
-		m.inProcess = false
-		m.unlock(readonly)
-	}()
-	// range over map and call function.
-	for key, value := range m.list {
-		if err := f(key, value); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-//----------------------------------------------------------------------
-
-// Put value into map under given key.
-func (m *Map[K, V]) Put(key K, value V) {
-	m.lock(false)
-	defer m.unlock(false)
-	m.list[key] = value
-}
-
-// Get value with iven key from map.
-func (m *Map[K, V]) Get(key K) (value V, ok bool) {
-	m.lock(true)
-	defer m.unlock(true)
-	value, ok = m.list[key]
-	return
-}
-
-// Delete key/value pair from map.
-func (m *Map[K, V]) Delete(key K) {
-	m.lock(false)
-	defer m.unlock(false)
-	delete(m.list, key)
-}
-
-//----------------------------------------------------------------------
-
-// lock with given mode (if not in processing function)
-func (m *Map[K, V]) lock(readonly bool) {
-	if !m.inProcess {
-		if readonly {
-			m.mtx.RLock()
-		} else {
-			m.mtx.Lock()
-		}
-	}
-}
-
-// lock with given mode (if not in processing function)
-func (m *Map[K, V]) unlock(readonly bool) {
-	if !m.inProcess {
-		if readonly {
-			m.mtx.RUnlock()
-		} else {
-			m.mtx.Unlock()
-		}
-	}
 }
 
 //----------------------------------------------------------------------
