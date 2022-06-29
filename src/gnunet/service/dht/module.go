@@ -89,8 +89,11 @@ func (m *Module) Get(ctx context.Context, query blocks.Query) (block blocks.Bloc
 }
 
 // GetApprox returns the first block not excluded ["dht:getapprox"]
-func (m *Module) GetApprox(ctx context.Context, query blocks.Query, excl func(blocks.Block) bool) (block blocks.Block, err error) {
-	return m.store.GetApprox(query, excl)
+func (m *Module) GetApprox(ctx context.Context, query blocks.Query, excl func(blocks.Block) bool) (block blocks.Block, dist *math.Int, err error) {
+	var d any
+	block, d, err = m.store.GetApprox(query, excl)
+	dist = d.(*math.Int)
+	return
 }
 
 // Put a block into the DHT ["dht:put"]
@@ -258,11 +261,14 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-GET message", label)
 		query := blocks.NewGenericQuery(msgT.Query.Bits, enums.BlockType(msgT.BType), msgT.Flags)
 
+		var block blocks.Block
+		var dist *math.Int
+		var err error
+
 		//--------------------------------------------------------------
 		// validate query (based on block type requested)  (9.4.3.1)
 		btype := enums.BlockType(msgT.BType)
 		blockHdlr, ok := blocks.BlockHandlers[btype]
-		var block blocks.Block
 		if ok {
 			// validate block query
 			if !blockHdlr.ValidateBlockQuery(msgT.Query, msgT.XQuery) {
@@ -286,25 +292,29 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 		pf := msgT.PeerFilter.Clone()
 
 		//----------------------------------------------------------
-		// check if we need to respond (9.4.3.3)
+		// check if we need to respond (and how) (9.4.3.3)
 		addr := NewQueryAddress(msgT.Query)
 		closest := m.rtable.IsClosestPeer(nil, addr, msgT.PeerFilter)
 		demux := int(msgT.Flags)&enums.DHT_RO_DEMULTIPLEX_EVERYWHERE != 0
 		approx := int(msgT.Flags)&enums.DHT_RO_FIND_APPROXIMATE != 0
-		logger.Printf(logger.DBG, "[dht] GET message: closest=%v, demux=%v, approx=%v", closest, demux, approx)
+		// actions
+		do_result := closest || (demux && approx)
+		do_forward := !closest || (demux && !approx)
+		logger.Printf(logger.DBG, "[dht] GET message: closest=%v, demux=%v, approx=%v --> result=%v, forward=%v",
+			closest, demux, approx, do_result, do_forward)
 
 		//------------------------------------------------------
 		// query for a HELLO? (9.4.3.3a)
 		if msgT.BType == uint32(enums.BLOCK_TYPE_DHT_URL_HELLO) {
 			logger.Println(logger.DBG, "[dht] GET message for HELLO: check cache")
 			// iterate over cached HELLOs to find (best) match first
-			var dist *math.Int
 			if block, dist = m.rtable.BestHello(addr, rf); block != nil {
 				// is block in result filter?
 				if rf.Contains(block) {
 					// skip it
 					logger.Println(logger.DBG, "[dht] GET message for HELLO: best cached block is filtered")
 					block = nil
+					dist = nil
 				} else {
 					// do we have a perfect match?
 					match := dist.Equals(math.ZERO)
@@ -317,6 +327,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 					} else {
 						logger.Println(logger.DBG, "[dht] GET message for HELLO: best cached block not applicable")
 						block = nil
+						dist = nil
 					}
 				}
 			}
@@ -324,11 +335,11 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 		//--------------------------------------------------------------
 		// find the closest block that has that is not filtered/ by the result
 		// filter (in case we did not find an appropriate block in cache).
-
-		if block == nil {
+		if do_result {
+			block_cache := block
+			dist_cache := dist
 			// query DHT store for exact match  (9.4.3.3c)
-			block, err := m.Get(ctx, query)
-			if err != nil {
+			if block, err = m.Get(ctx, query); err != nil {
 				logger.Printf(logger.ERROR, "[%s] Failed to get DHT block from storage: %s", label, err.Error())
 				return true
 			}
@@ -338,15 +349,21 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 			}
 			// if we have no exact match, find approximate block if requested
 			if block == nil || approx {
-				// no exact match: find approximate  (9.4.3.3b)
+				// no exact match: find approximate (9.4.3.3b)
 				match := func(b blocks.Block) bool {
 					return rf.Contains(b)
 				}
-				block, err = m.GetApprox(ctx, query, match)
+				block, dist, err = m.GetApprox(ctx, query, match)
 				if err != nil {
 					logger.Printf(logger.ERROR, "[%s] Failed to get (approx.) DHT block from storage: %s", label, err.Error())
 					return true
 				}
+			}
+			// if we have a block from cache, check if it is better than the
+			// block found in the DHT
+			if block_cache != nil && dist_cache.Cmp(dist) < 0 {
+				block = block_cache
+				dist = dist_cache
 			}
 			// if we have a block, send it as response
 			if block != nil {
@@ -356,21 +373,19 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 				}
 			}
 		}
-
-		// check if we need to forward message
-		forward := demux
+		// check if we need to forward message based on filter result
 		if block != nil && blockHdlr != nil {
 			switch blockHdlr.FilterResult(block, query.Key(), rf, msgT.XQuery) {
 			case blocks.RF_LAST:
 				// no need for further results
 			case blocks.RF_MORE:
 				// possibly more results
-				forward = true
+				do_forward = true
 			case blocks.RF_DUPLICATE, blocks.RF_IRRELEVANT:
 				// do not forward
 			}
 		}
-		if forward {
+		if do_forward {
 			// build updated GET message
 			pf.Add(m.core.PeerID())
 			outMsg := msgT.Update(pf, rf, msgT.HopCount+1)
