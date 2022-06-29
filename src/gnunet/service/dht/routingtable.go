@@ -95,11 +95,11 @@ func (addr *PeerAddress) Equals(p *PeerAddress) bool {
 // Distance between two addresses: returns a distance value and a
 // bucket index (smaller index = less distant).
 func (addr *PeerAddress) Distance(p *PeerAddress) (*math.Int, int) {
-	var d PeerAddress
-	for i := range d.addr {
-		d.addr[i] = addr.addr[i] ^ p.addr[i]
+	d := make([]byte, 64)
+	for i := range d {
+		d[i] = addr.addr[i] ^ p.addr[i]
 	}
-	r := math.NewIntFromBytes(d.addr[:])
+	r := math.NewIntFromBytes(d)
 	return r, numBuckets - r.BitLen()
 }
 
