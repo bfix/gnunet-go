@@ -152,7 +152,7 @@ func (db *FileMetaDB) Traverse(f func(*FileMetadata)) error {
 	if err != nil {
 		return err
 	}
-	var md *FileMetadata
+	md := new(FileMetadata)
 	for rows.Next() {
 		var st, exp, lu uint64
 		err = rows.Scan(&md.key, &md.btype, &md.size, &st, &exp, &lu, &md.usedCount)
