@@ -16,7 +16,7 @@
 //
 // SPDX-License-Identifier: AGPL3.0-or-later
 
-package filter
+package blocks
 
 import (
 	"bytes"

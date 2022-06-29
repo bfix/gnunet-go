@@ -23,7 +23,7 @@ import (
 	"encoding/hex"
 	"gnunet/config"
 	"gnunet/core"
-	"gnunet/service/dht/filter"
+	"gnunet/service/dht/blocks"
 	"gnunet/util"
 	"math/rand"
 	"testing"
@@ -141,11 +141,11 @@ func TestRT(t *testing.T) {
 
 	// execute some routing functions on remaining table
 	k := genRemotePeer()
-	bf := filter.NewBloomFilter(128)
-	n := rt.SelectClosestPeer(k, bf)
+	pf := blocks.NewPeerFilter()
+	n := rt.SelectClosestPeer(k, pf)
 	t.Logf("Closest: %s -> %s\n", k, n)
 
-	n = rt.SelectRandomPeer(bf)
+	n = rt.SelectRandomPeer(pf)
 	t.Logf("Random: %s\n", n)
 }
 

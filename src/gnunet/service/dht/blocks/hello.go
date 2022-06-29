@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"gnunet/crypto"
 	"gnunet/enums"
-	"gnunet/service/dht/filter"
 	"gnunet/util"
 	"net/url"
 	"strconv"
@@ -338,14 +337,14 @@ func (bh *HelloBlockHandler) ValidateBlockStoreRequest(b Block) bool {
 
 // HelloResultFilter is a result  filter implementation for HELLO blocks
 type HelloResultFilter struct {
-	bf *filter.BloomFilter
+	bf *BloomFilter
 }
 
 // NewHelloResultFilter initializes an empty resut filter
 func NewHelloResultFilter(filterSize int, mutator uint32) *HelloResultFilter {
 	// HELLO result filters are BloomFilters with a mutator
 	rf := new(HelloResultFilter)
-	rf.bf = filter.NewBloomFilter(filterSize)
+	rf.bf = NewBloomFilter(filterSize)
 	rf.bf.SetMutator(mutator)
 	return rf
 }
@@ -353,16 +352,13 @@ func NewHelloResultFilter(filterSize int, mutator uint32) *HelloResultFilter {
 // NewHelloResultFilterFromBytes creates a new result filter from a binary
 // representation: 'data' is the concatenaion 'mutator|bloomfilter'.
 // If 'withMutator' is false, no mutator is used.
-func NewHelloResultFilterFromBytes(data []byte, withMutator bool) *HelloResultFilter {
+func NewHelloResultFilterFromBytes(data []byte) *HelloResultFilter {
 	//logger.Printf(logger.DBG, "[filter] FromBytes = %d:%s (mutator: %v)",len(data), hex.EncodeToString(data), withMutator)
 
 	// handle mutator input
-	mSize := 0
-	if withMutator {
-		mSize = 4
-	}
+	mSize := 4
 	rf := new(HelloResultFilter)
-	rf.bf = &filter.BloomFilter{
+	rf.bf = &BloomFilter{
 		Bits: util.Clone(data[mSize:]),
 	}
 	if mSize > 0 {

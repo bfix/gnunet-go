@@ -26,7 +26,6 @@ import (
 	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/service/dht/blocks"
-	"gnunet/service/dht/filter"
 	"gnunet/util"
 	"time"
 
@@ -111,33 +110,33 @@ func (pe *PathElement) Wire() *PathElementWire {
 
 // DHTP2PGetMsg wire layout
 type DHTP2PGetMsg struct {
-	MsgSize   uint16             `order:"big"`   // total size of message
-	MsgType   uint16             `order:"big"`   // DHT_P2P_GET (147)
-	BType     uint32             `order:"big"`   // content type of the payload
-	Flags     uint16             `order:"big"`   // processing flags
-	HopCount  uint16             `order:"big"`   // number of hops so far
-	ReplLevel uint16             `order:"big"`   // Replication level
-	RfSize    uint16             `order:"big"`   // size of result filter
-	PeerBF    *blocks.PeerFilter ``              // bloomfilter to prevent loops
-	Query     *crypto.HashCode   ``              // query hash
-	ResFilter []byte             `size:"RfSize"` // result filter
-	XQuery    []byte             `size:"*"`      // extended query
+	MsgSize    uint16             `order:"big"`   // total size of message
+	MsgType    uint16             `order:"big"`   // DHT_P2P_GET (147)
+	BType      uint32             `order:"big"`   // content type of the payload
+	Flags      uint16             `order:"big"`   // processing flags
+	HopCount   uint16             `order:"big"`   // number of hops so far
+	ReplLevel  uint16             `order:"big"`   // Replication level
+	RfSize     uint16             `order:"big"`   // size of result filter
+	PeerFilter *blocks.PeerFilter ``              // peer filter to prevent loops
+	Query      *crypto.HashCode   ``              // query hash
+	ResFilter  []byte             `size:"RfSize"` // result filter
+	XQuery     []byte             `size:"*"`      // extended query
 }
 
 // NewDHTP2PGetMsg creates an empty DHT-P2P-Get message
 func NewDHTP2PGetMsg() *DHTP2PGetMsg {
 	return &DHTP2PGetMsg{
-		MsgSize:   208,                     // message size without ResFiter and XQuery
-		MsgType:   DHT_P2P_GET,             // DHT_P2P_GET (147)
-		BType:     0,                       // no block type defined
-		Flags:     0,                       // no flags defined
-		HopCount:  0,                       // no hops
-		ReplLevel: 0,                       // no replication level defined
-		RfSize:    0,                       // no result filter
-		PeerBF:    blocks.NewPeerFilter(),  // allocate bloom filter
-		Query:     crypto.NewHashCode(nil), // empty Query hash
-		ResFilter: nil,                     // empty result filter
-		XQuery:    nil,                     // empty XQuery
+		MsgSize:    208,                     // message size without ResFiter and XQuery
+		MsgType:    DHT_P2P_GET,             // DHT_P2P_GET (147)
+		BType:      0,                       // no block type defined
+		Flags:      0,                       // no flags defined
+		HopCount:   0,                       // no hops
+		ReplLevel:  0,                       // no replication level defined
+		RfSize:     0,                       // no result filter
+		PeerFilter: blocks.NewPeerFilter(),  // allocate bloom filter
+		Query:      crypto.NewHashCode(nil), // empty Query hash
+		ResFilter:  nil,                     // empty result filter
+		XQuery:     nil,                     // empty XQuery
 	}
 }
 
@@ -157,17 +156,17 @@ func (m *DHTP2PGetMsg) Update(pf *blocks.PeerFilter, rf blocks.ResultFilter, hop
 	buf := rf.Bytes()
 	ns := uint16(len(buf))
 	return &DHTP2PGetMsg{
-		MsgSize:   m.MsgSize - m.RfSize + ns,
-		MsgType:   DHT_P2P_GET,
-		BType:     m.BType,
-		Flags:     m.Flags,
-		HopCount:  hop,
-		ReplLevel: m.ReplLevel,
-		RfSize:    ns,
-		PeerBF:    pf.Clone(),
-		Query:     m.Query,
-		ResFilter: buf,
-		XQuery:    util.Clone(m.XQuery),
+		MsgSize:    m.MsgSize - m.RfSize + ns,
+		MsgType:    DHT_P2P_GET,
+		BType:      m.BType,
+		Flags:      m.Flags,
+		HopCount:   hop,
+		ReplLevel:  m.ReplLevel,
+		RfSize:     ns,
+		PeerFilter: pf.Clone(),
+		Query:      m.Query,
+		ResFilter:  buf,
+		XQuery:     util.Clone(m.XQuery),
 	}
 }
 
@@ -178,35 +177,35 @@ func (m *DHTP2PGetMsg) Update(pf *blocks.PeerFilter, rf blocks.ResultFilter, hop
 
 // DHTP2PPutMsg wire layout
 type DHTP2PPutMsg struct {
-	MsgSize    uint16              `order:"big"`  // total size of message
-	MsgType    uint16              `order:"big"`  // DHT_P2P_PUT (146)
-	BType      uint32              `order:"big"`  // block type
-	Flags      uint16              `order:"big"`  // processing flags
-	HopCount   uint16              `order:"big"`  // message hops
-	ReplLvl    uint16              `order:"big"`  // replication level
-	PathL      uint16              `order:"big"`  // path length
-	Expiration util.AbsoluteTime   ``             // expiration date
-	PeerBF     *filter.BloomFilter ``             // peer bloomfilter
-	Key        *crypto.HashCode    ``             // query key to block
-	PutPath    []*PathElementWire  `size:"PathL"` // PUT path
-	Block      []byte              `size:"*"`     // block data
+	MsgSize    uint16             `order:"big"`  // total size of message
+	MsgType    uint16             `order:"big"`  // DHT_P2P_PUT (146)
+	BType      uint32             `order:"big"`  // block type
+	Flags      uint16             `order:"big"`  // processing flags
+	HopCount   uint16             `order:"big"`  // message hops
+	ReplLvl    uint16             `order:"big"`  // replication level
+	PathL      uint16             `order:"big"`  // path length
+	Expiration util.AbsoluteTime  ``             // expiration date
+	PeerFilter *blocks.PeerFilter ``             // peer bloomfilter
+	Key        *crypto.HashCode   ``             // query key to block
+	PutPath    []*PathElementWire `size:"PathL"` // PUT path
+	Block      []byte             `size:"*"`     // block data
 }
 
 // NewDHTP2PPutMsg creates an empty new DHTP2PPutMsg
 func NewDHTP2PPutMsg() *DHTP2PPutMsg {
 	return &DHTP2PPutMsg{
-		MsgSize:    218,                        // total size without path and block data
-		MsgType:    DHT_P2P_PUT,                // DHT_P2P_PUT (146)
-		BType:      0,                          // block type
-		Flags:      0,                          // processing flags
-		HopCount:   0,                          // message hops
-		ReplLvl:    0,                          // replication level
-		PathL:      0,                          // no PUT path
-		Expiration: util.AbsoluteTimeNever(),   // expiration date
-		PeerBF:     filter.NewBloomFilter(128), // peer bloom filter
-		Key:        crypto.NewHashCode(nil),    // query key
-		PutPath:    nil,                        // no PUT path
-		Block:      nil,                        // no block data
+		MsgSize:    218,                      // total size without path and block data
+		MsgType:    DHT_P2P_PUT,              // DHT_P2P_PUT (146)
+		BType:      0,                        // block type
+		Flags:      0,                        // processing flags
+		HopCount:   0,                        // message hops
+		ReplLvl:    0,                        // replication level
+		PathL:      0,                        // no PUT path
+		Expiration: util.AbsoluteTimeNever(), // expiration date
+		PeerFilter: blocks.NewPeerFilter(),   // peer bloom filter
+		Key:        crypto.NewHashCode(nil),  // query key
+		PutPath:    nil,                      // no PUT path
+		Block:      nil,                      // no block data
 	}
 }
 

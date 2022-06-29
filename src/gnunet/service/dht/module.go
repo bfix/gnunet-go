@@ -274,21 +274,21 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 		}
 		//----------------------------------------------------------
 		// check if sender is in peer filter (9.4.3.2)
-		if !msgT.PeerBF.Contains(sender) {
+		if !msgT.PeerFilter.Contains(sender) {
 			logger.Printf(logger.WARN, "[dht] Sender not in peer filter")
 		}
 		// parse result filter
 		var rf blocks.ResultFilter = new(blocks.PassResultFilter)
 		if msgT.ResFilter != nil && len(msgT.ResFilter) > 0 {
-			rf = blocks.NewHelloResultFilterFromBytes(msgT.ResFilter, true)
+			rf = blocks.NewHelloResultFilterFromBytes(msgT.ResFilter)
 		}
 		// clone peer filter
-		pf := msgT.PeerBF.Clone()
+		pf := msgT.PeerFilter.Clone()
 
 		//----------------------------------------------------------
 		// check if we need to respond (9.4.3.3)
 		addr := NewQueryAddress(msgT.Query)
-		closest := m.rtable.IsClosestPeer(nil, addr, msgT.PeerBF.BF)
+		closest := m.rtable.IsClosestPeer(nil, addr, msgT.PeerFilter)
 		demux := int(msgT.Flags)&enums.DHT_RO_DEMULTIPLEX_EVERYWHERE != 0
 		approx := int(msgT.Flags)&enums.DHT_RO_FIND_APPROXIMATE != 0
 		logger.Printf(logger.DBG, "[dht] GET message: closest=%v, demux=%v, approx=%v", closest, demux, approx)
@@ -310,7 +310,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 					match := dist.Equals(math.ZERO)
 					if match || approx {
 						// send best result
-						logger.Println(logger.INFO, "[dht] sending DHT result message to caller")
+						logger.Println(logger.INFO, "[dht] sending DHT result message from cache to caller")
 						if err := m.sendResult(ctx, query, block, back); err != nil {
 							logger.Println(logger.ERROR, "[dht] Failed to send DHT result message: "+err.Error())
 						}
@@ -379,12 +379,12 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 			numForward := m.rtable.ComputeOutDegree(msgT.ReplLevel, msgT.HopCount)
 			key := NewQueryAddress(query.Key())
 			for n := 0; n < numForward; n++ {
-				if p := m.rtable.SelectClosestPeer(key, pf.BF); p != nil {
+				if p := m.rtable.SelectClosestPeer(key, pf); p != nil {
 					logger.Printf(logger.INFO, "[dht] forward DHT get message to %s", p.String())
 					if err := back.Send(ctx, outMsg); err != nil {
 						logger.Println(logger.ERROR, "[dht] Failed to forward DHT get message: "+err.Error())
 					}
-					pf.Add(p.peer)
+					pf.Add(p.Peer)
 				} else {
 					break
 				}

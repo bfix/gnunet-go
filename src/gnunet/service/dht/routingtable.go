@@ -21,12 +21,10 @@ package dht
 import (
 	"bytes"
 	"context"
-	"crypto/sha512"
 	"encoding/hex"
 	"gnunet/config"
 	"gnunet/crypto"
 	"gnunet/service/dht/blocks"
-	"gnunet/service/dht/filter"
 	"gnunet/util"
 	"sync"
 	"time"
@@ -35,48 +33,39 @@ import (
 	"github.com/bfix/gospel/math"
 )
 
-var (
-	// routing table hash function: defines number of
-	// buckets and size of peer addresses
-	rtHash = sha512.New
-)
-
-// Routing table contants (adjust with changing hash function)
+// Routing table constants
 const (
-	numBuckets = 512 // number of bits of hash function result
-	numK       = 20  // number of entries per k-bucket
-	sizeAddr   = 64  // size of peer address in bytes
+	numK = 20 // number of entries per k-bucket
 )
 
 //======================================================================
+// Peer address
 //======================================================================
 
 // PeerAddress is the identifier for a peer in the DHT network.
 // It is the SHA-512 hash of the PeerID (public Ed25519 key).
 type PeerAddress struct {
-	peer     *util.PeerID      // peer identifier
-	addr     []byte            // hash value as bytes
+	Peer     *util.PeerID      // peer identifier
+	Key      *crypto.HashCode  // address key is a sha512 hash
 	lastSeen util.AbsoluteTime // time the peer was last seen
 	lastUsed util.AbsoluteTime // time the peer was last used
 }
 
 // NewPeerAddress returns the DHT address of a peer.
 func NewPeerAddress(peer *util.PeerID) *PeerAddress {
-	r := new(PeerAddress)
-	h := rtHash()
-	h.Write(peer.Data)
-	r.addr = h.Sum(nil)
-	r.peer = peer
-	r.lastSeen = util.AbsoluteTimeNow()
-	r.lastUsed = util.AbsoluteTimeNow()
-	return r
+	return &PeerAddress{
+		Peer:     peer,
+		Key:      crypto.Hash(peer.Data),
+		lastSeen: util.AbsoluteTimeNow(),
+		lastUsed: util.AbsoluteTimeNow(),
+	}
 }
 
 // NewQueryAddress returns a wrapped peer address for a query key
 func NewQueryAddress(key *crypto.HashCode) *PeerAddress {
 	return &PeerAddress{
-		peer:     nil,
-		addr:     util.Clone(key.Bits),
+		Peer:     nil,
+		Key:      crypto.NewHashCode(key.Bits),
 		lastSeen: util.AbsoluteTimeNow(),
 		lastUsed: util.AbsoluteTimeNow(),
 	}
@@ -84,12 +73,12 @@ func NewQueryAddress(key *crypto.HashCode) *PeerAddress {
 
 // String returns a human-readble representation of an address.
 func (addr *PeerAddress) String() string {
-	return hex.EncodeToString(addr.addr[:])
+	return hex.EncodeToString(addr.Key.Bits)
 }
 
 // Equals returns true if two peer addresses are the same.
 func (addr *PeerAddress) Equals(p *PeerAddress) bool {
-	return bytes.Equal(addr.addr[:], p.addr[:])
+	return bytes.Equal(addr.Key.Bits, p.Key.Bits)
 }
 
 // Distance between two addresses: returns a distance value and a
@@ -97,10 +86,10 @@ func (addr *PeerAddress) Equals(p *PeerAddress) bool {
 func (addr *PeerAddress) Distance(p *PeerAddress) (*math.Int, int) {
 	d := make([]byte, 64)
 	for i := range d {
-		d[i] = addr.addr[i] ^ p.addr[i]
+		d[i] = addr.Key.Bits[i] ^ p.Key.Bits[i]
 	}
 	r := math.NewIntFromBytes(d)
-	return r, numBuckets - r.BitLen()
+	return r, 512 - r.BitLen()
 }
 
 //======================================================================
@@ -129,7 +118,7 @@ func NewRoutingTable(ref *PeerAddress, cfg *config.RoutingConfig) *RoutingTable 
 	rt := &RoutingTable{
 		ref:        ref,
 		list:       util.NewMap[string, *PeerAddress](),
-		buckets:    make([]*Bucket, numBuckets),
+		buckets:    make([]*Bucket, 512),
 		l2nse:      -1,
 		inProcess:  false,
 		cfg:        cfg,
@@ -190,7 +179,7 @@ func (rt *RoutingTable) Remove(p *PeerAddress) bool {
 	}
 	rt.list.Delete(k)
 	// delete from HELLO cache
-	rt.helloCache.Delete(p.peer.String())
+	rt.helloCache.Delete(p.Peer.String())
 	return rc
 }
 
@@ -233,8 +222,8 @@ func (rt *RoutingTable) Process(f func() error, readonly bool) error {
 // Routing functions
 //----------------------------------------------------------------------
 
-// SelectClosestPeer for a given peer address and bloomfilter.
-func (rt *RoutingTable) SelectClosestPeer(p *PeerAddress, bf *filter.BloomFilter) (n *PeerAddress) {
+// SelectClosestPeer for a given peer address and peer filter.
+func (rt *RoutingTable) SelectClosestPeer(p *PeerAddress, pf *blocks.PeerFilter) (n *PeerAddress) {
 	// no writer allowed
 	rt.RLock()
 	defer rt.RUnlock()
@@ -242,27 +231,34 @@ func (rt *RoutingTable) SelectClosestPeer(p *PeerAddress, bf *filter.BloomFilter
 	// find closest address
 	var dist *math.Int
 	for _, b := range rt.buckets {
-		if k, d := b.SelectClosestPeer(p, bf); n == nil || (d != nil && d.Cmp(dist) < 0) {
+		if k, d := b.SelectClosestPeer(p, pf); n == nil || (d != nil && d.Cmp(dist) < 0) {
 			dist = d
 			n = k
 		}
 	}
 	// mark peer as used
-	n.lastUsed = util.AbsoluteTimeNow()
+	if n != nil {
+		n.lastUsed = util.AbsoluteTimeNow()
+	}
 	return
 }
 
 // SelectRandomPeer returns a random address from table (that is not
 // included in the bloomfilter)
-func (rt *RoutingTable) SelectRandomPeer(bf *filter.BloomFilter) (p *PeerAddress) {
+func (rt *RoutingTable) SelectRandomPeer(pf *blocks.PeerFilter) (p *PeerAddress) {
 	// no writer allowed
 	rt.RLock()
 	defer rt.RUnlock()
 
 	// select random entry from list
 	var ok bool
-	if _, p, ok = rt.list.GetRandom(); !ok {
-		return nil
+	for {
+		if _, p, ok = rt.list.GetRandom(); !ok {
+			return nil
+		}
+		if !pf.Contains(p.Peer) {
+			break
+		}
 	}
 	// mark peer as used
 	p.lastUsed = util.AbsoluteTimeNow()
@@ -272,7 +268,7 @@ func (rt *RoutingTable) SelectRandomPeer(bf *filter.BloomFilter) (p *PeerAddress
 // SelectPeer selects a neighbor depending on the number of hops parameter.
 // If hops < NSE this function MUST return SelectRandomPeer() and
 // SelectClosestpeer() otherwise.
-func (rt *RoutingTable) SelectPeer(p *PeerAddress, hops int, bf *filter.BloomFilter) *PeerAddress {
+func (rt *RoutingTable) SelectPeer(p *PeerAddress, hops int, bf *blocks.PeerFilter) *PeerAddress {
 	if float64(hops) < rt.l2nse {
 		return rt.SelectRandomPeer(bf)
 	}
@@ -282,8 +278,8 @@ func (rt *RoutingTable) SelectPeer(p *PeerAddress, hops int, bf *filter.BloomFil
 // IsClosestPeer returns true if p is the closest peer for k. Peers with a
 // positive test in the Bloom filter are not considered. If p is nil, our
 // reference address is used.
-func (rt *RoutingTable) IsClosestPeer(p, k *PeerAddress, bf *filter.BloomFilter) bool {
-	n := rt.SelectClosestPeer(k, bf)
+func (rt *RoutingTable) IsClosestPeer(p, k *PeerAddress, pf *blocks.PeerFilter) bool {
+	n := rt.SelectClosestPeer(k, pf)
 	if p == nil {
 		p = rt.ref
 	}
@@ -453,14 +449,14 @@ func (b *Bucket) Remove(p *PeerAddress) bool {
 
 // SelectClosestPeer returns the entry with minimal distance to the given
 // peer address; entries included in the bloom flter are ignored.
-func (b *Bucket) SelectClosestPeer(p *PeerAddress, bf *filter.BloomFilter) (n *PeerAddress, dist *math.Int) {
+func (b *Bucket) SelectClosestPeer(p *PeerAddress, pf *blocks.PeerFilter) (n *PeerAddress, dist *math.Int) {
 	// no writer allowed
 	b.RLock()
 	defer b.RUnlock()
 
 	for _, addr := range b.list {
 		// skip addresses in bloomfilter
-		if bf.Contains(addr.addr[:]) {
+		if pf.Contains(addr.Peer) {
 			continue
 		}
 		// check for shorter distance
