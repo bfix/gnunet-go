@@ -39,7 +39,7 @@ var (
 	ErrEndpExists           = errors.New("endpoint exists")
 	ErrEndpNoAddress        = errors.New("no address for endpoint")
 	ErrEndpNoConnection     = errors.New("no connection on endpoint")
-	ErrEndpMaybeSent        = errors.New("message may have been sent - cant know")
+	ErrEndpMaybeSent        = errors.New("message may have been sent - can't know")
 	ErrEndpWriteShort       = errors.New("write too short")
 )
 
