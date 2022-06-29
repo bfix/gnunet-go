@@ -228,7 +228,7 @@ func (rt *RoutingTable) SelectClosestPeer(p *PeerAddress, pf *blocks.PeerFilter)
 	rt.RLock()
 	defer rt.RUnlock()
 
-	// find closest address
+	// find closest peer in routing table
 	var dist *math.Int
 	for _, b := range rt.buckets {
 		if k, d := b.SelectClosestPeer(p, pf); n == nil || (d != nil && d.Cmp(dist) < 0) {
@@ -279,10 +279,21 @@ func (rt *RoutingTable) SelectPeer(p *PeerAddress, hops int, bf *blocks.PeerFilt
 // positive test in the Bloom filter are not considered. If p is nil, our
 // reference address is used.
 func (rt *RoutingTable) IsClosestPeer(p, k *PeerAddress, pf *blocks.PeerFilter) bool {
+	// get closest peer in routing table
 	n := rt.SelectClosestPeer(k, pf)
+	// check SELF?
 	if p == nil {
-		p = rt.ref
+		// if no peer in routing table found
+		if n == nil {
+			// local peer is closest
+			return true
+		}
+		// check if local distance is smaller than for best peer in routing table
+		d0, _ := n.Distance(k)
+		d1, _ := rt.ref.Distance(k)
+		return d1.Cmp(d0) < 0
 	}
+	// check if p is closest peer
 	return n.Equals(p)
 }
 
