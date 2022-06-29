@@ -177,7 +177,7 @@ func (s *FileStore) Get(query blocks.Query) (block blocks.Block, err error) {
 
 // GetApprox returns the best-matching value with given key from storage
 // that is not excluded
-func (s *FileStore) GetApprox(key blocks.Query, excl func(blocks.Block) bool) (block blocks.Block, err error) {
+func (s *FileStore) GetApprox(query blocks.Query, excl func(blocks.Block) bool) (block blocks.Block, key any, err error) {
 	var bestKey []byte
 	var bestBlk blocks.Block
 	var bestDist *math.Int
@@ -192,7 +192,7 @@ func (s *FileStore) GetApprox(key blocks.Query, excl func(blocks.Block) bool) (b
 	// iterate over all keys
 	check := func(md *FileMetadata) {
 		// check for better match
-		d := dist(md.key, key.Key().Bits)
+		d := dist(md.key, query.Key().Bits)
 		if bestKey == nil || d.Cmp(bestDist) < 0 {
 			// we might have a match. check block for exclusion
 			block, err = s.readBlock(md.key)
@@ -210,13 +210,13 @@ func (s *FileStore) GetApprox(key blocks.Query, excl func(blocks.Block) bool) (b
 		}
 	}
 	if err := s.meta.Traverse(check); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if bestBlk != nil {
 		// mark the block as newly used
 		s.meta.Used(bestKey, bestBlk.Type())
 	}
-	return bestBlk, nil
+	return bestBlk, bestDist, nil
 }
 
 // Get a list of all stored block keys (generic query).

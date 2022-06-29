@@ -57,7 +57,7 @@ type Store[K, V any] interface {
 
 	// GetApprox returns the best-matching value with given key from storage
 	// that is not excluded.
-	GetApprox(key K, excl func(V) bool) (V, error)
+	GetApprox(key K, excl func(V) bool) (V, any, error)
 
 	// List all store keys
 	List() ([]K, error)
@@ -172,8 +172,8 @@ func (s *RedisStore) Get(key string) (value string, err error) {
 }
 
 // GetApprox returns the best-matching value for given key from storage
-func (s *RedisStore) GetApprox(key string, crit func(string) bool) (value string, err error) {
-	return "", ErrStoreNoApprox
+func (s *RedisStore) GetApprox(key string, crit func(string) bool) (value string, vkey any, err error) {
+	return "", "", ErrStoreNoApprox
 }
 
 // List all keys in store
@@ -249,8 +249,8 @@ func (s *SQLStore) Get(key string) (value string, err error) {
 }
 
 // GetApprox returns the best-matching value for given key from storage
-func (s *SQLStore) GetApprox(key string, crit func(string) bool) (value string, err error) {
-	return "", ErrStoreNoApprox
+func (s *SQLStore) GetApprox(key string, crit func(string) bool) (value string, vkey any, err error) {
+	return "", "", ErrStoreNoApprox
 }
 
 // List all keys in store
