@@ -307,42 +307,23 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 		// query for a HELLO? (9.4.3.3a)
 		if msgT.BType == uint32(enums.BLOCK_TYPE_DHT_URL_HELLO) {
 			logger.Println(logger.DBG, "[dht] GET message for HELLO: check cache")
-			// iterate over cached HELLOs to find (best) match first
-			if block, dist = m.rtable.BestHello(addr, rf); block != nil {
-				// is block in result filter?
-				if rf.Contains(block) {
-					// skip it
-					logger.Println(logger.DBG, "[dht] GET message for HELLO: best cached block is filtered")
-					block = nil
-					dist = nil
-				} else {
-					// do we have a perfect match?
-					match := dist.Equals(math.ZERO)
-					if match || approx {
-						// send best result
-						logger.Println(logger.INFO, "[dht] sending DHT result message from cache to caller")
-						if err := m.sendResult(ctx, query, block, back); err != nil {
-							logger.Println(logger.ERROR, "[dht] Failed to send DHT result message: "+err.Error())
-						}
-					} else {
-						logger.Println(logger.DBG, "[dht] GET message for HELLO: best cached block not applicable")
-						block = nil
-						dist = nil
-					}
-				}
-			}
+			// find best cached HELLO
+			block, dist = m.rtable.BestHello(addr, rf)
 		}
 		//--------------------------------------------------------------
 		// find the closest block that has that is not filtered/ by the result
 		// filter (in case we did not find an appropriate block in cache).
 		if do_result {
+			// save best-match values from cache
 			block_cache := block
 			dist_cache := dist
+
 			// query DHT store for exact match  (9.4.3.3c)
 			if block, err = m.Get(ctx, query); err != nil {
 				logger.Printf(logger.ERROR, "[%s] Failed to get DHT block from storage: %s", label, err.Error())
 				return true
 			}
+			// if block is filtered, skip it
 			if rf.Contains(block) {
 				logger.Println(logger.DBG, "[dht] GET message for HELLO: matching DHT block is filtered")
 				block = nil
