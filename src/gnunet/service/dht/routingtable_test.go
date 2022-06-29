@@ -19,6 +19,8 @@
 package dht
 
 import (
+	"crypto/sha512"
+	"encoding/hex"
 	"gnunet/config"
 	"gnunet/core"
 	"gnunet/service/dht/filter"
@@ -145,4 +147,23 @@ func TestRT(t *testing.T) {
 
 	n = rt.SelectRandomPeer(bf)
 	t.Logf("Random: %s\n", n)
+}
+
+func TestDistance(t *testing.T) {
+	pid1 := "4ER9C0GV4QC25GGQMXBBGXYFEB3ZVAYMXZVSRKDVEGCDTAS34E30"
+	pid2 := "V61ESQ96AFXZWDSA509HP11K5HJXXJ9ECM4NAMCQRX5YW4KN8XPG"
+
+	p1, _ := util.DecodeStringToBinary(pid1, 32)
+	p2, _ := util.DecodeStringToBinary(pid2, 32)
+
+	h1 := sha512.Sum512(p1)
+	h2 := sha512.Sum512(p2)
+	t.Logf("h1=%s\n", hex.EncodeToString(h1[:]))
+	t.Logf("h2=%s\n", hex.EncodeToString(h2[:]))
+
+	pa1 := NewPeerAddress(util.NewPeerID(p1))
+	pa2 := NewPeerAddress(util.NewPeerID(p2))
+
+	dist, idx := pa1.Distance(pa2)
+	t.Logf("dist=%v, idx=%d\n", dist, idx)
 }
