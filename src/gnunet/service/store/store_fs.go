@@ -162,7 +162,7 @@ func (s *FileStore) Get(query blocks.Query) (block blocks.Block, err error) {
 	key := query.Key().Bits
 	btype := query.Type()
 	var md *FileMetadata
-	if md, err = s.meta.Get(key, btype); err != nil {
+	if md, err = s.meta.Get(key, btype); err != nil || md == nil {
 		return
 	}
 	// check for expired entry

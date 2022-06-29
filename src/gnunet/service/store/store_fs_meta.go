@@ -95,13 +95,17 @@ func (db *FileMetaDB) Get(key []byte, btype uint16) (md *FileMetadata, err error
 	md = new(FileMetadata)
 	md.key = util.Clone(key)
 	md.btype = btype
-	sql := "select size,stored,expires,lastUsed,usedCount from meta where qkey=? and btype=?"
-	row := db.conn.QueryRow(sql, key, btype)
+	stmt := "select size,stored,expires,lastUsed,usedCount from meta where qkey=? and btype=?"
+	row := db.conn.QueryRow(stmt, key, btype)
 	var st, exp, lu uint64
-	err = row.Scan(&md.size, &st, &exp, &lu, &md.usedCount)
-	md.stored.Val = st * 1000000
-	md.expires.Val = exp * 1000000
-	md.lastUsed.Val = lu * 1000000
+	if err = row.Scan(&md.size, &st, &exp, &lu, &md.usedCount); err == sql.ErrNoRows {
+		md = nil
+		err = nil
+	} else {
+		md.stored.Val = st * 1000000
+		md.expires.Val = exp * 1000000
+		md.lastUsed.Val = lu * 1000000
+	}
 	return
 }
 
