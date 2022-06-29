@@ -274,7 +274,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 		}
 		//----------------------------------------------------------
 		// check if sender is in peer filter (9.4.3.2)
-		if !msgT.PeerBF.Contains(sender.Data) {
+		if !msgT.PeerBF.Contains(sender) {
 			logger.Printf(logger.WARN, "[dht] Sender not in peer filter")
 		}
 		// parse result filter
@@ -287,36 +287,45 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 
 		//----------------------------------------------------------
 		// check if we need to respond (9.4.3.3)
-		addr := NewPeerAddress(util.NewPeerID(msgT.Query.Bits))
-		closest := m.rtable.IsClosestPeer(nil, addr, msgT.PeerBF)
+		addr := NewQueryAddress(msgT.Query)
+		closest := m.rtable.IsClosestPeer(nil, addr, msgT.PeerBF.BF)
 		demux := int(msgT.Flags)&enums.DHT_RO_DEMULTIPLEX_EVERYWHERE != 0
-		if demux || closest {
+		approx := int(msgT.Flags)&enums.DHT_RO_FIND_APPROXIMATE != 0
+		logger.Printf(logger.DBG, "[dht] GET message: closest=%v, demux=%v, approx=%v", closest, demux, approx)
 
-			//------------------------------------------------------
-			// query for a HELLO? (9.4.3.3a)
-			if msgT.BType == uint32(enums.BLOCK_TYPE_DHT_URL_HELLO) {
-				// iterate over cached HELLOs to find (best) match first
-				var dist *math.Int
-				if block, dist = m.rtable.BestHello(addr, rf); block != nil {
+		//------------------------------------------------------
+		// query for a HELLO? (9.4.3.3a)
+		if msgT.BType == uint32(enums.BLOCK_TYPE_DHT_URL_HELLO) {
+			logger.Println(logger.DBG, "[dht] GET message for HELLO: check cache")
+			// iterate over cached HELLOs to find (best) match first
+			var dist *math.Int
+			if block, dist = m.rtable.BestHello(addr, rf); block != nil {
+				// is block in result filter?
+				if rf.Contains(block) {
+					// skip it
+					logger.Println(logger.DBG, "[dht] GET message for HELLO: best cached block is filtered")
+					block = nil
+				} else {
 					// do we have a perfect match?
 					match := dist.Equals(math.ZERO)
-					if match || demux {
-						// send best result we have if that is not in the result filter
-						if !rf.Contains(block) {
-							logger.Println(logger.INFO, "[dht] sending DHT result message to caller")
-							if err := m.sendResult(ctx, query, block, back); err != nil {
-								logger.Println(logger.ERROR, "[dht] Failed to send DHT result message: "+err.Error())
-							}
-						} else {
-							block = nil
+					if match || approx {
+						// send best result
+						logger.Println(logger.INFO, "[dht] sending DHT result message to caller")
+						if err := m.sendResult(ctx, query, block, back); err != nil {
+							logger.Println(logger.ERROR, "[dht] Failed to send DHT result message: "+err.Error())
 						}
+					} else {
+						logger.Println(logger.DBG, "[dht] GET message for HELLO: best cached block not applicable")
+						block = nil
 					}
 				}
 			}
-			//------------------------------------------------------
-			// find the closest block that has that is not filtered
-			// by the result filter
+		}
+		//--------------------------------------------------------------
+		// find the closest block that has that is not filtered/ by the result
+		// filter (in case we did not find an appropriate block in cache).
 
+		if block == nil {
 			// query DHT store for exact match  (9.4.3.3c)
 			block, err := m.Get(ctx, query)
 			if err != nil {
@@ -324,10 +333,11 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 				return true
 			}
 			if rf.Contains(block) {
+				logger.Println(logger.DBG, "[dht] GET message for HELLO: matching DHT block is filtered")
 				block = nil
 			}
-			// if we demultiplex, find approximate block
-			if block == nil || demux {
+			// if we have no exact match, find approximate block if requested
+			if block == nil || approx {
 				// no exact match: find approximate  (9.4.3.3b)
 				match := func(b blocks.Block) bool {
 					return rf.Contains(b)
@@ -346,8 +356,9 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 				}
 			}
 		}
+
 		// check if we need to forward message
-		forward := false
+		forward := demux
 		if block != nil && blockHdlr != nil {
 			switch blockHdlr.FilterResult(block, query.Key(), rf, msgT.XQuery) {
 			case blocks.RF_LAST:
@@ -361,19 +372,19 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msg mes
 		}
 		if forward {
 			// build updated GET message
-			pf.Add(m.core.PeerID().Bytes())
+			pf.Add(m.core.PeerID())
 			outMsg := msgT.Update(pf, rf, msgT.HopCount+1)
 
 			// forward to number of peers
 			numForward := m.rtable.ComputeOutDegree(msgT.ReplLevel, msgT.HopCount)
 			key := NewQueryAddress(query.Key())
 			for n := 0; n < numForward; n++ {
-				if p := m.rtable.SelectClosestPeer(key, pf); p != nil {
+				if p := m.rtable.SelectClosestPeer(key, pf.BF); p != nil {
 					logger.Printf(logger.INFO, "[dht] forward DHT get message to %s", p.String())
 					if err := back.Send(ctx, outMsg); err != nil {
 						logger.Println(logger.ERROR, "[dht] Failed to forward DHT get message: "+err.Error())
 					}
-					pf.Add(p.addr)
+					pf.Add(p.peer)
 				} else {
 					break
 				}
