@@ -111,33 +111,33 @@ func (pe *PathElement) Wire() *PathElementWire {
 
 // DHTP2PGetMsg wire layout
 type DHTP2PGetMsg struct {
-	MsgSize   uint16              `order:"big"`   // total size of message
-	MsgType   uint16              `order:"big"`   // DHT_P2P_GET (147)
-	BType     uint32              `order:"big"`   // content type of the payload
-	Flags     uint16              `order:"big"`   // processing flags
-	HopCount  uint16              `order:"big"`   // number of hops so far
-	ReplLevel uint16              `order:"big"`   // Replication level
-	RfSize    uint16              `order:"big"`   // size of result filter
-	PeerBF    *filter.BloomFilter ``              // bloomfilter to prevent loops
-	Query     *crypto.HashCode    ``              // query hash
-	ResFilter []byte              `size:"RfSize"` // result filter
-	XQuery    []byte              `size:"*"`      // extended query
+	MsgSize   uint16             `order:"big"`   // total size of message
+	MsgType   uint16             `order:"big"`   // DHT_P2P_GET (147)
+	BType     uint32             `order:"big"`   // content type of the payload
+	Flags     uint16             `order:"big"`   // processing flags
+	HopCount  uint16             `order:"big"`   // number of hops so far
+	ReplLevel uint16             `order:"big"`   // Replication level
+	RfSize    uint16             `order:"big"`   // size of result filter
+	PeerBF    *blocks.PeerFilter ``              // bloomfilter to prevent loops
+	Query     *crypto.HashCode   ``              // query hash
+	ResFilter []byte             `size:"RfSize"` // result filter
+	XQuery    []byte             `size:"*"`      // extended query
 }
 
 // NewDHTP2PGetMsg creates an empty DHT-P2P-Get message
 func NewDHTP2PGetMsg() *DHTP2PGetMsg {
 	return &DHTP2PGetMsg{
-		MsgSize:   208,                        // message size without ResFiter and XQuery
-		MsgType:   DHT_P2P_GET,                // DHT_P2P_GET (147)
-		BType:     0,                          // no block type defined
-		Flags:     0,                          // no flags defined
-		HopCount:  0,                          // no hops
-		ReplLevel: 0,                          // no replication level defined
-		RfSize:    0,                          // no result filter
-		PeerBF:    filter.NewBloomFilter(128), // allocate bloom filter
-		Query:     crypto.NewHashCode(nil),    // empty Query hash
-		ResFilter: nil,                        // empty result filter
-		XQuery:    nil,                        // empty XQuery
+		MsgSize:   208,                     // message size without ResFiter and XQuery
+		MsgType:   DHT_P2P_GET,             // DHT_P2P_GET (147)
+		BType:     0,                       // no block type defined
+		Flags:     0,                       // no flags defined
+		HopCount:  0,                       // no hops
+		ReplLevel: 0,                       // no replication level defined
+		RfSize:    0,                       // no result filter
+		PeerBF:    blocks.NewPeerFilter(),  // allocate bloom filter
+		Query:     crypto.NewHashCode(nil), // empty Query hash
+		ResFilter: nil,                     // empty result filter
+		XQuery:    nil,                     // empty XQuery
 	}
 }
 
@@ -153,7 +153,7 @@ func (m *DHTP2PGetMsg) Header() *Header {
 }
 
 // Clone message
-func (m *DHTP2PGetMsg) Update(pf *filter.BloomFilter, rf blocks.ResultFilter, hop uint16) *DHTP2PGetMsg {
+func (m *DHTP2PGetMsg) Update(pf *blocks.PeerFilter, rf blocks.ResultFilter, hop uint16) *DHTP2PGetMsg {
 	buf := rf.Bytes()
 	ns := uint16(len(buf))
 	return &DHTP2PGetMsg{
@@ -243,7 +243,7 @@ type DHTP2PResultMsg struct {
 // NewDHTP2PResultMsg creates a new empty DHTP2PResultMsg
 func NewDHTP2PResultMsg() *DHTP2PResultMsg {
 	return &DHTP2PResultMsg{
-		MsgSize:  104,                          // size of empty message
+		MsgSize:  88,                           // size of empty message
 		MsgType:  DHT_P2P_RESULT,               // DHT_P2P_RESULT (148)
 		BType:    uint32(enums.BLOCK_TYPE_ANY), // type of returned block
 		PutPathL: 0,                            // empty putpath

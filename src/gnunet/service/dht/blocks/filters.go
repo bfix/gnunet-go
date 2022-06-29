@@ -18,6 +18,48 @@
 
 package blocks
 
+import (
+	"gnunet/service/dht/filter"
+	"gnunet/util"
+)
+
+//======================================================================
+// Peer filter
+//======================================================================
+
+// PeerFilter is a bloom filter without mutator
+type PeerFilter struct {
+	BF *filter.BloomFilter
+}
+
+// NewPeerFilter creates an empty peer filter instance.
+func NewPeerFilter() *PeerFilter {
+	return &PeerFilter{
+		BF: filter.NewBloomFilter(128),
+	}
+}
+
+// Add peer id to the filter
+func (pf *PeerFilter) Add(p *util.PeerID) {
+	pf.BF.Add(p.Data)
+}
+
+// Contains returns true if the peer id is filtered (in the filter)
+func (pf *PeerFilter) Contains(p *util.PeerID) bool {
+	return pf.BF.Contains(p.Data)
+}
+
+// Cloone peer filter instance
+func (pf *PeerFilter) Clone() *PeerFilter {
+	return &PeerFilter{
+		BF: pf.BF.Clone(),
+	}
+}
+
+//======================================================================
+// Result filter
+//======================================================================
+
 // ResultFilter return values
 const (
 	RF_MORE       = iota // Valid result, and there may be more.
@@ -37,10 +79,10 @@ const (
 // by the local peer.
 type ResultFilter interface {
 
-	// Add entry (binary representation) to filter
+	// Add entry to filter
 	Add(Block)
 
-	// Contains returns true if entry (binary representation) is filtered
+	// Contains returns true if entry is filtered
 	Contains(Block) bool
 
 	// Bytes returns the binary representation of a result filter
@@ -49,15 +91,19 @@ type ResultFilter interface {
 
 //----------------------------------------------------------------------
 
+// PassResultFilter is a dummy result filter with no state.
 type PassResultFilter struct{}
 
+// Add a block to the result filter.
 func (rf *PassResultFilter) Add(Block) {
 }
 
+// Contains returns true if entry (binary representation) is filtered
 func (rf *PassResultFilter) Contains(Block) bool {
 	return false
 }
 
-func (rf *PassResultFilter) Bytes() []byte {
-	return nil
+// Bytes returns the binary representation of a result filter
+func (rf *PassResultFilter) Bytes() (buf []byte) {
+	return
 }
