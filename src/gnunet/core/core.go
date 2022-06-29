@@ -196,7 +196,7 @@ func (c *Core) pump(ctx context.Context) {
 				ID:   EV_MESSAGE,
 				Peer: tm.Peer,
 				Msg:  tm.Msg,
-				Resp: tm.Resp,
+				Resp: resp,
 			})
 
 		// wait for termination
@@ -299,7 +299,7 @@ type Signable interface {
 // Sign a signable onject with private peer key
 func (c *Core) Sign(obj Signable) error {
 	sd := obj.SignedData()
-	logger.Printf(logger.DBG, "[core] Siging data '%s'", hex.EncodeToString(sd))
+	logger.Printf(logger.DBG, "[core] Signing data '%s'", hex.EncodeToString(sd))
 	sig, err := c.local.prv.EdSign(sd)
 	if err != nil {
 		return err
