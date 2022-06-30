@@ -239,7 +239,8 @@ func (c *Core) Send(ctx context.Context, peer *util.PeerID, msg message.Message)
 		return
 	}
 	if maybe {
-		err = transport.ErrEndpMaybeSent
+		logger.Printf(logger.WARN, "[core] %s", transport.ErrEndpMaybeSent.Error())
+		err = nil
 	} else {
 		err = ErrCoreNotSent
 	}
