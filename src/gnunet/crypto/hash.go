@@ -21,6 +21,7 @@ package crypto
 import (
 	"bytes"
 	"crypto/sha512"
+	"encoding/hex"
 
 	"gnunet/util"
 )
@@ -33,6 +34,16 @@ type HashCode struct {
 // Equals tests if two hash results are equal.
 func (hc *HashCode) Equals(n *HashCode) bool {
 	return bytes.Equal(hc.Bits, n.Bits)
+}
+
+// Clone the hash code
+func (hc *HashCode) Clone() *HashCode {
+	return NewHashCode(hc.Bits)
+}
+
+// String returns a hex-representation of the hash code
+func (hc *HashCode) String() string {
+	return hex.EncodeToString(hc.Bits)
 }
 
 // NewHashCode creates a new (initalized) hash value
