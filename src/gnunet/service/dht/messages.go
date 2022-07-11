@@ -71,17 +71,22 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 				return false
 			}
 		} else {
-			logger.Printf(logger.INFO, "[%s] No validator defined for block type %s", label, btype.String())
+			logger.Printf(logger.INFO, "[%s] no handler defined for block type %s", label, btype.String())
+			blockHdlr = nil
 		}
 		//----------------------------------------------------------
 		// check if sender is in peer filter (9.4.3.2)
 		if !msg.PeerFilter.Contains(sender) {
-			logger.Printf(logger.WARN, "[dht] Sender not in peer filter")
+			logger.Printf(logger.WARN, "[%s] sender not in peer filter", label)
 		}
 		// parse result filter
 		var rf blocks.ResultFilter = new(blocks.PassResultFilter)
 		if msg.ResFilter != nil && len(msg.ResFilter) > 0 {
-			rf = blocks.NewHelloResultFilterFromBytes(msg.ResFilter)
+			if blockHdlr != nil {
+				rf = blockHdlr.ParseResultFilter(msg.ResFilter)
+			} else {
+				logger.Printf(logger.WARN, "[%s] unknown result filter implementation -- skipped")
+			}
 		}
 		// clone peer filter
 		pf := msg.PeerFilter.Clone()
@@ -143,9 +148,9 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			}
 			// if we have a block, send it as response
 			if block != nil {
-				logger.Println(logger.INFO, "[dht] sending DHT result message to caller")
+				logger.Printf(logger.INFO, "[%s] sending DHT result message to caller", label)
 				if err := m.sendResult(ctx, query, block, back); err != nil {
-					logger.Println(logger.ERROR, "[dht] Failed to send DHT result message: "+err.Error())
+					logger.Printf(logger.ERROR, "[%s] Failed to send DHT result message: %s", label, err.Error())
 				}
 			}
 		}
@@ -172,15 +177,15 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			for n := 0; n < numForward; n++ {
 				if p := m.rtable.SelectClosestPeer(key, pf); p != nil {
 					// forward message to peer
-					logger.Printf(logger.INFO, "[dht] forward DHT get message to %s", p.String())
+					logger.Printf(logger.INFO, "[%s] forward DHT get message to %s", label, p.String())
 					if err := back.Send(ctx, msgOut); err != nil {
-						logger.Println(logger.ERROR, "[dht] Failed to forward DHT get message: "+err.Error())
+						logger.Printf(logger.ERROR, "[%s] Failed to forward DHT get message: %s", label, err.Error())
 					}
 					pf.Add(p.Peer)
-					// create open get-forward-task
-					task := NewGetForwardTask(query.Key(), p.Peer, sender, back)
-					logger.Printf(logger.INFO, "[%s] DHT-P2P-GET task #%d started", label, task.ID())
-					m.tasks.Add(task)
+					// create open get-forward result handler
+					rh := NewForwardResultHandler(msg, rf, back)
+					logger.Printf(logger.INFO, "[%s] DHT-P2P-GET task #%d started", label, rh.ID())
+					m.reshdlrs.Add(rh)
 				} else {
 					break
 				}
@@ -194,27 +199,78 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		//----------------------------------------------------------
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-PUT message", label)
 
+		//--------------------------------------------------------------
+		// check if request is expired (9.3.2.1)
+		if msg.Expiration.Expired() {
+			logger.Printf(logger.WARN, "[%s] DHT-P2P-PUT message expired (%s)", label, msg.Expiration.String())
+			return false
+		}
+		btype := enums.BlockType(msg.BType)
+		blockHdlr, ok := blocks.BlockHandlers[btype]
+		if ok { // (9.3.2.2)
+			// reconstruct block instance
+			if block, err := blockHdlr.ParseBlock(msg.Block); err == nil {
+
+				// validate block key (9.3.2.3)
+				if !blockHdlr.ValidateBlockKey(block, msg.Key) {
+					logger.Printf(logger.WARN, "[%s] DHT-P2P-PUT invalid key -- discarded", label)
+					return false
+				}
+
+				// validate block payload (9.3.2.4)
+				if !blockHdlr.ValidateBlockStoreRequest(block) {
+					logger.Printf(logger.WARN, "[%s] DHT-P2P-PUT invalid payload -- discarded", label)
+					return false
+				}
+			}
+		} else {
+			logger.Printf(logger.INFO, "[%s] No validator defined for block type %s", label, btype.String())
+			blockHdlr = nil
+		}
+		//--------------------------------------------------------------
+		// check if sender is in peer filter (9.3.2.5)
+		if !msg.PeerFilter.Contains(sender) {
+			logger.Printf(logger.WARN, "[%s] Sender not in peer filter", label)
+		}
+		//--------------------------------------------------------------
+		// check if route is recorded (9.3.2.6)
+		/*
+			withPath := msg.Flags&enums.DHT_RO_RECORD_ROUTE != 0
+			if withPath {
+				spe := message.NewPathElement(msg.Key, sender, p)
+				m.core.Sign(spe)
+				msg.AppendPutPath(spe)
+			}
+		*/
+		//--------------------------------------------------------------
+		// verify PUT path (9.3.2.7)
+		if msg.PathL > 0 {
+
+		}
+
+		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-PUT message done", label)
+
 	case *message.DHTP2PResultMsg:
 		//----------------------------------------------------------
 		// DHT-P2P RESULT
 		//----------------------------------------------------------
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-RESULT message", label)
 
-		// check task list for handler (get and getforward tasks)
-		key := GetTaskKey(msg.Query, sender)
-		task, ok := m.tasks.Get(key)
-		if !ok {
-			key = GetForwardTaskKey(msg.Query, sender)
-			task, ok = m.tasks.Get(key)
-		}
-		if ok {
-			logger.Printf(logger.DBG, "[%s] Task #%d for DHT-P2P-RESULT found", label, task.ID())
-			// let the task handle the message
-			go task.Handle(ctx, msg)
+		// check task list for handler
+		key := msg.Query.String()
+		handled := false
+		if list, ok := m.reshdlrs.Get(key); ok {
+			for _, rh := range list {
+				logger.Printf(logger.DBG, "[%s] Task #%d for DHT-P2P-RESULT found", label, rh.ID())
+				//  handle the message
+				go rh.Handle(ctx, msg)
+			}
 			return true
 		}
-		logger.Printf(logger.WARN, "[%s] DHT-P2P-RESULT not processed!", label)
-		return false
+		if !handled {
+			logger.Printf(logger.WARN, "[%s] DHT-P2P-RESULT not processed (no handler)", label)
+		}
+		return handled
 
 	case *message.DHTP2PHelloMsg:
 		//----------------------------------------------------------
