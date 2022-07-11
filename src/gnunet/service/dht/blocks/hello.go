@@ -289,8 +289,16 @@ func (h *HelloBlock) SignedData() []byte {
 }
 
 //----------------------------------------------------------------------
+// HELLO block handler
+//----------------------------------------------------------------------
 
+// HelloBlockHandler methods related to HELLO blocks
 type HelloBlockHandler struct{}
+
+// Parse a block instance from binary data
+func (bh *HelloBlockHandler) ParseBlock(buf []byte) (Block, error) {
+	return ParseHelloFromBytes(buf)
+}
 
 // ValidateHelloBlockQuery validates query parameters for a
 // DHT-GET request for HELLO blocks.
@@ -299,12 +307,36 @@ func (bh *HelloBlockHandler) ValidateBlockQuery(key *crypto.HashCode, xquery []b
 	return len(xquery) == 0
 }
 
+// ValidateBlockKey returns true if the block key is the same as the
+// query key used to access the block.
+func (bh *HelloBlockHandler) ValidateBlockKey(b Block, key *crypto.HashCode) bool {
+	hb, ok := b.(*HelloBlock)
+	if !ok {
+		return false
+	}
+	// key must be the hash of the peer id
+	bkey := crypto.Hash(hb.PeerID.Bytes())
+	return key.Equals(bkey)
+}
+
+// ValidateBlockStoreRequest is used to evaluate a block payload as part of
+// PutMessage and ResultMessage processing.
+func (bh *HelloBlockHandler) ValidateBlockStoreRequest(b Block) bool {
+	// TODO: verify block payload
+	return true
+}
+
 // SetupResultFilter is used to setup an empty result filter. The arguments
 // are the set of results that must be filtered at the initiator, and a
 // MUTATOR value which MAY be used to deterministically re-randomize
 // probabilistic data structures.
 func (bh *HelloBlockHandler) SetupResultFilter(filterSize int, mutator uint32) ResultFilter {
 	return NewHelloResultFilter(filterSize, mutator)
+}
+
+// ParseResultFilter from binary data
+func (bh *HelloBlockHandler) ParseResultFilter(data []byte) ResultFilter {
+	return NewHelloResultFilterFromBytes(data)
 }
 
 // FilterResult is used to filter results against specific queries. This
@@ -325,12 +357,6 @@ func (bh *HelloBlockHandler) FilterResult(b Block, key *crypto.HashCode, rf Resu
 	}
 	rf.Add(b)
 	return RF_LAST
-}
-
-// ValidateBlockStoreRequest is used to evaluate a block payload as part of
-// PutMessage and ResultMessage processing.
-func (bh *HelloBlockHandler) ValidateBlockStoreRequest(b Block) bool {
-	return false
 }
 
 //----------------------------------------------------------------------
@@ -387,4 +413,16 @@ func (rf *HelloResultFilter) Contains(b Block) bool {
 // Bytes returns a binary representation of a HELLO result filter
 func (rf *HelloResultFilter) Bytes() []byte {
 	return rf.bf.Bytes()
+}
+
+// Equal returns true if two HELLO result filters are identical
+func (rf *HelloResultFilter) Equal(t ResultFilter) bool {
+	trf, ok := t.(*HelloResultFilter)
+	if !ok {
+		return false
+	}
+	if !bytes.Equal(rf.bf.mInput, trf.bf.mInput) {
+		return false
+	}
+	return bytes.Equal(rf.bf.Bits, trf.bf.Bits)
 }
