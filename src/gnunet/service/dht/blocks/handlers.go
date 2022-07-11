@@ -26,16 +26,30 @@ import (
 // BlockHandler interface defines methods specific to block types.
 type BlockHandler interface {
 
+	// Parse a block instance from binary data
+	ParseBlock(buf []byte) (Block, error)
+
 	// ValidateBlockQuery is used to evaluate the request for a block as part of
 	// DHT-P2P-GET processing. Here, the block payload is unknown, but if possible
 	// the XQuery and Key SHOULD be verified.
 	ValidateBlockQuery(key *crypto.HashCode, xquery []byte) bool
+
+	// ValidateBlockKey returns true if the block key is the same as the
+	// query key used to access the block.
+	ValidateBlockKey(b Block, key *crypto.HashCode) bool
+
+	// ValidateBlockStoreRequest is used to evaluate a block payload as part of
+	// PutMessage and ResultMessage processing.
+	ValidateBlockStoreRequest(b Block) bool
 
 	// SetupResultFilter is used to setup an empty result filter. The arguments
 	// are the set of results that must be filtered at the initiator, and a
 	// MUTATOR value which MAY be used to deterministically re-randomize
 	// probabilistic data structures.
 	SetupResultFilter(filterSize int, mutator uint32) ResultFilter
+
+	// ParseResultFilter from binary data
+	ParseResultFilter(data []byte) ResultFilter
 
 	// FilterResult is used to filter results against specific queries. This
 	// function does not check the validity of the block itself or that it
@@ -50,10 +64,6 @@ type BlockHandler interface {
 	// RF_IRRELEVANT return values: in both cases the block is ignored for
 	// this query.
 	FilterResult(b Block, key *crypto.HashCode, rf ResultFilter, xQuery []byte) int
-
-	// ValidateBlockStoreRequest is used to evaluate a block payload as part of
-	// PutMessage and ResultMessage processing.
-	ValidateBlockStoreRequest(b Block) bool
 }
 
 // BlockHandlers is a map of block query validation implementations
