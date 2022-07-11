@@ -89,6 +89,9 @@ type ResultFilter interface {
 
 	// Bytes returns the binary representation of a result filter
 	Bytes() []byte
+
+	// Equal returns true if the two result filters are identical
+	Equal(ResultFilter) bool
 }
 
 //----------------------------------------------------------------------
@@ -111,6 +114,12 @@ func (rf *PassResultFilter) Contains(Block) bool {
 // Bytes returns the binary representation of a result filter
 func (rf *PassResultFilter) Bytes() (buf []byte) {
 	return
+}
+
+// Equal returns true if the two result filters are identical
+func (rf *PassResultFilter) Equal(t ResultFilter) bool {
+	_, ok := t.(*PassResultFilter)
+	return ok
 }
 
 //======================================================================
