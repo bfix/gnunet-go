@@ -32,6 +32,9 @@ import (
 type Responder interface {
 	// Handle outgoing message
 	Send(ctx context.Context, msg message.Message) error
+
+	// Receiver returns the receiving peer (string representation)
+	Receiver() string
 }
 
 //----------------------------------------------------------------------
@@ -49,4 +52,9 @@ func (r *TransportResponder) Send(ctx context.Context, msg message.Message) erro
 		return errors.New("no send function defined")
 	}
 	return r.SendFcn(ctx, r.Peer, msg)
+}
+
+// Receiver returns the receiving peer id
+func (r *TransportResponder) Receiver() string {
+	return r.Peer.String()
 }

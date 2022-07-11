@@ -23,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"gnunet/message"
+	"gnunet/util"
 	"net"
 	"os"
 	"strconv"
@@ -43,6 +44,7 @@ var (
 // based on Unix domain sockets. It is used locally by services and
 // clients in the standard GNUnet environment.
 type Connection struct {
+	id   int      // connection identifier
 	path string   // file name of Unix socket
 	conn net.Conn // associated connection
 	buf  []byte   // read/write buffer
@@ -53,6 +55,7 @@ type Connection struct {
 func NewConnection(ctx context.Context, path string) (s *Connection, err error) {
 	var d net.Dialer
 	s = new(Connection)
+	s.id = util.NextID()
 	s.path = path
 	s.buf = make([]byte, 65536)
 	s.conn, err = d.DialContext(ctx, "unix", path)
@@ -132,6 +135,11 @@ func (s *Connection) Receive(ctx context.Context) (message.Message, error) {
 		return nil, err
 	}
 	return msg, nil
+}
+
+// Receiver returns the receiving client (string representation)
+func (s *Connection) Receiver() string {
+	return fmt.Sprintf("uds:%d", s.id)
 }
 
 //----------------------------------------------------------------------
