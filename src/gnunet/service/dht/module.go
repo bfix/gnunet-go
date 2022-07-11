@@ -53,7 +53,7 @@ type Module struct {
 
 	rtable    *RoutingTable           // routing table
 	lastHello *message.DHTP2PHelloMsg // last own HELLO message used; re-create if expired
-	tasks     *TaskList               // list of open tasks
+	reshdlrs  *ResultHandlerList      // list of open tasks
 }
 
 // NewModule returns a new module instance. It initializes the storage
@@ -73,7 +73,7 @@ func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Mod
 		store:      storage,
 		core:       c,
 		rtable:     rt,
-		tasks:      NewTaskList(),
+		reshdlrs:   NewResultHandlerList(),
 	}
 	// register as listener for core events
 	pulse := time.Duration(cfg.Heartbeat) * time.Second
@@ -164,7 +164,7 @@ func (m *Module) heartbeat(ctx context.Context) {
 	m.rtable.heartbeat(ctx)
 
 	// clean-up task list
-	m.tasks.Cleanup()
+	m.reshdlrs.Cleanup()
 }
 
 // Send the currently active HELLO to given network address
