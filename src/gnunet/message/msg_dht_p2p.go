@@ -69,10 +69,28 @@ type PathElement struct {
 	Signature *util.PeerSignature // signature
 }
 
+// NewPathElement creates a new path element from data
+func NewPathElement(key *crypto.HashCode, pred, succ *util.PeerID) *PathElement {
+	return &PathElement{
+		pathElementData: pathElementData{
+			Expiration:      util.AbsoluteTimeNow().Add(12 * time.Hour),
+			BlockHash:       key,
+			PeerPredecessor: pred,
+			PeerSuccessor:   succ,
+		},
+		Signature: nil,
+	}
+}
+
 // PathElementWire is the data stored and retrieved from messages
 type PathElementWire struct {
 	Predecessor *util.PeerID        // peer id of predecessor
 	Signature   *util.PeerSignature // path signature
+}
+
+// Size returns the size of a path element in wire format
+func (pew *PathElementWire) Size() uint16 {
+	return 96
 }
 
 // SignedData gets the data to be signed by peer ('Signable' interface)
@@ -91,8 +109,9 @@ func (pe *PathElement) SignedData() []byte {
 }
 
 // SetSignature stores the generated signature.
-func (pe *PathElement) SetSignature(sig *util.PeerSignature) {
+func (pe *PathElement) SetSignature(sig *util.PeerSignature) error {
 	pe.Signature = sig
+	return nil
 }
 
 // Wire returns the path element suitable for inclusion into messages
@@ -194,24 +213,33 @@ type DHTP2PPutMsg struct {
 // NewDHTP2PPutMsg creates an empty new DHTP2PPutMsg
 func NewDHTP2PPutMsg() *DHTP2PPutMsg {
 	return &DHTP2PPutMsg{
-		MsgSize:    218,                      // total size without path and block data
-		MsgType:    DHT_P2P_PUT,              // DHT_P2P_PUT (146)
-		BType:      0,                        // block type
-		Flags:      0,                        // processing flags
-		HopCount:   0,                        // message hops
-		ReplLvl:    0,                        // replication level
-		PathL:      0,                        // no PUT path
-		Expiration: util.AbsoluteTimeNever(), // expiration date
-		PeerFilter: blocks.NewPeerFilter(),   // peer bloom filter
-		Key:        crypto.NewHashCode(nil),  // query key
-		PutPath:    nil,                      // no PUT path
-		Block:      nil,                      // no block data
+		MsgSize:    218,                         // total size without path and block data
+		MsgType:    DHT_P2P_PUT,                 // DHT_P2P_PUT (146)
+		BType:      0,                           // block type
+		Flags:      0,                           // processing flags
+		HopCount:   0,                           // message hops
+		ReplLvl:    0,                           // replication level
+		PathL:      0,                           // no PUT path
+		Expiration: util.AbsoluteTimeNever(),    // expiration date
+		PeerFilter: blocks.NewPeerFilter(),      // peer bloom filter
+		Key:        crypto.NewHashCode(nil),     // query key
+		PutPath:    make([]*PathElementWire, 0), // empty PUT path
+		Block:      nil,                         // no block data
 	}
+}
+
+// AddPutPath adds an element to the PUT path
+func (m *DHTP2PPutMsg) AppendPutPath(pe *PathElement) {
+	pew := pe.Wire()
+	m.PutPath = append(m.PutPath, pew)
+	m.PathL++
+	m.MsgSize += pew.Size()
 }
 
 // String returns a human-readable representation of the message.
 func (m *DHTP2PPutMsg) String() string {
-	return fmt.Sprintf("DHTP2PPutMsg{}")
+	return fmt.Sprintf("DHTP2PPutMsg{btype=%s,hops=%d,flags=%d}",
+		enums.BlockType(m.BType).String(), m.HopCount, m.Flags)
 }
 
 // Header returns the message header in a separate instance.
@@ -255,7 +283,8 @@ func NewDHTP2PResultMsg() *DHTP2PResultMsg {
 
 // String returns a human-readable representation of the message.
 func (m *DHTP2PResultMsg) String() string {
-	return fmt.Sprintf("DHTP2ResultMsg{}")
+	return fmt.Sprintf("DHTP2PResultMsg{btype=%s,putl=%d,getl=%d}",
+		enums.BlockType(m.BType).String(), m.PutPathL, m.GetPathL)
 }
 
 // Header returns the message header in a separate instance.
