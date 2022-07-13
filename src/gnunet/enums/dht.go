@@ -24,7 +24,7 @@ const (
 	DHT_RO_DEMULTIPLEX_EVERYWHERE = 1 // Each peer along the way should look at 'enc'
 	DHT_RO_RECORD_ROUTE           = 2 // keep track of the route that the message took in the P2P network.
 	DHT_RO_FIND_APPROXIMATE       = 4 // Approximate results are fine.
-	DHT_RO_LAST_HOP               = 8 // Flag given to monitors if this was the last hop for a GET/PUT.
+	DHT_RO_TRUNCATED              = 8 // Flag if path is truncated
 )
 
 //go:generate go run generate.go gnunet-dht.rec gnunet-dht.tpl dht_block_type.go
