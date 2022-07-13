@@ -415,14 +415,20 @@ func (rf *HelloResultFilter) Bytes() []byte {
 	return rf.bf.Bytes()
 }
 
-// Equal returns true if two HELLO result filters are identical
-func (rf *HelloResultFilter) Equal(t ResultFilter) bool {
+// Compare two HELLO result filters
+func (rf *HelloResultFilter) Compare(t ResultFilter) int {
+	trf, ok := t.(*HelloResultFilter)
+	if !ok {
+		return CMP_DIFFER
+	}
+	return rf.bf.Compare(trf.bf)
+}
+
+// Merge two HELLO result filters
+func (rf *HelloResultFilter) Merge(t ResultFilter) bool {
 	trf, ok := t.(*HelloResultFilter)
 	if !ok {
 		return false
 	}
-	if !bytes.Equal(rf.bf.mInput, trf.bf.mInput) {
-		return false
-	}
-	return bytes.Equal(rf.bf.Bits, trf.bf.Bits)
+	return rf.bf.Merge(trf.bf)
 }

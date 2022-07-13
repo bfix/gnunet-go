@@ -70,6 +70,16 @@ const (
 	RF_IRRELEVANT        // Block does not satisfy the constraints imposed by the XQuery.
 )
 
+// Compare return values
+const (
+	CMP_SAME   = iota // the two result filter are the same
+	CMP_MERGE         // the two result filter can be merged
+	CMP_DIFFER        // the two result filter are different
+	CMP_1             // used as state by derived/complex compare functions
+	CMP_2
+	CMP_3
+)
+
 //----------------------------------------------------------------------
 
 // ResultFilter is used to indicate to other peers which results are not of
@@ -90,8 +100,11 @@ type ResultFilter interface {
 	// Bytes returns the binary representation of a result filter
 	Bytes() []byte
 
-	// Equal returns true if the two result filters are identical
-	Equal(ResultFilter) bool
+	// Compare two result filters
+	Compare(ResultFilter) int
+
+	// Merge two result filters
+	Merge(ResultFilter) bool
 }
 
 //----------------------------------------------------------------------
@@ -116,10 +129,17 @@ func (rf *PassResultFilter) Bytes() (buf []byte) {
 	return
 }
 
-// Equal returns true if the two result filters are identical
-func (rf *PassResultFilter) Equal(t ResultFilter) bool {
-	_, ok := t.(*PassResultFilter)
-	return ok
+// Merge two result filters
+func (rf *PassResultFilter) Merge(ResultFilter) bool {
+	return true
+}
+
+// Compare two result filters
+func (rf *PassResultFilter) Compare(t ResultFilter) int {
+	if _, ok := t.(*PassResultFilter); ok {
+		return CMP_SAME
+	}
+	return CMP_DIFFER
 }
 
 //======================================================================
@@ -187,6 +207,28 @@ func (bf *BloomFilter) Bytes() []byte {
 	return buf
 }
 
+// Compare two bloom filters
+func (bf *BloomFilter) Compare(a *BloomFilter) int {
+	if len(bf.Bits) != len(a.Bits) || !bytes.Equal(bf.mInput, a.mInput) {
+		return CMP_DIFFER
+	}
+	if bytes.Equal(bf.Bits, a.Bits) {
+		return CMP_SAME
+	}
+	return CMP_MERGE
+}
+
+// Merge two bloom filters
+func (bf *BloomFilter) Merge(a *BloomFilter) bool {
+	if len(bf.Bits) != len(a.Bits) || !bytes.Equal(bf.mInput, a.mInput) {
+		return false
+	}
+	for i := range bf.Bits {
+		bf.Bits[i] |= a.Bits[i]
+	}
+	return true
+}
+
 // Clone a bloom filter instance
 func (bf *BloomFilter) Clone() *BloomFilter {
 	return &BloomFilter{
@@ -240,40 +282,5 @@ func (bf *BloomFilter) indices(e []byte) []uint32 {
 		binary.Read(buf, binary.BigEndian, &idx[i])
 		idx[i] %= size
 	}
-	/*
-		// TEST:
-		count := func(d []byte) int {
-			num := 0
-			for _, v := range d {
-				var i byte
-				for i = 1; i < 128; i <<= 1 {
-					if v&i == i {
-						num++
-					}
-				}
-			}
-			return num
-		}
-		logger.Printf(logger.DBG, "[filter] bits = %d:%s (%d set)", len(bf.Bits), hex.EncodeToString(bf.Bits), count(bf.Bits))
-		logger.Printf(logger.DBG, "[filter] elem = %s", hex.EncodeToString(e))
-		if bf.mData != nil {
-			logger.Printf(logger.DBG, "[filter] sha512(elem)^mutator = %s", hex.EncodeToString(h[:]))
-		} else {
-			logger.Printf(logger.DBG, "[filter] sha512(elem) = %s", hex.EncodeToString(h[:]))
-		}
-		logger.Printf(logger.DBG, "[filter] indices = %v", idx)
-		s := 128
-		if bf.mInput != nil {
-			s = 124
-		}
-		bft := NewBloomFilter(s)
-		if bf.mInput != nil {
-			bft.SetMutator(bf.mInput)
-		}
-		for _, i := range idx {
-			bft.Bits[i/8] |= (1 << (i % 7))
-		}
-		logger.Printf(logger.DBG, "[filter] bits' = %d:%s (%d set)", len(bft.Bits), hex.EncodeToString(bft.Bits), count(bft.Bits))
-	*/
 	return idx
 }
