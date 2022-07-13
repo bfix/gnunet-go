@@ -156,7 +156,7 @@ func (p *Peer) GetIDString() string {
 // Sign a message with the (long-term) private key.
 func (p *Peer) Sign(msg []byte) (*ed25519.EdSignature, error) {
 	if p.prv == nil {
-		return nil, fmt.Errorf("No private key")
+		return nil, fmt.Errorf("no private key")
 	}
 	return p.prv.EdSign(msg)
 }

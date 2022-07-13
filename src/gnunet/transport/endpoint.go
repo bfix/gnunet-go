@@ -48,10 +48,10 @@ var (
 // remote endpoints for TCP and UDP traffic.
 type Endpoint interface {
 	// Run the endpoint and send received messages to channel
-	Run(context.Context, chan *TransportMessage) error
+	Run(context.Context, chan *Message) error
 
 	// Send message on endpoint
-	Send(context.Context, net.Addr, *TransportMessage) error
+	Send(context.Context, net.Addr, *Message) error
 
 	// Address returns the listening address for the endpoint
 	Address() net.Addr
@@ -94,7 +94,7 @@ type PaketEndpoint struct {
 }
 
 // Run packet endpoint: send incoming messages to the handler.
-func (ep *PaketEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) (err error) {
+func (ep *PaketEndpoint) Run(ctx context.Context, hdlr chan *Message) (err error) {
 	// create listener
 	var lc net.ListenConfig
 	xproto := ep.addr.Network()
@@ -145,7 +145,7 @@ func (ep *PaketEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) (
 }
 
 // Read a transport message from endpoint based on extended protocol
-func (ep *PaketEndpoint) read() (tm *TransportMessage, err error) {
+func (ep *PaketEndpoint) read() (tm *Message, err error) {
 	// read next packet (assuming that it contains one complete message)
 	var n int
 	if n, _, err = ep.conn.ReadFrom(ep.buf); err != nil {
@@ -168,7 +168,7 @@ func (ep *PaketEndpoint) read() (tm *TransportMessage, err error) {
 		panic(ErrEndpProtocolUnknown)
 	}
 	// return transport message
-	return &TransportMessage{
+	return &Message{
 		Peer:  peer,
 		Msg:   msg,
 		Resp:  nil,
@@ -177,7 +177,7 @@ func (ep *PaketEndpoint) read() (tm *TransportMessage, err error) {
 }
 
 // Send message to address from endpoint
-func (ep *PaketEndpoint) Send(ctx context.Context, addr net.Addr, msg *TransportMessage) (err error) {
+func (ep *PaketEndpoint) Send(ctx context.Context, addr net.Addr, msg *Message) (err error) {
 	// only one sender at a time
 	ep.Lock()
 	defer ep.Unlock()
@@ -285,7 +285,7 @@ type StreamEndpoint struct {
 }
 
 // Run packet endpoint: send incoming messages to the handler.
-func (ep *StreamEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) (err error) {
+func (ep *StreamEndpoint) Run(ctx context.Context, hdlr chan *Message) (err error) {
 	// create listener
 	var lc net.ListenConfig
 	xproto := ep.addr.Network()
@@ -332,7 +332,7 @@ func (ep *StreamEndpoint) Run(ctx context.Context, hdlr chan *TransportMessage) 
 }
 
 // Read a transport message from endpoint based on extended protocol
-func (ep *StreamEndpoint) read(ctx context.Context, conn net.Conn) (tm *TransportMessage, err error) {
+func (ep *StreamEndpoint) read(ctx context.Context, conn net.Conn) (tm *Message, err error) {
 	// parse transport message based on extended protocol
 	var (
 		peer *util.PeerID
@@ -353,14 +353,14 @@ func (ep *StreamEndpoint) read(ctx context.Context, conn net.Conn) (tm *Transpor
 		panic(ErrEndpProtocolUnknown)
 	}
 	// return transport message
-	return &TransportMessage{
+	return &Message{
 		Peer: peer,
 		Msg:  msg,
 	}, nil
 }
 
 // Send message to address from endpoint
-func (ep *StreamEndpoint) Send(ctx context.Context, addr net.Addr, msg *TransportMessage) error {
+func (ep *StreamEndpoint) Send(ctx context.Context, addr net.Addr, msg *Message) error {
 	return nil
 }
 

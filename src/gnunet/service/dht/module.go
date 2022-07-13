@@ -93,7 +93,7 @@ func (m *Module) Get(ctx context.Context, query blocks.Query) (block blocks.Bloc
 func (m *Module) GetApprox(ctx context.Context, query blocks.Query, excl func(blocks.Block) bool) (block blocks.Block, dist *math.Int, err error) {
 	var d any
 	block, d, err = m.store.GetApprox(query, excl)
-	dist = d.(*math.Int)
+	dist, _ = d.(*math.Int)
 	return
 }
 

@@ -12,7 +12,6 @@ import (
 
 // Test revocation with test vector defined in the RFC draft.
 func TestRevocationRFC(t *testing.T) {
-
 	var (
 		D     = "6fea32c05af58bfa979553d188605fd57d8bf9cc263b78d5f7478c07b998ed70"
 		ZKEY  = "000100002ca223e879ecc4bbdeb5da17319281d63b2e3b6955f1c3775c804a98d5f8ddaa"

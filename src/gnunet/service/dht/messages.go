@@ -40,7 +40,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 	// assemble log label
 	label := "dht"
 	if v := ctx.Value("label"); v != nil {
-		if s := v.(string); len(s) > 0 {
+		if s, _ := v.(string); len(s) > 0 {
 			label = "dht-" + s
 		}
 	}
@@ -98,10 +98,10 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		demux := int(msg.Flags)&enums.DHT_RO_DEMULTIPLEX_EVERYWHERE != 0
 		approx := int(msg.Flags)&enums.DHT_RO_FIND_APPROXIMATE != 0
 		// actions
-		do_result := closest || (demux && approx)
-		do_forward := !closest || (demux && !approx)
+		doResult := closest || (demux && approx)
+		doForward := !closest || (demux && !approx)
 		logger.Printf(logger.DBG, "[dht] GET message: closest=%v, demux=%v, approx=%v --> result=%v, forward=%v",
-			closest, demux, approx, do_result, do_forward)
+			closest, demux, approx, doResult, doForward)
 
 		//------------------------------------------------------
 		// query for a HELLO? (9.4.3.3a)
@@ -113,10 +113,10 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		//--------------------------------------------------------------
 		// find the closest block that has that is not filtered/ by the result
 		// filter (in case we did not find an appropriate block in cache).
-		if do_result {
+		if doResult {
 			// save best-match values from cache
-			block_cache := block
-			dist_cache := dist
+			blockCache := block
+			distCache := dist
 
 			// query DHT store for exact match  (9.4.3.3c)
 			if block, err = m.Get(ctx, query); err != nil {
@@ -142,8 +142,8 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			}
 			// if we have a block from cache, check if it is better than the
 			// block found in the DHT
-			if block_cache != nil && dist_cache.Cmp(dist) < 0 {
-				block = block_cache
+			if blockCache != nil && distCache.Cmp(dist) < 0 {
+				block = blockCache
 			}
 			// if we have a block, send it as response
 			if block != nil {
@@ -160,12 +160,12 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 				// no need for further results
 			case blocks.RF_MORE:
 				// possibly more results
-				do_forward = true
+				doForward = true
 			case blocks.RF_DUPLICATE, blocks.RF_IRRELEVANT:
 				// do not forward
 			}
 		}
-		if do_forward {
+		if doForward {
 			// build updated GET message
 			pf.Add(m.core.PeerID())
 			msgOut := msg.Update(pf, rf, msg.HopCount+1)

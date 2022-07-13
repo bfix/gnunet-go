@@ -302,7 +302,6 @@ func TestDeriveH(t *testing.T) {
 }
 
 func TestHKDF_gnunet(t *testing.T) {
-
 	var (
 		// SALT as defined in GNUnet
 		salt = []byte("key-derivation")

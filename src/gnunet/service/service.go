@@ -85,7 +85,6 @@ func (h *SocketHandler) Start(ctx context.Context, path string, params map[strin
 	loop:
 		for {
 			select {
-
 			// handle incoming connection
 			case conn := <-h.hdlr:
 				// run a new session with context

@@ -88,7 +88,7 @@ func (a *Address) Network() string {
 
 //----------------------------------------------------------------------
 
-// URI returns a string representaion of an address.
+// URI returns a string representation of an address.
 func (a *Address) URI() string {
 	return URI(a.Netw, a.Address)
 }

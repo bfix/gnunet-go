@@ -46,9 +46,9 @@ const xlate = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 
 var (
 	// ErrInvalidEncoding signals an invalid encoding
-	ErrInvalidEncoding = errors.New("Invalid encoding")
+	ErrInvalidEncoding = errors.New("invalid encoding")
 	// ErrBufferTooSmall signalsa too small buffer for decoding
-	ErrBufferTooSmall = errors.New("Buffer to small")
+	ErrBufferTooSmall = errors.New("buffer to small")
 )
 
 // EncodeBinaryToString encodes a byte array into a string.

@@ -16,6 +16,7 @@
 //
 // SPDX-License-Identifier: AGPL3.0-or-later
 
+//nolint:stylecheck // allow non-camel-case for constants
 package enums
 
 const (

@@ -37,7 +37,7 @@ func EnforceDirExists(path string) error {
 		return err
 	}
 	if !fi.IsDir() {
-		return fmt.Errorf("Not a directory (%s)", path)
+		return fmt.Errorf("not a directory (%s)", path)
 	}
 	return nil
 }

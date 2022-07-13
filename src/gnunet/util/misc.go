@@ -23,7 +23,7 @@ import (
 )
 
 //----------------------------------------------------------------------
-// Count occurence of multiple instance at the same time.
+// Count occurrence of multiple instance at the same time.
 //----------------------------------------------------------------------
 
 // Counter is a metric with single key

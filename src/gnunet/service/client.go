@@ -67,7 +67,6 @@ func RequestResponse(
 	callee string,
 	path string,
 	req message.Message) (message.Message, error) {
-
 	// client-connect to the service
 	logger.Printf(logger.DBG, "[%s] Connecting to %s service...\n", caller, callee)
 	cl, err := NewClient(ctx, path)

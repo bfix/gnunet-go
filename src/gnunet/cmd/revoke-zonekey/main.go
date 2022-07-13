@@ -43,10 +43,10 @@ import (
 
 // State of RevData calculation
 const (
-	S_NEW    = iota // start new PoW calculation
-	S_CONT          // continue PoW calculation
-	S_DONE          // PoW calculation done
-	S_SIGNED        // revocation data signed
+	StateNew    = iota // start new PoW calculation
+	StateCont          // continue PoW calculation
+	StateDone          // PoW calculation done
+	StateSigned        // revocation data signed
 )
 
 // RevData is the storage layout for persistent data used by this program.
@@ -67,7 +67,7 @@ func ReadRevData(filename string, bits int, zk *crypto.ZoneKey) (rd *RevData, er
 		Rd:      revocation.NewRevDataCalc(zk),
 		Numbits: uint8(bits),
 		T:       util.NewRelativeTime(0),
-		State:   S_NEW,
+		State:   StateNew,
 	}
 
 	// read revocation object from file. If the file does not exist, a new
@@ -80,23 +80,23 @@ func ReadRevData(filename string, bits int, zk *crypto.ZoneKey) (rd *RevData, er
 	dataBuf := make([]byte, rd.size())
 	var n int
 	if n, err = file.Read(dataBuf); err != nil {
-		err = fmt.Errorf("Error reading file: " + err.Error())
+		err = fmt.Errorf("error reading file: " + err.Error())
 		return
 	}
 	if n != len(dataBuf) {
-		err = fmt.Errorf("File size mismatch")
+		err = fmt.Errorf("file size mismatch")
 		return
 	}
 	if err = data.Unmarshal(&rd, dataBuf); err != nil {
-		err = fmt.Errorf("File corrupted: " + err.Error())
+		err = fmt.Errorf("file corrupted: " + err.Error())
 		return
 	}
 	if !zk.Equal(&rd.Rd.RevData.ZoneKeySig.ZoneKey) {
-		err = fmt.Errorf("Zone key mismatch")
+		err = fmt.Errorf("zone key mismatch")
 		return
 	}
 	if err = file.Close(); err != nil {
-		err = fmt.Errorf("Error closing file: " + err.Error())
+		err = fmt.Errorf("error closing file: " + err.Error())
 	}
 	return
 }
@@ -105,24 +105,24 @@ func ReadRevData(filename string, bits int, zk *crypto.ZoneKey) (rd *RevData, er
 func (r *RevData) Write(filename string) (err error) {
 	var file *os.File
 	if file, err = os.Create(filename); err != nil {
-		return fmt.Errorf("Can't write to output file: " + err.Error())
+		return fmt.Errorf("can't write to output file: " + err.Error())
 	}
 	var buf []byte
 	if buf, err = data.Marshal(r); err != nil {
-		return fmt.Errorf("Internal error: " + err.Error())
+		return fmt.Errorf("internal error: " + err.Error())
 	}
 	if len(buf) != r.size() {
-		return fmt.Errorf("Internal error: Buffer mismatch %d != %d", len(buf), r.size())
+		return fmt.Errorf("internal error: Buffer mismatch %d != %d", len(buf), r.size())
 	}
 	var n int
 	if n, err = file.Write(buf); err != nil {
-		return fmt.Errorf("Can't write to output file: " + err.Error())
+		return fmt.Errorf("can't write to output file: " + err.Error())
 	}
 	if n != len(buf) {
-		return fmt.Errorf("Can't write data to output file!")
+		return fmt.Errorf("can't write data to output file")
 	}
 	if err = file.Close(); err != nil {
-		return fmt.Errorf("Error closing file: " + err.Error())
+		return fmt.Errorf("error closing file: " + err.Error())
 	}
 	return
 }
@@ -137,7 +137,7 @@ func (r *RevData) size() int {
 //
 // (1) Generate the desired PoWs for the public zone key:
 //     This process can be started, stopped and resumed, so the long
-//     calculation time (usually days or even weeks) can be interruped if
+//     calculation time (usually days or even weeks) can be interrupted if
 //     desired. For security reasons you should only pass the "-z" argument to
 //     this step but not the "-k" argument (private key) as it is not required
 //     to calculate the PoWs.
@@ -163,7 +163,7 @@ func main() {
 		zonekey  string // zonekey to be revoked
 		prvkey   string // private zonekey (base64-encoded key data)
 		testing  bool   // test mode (no minimum difficulty)
-		filename string // name of file for persistance
+		filename string // name of file for persistence
 	)
 	minDiff := revocation.MinDifficulty
 	flag.IntVar(&bits, "b", minDiff+1, "Number of leading zero bits")
@@ -226,27 +226,27 @@ func main() {
 
 	// handle revocation data state
 	switch rd.State {
-	case S_NEW:
+	case StateNew:
 		log.Println("Starting new revocation calculation...")
-		rd.State = S_CONT
+		rd.State = StateCont
 
-	case S_CONT:
+	case StateCont:
 		log.Printf("Revocation calculation started at %s\n", rd.Rd.Timestamp.String())
 		log.Printf("Time spent on calculation: %s\n", rd.T.String())
 		log.Printf("Last tested PoW value: %d\n", rd.Last)
 		log.Println("Continuing...")
 
-	case S_DONE:
+	case StateDone:
 		// calculation complete: sign with private key
 		if sk == nil {
 			log.Fatal("Need to sign revocation: private key is missing.")
 		}
 		log.Println("Signing revocation with private key")
-		if err := rd.Rd.Sign(sk); err != nil {
+		if err = rd.Rd.Sign(sk); err != nil {
 			log.Fatal("Failed to sign revocation: " + err.Error())
 		}
 		// write final revocation
-		rd.State = S_SIGNED
+		rd.State = StateSigned
 		if err = rd.Write(filename); err != nil {
 			log.Fatal("Failed to write revocation: " + err.Error())
 		}
@@ -277,10 +277,10 @@ func main() {
 			// The calculation was interrupted; we still need to compute
 			// more and better PoWs...
 			log.Printf("Incomplete revocation: Only %f zero bits on average!\n", average)
-			rd.State = S_CONT
+			rd.State = StateCont
 		} else {
 			// we have reached the required PoW difficulty
-			rd.State = S_DONE
+			rd.State = StateDone
 			// check if we have a valid revocation.
 			log.Println("Revocation calculation complete:")
 			diff, rc := rd.Rd.Verify(false)

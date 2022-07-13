@@ -47,7 +47,7 @@ type EndpointRef struct {
 	id     string             // endpoint identifier in configuration
 	ep     transport.Endpoint // reference to endpoint
 	addr   *util.Address      // public endpoint address
-	upnpId string             // UPNP identifier (empty if unused)
+	upnpID string             // UPNP identifier (empty if unused)
 }
 
 //----------------------------------------------------------------------
@@ -57,7 +57,7 @@ type Core struct {
 	local *Peer
 
 	// incoming messages from transport
-	incoming chan *transport.TransportMessage
+	incoming chan *transport.Message
 
 	// reference to transport implementation
 	trans *transport.Transport
@@ -79,7 +79,6 @@ type Core struct {
 
 // NewCore creates and runs a new core instance.
 func NewCore(ctx context.Context, node *config.NodeConfig) (c *Core, err error) {
-
 	// instantiate peer
 	var peer *Peer
 	if peer, err = NewLocalPeer(node); err != nil {
@@ -88,7 +87,7 @@ func NewCore(ctx context.Context, node *config.NodeConfig) (c *Core, err error) 
 	logger.Printf(logger.DBG, "[core] Local node is %s", peer.GetID().String())
 
 	// create new core instance
-	incoming := make(chan *transport.TransportMessage)
+	incoming := make(chan *transport.Message)
 	c = &Core{
 		local:     peer,
 		incoming:  incoming,
@@ -101,7 +100,7 @@ func NewCore(ctx context.Context, node *config.NodeConfig) (c *Core, err error) 
 	// add all local peer endpoints to transport.
 	for _, epCfg := range node.Endpoints {
 		var (
-			upnpId string             // upnp identifier
+			upnpID string             // upnp identifier
 			local  *util.Address      // local address
 			remote *util.Address      // remote address
 			ep     transport.Endpoint // endpoint reference
@@ -116,7 +115,7 @@ func NewCore(ctx context.Context, node *config.NodeConfig) (c *Core, err error) 
 			// handle UPNP port forwarding
 			protocol := transport.EpProtocol(epCfg.Network)
 			var localA, remoteA string
-			if upnpId, remoteA, localA, err = c.trans.ForwardOpen(protocol, epCfg.Address[5:], epCfg.Port); err != nil {
+			if upnpID, remoteA, localA, err = c.trans.ForwardOpen(protocol, epCfg.Address[5:], epCfg.Port); err != nil {
 				return
 			}
 			// parse local and remote addresses
@@ -132,7 +131,7 @@ func NewCore(ctx context.Context, node *config.NodeConfig) (c *Core, err error) 
 				return
 			}
 			remote = local
-			upnpId = ""
+			upnpID = ""
 		}
 		// add endpoint for address
 		if ep, err = c.trans.AddEndpoint(ctx, local); err != nil {
@@ -151,7 +150,7 @@ func NewCore(ctx context.Context, node *config.NodeConfig) (c *Core, err error) 
 			id:     epCfg.ID,
 			ep:     ep,
 			addr:   remote,
-			upnpId: upnpId,
+			upnpID: upnpID,
 		}
 	}
 	// run message pump

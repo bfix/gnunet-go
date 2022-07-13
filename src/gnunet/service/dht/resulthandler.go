@@ -65,6 +65,7 @@ type ResultHandler interface {
 }
 
 // Compare return values
+//nolint:stylecheck // allow non-camel-case in constants
 const (
 	RHC_SAME   = blocks.CMP_SAME   // the two result handlers are the same
 	RHC_MERGE  = blocks.CMP_MERGE  // the two result handlers can be merged
@@ -265,7 +266,6 @@ func (t *DirectResultHandler) Merge(h ResultHandler) bool {
 	}
 	// check generic handler data
 	return t.GenericResultHandler.Merge(&ht.GenericResultHandler)
-
 }
 
 //----------------------------------------------------------------------

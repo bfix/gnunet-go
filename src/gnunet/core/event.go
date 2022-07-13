@@ -30,6 +30,7 @@ import (
 //----------------------------------------------------------------------
 
 // Event types
+//nolint:stylecheck // allow non-camel-case in constants
 const (
 	EV_CONNECT    = iota // peer connected
 	EV_DISCONNECT        // peer disconnected

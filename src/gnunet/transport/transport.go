@@ -39,11 +39,11 @@ var (
 // Network-oriented transport implementation
 //======================================================================
 
-// TransportMessage is the unit processed by the transport mechanism.
+// Message is the unit processed by the transport mechanism.
 // Peer refers to the remote endpoint (sender/receiver) and
 // Msg is the exchanged GNUnet message. The packet itself satisfies the
 // message.Message interface.
-type TransportMessage struct {
+type Message struct {
 	// Peer is a identifier for a remote peer
 	Peer *util.PeerID
 
@@ -63,7 +63,7 @@ type TransportMessage struct {
 }
 
 // Bytes returns the binary representation of a transport message
-func (msg *TransportMessage) Bytes() ([]byte, error) {
+func (msg *Message) Bytes() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	// serialize peer id
 	if _, err := buf.Write(msg.Peer.Bytes()); err != nil {
@@ -75,16 +75,16 @@ func (msg *TransportMessage) Bytes() ([]byte, error) {
 }
 
 // String returns the message in human-readable form
-func (msg *TransportMessage) String() string {
+func (msg *Message) String() string {
 	return "TransportMessage{...}"
 }
 
 // NewTransportMessage creates a message suitable for transfer
-func NewTransportMessage(peer *util.PeerID, msg message.Message) (tm *TransportMessage) {
+func NewTransportMessage(peer *util.PeerID, msg message.Message) (tm *Message) {
 	if peer == nil {
 		peer = util.NewPeerID(nil)
 	}
-	tm = &TransportMessage{
+	tm = &Message{
 		Peer:  peer,
 		Msg:   msg,
 		Resp:  nil,
@@ -98,13 +98,13 @@ func NewTransportMessage(peer *util.PeerID, msg message.Message) (tm *TransportM
 // Transport enables network-oriented (like IP, UDP, TCP or UDS)
 // message exchange on multiple endpoints.
 type Transport struct {
-	incoming  chan *TransportMessage   // messages as received from the network
+	incoming  chan *Message            // messages as received from the network
 	endpoints *util.Map[int, Endpoint] // list of available endpoints
 	upnp      *network.PortMapper      // UPnP mapper (optional)
 }
 
 // NewTransport creates and runs a new transport layer implementation.
-func NewTransport(ctx context.Context, tag string, ch chan *TransportMessage) (t *Transport) {
+func NewTransport(ctx context.Context, tag string, ch chan *Message) (t *Transport) {
 	// create transport instance
 	mngr, err := network.NewPortMapper(tag)
 	if err != nil {
@@ -125,7 +125,7 @@ func (t *Transport) Shutdown() {
 }
 
 // Send a message over suitable endpoint
-func (t *Transport) Send(ctx context.Context, addr net.Addr, msg *TransportMessage) (err error) {
+func (t *Transport) Send(ctx context.Context, addr net.Addr, msg *Message) (err error) {
 	// select best endpoint able to handle address
 	var bestEp Endpoint
 	err = t.endpoints.ProcessRange(func(_ int, ep Endpoint) error {

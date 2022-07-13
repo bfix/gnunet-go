@@ -144,10 +144,14 @@ type ZoneSigImpl interface {
 //----------------------------------------------------------------------
 // Zone types
 //----------------------------------------------------------------------
+
+//nolint:stylecheck // allow non-camel-case in constants
 var (
 	ZONE_PKEY  = uint32(enums.GNS_TYPE_PKEY)
 	ZONE_EDKEY = uint32(enums.GNS_TYPE_EDKEY)
+)
 
+var (
 	// register available zone types for BlockHandler
 	ZoneTypes = []enums.GNSType{
 		enums.GNS_TYPE_PKEY,
@@ -245,7 +249,7 @@ func (zp *ZonePrivate) Derive(label, context string) (dzp *ZonePrivate, h *math.
 	// get factory for given zone type
 	impl := zoneImpl[zp.Type]
 
-	// caclulate derived key
+	// calculate derived key
 	h = deriveH(zp.impl.Bytes(), label, context)
 	var derived ZonePrivateImpl
 	if derived, h, err = zp.impl.Derive(h); err != nil {

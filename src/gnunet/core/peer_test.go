@@ -43,7 +43,6 @@ var (
 )
 
 func TestPeerHello(t *testing.T) {
-
 	// generate new local node
 	node, err := NewLocalPeer(cfg)
 	if err != nil {
@@ -54,8 +53,8 @@ func TestPeerHello(t *testing.T) {
 	// This hack will only work for direct listening addresses
 	addrList := make([]*util.Address, 0)
 	for _, epRef := range cfg.Endpoints {
-		addr, err := util.ParseAddress(epRef.Addr())
-		if err != nil {
+		var addr *util.Address
+		if addr, err = util.ParseAddress(epRef.Addr()); err != nil {
 			t.Fatal(err)
 		}
 		addrList = append(addrList, addr)

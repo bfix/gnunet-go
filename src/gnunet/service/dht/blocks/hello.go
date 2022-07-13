@@ -243,7 +243,7 @@ func (h *HelloBlock) URL() string {
 }
 
 // Equals returns true if two HELLOs are the same. The expiration
-// timestamp is ignored in the comparision.
+// timestamp is ignored in the comparison.
 func (h *HelloBlock) Equals(g *HelloBlock) bool {
 	if !h.PeerID.Equals(g.PeerID) ||
 		!util.Equals(h.Signature.Data, g.Signature.Data) ||
@@ -364,7 +364,7 @@ func (bh *HelloBlockHandler) ParseResultFilter(data []byte) ResultFilter {
 // FilterEvaluationResult are defined above. If the main evaluation result
 // is RF_MORE, the function also returns and updated result filter where
 // the block is added to the set of filtered replies. An implementation is
-// not expected to actually differenciate between the RF_DUPLICATE and
+// not expected to actually differentiate between the RF_DUPLICATE and
 // RF_IRRELEVANT return values: in both cases the block is ignored for
 // this query.
 func (bh *HelloBlockHandler) FilterResult(b Block, key *crypto.HashCode, rf ResultFilter, xQuery []byte) int {
@@ -412,16 +412,16 @@ func NewHelloResultFilterFromBytes(data []byte) *HelloResultFilter {
 // Add a HELLO block to th result filter
 func (rf *HelloResultFilter) Add(b Block) {
 	if hb, ok := b.(*HelloBlock); ok {
-		h_addr := sha512.Sum512(hb.AddrBin)
-		rf.bf.Add(h_addr[:])
+		hAddr := sha512.Sum512(hb.AddrBin)
+		rf.bf.Add(hAddr[:])
 	}
 }
 
 // Contains checks if a block is contained in the result filter
 func (rf *HelloResultFilter) Contains(b Block) bool {
 	if hb, ok := b.(*HelloBlock); ok {
-		h_addr := sha512.Sum512(hb.AddrBin)
-		return rf.bf.Contains(h_addr[:])
+		hAddr := sha512.Sum512(hb.AddrBin)
+		return rf.bf.Contains(hAddr[:])
 	}
 	return false
 }

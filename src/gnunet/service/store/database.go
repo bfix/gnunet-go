@@ -32,8 +32,8 @@ import (
 
 // Error messages related to databases
 var (
-	ErrSQLInvalidDatabaseSpec = fmt.Errorf("Invalid database specification")
-	ErrSQLNoDatabase          = fmt.Errorf("Database not found")
+	ErrSQLInvalidDatabaseSpec = fmt.Errorf("invalid database specification")
+	ErrSQLNoDatabase          = fmt.Errorf("database not found")
 )
 
 //----------------------------------------------------------------------
@@ -41,35 +41,35 @@ var (
 // on the same instance, managed by the database pool.
 //----------------------------------------------------------------------
 
-// DbConn is a database connection suitable for executing SQL commands.
-type DbConn struct {
+// DBConn is a database connection suitable for executing SQL commands.
+type DBConn struct {
 	conn   *sql.Conn // connection to database instance
 	key    string    // database connect string (identifier for pool)
 	engine string    // database engine
 }
 
 // Close database connection.
-func (db *DbConn) Close() (err error) {
+func (db *DBConn) Close() (err error) {
 	if err = db.conn.Close(); err != nil {
 		return
 	}
-	err = DbPool.remove(db.key)
+	err = DBPool.remove(db.key)
 	return
 }
 
 // QueryRow returns a single record for a query
-func (db *DbConn) QueryRow(query string, args ...any) *sql.Row {
-	return db.conn.QueryRowContext(DbPool.ctx, query, args...)
+func (db *DBConn) QueryRow(query string, args ...any) *sql.Row {
+	return db.conn.QueryRowContext(DBPool.ctx, query, args...)
 }
 
 // Query returns all matching records for a query
-func (db *DbConn) Query(query string, args ...any) (*sql.Rows, error) {
-	return db.conn.QueryContext(DbPool.ctx, query, args...)
+func (db *DBConn) Query(query string, args ...any) (*sql.Rows, error) {
+	return db.conn.QueryContext(DBPool.ctx, query, args...)
 }
 
 // Exec a SQL statement
-func (db *DbConn) Exec(query string, args ...any) (sql.Result, error) {
-	return db.conn.ExecContext(DbPool.ctx, query, args...)
+func (db *DBConn) Exec(query string, args ...any) (sql.Result, error) {
+	return db.conn.ExecContext(DBPool.ctx, query, args...)
 }
 
 // TODO: add more SQL methods
@@ -81,11 +81,11 @@ func (db *DbConn) Exec(query string, args ...any) (sql.Result, error) {
 
 // global instance for the database pool (singleton)
 var (
-	DbPool *dbPool
+	DBPool *dbPool
 )
 
-// DbPoolEntry holds information about a database instance.
-type DbPoolEntry struct {
+// DBPoolEntry holds information about a database instance.
+type DBPoolEntry struct {
 	db      *sql.DB // reference to the database engine
 	refs    int     // number of open connections (reference count)
 	connect string  // SQL connect string
@@ -94,16 +94,16 @@ type DbPoolEntry struct {
 // package initialization
 func init() {
 	// construct database pool
-	DbPool = new(dbPool)
-	DbPool.insts = util.NewMap[string, *DbPoolEntry]()
-	DbPool.ctx, DbPool.cancel = context.WithCancel(context.Background())
+	DBPool = new(dbPool)
+	DBPool.insts = util.NewMap[string, *DBPoolEntry]()
+	DBPool.ctx, DBPool.cancel = context.WithCancel(context.Background())
 }
 
 // dbPool keeps a mapping between connect string and database instance
 type dbPool struct {
 	ctx    context.Context                 // connection context
 	cancel context.CancelFunc              // cancel function
-	insts  *util.Map[string, *DbPoolEntry] // map of database instances
+	insts  *util.Map[string, *DBPoolEntry] // map of database instances
 }
 
 // remove a database instance from the pool based on its connect string.
@@ -128,7 +128,7 @@ func (p *dbPool) remove(key string) error {
 // Connect to a SQL database (various types and flavors):
 // The 'spec' option defines the arguments required to connect to a database;
 // the meaning and format of the arguments depends on the specific SQL database.
-// The arguments are seperated by the '+' character; the first (and mandatory)
+// The arguments are separated by the '+' character; the first (and mandatory)
 // argument defines the SQL database type. Other arguments depend on the value
 // of this first argument.
 // The following SQL types are implemented:
@@ -137,13 +137,13 @@ func (p *dbPool) remove(key string) error {
 // * 'mysql':   A MySQL-compatible database; the second argument specifies the
 //              information required to log into the database (e.g.
 //              "[user[:passwd]@][proto[(addr)]]/dbname[?param1=value1&...]").
-func (p *dbPool) Connect(spec string) (db *DbConn, err error) {
+func (p *dbPool) Connect(spec string) (db *DBConn, err error) {
 	err = p.insts.Process(func() error {
 		// check if we have a connection to this database.
-		db = new(DbConn)
+		db = new(DBConn)
 		inst, ok := p.insts.Get(spec)
 		if !ok {
-			inst = new(DbPoolEntry)
+			inst = new(DBPoolEntry)
 			inst.refs = 0
 			inst.connect = spec
 

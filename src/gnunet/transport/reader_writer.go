@@ -89,35 +89,34 @@ func ReadMessage(ctx context.Context, rdr io.ReadCloser, buf []byte) (msg messag
 	if buf == nil {
 		buf = make([]byte, 65536)
 	}
-	get := func(pos, count int) error {
-		n, err := rdr.Read(buf[pos : pos+count])
-		if err == nil && n != count {
+	get := func(pos, count int) (err error) {
+		var n int
+		if n, err = rdr.Read(buf[pos : pos+count]); err == nil && n != count {
 			err = fmt.Errorf("not enough bytes on reader (%d of %d)", n, count)
 		}
 		return err
 	}
 	// read header first
-	if err := get(0, 4); err != nil {
-		return nil, err
+	if err = get(0, 4); err != nil {
+		return
 	}
 	var mh *message.Header
 	if mh, err = message.GetMsgHeader(buf[:4]); err != nil {
-		return nil, err
+		return
 	}
 	// get rest of message
 	if err = get(4, int(mh.MsgSize)-4); err != nil {
-		return nil, err
+		return
 	}
 	if msg, err = message.NewEmptyMessage(mh.MsgType); err != nil {
-		return nil, err
+		return
 	}
 	if msg == nil {
-		return nil, fmt.Errorf("message{%d} is nil", mh.MsgType)
+		err = fmt.Errorf("message{%d} is nil", mh.MsgType)
+		return
 	}
-	if err = data.Unmarshal(msg, buf[:mh.MsgSize]); err != nil {
-		return nil, err
-	}
-	return msg, nil
+	err = data.Unmarshal(msg, buf[:mh.MsgSize])
+	return
 }
 
 //----------------------------------------------------------------------

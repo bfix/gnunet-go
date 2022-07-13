@@ -56,7 +56,7 @@ type pathElementSignedData struct {
 
 // PathElement is the full-fledged data assembly for a path element in
 // PUT/GET pathes. It is assembled programatically (on generation[1] and
-// verification[2]) and not transfered in messages directly.
+// verification[2]) and not transferred in messages directly.
 //
 // [1] spe = &PathElement{...}
 //     core.Sign(spe)

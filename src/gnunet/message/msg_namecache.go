@@ -149,7 +149,7 @@ func (m *NamecacheCacheMsg) Header() *Header {
 // NAMECACHE_BLOCK_CACHE_RESPONSE
 //----------------------------------------------------------------------
 
-// NamecacheCacheResponseMsg is the reponse message for a put request
+// NamecacheCacheResponseMsg is the response message for a put request
 type NamecacheCacheResponseMsg struct {
 	MsgSize uint16 `order:"big"` // total size of message
 	MsgType uint16 `order:"big"` // NAMECACHE_LOOKUP_BLOCK_RESPONSE (432)

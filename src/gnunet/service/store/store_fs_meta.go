@@ -51,7 +51,7 @@ var initScript []byte
 
 // FileMetaDB is a SQLite3 database for block metadata
 type FileMetaDB struct {
-	conn *DbConn // database connection
+	conn *DBConn // database connection
 }
 
 // OpenMetaDB opens a metadata database in the given path. The name of the
@@ -67,7 +67,7 @@ func OpenMetaDB(path string) (db *FileMetaDB, err error) {
 		file.Close()
 	}
 	db = new(FileMetaDB)
-	if db.conn, err = DbPool.Connect("sqlite3:" + dbFile); err != nil {
+	if db.conn, err = DBPool.Connect("sqlite3:" + dbFile); err != nil {
 		return
 	}
 	// check for initialized database

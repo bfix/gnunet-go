@@ -29,14 +29,14 @@ import (
 )
 
 var (
-	d_1 = []byte{
+	d1 = []byte{
 		0x7F, 0xDE, 0x7A, 0xAA, 0xEA, 0x0D, 0xA1, 0x7A,
 		0x7B, 0xCB, 0x4F, 0x57, 0x49, 0xCC, 0xA9, 0xBE,
 		0xA7, 0xFB, 0x2B, 0x85, 0x77, 0xAD, 0xC9, 0x55,
 		0xDA, 0xB2, 0x68, 0xB2, 0xB4, 0xCC, 0x24, 0x78,
 	}
 
-	d_2 = []byte{
+	d2 = []byte{
 		0x20, 0x3f, 0x2f, 0x8c, 0x54, 0xf4, 0x1a, 0xd3,
 		0x01, 0x9a, 0x56, 0x92, 0x19, 0xda, 0xee, 0x4f,
 		0xd2, 0x53, 0x55, 0xa6, 0x3c, 0xfc, 0x57, 0x40,
@@ -54,11 +54,11 @@ var (
 		0x05, 0xbd, 0x1b, 0x85, 0xd5, 0xfd, 0x63, 0x60,
 	}
 
-	prv_1, prv_2 *ed25519.PrivateKey
-	pub_1, pub_2 *ed25519.PublicKey
-	ss_1, ss_2   []byte
+	prv1, prv2 *ed25519.PrivateKey
+	pub1, pub2 *ed25519.PublicKey
+	ss1, ss2   []byte
 
-	ED25519_N = ed25519.GetCurve().N
+	ed25519N = ed25519.GetCurve().N
 )
 
 func calcSharedSecret() bool {
@@ -67,29 +67,29 @@ func calcSharedSecret() bool {
 		return x[:]
 	}
 	// compute shared secret
-	ss_1 = calc(prv_1, pub_2)
-	ss_2 = calc(prv_2, pub_1)
-	return bytes.Equal(ss_1, ss_2)
+	ss1 = calc(prv1, pub2)
+	ss2 = calc(prv2, pub1)
+	return bytes.Equal(ss1, ss2)
 }
 
 func TestDHE(t *testing.T) {
 	// generate two key pairs
-	prv_1 = ed25519.NewPrivateKeyFromD(math.NewIntFromBytes(d_1))
-	pub_1 = prv_1.Public()
-	prv_2 = ed25519.NewPrivateKeyFromD(math.NewIntFromBytes(d_2))
-	pub_2 = prv_2.Public()
+	prv1 = ed25519.NewPrivateKeyFromD(math.NewIntFromBytes(d1))
+	pub1 = prv1.Public()
+	prv2 = ed25519.NewPrivateKeyFromD(math.NewIntFromBytes(d2))
+	pub2 = prv2.Public()
 
 	if !calcSharedSecret() {
 		t.Fatal("Shared secret mismatch")
 	}
 	if testing.Verbose() {
-		t.Logf("SS_1 = %s\n", hex.EncodeToString(ss_1))
-		t.Logf("SS_2 = %s\n", hex.EncodeToString(ss_2))
+		t.Logf("SS_1 = %s\n", hex.EncodeToString(ss1))
+		t.Logf("SS_2 = %s\n", hex.EncodeToString(ss2))
 	}
 
-	if !bytes.Equal(ss_1[:], ss) {
+	if !bytes.Equal(ss1[:], ss) {
 		t.Logf("SS(expected) = %s\n", hex.EncodeToString(ss))
-		t.Logf("SS(computed) = %s\n", hex.EncodeToString(ss_1[:]))
+		t.Logf("SS(computed) = %s\n", hex.EncodeToString(ss1[:]))
 		t.Fatal("Wrong shared secret:")
 	}
 }
@@ -98,19 +98,19 @@ func TestDHERandom(t *testing.T) {
 	failed := 0
 	once := false
 	for i := 0; i < 100; i++ {
-		prv_1 = ed25519.NewPrivateKeyFromD(math.NewIntRnd(ED25519_N))
-		pub_1 = prv_1.Public()
-		prv_2 = ed25519.NewPrivateKeyFromD(math.NewIntRnd(ED25519_N))
-		pub_2 = prv_2.Public()
+		prv1 = ed25519.NewPrivateKeyFromD(math.NewIntRnd(ed25519N))
+		pub1 = prv1.Public()
+		prv2 = ed25519.NewPrivateKeyFromD(math.NewIntRnd(ed25519N))
+		pub2 = prv2.Public()
 
 		if !calcSharedSecret() {
 			if !once {
 				once = true
-				t.Logf("d1=%s\n", hex.EncodeToString(prv_1.D.Bytes()))
-				t.Logf("d2=%s\n", hex.EncodeToString(prv_2.D.Bytes()))
-				t.Logf("ss1=%s\n", hex.EncodeToString(ss_1))
-				t.Logf("ss2=%s\n", hex.EncodeToString(ss_2))
-				dd := prv_1.D.Mul(prv_2.D).Mod(ED25519_N)
+				t.Logf("d1=%s\n", hex.EncodeToString(prv1.D.Bytes()))
+				t.Logf("d2=%s\n", hex.EncodeToString(prv2.D.Bytes()))
+				t.Logf("ss1=%s\n", hex.EncodeToString(ss1))
+				t.Logf("ss2=%s\n", hex.EncodeToString(ss2))
+				dd := prv1.D.Mul(prv2.D).Mod(ed25519N)
 				pk := sha512.Sum512(ed25519.NewPrivateKeyFromD(dd).Public().Q.X().Bytes())
 				t.Logf("ss0=%s\n", hex.EncodeToString(pk[:]))
 			}

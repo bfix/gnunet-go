@@ -36,7 +36,6 @@ import (
 
 // TestCoreSimple test a two node network
 func TestCoreSimple(t *testing.T) {
-
 	var (
 		peer1Cfg = &config.NodeConfig{
 			Name:        "p1",
@@ -75,11 +74,11 @@ func TestCoreSimple(t *testing.T) {
 	}()
 
 	// create and run nodes
-	node1, err := NewTestNode(t, ctx, peer1Cfg)
+	node1, err := NewTestNode(ctx, t, peer1Cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	node2, err := NewTestNode(t, ctx, peer2Cfg)
+	node2, err := NewTestNode(ctx, t, peer2Cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +103,6 @@ func TestCoreSimple(t *testing.T) {
 
 // TestCoreSimple test a two node network
 func TestCoreUPNP(t *testing.T) {
-
 	// configuration data
 	var (
 		peer1Cfg = &config.NodeConfig{
@@ -143,7 +141,7 @@ func TestCoreUPNP(t *testing.T) {
 	}()
 
 	// create and run nodes
-	node1, err := NewTestNode(t, ctx, peer1Cfg)
+	node1, err := NewTestNode(ctx, t, peer1Cfg)
 	if err != nil {
 		if err == transport.ErrTransNoUPNP {
 			t.Log("No UPnP available -- skipping test")
@@ -152,7 +150,7 @@ func TestCoreUPNP(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer node1.Shutdown()
-	node2, err := NewTestNode(t, ctx, peer2Cfg)
+	node2, err := NewTestNode(ctx, t, peer2Cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +182,7 @@ func TestDHTU(t *testing.T) {
 	}
 	// convert arguments
 	var (
-		rId   *util.PeerID
+		rID   *util.PeerID
 		rAddr *util.Address
 		err   error
 	)
@@ -215,14 +213,14 @@ func TestDHTU(t *testing.T) {
 	}()
 
 	// create and run node
-	node, err := NewTestNode(t, ctx, peerCfg)
+	node, err := NewTestNode(ctx, t, peerCfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer node.Shutdown()
 
 	// learn bootstrap address (triggers HELLO)
-	node.Learn(ctx, rId, rAddr)
+	node.Learn(ctx, rID, rAddr)
 
 	// run forever
 	var ch chan struct{}
@@ -254,8 +252,8 @@ func (n *TestNode) Learn(ctx context.Context, peer *util.PeerID, addr *util.Addr
 	n.core.Learn(ctx, peer, []*util.Address{addr})
 }
 
-func NewTestNode(t *testing.T, ctx context.Context, cfg *config.NodeConfig) (node *TestNode, err error) {
-
+func NewTestNode(ctx context.Context, t *testing.T, cfg *config.NodeConfig) (node *TestNode, err error) {
+	t.Helper()
 	// create test node
 	node = new(TestNode)
 	node.t = t

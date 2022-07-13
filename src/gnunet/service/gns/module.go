@@ -135,11 +135,11 @@ func (m *Module) Export(fcn map[string]any) {
 // Import functions
 func (m *Module) Import(fcn map[string]any) {
 	// resolve imports from other modules
-	m.LookupLocal = fcn["namecache:get"].(func(ctx context.Context, query *blocks.GNSQuery) (*blocks.GNSBlock, error))
-	m.StoreLocal = fcn["namecache:put"].(func(ctx context.Context, query *blocks.GNSQuery, block *blocks.GNSBlock) error)
-	m.LookupRemote = fcn["dht:get"].(func(ctx context.Context, query blocks.Query) (blocks.Block, error))
-	m.RevocationQuery = fcn["rev:query"].(func(ctx context.Context, zkey *crypto.ZoneKey) (valid bool, err error))
-	m.RevocationRevoke = fcn["rev:revoke"].(func(ctx context.Context, rd *revocation.RevData) (success bool, err error))
+	m.LookupLocal, _ = fcn["namecache:get"].(func(ctx context.Context, query *blocks.GNSQuery) (*blocks.GNSBlock, error))
+	m.StoreLocal, _ = fcn["namecache:put"].(func(ctx context.Context, query *blocks.GNSQuery, block *blocks.GNSBlock) error)
+	m.LookupRemote, _ = fcn["dht:get"].(func(ctx context.Context, query blocks.Query) (blocks.Block, error))
+	m.RevocationQuery, _ = fcn["rev:query"].(func(ctx context.Context, zkey *crypto.ZoneKey) (valid bool, err error))
+	m.RevocationRevoke, _ = fcn["rev:revoke"].(func(ctx context.Context, rd *revocation.RevData) (success bool, err error))
 }
 
 //----------------------------------------------------------------------
@@ -257,7 +257,7 @@ func (m *Module) ResolveRelative(
 
 		if hdlr := hdlrs.GetHandler(crypto.ZoneTypes...); hdlr != nil {
 			// (1) zone key record:
-			inst := hdlr.(*ZoneKeyHandler)
+			inst, _ := hdlr.(*ZoneKeyHandler)
 			// if labels are pending, set new zone and continue resolution;
 			// otherwise resolve "@" label for the zone if no zone key record
 			// was requested.
@@ -265,14 +265,15 @@ func (m *Module) ResolveRelative(
 				labels = append(labels, "@")
 			}
 			// check if zone key has been revoked
-			if valid, err := m.RevocationQuery(ctx, inst.zkey); err != nil || !valid {
+			var valid bool
+			if valid, err = m.RevocationQuery(ctx, inst.zkey); err != nil || !valid {
 				// revoked key -> no results!
 				records = make([]*message.ResourceRecord, 0)
 				break
 			}
 		} else if hdlr := hdlrs.GetHandler(enums.GNS_TYPE_GNS2DNS); hdlr != nil {
 			// (2) GNS2DNS records
-			inst := hdlr.(*Gns2DnsHandler)
+			inst, _ := hdlr.(*Gns2DnsHandler)
 			// if we are at the end of the path and the requested type
 			// includes GNS_TYPE_GNS2DNS, the GNS2DNS records are returned...
 			if len(labels) == 1 && kind.HasType(enums.GNS_TYPE_GNS2DNS) && !kind.IsAny() {
@@ -308,7 +309,7 @@ func (m *Module) ResolveRelative(
 			break
 		} else if hdlr := hdlrs.GetHandler(enums.GNS_TYPE_BOX); hdlr != nil {
 			// (3) BOX records:
-			inst := hdlr.(*BoxHandler)
+			inst, _ := hdlr.(*BoxHandler)
 			newRecords := inst.Records(kind).Records
 			if len(newRecords) > 0 {
 				records = newRecords
@@ -316,7 +317,7 @@ func (m *Module) ResolveRelative(
 			}
 		} else if hdlr := hdlrs.GetHandler(enums.GNS_TYPE_DNS_CNAME); hdlr != nil {
 			// (4) CNAME records:
-			inst := hdlr.(*CnameHandler)
+			inst, _ := hdlr.(*CnameHandler)
 			// if we are at the end of the path and the requested type
 			// includes GNS_TYPE_DNS_CNAME, the records are returned...
 			if len(labels) == 1 && kind.HasType(enums.GNS_TYPE_DNS_CNAME) && !kind.IsAny() {
@@ -352,7 +353,7 @@ func (m *Module) ResolveRelative(
 		// check for VPN record
 		if hdlr := hdlrs.GetHandler(enums.GNS_TYPE_VPN); hdlr != nil {
 			// add VPN record to result set
-			inst := hdlr.(*VpnHandler)
+			inst, _ := hdlr.(*VpnHandler)
 			set.AddRecord(inst.rec)
 		}
 	}

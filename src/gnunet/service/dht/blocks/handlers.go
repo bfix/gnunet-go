@@ -60,7 +60,7 @@ type BlockHandler interface {
 	// FilterEvaluationResult are defined above. If the main evaluation result
 	// is RF_MORE, the function also returns and updated result filter where
 	// the block is added to the set of filtered replies. An implementation is
-	// not expected to actually differenciate between the RF_DUPLICATE and
+	// not expected to actually differentiate between the RF_DUPLICATE and
 	// RF_IRRELEVANT return values: in both cases the block is ignored for
 	// this query.
 	FilterResult(b Block, key *crypto.HashCode, rf ResultFilter, xQuery []byte) int

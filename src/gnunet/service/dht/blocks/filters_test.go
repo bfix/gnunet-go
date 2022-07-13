@@ -40,7 +40,6 @@ func (list EntryList) Contains(e Entry) bool {
 }
 
 func TestBloomfilter(t *testing.T) {
-
 	F := 500 // number of expected entries
 
 	// The K-value for the HELLO_BF Bloom filter is always 16. The size S of

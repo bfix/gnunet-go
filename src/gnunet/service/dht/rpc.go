@@ -27,30 +27,30 @@ import (
 
 //----------------------------------------------------------------------
 
-// DHTService is a type for DHT-related JSON-RPC requests
-type DHTService struct{}
+// RPCService is a type for DHT-related JSON-RPC requests
+type RPCService struct{}
 
 // local instance of service
-var dhtRPC = &DHTService{}
+var dhtRPC = &RPCService{}
 
 //----------------------------------------------------------------------
 // Command "DHT.Status"
 //----------------------------------------------------------------------
 
-// DHTStatusRequest is a status request for specific information addressed
+// StatusRequest is a status request for specific information addressed
 // by topic(s)
-type DHTStatusRequest struct {
+type StatusRequest struct {
 	Topics []string `json:"topics"`
 }
 
-// DHTStatusResponse is a response to a status request. It returns information
+// StatusResponse is a response to a status request. It returns information
 // on each topic requested.
-type DHTStatusResponse struct {
+type StatusResponse struct {
 	Messages map[string]string `json:"messages"`
 }
 
 // Status requests information by topic(s).
-func (s *DHTService) Status(r *http.Request, req *DHTStatusRequest, reply *DHTStatusResponse) error {
+func (s *RPCService) Status(r *http.Request, req *StatusRequest, reply *StatusResponse) error {
 	// assemble information on topic(s)
 	out := make(map[string]string)
 	for _, topic := range req.Topics {
@@ -60,7 +60,7 @@ func (s *DHTService) Status(r *http.Request, req *DHTStatusRequest, reply *DHTSt
 		}
 	}
 	// set reply
-	*reply = DHTStatusResponse{
+	*reply = StatusResponse{
 		Messages: out,
 	}
 	return nil

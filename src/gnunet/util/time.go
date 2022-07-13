@@ -46,7 +46,7 @@ func NewAbsoluteTime(t time.Time) AbsoluteTime {
 // NewAbsoluteTimeEpoch set the point in time to the given time value
 func NewAbsoluteTimeEpoch(secs uint64) AbsoluteTime {
 	return AbsoluteTime{
-		Val: uint64(secs * 1000000),
+		Val: secs * 1000000,
 	}
 }
 

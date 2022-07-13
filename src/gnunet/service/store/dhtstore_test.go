@@ -37,7 +37,6 @@ const (
 // and stores them under their SHA512 key. It than retrieves
 // each block from storage and checks for matching hash.
 func TestDHTFilesStore(t *testing.T) {
-
 	// test configuration
 	cfg := make(util.ParameterSet)
 	cfg["mode"] = "file"

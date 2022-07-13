@@ -129,7 +129,7 @@ type NamecacheConfig struct {
 // RevocationConfig contains parameters for the key revocation service
 type RevocationConfig struct {
 	Service *ServiceConfig    `json:"service"` // socket for Revocation service
-	Storage util.ParameterSet `json:"storage"` // persistance mechanism for revocation data
+	Storage util.ParameterSet `json:"storage"` // persistence mechanism for revocation data
 }
 
 //----------------------------------------------------------------------
@@ -204,7 +204,6 @@ func substString(s string, env map[string]string) string {
 // applySubstitutions traverses the configuration data structure
 // and applies string substitutions to all string values.
 func applySubstitutions(x interface{}, env map[string]string) {
-
 	var process func(v reflect.Value)
 	process = func(v reflect.Value) {
 		for i := 0; i < v.NumField(); i++ {
@@ -213,7 +212,7 @@ func applySubstitutions(x interface{}, env map[string]string) {
 				switch fld.Kind() {
 				case reflect.String:
 					// check for substitution
-					s := fld.Interface().(string)
+					s, _ := fld.Interface().(string)
 					for {
 						s1 := substString(s, env)
 						if s1 == s {

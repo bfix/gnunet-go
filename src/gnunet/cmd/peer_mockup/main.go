@@ -36,7 +36,7 @@ var (
 	// configuration for remote node
 	remoteCfg = "3GXXMNb5YpIUO7ejIR2Yy0Cf5texuLfDjHkXcqbPxkc="
 
-	// top-level variables used accross functions
+	// top-level variables used across functions
 	local  *core.Peer // local peer (with private key)
 	remote *core.Peer // remote peer
 	c      *core.Core
@@ -119,11 +119,9 @@ loop:
 // process incoming messages and send responses; it is used for protocol exploration only.
 // it tries to mimick the message flow between "real" GNUnet peers.
 func process(ctx context.Context, ev *core.Event) {
-
 	logger.Printf(logger.DBG, "<<< %s", ev.Msg.String())
 
 	switch msg := ev.Msg.(type) {
-
 	case *message.TransportTCPWelcomeMsg:
 		if err := c.Send(ctx, ev.Peer, message.NewTransportPingMsg(ev.Peer, nil)); err != nil {
 			logger.Printf(logger.ERROR, "TransportTCPWelcomeMsg send failed: %s", err.Error())

@@ -65,6 +65,7 @@ func (pf *PeerFilter) Clone() *PeerFilter {
 //======================================================================
 
 // ResultFilter return values
+//nolint:stylecheck // allow non-camel-case in constants
 const (
 	RF_MORE       = iota // Valid result, and there may be more.
 	RF_LAST              // Last possible valid result.
@@ -73,6 +74,7 @@ const (
 )
 
 // Compare return values
+//nolint:stylecheck // allow non-camel-case in constants
 const (
 	CMP_SAME   = iota // the two result filter are the same
 	CMP_MERGE         // the two result filter can be merged

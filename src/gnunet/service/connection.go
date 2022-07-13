@@ -121,11 +121,11 @@ func (s *Connection) Receive(ctx context.Context) (message.Message, error) {
 		return nil, err
 	}
 	// get rest of message
-	if err := get(4, int(mh.MsgSize)-4); err != nil {
+	if err = get(4, int(mh.MsgSize)-4); err != nil {
 		return nil, err
 	}
-	msg, err := message.NewEmptyMessage(mh.MsgType)
-	if err != nil {
+	var msg message.Message
+	if msg, err = message.NewEmptyMessage(mh.MsgType); err != nil {
 		return nil, err
 	}
 	if msg == nil {
@@ -220,7 +220,6 @@ func NewConnectionManager(
 	params map[string]string, // connection parameters
 	hdlr chan *Connection, // handler for incoming connections
 ) (cs *ConnectionManager, err error) {
-
 	// instantiate channel server
 	cs = &ConnectionManager{
 		listener: nil,
@@ -241,7 +240,6 @@ func NewConnectionManager(
 						logger.ERROR,
 						"MsgChannelServer: Failed to set permissions %s on %s: %s\n",
 						path, value, err.Error())
-
 				}
 			} else {
 				logger.Printf(

@@ -58,7 +58,7 @@ var (
 func TestPrvKey(t *testing.T) {
 	if testing.Verbose() {
 		t.Logf("PRIVATE (seed=%s)\n", hex.EncodeToString(seed))
-		t.Logf("     d = %s\n", hex.EncodeToString(prv_1.D.Bytes()))
+		t.Logf("     d = %s\n", hex.EncodeToString(prv1.D.Bytes()))
 		t.Logf("    ID = '%s'\n", util.EncodeBinaryToString(seed))
 	}
 

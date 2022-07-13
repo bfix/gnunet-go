@@ -44,7 +44,7 @@ type JRPCServer struct {
 
 // RunRPCServer runs the JSON-RPC server. It can be terminated by context only.
 func RunRPCServer(ctx context.Context, endpoint string) (srvRPC *JRPCServer, err error) {
-
+	// instantiate RPC service
 	srvRPC = &JRPCServer{rpc.NewServer()}
 	srvRPC.RegisterCodec(json2.NewCodec(), "application/json")
 

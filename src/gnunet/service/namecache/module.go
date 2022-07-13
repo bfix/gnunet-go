@@ -70,7 +70,9 @@ func (m *Module) Import(fcm map[string]any) {
 // Get an entry from the cache if available.
 func (m *Module) Get(ctx context.Context, query *blocks.GNSQuery) (block *blocks.GNSBlock, err error) {
 	var b blocks.Block
-	b, err = m.cache.Get(query)
+	if b, err = m.cache.Get(query); err != nil {
+		return
+	}
 	err = blocks.Unwrap(b, block)
 	return
 }

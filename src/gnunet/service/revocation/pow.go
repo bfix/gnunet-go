@@ -164,7 +164,6 @@ func (rd *RevData) Sign(skey *crypto.ZonePrivate) (err error) {
 // in this revocation and a verification status (-1=failed signature, -2=
 // expired revocation, -3="out-of-order" PoW sequence).
 func (rd *RevData) Verify(withSig bool) (zbits float64, rc int) {
-
 	// (1) check signature
 	if withSig {
 		sigBlock := &SignedRevData{
@@ -186,7 +185,7 @@ func (rd *RevData) Verify(withSig bool) (zbits float64, rc int) {
 	}
 
 	// (2) check PoWs
-	var last uint64 = 0
+	var last uint64
 	for _, pow := range rd.PoWs {
 		// check sequence order
 		if pow <= last {
@@ -242,7 +241,7 @@ func (rdc *RevDataCalc) Size() int {
 
 // Average number of leading zero-bits in current list
 func (rdc *RevDataCalc) Average() float64 {
-	var sum uint16 = 0
+	var sum uint16
 	for _, num := range rdc.Bits {
 		sum += num
 	}
@@ -280,7 +279,7 @@ func (rdc *RevDataCalc) sortBits() {
 func (rdc *RevDataCalc) Compute(ctx context.Context, bits int, last uint64, cb func(float64, uint64)) (float64, uint64) {
 	// find the largest PoW value in current work unit
 	work := NewPoWData(0, rdc.Timestamp, &rdc.ZoneKeySig.ZoneKey)
-	var max uint64 = 0
+	var max uint64
 	for i, pow := range rdc.PoWs {
 		if pow == 0 {
 			max++

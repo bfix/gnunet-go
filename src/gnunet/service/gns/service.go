@@ -96,7 +96,7 @@ func (s *Service) ServeClient(ctx context.Context, id int, mc *service.Connectio
 		logger.Printf(logger.INFO, "[gns:%d:%d] Received request: %v\n", id, reqID, msg)
 
 		// handle message
-		valueCtx := context.WithValue(ctx, "label", fmt.Sprintf(":%d:%d", id, reqID))
+		valueCtx := context.WithValue(ctx, service.CtxKey("label"), fmt.Sprintf(":%d:%d", id, reqID))
 		s.HandleMessage(valueCtx, nil, msg, mc)
 	}
 	// close client connection
@@ -112,7 +112,7 @@ func (s *Service) HandleMessage(ctx context.Context, sender *util.PeerID, msg me
 	// assemble log label
 	label := ""
 	if v := ctx.Value("label"); v != nil {
-		label = v.(string)
+		label, _ = v.(string)
 	}
 	// perform lookup
 	switch m := msg.(type) {
@@ -419,7 +419,7 @@ func (s *Service) LookupDHT(ctx context.Context, query blocks.Query) (block bloc
 		}
 
 		// get GNSBlock from message
-		qGNS := query.(*blocks.GNSQuery)
+		qGNS, _ := query.(*blocks.GNSQuery)
 		block = new(blocks.GNSBlock)
 		if err = data.Unmarshal(block, m.Data); err != nil {
 			logger.Printf(logger.ERROR, "[gns] can't read GNS block: %s\n", err.Error())

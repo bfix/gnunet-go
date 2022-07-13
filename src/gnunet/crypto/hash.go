@@ -46,7 +46,7 @@ func (hc *HashCode) String() string {
 	return hex.EncodeToString(hc.Bits)
 }
 
-// NewHashCode creates a new (initalized) hash value
+// NewHashCode creates a new (initialized) hash value
 func NewHashCode(buf []byte) *HashCode {
 	hc := &HashCode{
 		Bits: make([]byte, 64),

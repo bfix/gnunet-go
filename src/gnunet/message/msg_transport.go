@@ -158,7 +158,7 @@ func NewSignedAddress(a *util.Address) *SignedAddress {
 	return addr
 }
 
-// TransportPongMsg is a reponse message for a PING request
+// TransportPongMsg is a response message for a PING request
 type TransportPongMsg struct {
 	MsgSize     uint16         `order:"big"` // total size of message
 	MsgType     uint16         `order:"big"` // TRANSPORT_PING (372)
@@ -167,7 +167,7 @@ type TransportPongMsg struct {
 	SignedBlock *SignedAddress // signed block of data
 }
 
-// NewTransportPongMsg creates a reponse message with an address the replying
+// NewTransportPongMsg creates a response message with an address the replying
 // peer wants to be reached.
 func NewTransportPongMsg(challenge uint32, a *util.Address) *TransportPongMsg {
 	m := &TransportPongMsg{
@@ -192,7 +192,7 @@ func (m *TransportPongMsg) String() string {
 		return fmt.Sprintf("TransportPongMsg{addr=%s,challenge=%d}",
 			a, m.Challenge)
 	}
-	return fmt.Sprintf("TransportPongMsg{addr=<unkown>,%d}", m.Challenge)
+	return fmt.Sprintf("TransportPongMsg{addr=<unknown>,%d}", m.Challenge)
 }
 
 // Header returns the message header in a separate instance.
@@ -231,7 +231,7 @@ func (m *TransportPongMsg) Verify(pub *ed25519.PublicKey) (bool, error) {
 // TRANSPORT_SESSION_ACK
 //----------------------------------------------------------------------
 
-// SessionAckMsg is a message to acknowlege a session request
+// SessionAckMsg is a message to acknowledge a session request
 type SessionAckMsg struct {
 	MsgSize uint16 `order:"big"` // total size of message
 	MsgType uint16 `order:"big"` // TRANSPORT_SESSION_ACK (377)

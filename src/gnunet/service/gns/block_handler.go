@@ -30,7 +30,7 @@ import (
 	"github.com/bfix/gospel/logger"
 )
 
-// HdlrInst is the type for functions that instanciate custom block handlers.
+// HdlrInst is the type for functions that instantiate custom block handlers.
 type HdlrInst func(*message.ResourceRecord, []string) (BlockHandler, error)
 
 // Error codes
@@ -157,7 +157,7 @@ func NewBlockHandlerList(records []*message.ResourceRecord, labels []string) (*B
 		hl.counts.Add(rrType)
 
 		// check for custom handler type
-		if creat, ok := customHandler[enums.GNSType(rrType)]; ok {
+		if creat, ok := customHandler[rrType]; ok {
 			// check if a handler for given type already exists
 			var (
 				hdlr BlockHandler
@@ -192,7 +192,7 @@ func NewBlockHandlerList(records []*message.ResourceRecord, labels []string) (*B
 }
 
 // GetHandler returns a BlockHandler for the given GNS block type.
-// If more than one type is given, the first matching hanlder is
+// If more than one type is given, the first matching handler is
 // returned.
 func (hl *BlockHandlerList) GetHandler(types ...enums.GNSType) BlockHandler {
 	for _, t := range types {

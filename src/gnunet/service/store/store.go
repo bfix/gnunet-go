@@ -21,7 +21,7 @@ package store
 import (
 	"context"
 	"database/sql"
-	_ "embed"
+	_ "embed" // use embedded filesystem
 	"errors"
 	"fmt"
 	"gnunet/service/dht/blocks"
@@ -208,7 +208,7 @@ func (s *RedisStore) Close() error {
 
 // SQLStore for generic SQL database handling
 type SQLStore struct {
-	db *DbConn
+	db *DBConn
 }
 
 // NewSQLStore creates a new SQL-based key/value store.
@@ -222,7 +222,7 @@ func NewSQLStore(spec util.ParameterSet) (s KVStore, err error) {
 	kvs := new(SQLStore)
 
 	// connect to SQL database
-	kvs.db, err = DbPool.Connect(connect)
+	kvs.db, err = DBPool.Connect(connect)
 	if err != nil {
 		return nil, err
 	}

@@ -54,7 +54,6 @@ type FileStore struct {
 
 // NewFileStore instantiates a new file storage.
 func NewFileStore(spec util.ParameterSet) (DHTStore, error) {
-
 	// create file store handler
 	fs := new(FileStore)
 	fs.args = spec
@@ -211,8 +210,8 @@ func (s *FileStore) GetApprox(query blocks.Query, excl func(blocks.Block) bool) 
 			bestDist = d
 		}
 	}
-	if err := s.meta.Traverse(check); err != nil {
-		return nil, nil, err
+	if err = s.meta.Traverse(check); err != nil {
+		return
 	}
 	if bestBlk != nil {
 		// mark the block as newly used

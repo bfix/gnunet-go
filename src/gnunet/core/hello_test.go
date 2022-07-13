@@ -71,7 +71,6 @@ func TestHelloURLDirect(t *testing.T) {
 }
 
 func TestHelloURL(t *testing.T) {
-
 	// prepare peer and HELLO data
 	peer, err := NewLocalPeer(peerCfg)
 	if err != nil {

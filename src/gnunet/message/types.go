@@ -16,6 +16,7 @@
 //
 // SPDX-License-Identifier: AGPL3.0-or-later
 
+//nolint:stylecheck // allow non-camel-case in constants
 package message
 
 // GNUnet message types
@@ -370,7 +371,7 @@ const (
 	NAMESTORE_MONITOR_START          = 441 // Client to service: start monitoring (yields sequence of "ZONE_ITERATION_RESPONSES" --- forever).
 	NAMESTORE_MONITOR_SYNC           = 442 // Service to client: you're now in sync.
 	NAMESTORE_RECORD_RESULT          = 443 // Service to client: here is a (plaintext) record you requested.
-	NAMESTORE_MONITOR_NEXT           = 444 // Client to service: I am now ready for the next (set of) monitor events. Monitoring equivlaent of #NAMESTORE_ZONE_ITERATION_NEXT.
+	NAMESTORE_MONITOR_NEXT           = 444 // Client to service: I am now ready for the next (set of) monitor events. Monitoring equivalent of #NAMESTORE_ZONE_ITERATION_NEXT.
 	NAMESTORE_ZONE_ITERATION_START   = 445 // Client to service: please start iteration; receives "NAMESTORE_LOOKUP_NAME_RESPONSE" messages in return.
 	NAMESTORE_ZONE_ITERATION_NEXT    = 447 // Client to service: next record(s) in iteration please.
 	NAMESTORE_ZONE_ITERATION_STOP    = 448 // Client to service: stop iterating.
@@ -445,7 +446,7 @@ const (
 	CONSENSUS_P2P_ELEMENTS_REQUEST    = 544 // Elements, and requests for further elements
 	CONSENSUS_P2P_ELEMENTS_REPORT     = 545 // Elements that a peer reports to be missing at the remote peer.
 	CONSENSUS_P2P_HELLO               = 546 // Initialization message for consensus p2p communication.
-	CONSENSUS_P2P_SYNCED              = 547 // Report that the peer is synced with the partner after successfuly decoding the invertible bloom filter.
+	CONSENSUS_P2P_SYNCED              = 547 // Report that the peer is synced with the partner after successfully decoding the invertible bloom filter.
 	CONSENSUS_P2P_FIN                 = 548 // Interaction os over, got synched and reported all elements
 	CONSENSUS_P2P_ABORT               = 548 // Abort a round, don't send requested elements anymore
 	CONSENSUS_P2P_ROUND_CONTEXT       = 547 // Abort a round, don't send requested elements anymore

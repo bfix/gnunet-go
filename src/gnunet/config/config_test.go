@@ -35,7 +35,7 @@ func TestConfigRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	// parse configuration
-	if err := ParseConfigBytes(data, false); err != nil {
+	if err = ParseConfigBytes(data, false); err != nil {
 		t.Fatal(err)
 	}
 	// write configuration

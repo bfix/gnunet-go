@@ -75,6 +75,9 @@ type EventHandler func(context.Context, *core.Event)
 // Heartbeat is a function prototype for periodic tasks
 type Heartbeat func(context.Context)
 
+// CtxKey is a value-context key
+type CtxKey string
+
 // ModuleImpl is an event-handling type used by Module implementations.
 type ModuleImpl struct {
 	// channel for core events.
@@ -108,7 +111,7 @@ func (m *ModuleImpl) Run(
 			select {
 			// Handle events
 			case event := <-m.ch:
-				hCtx := context.WithValue(ctx, "label", event.Label)
+				hCtx := context.WithValue(ctx, CtxKey("label"), event.Label)
 				hdlr(hCtx, event)
 
 			// wait for terminate signal

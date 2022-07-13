@@ -75,7 +75,7 @@ func (s *Service) ServeClient(ctx context.Context, id int, mc *service.Connectio
 		logger.Printf(logger.INFO, "[revocation:%d:%d] Received request: %v\n", id, reqID, msg)
 
 		// handle message
-		valueCtx := context.WithValue(ctx, "label", fmt.Sprintf(":%d:%d", id, reqID))
+		valueCtx := context.WithValue(ctx, service.CtxKey("label"), fmt.Sprintf(":%d:%d", id, reqID))
 		s.HandleMessage(valueCtx, nil, msg, mc)
 	}
 	// close client connection
@@ -91,7 +91,7 @@ func (s *Service) HandleMessage(ctx context.Context, sender *util.PeerID, msg me
 	// assemble log label
 	label := ""
 	if v := ctx.Value("label"); v != nil {
-		label = v.(string)
+		label, _ = v.(string)
 	}
 	switch m := msg.(type) {
 	case *message.RevocationQueryMsg:
