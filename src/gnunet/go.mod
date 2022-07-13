@@ -3,7 +3,7 @@ module gnunet
 go 1.18
 
 require (
-	github.com/bfix/gospel v1.2.14
+	github.com/bfix/gospel v1.2.15
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/gorilla/mux v1.8.0
