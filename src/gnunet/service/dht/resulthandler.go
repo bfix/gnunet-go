@@ -44,12 +44,33 @@ import (
 
 // ResultHandler interface
 type ResultHandler interface {
+
+	// ID returna the handler id
 	ID() int
+
+	// Done returns true if handler can be removed
 	Done() bool
+
+	// Key returns the query/store key as string
 	Key() string
-	Equal(ResultHandler) bool
-	Handle(ctx context.Context, msg *message.DHTP2PResultMsg) bool
+
+	// Compare two result handlers
+	Compare(ResultHandler) int
+
+	// Merge two result handlers that are the same except for result filter
+	Merge(ResultHandler) bool
+
+	// Handle result message
+	Handle(context.Context, *message.DHTP2PResultMsg) bool
 }
+
+// Compare return values
+const (
+	RHC_SAME   = blocks.CMP_SAME   // the two result handlers are the same
+	RHC_MERGE  = blocks.CMP_MERGE  // the two result handlers can be merged
+	RHC_DIFFER = blocks.CMP_DIFFER // the two result handlers are different
+	RHC_SIBL   = blocks.CMP_1      // the two result handlers are siblings
+)
 
 //----------------------------------------------------------------------
 
@@ -97,14 +118,19 @@ func (t *GenericResultHandler) Done() bool {
 
 // Equal returns true if the two handlers handle the same result
 // for a recipient.
-func (t *GenericResultHandler) Equal(h *GenericResultHandler) bool {
-	if t.btype != h.btype || t.flags != h.flags {
-		return false
+func (t *GenericResultHandler) Compare(h *GenericResultHandler) int {
+	if t.key.Equals(h.key) ||
+		t.btype != h.btype ||
+		t.flags != h.flags ||
+		!bytes.Equal(t.xQuery, h.xQuery) {
+		return RHC_DIFFER
 	}
-	if !t.resFilter.Equal(h.resFilter) {
-		return false
-	}
-	return bytes.Equal(t.xQuery, h.xQuery)
+	return t.resFilter.Compare(h.resFilter)
+}
+
+// Merge two result handlers that are the same except for result filter
+func (t *GenericResultHandler) Merge(a *GenericResultHandler) bool {
+	return t.resFilter.Merge(a.resFilter)
 }
 
 //----------------------------------------------------------------------
@@ -142,20 +168,29 @@ func (t *ForwardResultHandler) Handle(ctx context.Context, msg *message.DHTP2PRe
 	return true
 }
 
-// Equal returns true if the two handlers handle the same result
-// for a recipient.
-func (t *ForwardResultHandler) Equal(h ResultHandler) bool {
+// Compare two forward result filters
+func (t *ForwardResultHandler) Compare(h ResultHandler) int {
+	// check for correct handler type
+	ht, ok := h.(*ForwardResultHandler)
+	if !ok {
+		return RHC_DIFFER
+	}
+	// check for same recipient
+	if ht.resp.Receiver() != t.resp.Receiver() {
+		return RHC_DIFFER
+	}
+	// check generic handler data
+	return t.GenericResultHandler.Compare(&ht.GenericResultHandler)
+}
+
+// Merge two forward result handlers
+func (t *ForwardResultHandler) Merge(h ResultHandler) bool {
 	// check for correct handler type
 	ht, ok := h.(*ForwardResultHandler)
 	if !ok {
 		return false
 	}
-	// check generic handler data
-	if !ht.GenericResultHandler.Equal(&ht.GenericResultHandler) {
-		return false
-	}
-	// check for same recipient
-	return ht.resp.Receiver() == t.resp.Receiver()
+	return t.GenericResultHandler.Merge(&ht.GenericResultHandler)
 }
 
 //----------------------------------------------------------------------
@@ -176,19 +211,19 @@ func (t *ForwardResultHandler) Equal(h ResultHandler) bool {
 // to nil).
 //----------------------------------------------------------------------
 
-// CustomResultHandler is the function prototype for custom handlers:
-type CustomResultHandler func(context.Context, *message.DHTP2PResultMsg, chan<- any) bool
+// ResultHandlerFcn is the function prototype for custom handlers:
+type ResultHandlerFcn func(context.Context, *message.DHTP2PResultMsg, chan<- any) bool
 
 // DirectResultHandler for local DHT-P2P-GET requests
 type DirectResultHandler struct {
 	GenericResultHandler
 
-	hdlr CustomResultHandler // Hdlr is a custom message handler
-	rc   chan any            // handler result channel
+	hdlr ResultHandlerFcn // Hdlr is a custom message handler
+	rc   chan any         // handler result channel
 }
 
 // NewDirectResultHandler create a new GET handler instance
-func NewDirectResultHandler(msgIn message.Message, rf blocks.ResultFilter, hdlr CustomResultHandler, rc chan any) *DirectResultHandler {
+func NewDirectResultHandler(msgIn message.Message, rf blocks.ResultFilter, hdlr ResultHandlerFcn, rc chan any) *DirectResultHandler {
 	// check for correct message type and handler function
 	msg, ok := msgIn.(*message.DHTP2PGetMsg)
 	if ok {
@@ -211,16 +246,27 @@ func (t *DirectResultHandler) Handle(ctx context.Context, msg *message.DHTP2PRes
 	return false
 }
 
-// Equal returns true if the two handlers handle the same result
-// for a recipient.
-func (t *DirectResultHandler) Equal(h ResultHandler) bool {
+// Compare two direct result handlers
+func (t *DirectResultHandler) Compare(h ResultHandler) int {
+	// check for correct handler type
+	ht, ok := h.(*DirectResultHandler)
+	if !ok {
+		return RHC_DIFFER
+	}
+	// check generic handler data
+	return t.GenericResultHandler.Compare(&ht.GenericResultHandler)
+}
+
+// Merge two direct result handlers
+func (t *DirectResultHandler) Merge(h ResultHandler) bool {
 	// check for correct handler type
 	ht, ok := h.(*DirectResultHandler)
 	if !ok {
 		return false
 	}
 	// check generic handler data
-	return ht.GenericResultHandler.Equal(&ht.GenericResultHandler)
+	return t.GenericResultHandler.Merge(&ht.GenericResultHandler)
+
 }
 
 //----------------------------------------------------------------------
@@ -245,18 +291,35 @@ func (t *ResultHandlerList) Add(hdlr ResultHandler) bool {
 	// get current list of handlers for key
 	key := hdlr.Key()
 	list, ok := t.list.Get(key)
+	modified := false
 	if !ok {
 		list = make([]ResultHandler, 0)
 	} else {
 		// check if handler is already available
-		for _, h := range list {
-			if h.Equal(hdlr) {
+	loop:
+		for i, h := range list {
+			switch h.Compare(hdlr) {
+			case RHC_SAME:
+				// already in list; no need to add again
 				return false
+			case RHC_MERGE:
+				// merge the two result handlers
+				modified = h.Merge(hdlr) || modified
+				break loop
+			case RHC_SIBL:
+				// replace the old handler with the new one
+				list[i] = hdlr
+				modified = true
+				break loop
+			case RHC_DIFFER:
+				// try next
 			}
 		}
 	}
-	// append handler to list
-	list = append(list, hdlr)
+	if !modified {
+		// append new handler to list
+		list = append(list, hdlr)
+	}
 	t.list.Put(key, list)
 	return true
 }
