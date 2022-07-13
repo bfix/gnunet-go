@@ -122,7 +122,7 @@ func (s *Service) HandleMessage(ctx context.Context, sender *util.PeerID, msg me
 		//----------------------------------------------------------
 
 		// perform lookup on block (locally and remote)
-		go func(m *message.LookupMsg) {
+		go func(m *message.LookupMsg, label string) {
 			logger.Printf(logger.INFO, "[gns%s] Lookup request received.\n", label)
 			resp := message.NewGNSLookupResultMsg(m.ID)
 			defer func() {
@@ -136,7 +136,6 @@ func (s *Service) HandleMessage(ctx context.Context, sender *util.PeerID, msg me
 				logger.Printf(logger.DBG, "[gns%s] Lookup request finished.\n", label)
 			}()
 
-			label := m.GetName()
 			kind := NewRRTypeList(enums.GNSType(m.Type))
 			recset, err := s.Resolve(ctx, label, m.Zone, kind, int(m.Options), 0)
 			if err != nil {
@@ -162,11 +161,13 @@ func (s *Service) HandleMessage(ctx context.Context, sender *util.PeerID, msg me
 					// is this the record type we are looking for?
 					if rec.Type == m.Type || enums.GNSType(m.Type) == enums.GNS_TYPE_ANY {
 						// add it to the response message
-						resp.AddRecord(rec)
+						if err := resp.AddRecord(rec); err != nil {
+							logger.Printf(logger.ERROR, "[gns%s] failed: %sv", label, err.Error())
+						}
 					}
 				}
 			}
-		}(m)
+		}(m, label)
 
 	default:
 		//----------------------------------------------------------

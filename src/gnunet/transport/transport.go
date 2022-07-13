@@ -175,7 +175,7 @@ func (t *Transport) AddEndpoint(ctx context.Context, addr *util.Address) (ep End
 	}
 	// add endpoint to list and run it
 	t.endpoints.Put(ep.ID(), ep)
-	ep.Run(ctx, t.incoming)
+	err = ep.Run(ctx, t.incoming)
 	return
 }
 

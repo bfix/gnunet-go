@@ -23,6 +23,8 @@ import (
 	"crypto/sha512"
 	"encoding/binary"
 	"gnunet/util"
+
+	"github.com/bfix/gospel/logger"
 )
 
 //======================================================================
@@ -174,7 +176,9 @@ func (bf *BloomFilter) SetMutator(m any) {
 	switch v := m.(type) {
 	case uint32:
 		buf := new(bytes.Buffer)
-		binary.Write(buf, binary.BigEndian, v)
+		if err := binary.Write(buf, binary.BigEndian, v); err != nil {
+			logger.Printf(logger.ERROR, "[BloomFilter.SetMutator] failed: %s", err.Error())
+		}
 		bf.mInput = buf.Bytes()
 	case []byte:
 		bf.mInput = make([]byte, 4)
@@ -186,7 +190,9 @@ func (bf *BloomFilter) SetMutator(m any) {
 	}
 	// generate mutator bytes
 	h := sha512.New()
-	h.Write(bf.mInput)
+	if _, err := h.Write(bf.mInput); err != nil {
+		logger.Printf(logger.ERROR, "[BloomFilter.SetMutator] failed: %s", err.Error())
+	}
 	bf.mData = h.Sum(nil)
 
 	//logger.Printf(logger.DBG, "[filter] Mutator %s -> %s", hex.EncodeToString(bf.mInput), hex.EncodeToString(bf.mData))
@@ -279,7 +285,9 @@ func (bf *BloomFilter) indices(e []byte) []uint32 {
 	idx := make([]uint32, 16)
 	buf := bytes.NewReader(h[:])
 	for i := range idx {
-		binary.Read(buf, binary.BigEndian, &idx[i])
+		if err := binary.Read(buf, binary.BigEndian, &idx[i]); err != nil {
+			logger.Printf(logger.ERROR, "[BloomFilter.indices] failed: %s", err.Error())
+		}
 		idx[i] %= size
 	}
 	return idx

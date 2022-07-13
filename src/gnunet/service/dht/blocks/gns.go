@@ -26,11 +26,15 @@ import (
 	"gnunet/util"
 
 	"github.com/bfix/gospel/data"
+	"github.com/bfix/gospel/logger"
 )
 
 // Error messages
 var (
-	ErrBlockNotDecrypted = fmt.Errorf("GNS block not decrypted")
+	ErrBlockNotDecrypted    = errors.New("GNS block not decrypted")
+	ErrBlockInvalidSig      = errors.New("invalid signature key for GNS Block")
+	ErrBlockTypeNotVerified = errors.New("can't verify block type")
+	ErrBlockCantDecrypt     = errors.New("can't decrypt block type")
 )
 
 //----------------------------------------------------------------------
@@ -55,9 +59,13 @@ func (q *GNSQuery) Verify(b Block) (err error) {
 
 		// verify derived key
 		dkey := blk.DerivedKeySig.ZoneKey
-		dkey2, _ := q.Zone.Derive(q.Label, "gns")
+		var dkey2 *crypto.ZoneKey
+		if dkey2, _, err = q.Zone.Derive(q.Label, "gns"); err != nil {
+			return
+		}
 		if !dkey.Equal(dkey2) {
-			return fmt.Errorf("invalid signature key for GNS Block")
+			err = ErrBlockInvalidSig
+			return
 		}
 		// verify signature
 		var buf []byte
@@ -67,7 +75,7 @@ func (q *GNSQuery) Verify(b Block) (err error) {
 		blk.verified, err = blk.DerivedKeySig.Verify(buf)
 
 	default:
-		err = errors.New("can't verify block type")
+		err = ErrBlockTypeNotVerified
 	}
 	return
 }
@@ -82,7 +90,7 @@ func (q *GNSQuery) Decrypt(b Block) (err error) {
 		return
 
 	default:
-		err = errors.New("can't decrypt block type")
+		err = ErrBlockCantDecrypt
 	}
 	return
 }
@@ -92,7 +100,10 @@ func NewGNSQuery(zkey *crypto.ZoneKey, label string) *GNSQuery {
 	// derive a public key from (pkey,label) and set the repository
 	// key as the SHA512 hash of the binary key representation.
 	// (key blinding)
-	pd, _ := zkey.Derive(label, "gns")
+	pd, _, err := zkey.Derive(label, "gns")
+	if err != nil {
+		logger.Printf(logger.ERROR, "[NewGNSQuery] failed: %s", err.Error())
+	}
 	gq := crypto.Hash(pd.Bytes()).Bits
 	return &GNSQuery{
 		GenericQuery: *NewGenericQuery(gq, enums.BLOCK_TYPE_GNS_NAMERECORD, 0),

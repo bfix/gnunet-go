@@ -101,7 +101,7 @@ func (m *ModuleImpl) Run(
 	if heartbeat == nil {
 		pulse = 365 * 24 * time.Hour // once a year
 	}
-	tick := time.Tick(pulse)
+	tick := time.NewTicker(pulse)
 	// run event loop
 	go func() {
 		for {
@@ -116,7 +116,7 @@ func (m *ModuleImpl) Run(
 				return
 
 			// handle heartbeat
-			case <-tick:
+			case <-tick.C:
 				// check for defined heartbeat handler
 				if heartbeat != nil {
 					heartbeat(ctx)

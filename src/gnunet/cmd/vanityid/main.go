@@ -8,8 +8,9 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/bfix/gospel/crypto/ed25519"
 	"gnunet/util"
+
+	"github.com/bfix/gospel/crypto/ed25519"
 )
 
 func main() {
@@ -32,16 +33,13 @@ func main() {
 	seed := make([]byte, 32)
 	start := time.Now()
 	for i := 0; ; i++ {
-		n, err := rand.Read(seed)
-		if err != nil || n != 32 {
-			panic(err)
-		}
+		_, _ = rand.Read(seed)
 		prv := ed25519.NewPrivateKeyFromSeed(seed)
 		pub := prv.Public().Bytes()
 		id := util.EncodeBinaryToString(pub)
 		for _, r := range reg {
 			if r.MatchString(id) {
-				elapsed := time.Now().Sub(start)
+				elapsed := time.Since(start)
 				s1 := hex.EncodeToString(seed)
 				s2 := hex.EncodeToString(prv.D.Bytes())
 				fmt.Printf("%s [%s][%s] (%d tries, %s elapsed)\n", id, s1, s2, i, elapsed)

@@ -154,7 +154,9 @@ func main() {
 	}
 	// send HELLO to all bootstrap addresses
 	for _, addr := range bsList {
-		dhtSrv.SendHello(ctx, addr)
+		if err := dhtSrv.SendHello(ctx, addr); err != nil {
+			logger.Printf(logger.ERROR, "[dht] send HELLO failed: %s", err.Error())
+		}
 	}
 
 	// handle OS signals
@@ -188,5 +190,7 @@ loop:
 
 	// terminating service
 	cancel()
-	srv.Stop()
+	if err := srv.Stop(); err != nil {
+		logger.Printf(logger.ERROR, "[dht] Failed to stop service: %s", err.Error())
+	}
 }

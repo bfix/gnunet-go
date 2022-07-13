@@ -85,7 +85,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			if blockHdlr != nil {
 				rf = blockHdlr.ParseResultFilter(msg.ResFilter)
 			} else {
-				logger.Printf(logger.WARN, "[%s] unknown result filter implementation -- skipped")
+				logger.Printf(logger.WARN, "[%s] unknown result filter implementation -- skipped", label)
 			}
 		}
 		// clone peer filter
@@ -144,7 +144,6 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			// block found in the DHT
 			if block_cache != nil && dist_cache.Cmp(dist) < 0 {
 				block = block_cache
-				dist = dist_cache
 			}
 			// if we have a block, send it as response
 			if block != nil {

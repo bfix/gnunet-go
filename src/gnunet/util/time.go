@@ -160,8 +160,10 @@ func (t RelativeTime) String() string {
 }
 
 // Add two durations
-func (t RelativeTime) Add(t2 RelativeTime) {
-	t.Val += t2.Val
+func (t RelativeTime) Add(t2 RelativeTime) RelativeTime {
+	return RelativeTime{
+		Val: t.Val + t2.Val,
+	}
 }
 
 // Compare two durations

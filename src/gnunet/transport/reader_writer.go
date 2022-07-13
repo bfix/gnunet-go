@@ -54,12 +54,8 @@ func WriteMessage(ctx context.Context, wrt io.WriteCloser, msg message.Message) 
 	}
 	// watch dog for write operation
 	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				wrt.Close()
-			}
-		}
+		<-ctx.Done()
+		wrt.Close()
 	}()
 	// perform write operation
 	var n int
@@ -86,12 +82,8 @@ func ReadMessageDirect(rdr io.Reader, buf []byte) (msg message.Message, err erro
 func ReadMessage(ctx context.Context, rdr io.ReadCloser, buf []byte) (msg message.Message, err error) {
 	// watch dog for write operation
 	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				rdr.Close()
-			}
-		}
+		<-ctx.Done()
+		rdr.Close()
 	}()
 	// get bytes from reader
 	if buf == nil {

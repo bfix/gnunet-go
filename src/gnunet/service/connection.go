@@ -232,24 +232,22 @@ func NewConnectionManager(
 		return
 	}
 	// handle additional parameters
-	if params != nil {
-		for key, value := range params {
-			switch key {
-			case "perm": // set permissions on 'unix'
-				if perm, err := strconv.ParseInt(value, 8, 32); err == nil {
-					if err := os.Chmod(path, os.FileMode(perm)); err != nil {
-						logger.Printf(
-							logger.ERROR,
-							"MsgChannelServer: Failed to set permissions %s on %s: %s\n",
-							path, value, err.Error())
-
-					}
-				} else {
+	for key, value := range params {
+		switch key {
+		case "perm": // set permissions on 'unix'
+			if perm, err := strconv.ParseInt(value, 8, 32); err == nil {
+				if err := os.Chmod(path, os.FileMode(perm)); err != nil {
 					logger.Printf(
 						logger.ERROR,
-						"MsgChannelServer: Invalid permissions '%s'\n",
-						value)
+						"MsgChannelServer: Failed to set permissions %s on %s: %s\n",
+						path, value, err.Error())
+
 				}
+			} else {
+				logger.Printf(
+					logger.ERROR,
+					"MsgChannelServer: Invalid permissions '%s'\n",
+					value)
 			}
 		}
 	}

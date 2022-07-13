@@ -22,17 +22,21 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/binary"
+
+	"github.com/bfix/gospel/logger"
 )
 
 // RndArray fills a buffer with random content
 func RndArray(b []byte) {
-	rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		logger.Printf(logger.ERROR, "[RndArray] failed: %s", err.Error())
+	}
 }
 
 // NewRndArray creates a new buffer of given size; filled with random content.
 func NewRndArray(size int) []byte {
 	b := make([]byte, size)
-	rand.Read(b)
+	RndArray(b)
 	return b
 }
 
@@ -42,7 +46,9 @@ func RndUInt64() uint64 {
 	RndArray(b)
 	var v uint64
 	c := bytes.NewBuffer(b)
-	binary.Read(c, binary.BigEndian, &v)
+	if err := binary.Read(c, binary.BigEndian, &v); err != nil {
+		logger.Printf(logger.ERROR, "[RndUInt64] failed: %s", err.Error())
+	}
 	return v
 }
 

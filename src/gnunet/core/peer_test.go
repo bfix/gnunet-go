@@ -61,6 +61,9 @@ func TestPeerHello(t *testing.T) {
 		addrList = append(addrList, addr)
 	}
 	h, err := node.HelloData(TTL, addrList)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// convert to URL and back
 	u := h.URL()

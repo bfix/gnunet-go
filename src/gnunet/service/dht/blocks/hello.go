@@ -66,7 +66,9 @@ type HelloBlock struct {
 // SetAddresses adds a bulk of addresses for this HELLO block.
 func (h *HelloBlock) SetAddresses(a []*util.Address) {
 	h.addrs = util.Clone(a)
-	h.finalize()
+	if err := h.finalize(); err != nil {
+		logger.Printf(logger.ERROR, "[HelloBlock.SetAddresses] failed: %s", err.Error())
+	}
 }
 
 // Addresses returns the list of addresses
@@ -141,7 +143,9 @@ func ParseHelloURL(u string, checkExpiry bool) (h *HelloBlock, err error) {
 	}
 
 	// (6) generate raw address data so block is complete
-	h.finalize()
+	if err = h.finalize(); err != nil {
+		return
+	}
 
 	// check signature
 	var ok bool
@@ -281,10 +285,22 @@ func (h *HelloBlock) SignedData() []byte {
 
 	// assemble signed data
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.BigEndian, size)
-	binary.Write(buf, binary.BigEndian, purpose)
-	binary.Write(buf, binary.BigEndian, h.Expires.Epoch()*1000000)
-	buf.Write(hAddr[:])
+	var n int
+	err := binary.Write(buf, binary.BigEndian, size)
+	if err == nil {
+		if err = binary.Write(buf, binary.BigEndian, purpose); err == nil {
+			if err = binary.Write(buf, binary.BigEndian, h.Expires.Epoch()*1000000); err == nil {
+				if n, err = buf.Write(hAddr[:]); err == nil {
+					if n != len(hAddr[:]) {
+						err = errors.New("signed data size mismatch")
+					}
+				}
+			}
+		}
+	}
+	if err != nil {
+		logger.Printf(logger.ERROR, "[HelloBlock.SignedData] failed: %s", err.Error())
+	}
 	return buf.Bytes()
 }
 

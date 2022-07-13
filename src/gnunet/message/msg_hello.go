@@ -25,6 +25,8 @@ import (
 	"gnunet/util"
 	"io"
 	"time"
+
+	"github.com/bfix/gospel/logger"
 )
 
 //----------------------------------------------------------------------
@@ -112,11 +114,19 @@ func (a *HelloAddress) String() string {
 // Bytes returns the binary representation of a HelloAddress
 func (a *HelloAddress) Bytes() []byte {
 	buf := new(bytes.Buffer)
-	buf.Write([]byte(a.transport))
-	buf.WriteByte(0)
-	binary.Write(buf, binary.BigEndian, a.addrSize)
-	binary.Write(buf, binary.BigEndian, a.expires.Val)
-	buf.Write(a.address)
+	_, err := buf.Write([]byte(a.transport))
+	if err == nil {
+		if err = buf.WriteByte(0); err == nil {
+			if err = binary.Write(buf, binary.BigEndian, a.addrSize); err == nil {
+				if err = binary.Write(buf, binary.BigEndian, a.expires.Val); err != nil {
+					_, err = buf.Write(a.address)
+				}
+			}
+		}
+	}
+	if err != nil {
+		logger.Printf(logger.ERROR, "[HelloAddress] failed: %s", err.Error())
+	}
 	return buf.Bytes()
 }
 

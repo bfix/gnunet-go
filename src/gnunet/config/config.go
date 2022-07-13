@@ -182,7 +182,7 @@ func ParseConfigBytes(data []byte, subst bool) (err error) {
 }
 
 var (
-	rx = regexp.MustCompile("\\$\\{([^\\}]*)\\}")
+	rx = regexp.MustCompile(`\$\{([^\}]*)\}`)
 )
 
 // substString is a helper function to substitute environment variables

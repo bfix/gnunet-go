@@ -73,7 +73,7 @@ func TestBase32Preset(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if bytes.Compare(x.bin, e) != 0 {
+		if !bytes.Equal(x.bin, e) {
 			t.Fatalf("Decoding mismatch: '%s' != '%s' for '%s'\n", hex.EncodeToString(e), hex.EncodeToString(x.bin), x.str)
 		}
 	}

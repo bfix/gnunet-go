@@ -175,7 +175,6 @@ func (p *dbPool) Connect(spec string) (db *DbConn, err error) {
 			}
 			// save database in pool
 			p.insts.Put(spec, inst)
-			ok = true
 		}
 		// increment reference count
 		inst.refs++

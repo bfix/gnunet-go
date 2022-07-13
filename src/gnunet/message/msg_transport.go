@@ -28,6 +28,7 @@ import (
 
 	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/data"
+	"github.com/bfix/gospel/logger"
 )
 
 //----------------------------------------------------------------------
@@ -106,7 +107,9 @@ func NewTransportPingMsg(target *util.PeerID, a *util.Address) *TransportPingMsg
 // String returns a human-readable representation of the message.
 func (m *TransportPingMsg) String() string {
 	a := new(util.Address)
-	data.Unmarshal(a, m.Address)
+	if err := data.Unmarshal(a, m.Address); err != nil {
+		logger.Printf(logger.ERROR, "[TransportPingMsg.String] failed: %s", err.Error())
+	}
 	return fmt.Sprintf("TransportPingMsg{target=%s,addr=%s,challenge=%d}",
 		m.Target, a, m.Challenge)
 }

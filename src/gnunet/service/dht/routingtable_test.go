@@ -70,9 +70,7 @@ func TestRT(t *testing.T) {
 	// helper functions
 	genRemotePeer := func() *PeerAddress {
 		d := make([]byte, 32)
-		if _, err := rand.Read(d); err != nil {
-			panic(err)
-		}
+		_, _ = rand.Read(d)
 		return NewPeerAddress(util.NewPeerID(d))
 	}
 

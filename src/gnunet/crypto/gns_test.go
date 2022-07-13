@@ -55,7 +55,9 @@ func TestDeriveBlockKey(t *testing.T) {
 
 	// create and initialize new public zone key (PKEY)
 	zkey := new(PKEYPublicImpl)
-	zkey.Init(PUB)
+	if err := zkey.Init(PUB); err != nil {
+		t.Fatal(err)
+	}
 
 	// derive and check a key for symmetric cipher
 	skey := zkey.BlockKey(LABEL, EXPIRE)
@@ -267,7 +269,10 @@ func TestDeriveH(t *testing.T) {
 	}
 
 	// test key derivation
-	dpub, h := pub.Derive(LABEL, CONTEXT)
+	dpub, h, err := pub.Derive(LABEL, CONTEXT)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !bytes.Equal(h.Bytes(), H) {
 		if testing.Verbose() {
 			t.Logf("H(computed) = %s\n", hex.EncodeToString(h.Bytes()))
@@ -332,7 +337,9 @@ func TestHKDF_gnunet(t *testing.T) {
 
 	rdr := hkdf.Expand(sha256.New, prk, info)
 	okm := make([]byte, len(OKM))
-	rdr.Read(okm)
+	if _, err := rdr.Read(okm); err != nil {
+		t.Fatal(err)
+	}
 	if testing.Verbose() {
 		t.Log("OKM(computed) = " + hex.EncodeToString(okm))
 	}
@@ -387,7 +394,9 @@ func TestHDKF(t *testing.T) {
 
 	rdr := hkdf.Expand(sha512.New, prk, info)
 	okm := make([]byte, len(OKM))
-	rdr.Read(okm)
+	if _, err := rdr.Read(okm); err != nil {
+		t.Fatal(err)
+	}
 	if testing.Verbose() {
 		t.Log("OKM(computed) = " + hex.EncodeToString(okm))
 	}

@@ -116,8 +116,7 @@ func (t *GenericResultHandler) Done() bool {
 	return !t.active || t.started.Add(time.Hour).Expired()
 }
 
-// Equal returns true if the two handlers handle the same result
-// for a recipient.
+// Compare two handlers
 func (t *GenericResultHandler) Compare(h *GenericResultHandler) int {
 	if t.key.Equals(h.key) ||
 		t.btype != h.btype ||
@@ -160,9 +159,9 @@ func NewForwardResultHandler(msgIn message.Message, rf blocks.ResultFilter, back
 // Handle incoming DHT-P2P-RESULT message
 func (t *ForwardResultHandler) Handle(ctx context.Context, msg *message.DHTP2PResultMsg) bool {
 	// send result message back to originator (result forwarding).
-	logger.Printf(logger.INFO, "[dht-task-%d] sending result back to originator", t.ID)
+	logger.Printf(logger.INFO, "[dht-task-%d] sending result back to originator", t.id)
 	if err := t.resp.Send(ctx, msg); err != nil && err != transport.ErrEndpMaybeSent {
-		logger.Printf(logger.ERROR, "[dht-task-%d] sending result back to originator failed: %s", t.ID, err.Error())
+		logger.Printf(logger.ERROR, "[dht-task-%d] sending result back to originator failed: %s", t.id, err.Error())
 		return false
 	}
 	return true
@@ -331,7 +330,7 @@ func (t *ResultHandlerList) Get(key string) ([]ResultHandler, bool) {
 
 // Cleanup removes expired tasks from list
 func (t *ResultHandlerList) Cleanup() {
-	t.list.ProcessRange(func(key string, list []ResultHandler) error {
+	err := t.list.ProcessRange(func(key string, list []ResultHandler) error {
 		var newList []ResultHandler
 		changed := false
 		for _, rh := range list {
@@ -346,4 +345,7 @@ func (t *ResultHandlerList) Cleanup() {
 		}
 		return nil
 	}, false)
+	if err != nil {
+		logger.Printf(logger.ERROR, "[ResultHandlerList] clean-up error: %s", err.Error())
+	}
 }

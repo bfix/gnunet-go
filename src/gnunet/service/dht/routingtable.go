@@ -192,7 +192,7 @@ func (rt *RoutingTable) Contains(p *PeerAddress) bool {
 	px, ok := rt.list.Get(k)
 	if !ok {
 		logger.Println(logger.DBG, "[RT] --> NOT found in current list:")
-		rt.list.ProcessRange(func(key string, val *PeerAddress) error {
+		_ = rt.list.ProcessRange(func(key string, val *PeerAddress) error {
 			logger.Printf(logger.DBG, "[RT]    * %s", val)
 			return nil
 		}, true)
@@ -341,7 +341,7 @@ func (rt *RoutingTable) heartbeat(ctx context.Context) {
 	}
 
 	// drop expired entries from the HELLO cache
-	rt.helloCache.ProcessRange(func(key string, val *blocks.HelloBlock) error {
+	_ = rt.helloCache.ProcessRange(func(key string, val *blocks.HelloBlock) error {
 		if val.Expires.Expired() {
 			rt.helloCache.Delete(key)
 		}
@@ -356,7 +356,7 @@ func (rt *RoutingTable) heartbeat(ctx context.Context) {
 
 func (rt *RoutingTable) BestHello(addr *PeerAddress, rf blocks.ResultFilter) (hb *blocks.HelloBlock, dist *math.Int) {
 	// iterate over cached HELLOs to find (best) match first
-	rt.helloCache.ProcessRange(func(key string, val *blocks.HelloBlock) error {
+	_ = rt.helloCache.ProcessRange(func(key string, val *blocks.HelloBlock) error {
 		// check if block is excluded by result filter
 		if !rf.Contains(val) {
 			// check for better match

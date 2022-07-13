@@ -171,6 +171,6 @@ func (m *Module) Revoke(ctx context.Context, rd *RevData) (success bool, err err
 // RPC returns the route and handler function for a JSON-RPC request
 func (m *Module) RPC() (string, func(http.ResponseWriter, *http.Request)) {
 	return "/revocation/", func(wrt http.ResponseWriter, req *http.Request) {
-		wrt.Write([]byte(`{"msg": "This is REVOCATION" }`))
+		_, _ = wrt.Write([]byte(`{"msg": "This is REVOCATION" }`))
 	}
 }

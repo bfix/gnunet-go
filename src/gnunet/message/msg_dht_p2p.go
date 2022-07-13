@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"crypto/sha512"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"gnunet/crypto"
 	"gnunet/enums"
@@ -196,18 +197,20 @@ func (m *DHTP2PGetMsg) Update(pf *blocks.PeerFilter, rf blocks.ResultFilter, hop
 
 // DHTP2PPutMsg wire layout
 type DHTP2PPutMsg struct {
-	MsgSize    uint16             `order:"big"`  // total size of message
-	MsgType    uint16             `order:"big"`  // DHT_P2P_PUT (146)
-	BType      uint32             `order:"big"`  // block type
-	Flags      uint16             `order:"big"`  // processing flags
-	HopCount   uint16             `order:"big"`  // message hops
-	ReplLvl    uint16             `order:"big"`  // replication level
-	PathL      uint16             `order:"big"`  // path length
-	Expiration util.AbsoluteTime  ``             // expiration date
-	PeerFilter *blocks.PeerFilter ``             // peer bloomfilter
-	Key        *crypto.HashCode   ``             // query key to block
-	PutPath    []*PathElementWire `size:"PathL"` // PUT path
-	Block      []byte             `size:"*"`     // block data
+	MsgSize    uint16             `order:"big"`     // total size of message
+	MsgType    uint16             `order:"big"`     // DHT_P2P_PUT (146)
+	BType      uint32             `order:"big"`     // block type
+	Flags      uint16             `order:"big"`     // processing flags
+	HopCount   uint16             `order:"big"`     // message hops
+	ReplLvl    uint16             `order:"big"`     // replication level
+	PathL      uint16             `order:"big"`     // path length
+	Expiration util.AbsoluteTime  ``                // expiration date
+	PeerFilter *blocks.PeerFilter ``                // peer bloomfilter
+	Key        *crypto.HashCode   ``                // query key to block
+	Origin     []byte             `size:"(PESize)"` // truncated origin (if TRUNCATED flag set)
+	PutPath    []*PathElementWire `size:"PathL"`    // PUT path
+	LastSig    []byte             `size:"(PESize)"` // signature of last hop (if RECORD_ROUTE flag is set)
+	Block      []byte             `size:"*"`        // block data
 }
 
 // NewDHTP2PPutMsg creates an empty new DHTP2PPutMsg
@@ -223,9 +226,26 @@ func NewDHTP2PPutMsg() *DHTP2PPutMsg {
 		Expiration: util.AbsoluteTimeNever(),    // expiration date
 		PeerFilter: blocks.NewPeerFilter(),      // peer bloom filter
 		Key:        crypto.NewHashCode(nil),     // query key
+		Origin:     nil,                         // no truncated path
 		PutPath:    make([]*PathElementWire, 0), // empty PUT path
+		LastSig:    nil,                         // no signature from last hop
 		Block:      nil,                         // no block data
 	}
+}
+
+// PESize calculates field sizes based on flags and attributes
+func (m *DHTP2PPutMsg) PESize(field string) uint {
+	switch field {
+	case "Origin":
+		if m.Flags&enums.DHT_RO_TRUNCATED != 0 {
+			return 32
+		}
+	case "LastSig":
+		if m.Flags&enums.DHT_RO_RECORD_ROUTE != 0 {
+			return 64
+		}
+	}
+	return 0
 }
 
 // AddPutPath adds an element to the PUT path
@@ -262,8 +282,10 @@ type DHTP2PResultMsg struct {
 	GetPathL uint16             `order:"big"`     // size of GETPATH field
 	Expires  util.AbsoluteTime  ``                // expiration date
 	Query    *crypto.HashCode   ``                // Query key for block
+	Origin   []byte             `size:"(PESize)"` // truncated origin (if TRUNCATED flag set)
 	PutPath  []*PathElementWire `size:"PutPathL"` // PUTPATH
 	GetPath  []*PathElementWire `size:"GetPathL"` // GETPATH
+	LastSig  []byte             `size:"(PESize)"` // signature of last hop (if RECORD_ROUTE flag is set)
 	Block    []byte             `size:"*"`        // block data
 }
 
@@ -273,12 +295,29 @@ func NewDHTP2PResultMsg() *DHTP2PResultMsg {
 		MsgSize:  88,                           // size of empty message
 		MsgType:  DHT_P2P_RESULT,               // DHT_P2P_RESULT (148)
 		BType:    uint32(enums.BLOCK_TYPE_ANY), // type of returned block
+		Origin:   nil,                          // no truncated origin
 		PutPathL: 0,                            // empty putpath
 		PutPath:  nil,                          // -"-
 		GetPathL: 0,                            // empty getpath
 		GetPath:  nil,                          // -"-
+		LastSig:  nil,                          // no recorded route
 		Block:    nil,                          // empty block
 	}
+}
+
+// PESize calculates field sizes based on flags and attributes
+func (m *DHTP2PResultMsg) PESize(field string) uint {
+	switch field {
+	case "Origin":
+		//if m.Flags&enums.DHT_RO_TRUNCATED != 0 {
+		return 32
+		//}
+	case "LastSig":
+		//if m.Flags&enums.DHT_RO_RECORD_ROUTE != 0 {
+		return 64
+		//}
+	}
+	return 0
 }
 
 // String returns a human-readable representation of the message.
@@ -414,9 +453,21 @@ func (m *DHTP2PHelloMsg) SignedData() []byte {
 
 	// assemble signed data
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.BigEndian, size)
-	binary.Write(buf, binary.BigEndian, purpose)
-	binary.Write(buf, binary.BigEndian, m.Expires.Epoch()*1000000)
-	buf.Write(hAddr[:])
+	var n int
+	err := binary.Write(buf, binary.BigEndian, size)
+	if err == nil {
+		if err = binary.Write(buf, binary.BigEndian, purpose); err == nil {
+			if err = binary.Write(buf, binary.BigEndian, m.Expires.Epoch()*1000000); err == nil {
+				if n, err = buf.Write(hAddr[:]); err == nil {
+					if n != len(hAddr[:]) {
+						err = errors.New("write failed")
+					}
+				}
+			}
+		}
+	}
+	if err != nil {
+		logger.Printf(logger.ERROR, "[DHTP2PHelloMsg.SignedData] failed: %s", err.Error())
+	}
 	return buf.Bytes()
 }

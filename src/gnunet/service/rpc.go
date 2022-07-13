@@ -67,11 +67,9 @@ func RunRPCServer(ctx context.Context, endpoint string) (srvRPC *JRPCServer, err
 	}()
 	// wait for shutdown
 	go func() {
-		select {
-		case <-ctx.Done():
-			if err := srv.Shutdown(context.Background()); err != nil {
-				logger.Printf(logger.WARN, "[rpc] server shutdownn failed: %s", err.Error())
-			}
+		<-ctx.Done()
+		if err := srv.Shutdown(context.Background()); err != nil {
+			logger.Printf(logger.WARN, "[rpc] server shutdownn failed: %s", err.Error())
 		}
 	}()
 	return

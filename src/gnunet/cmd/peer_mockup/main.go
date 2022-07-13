@@ -34,8 +34,7 @@ var (
 		},
 	}
 	// configuration for remote node
-	remoteCfg  = "3GXXMNb5YpIUO7ejIR2Yy0Cf5texuLfDjHkXcqbPxkc="
-	remoteAddr = "udp://172.17.0.5:2086"
+	remoteCfg = "3GXXMNb5YpIUO7ejIR2Yy0Cf5texuLfDjHkXcqbPxkc="
 
 	// top-level variables used accross functions
 	local  *core.Peer // local peer (with private key)
@@ -80,7 +79,9 @@ func main() {
 
 	if !asServer {
 		// we start the message exchange
-		c.Send(ctx, remote.GetID(), message.NewTransportTCPWelcomeMsg(c.PeerID()))
+		if err := c.Send(ctx, remote.GetID(), message.NewTransportTCPWelcomeMsg(c.PeerID())); err != nil {
+			fmt.Printf("send message failed: %s", err.Error())
+		}
 	}
 
 	// handle OS signals
@@ -124,17 +125,23 @@ func process(ctx context.Context, ev *core.Event) {
 	switch msg := ev.Msg.(type) {
 
 	case *message.TransportTCPWelcomeMsg:
-		c.Send(ctx, ev.Peer, message.NewTransportPingMsg(ev.Peer, nil))
+		if err := c.Send(ctx, ev.Peer, message.NewTransportPingMsg(ev.Peer, nil)); err != nil {
+			logger.Printf(logger.ERROR, "TransportTCPWelcomeMsg send failed: %s", err.Error())
+			return
+		}
 
 	case *message.HelloMsg:
 
 	case *message.TransportPingMsg:
 		mOut := message.NewTransportPongMsg(msg.Challenge, nil)
 		if err := mOut.Sign(local.PrvKey()); err != nil {
-			logger.Println(logger.ERROR, "PONG: signing failed")
+			logger.Printf(logger.ERROR, "PONG signing failed: %s", err.Error())
 			return
 		}
-		c.Send(ctx, ev.Peer, mOut)
+		if err := c.Send(ctx, ev.Peer, mOut); err != nil {
+			logger.Printf(logger.ERROR, "TransportPongMsg send failed: %s", err.Error())
+			return
+		}
 		logger.Printf(logger.DBG, ">>> %s", mOut)
 
 	case *message.TransportPongMsg:
@@ -149,7 +156,9 @@ func process(ctx context.Context, ev *core.Event) {
 	case *message.SessionSynMsg:
 		mOut := message.NewSessionSynAckMsg()
 		mOut.Timestamp = msg.Timestamp
-		c.Send(ctx, ev.Peer, mOut)
+		if err := c.Send(ctx, ev.Peer, mOut); err != nil {
+			logger.Printf(logger.ERROR, "SessionSynAckMsg send failed: %s", err.Error())
+		}
 		logger.Printf(logger.DBG, ">>> %s", mOut)
 
 	case *message.SessionQuotaMsg:
@@ -158,7 +167,9 @@ func process(ctx context.Context, ev *core.Event) {
 
 	case *message.SessionKeepAliveMsg:
 		mOut := message.NewSessionKeepAliveRespMsg(msg.Nonce)
-		c.Send(ctx, ev.Peer, mOut)
+		if err := c.Send(ctx, ev.Peer, mOut); err != nil {
+			logger.Printf(logger.ERROR, "SessionKeepAliveRespMsg send failed: %s", err.Error())
+		}
 		logger.Printf(logger.DBG, ">>> %s", mOut)
 
 	case *message.EphemeralKeyMsg:
@@ -172,10 +183,13 @@ func process(ctx context.Context, ev *core.Event) {
 		}
 		remote.SetEphKeyMsg(msg)
 		mOut := local.EphKeyMsg()
-		c.Send(ctx, ev.Peer, mOut)
+		if err := c.Send(ctx, ev.Peer, mOut); err != nil {
+			logger.Printf(logger.ERROR, "EphKeyMsg send failed: %s", err.Error())
+		}
 		logger.Printf(logger.DBG, ">>> %s", mOut)
 		pk := ed25519.NewPublicKeyFromBytes(remote.EphKeyMsg().Public().Data)
 		secret = crypto.SharedSecret(local.EphPrvKey(), pk)
+		fmt.Printf("Shared secret: %s\n", secret.String())
 
 	default:
 		fmt.Printf("!!! %v\n", msg)

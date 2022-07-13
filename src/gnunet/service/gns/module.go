@@ -103,7 +103,7 @@ func NewModule(ctx context.Context, c *core.Core) (m *Module) {
 		ModuleImpl: *service.NewModuleImpl(),
 	}
 	// register as listener for core events
-	listener := m.Run(ctx, m.event, m.Filter(), 0, nil)
+	listener := m.ModuleImpl.Run(ctx, m.event, m.Filter(), 0, nil)
 	c.Register("gns", listener)
 	return
 }
@@ -458,7 +458,10 @@ func (m *Module) Lookup(
 				return
 			}
 			// store RRs from remote locally.
-			m.StoreLocal(ctx, query, block)
+			if err = m.StoreLocal(ctx, query, block); err != nil {
+				logger.Printf(logger.DBG, "[gns] store local failed: %s", err.Error())
+				return
+			}
 		}
 	}
 	return

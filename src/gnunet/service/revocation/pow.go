@@ -22,7 +22,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
-	"fmt"
 	"sort"
 	"time"
 
@@ -62,27 +61,21 @@ func NewPoWData(pow uint64, ts util.AbsoluteTime, zoneKey *crypto.ZoneKey) *PoWD
 		Timestamp: ts,
 		ZoneKey:   zoneKey,
 	}
-	if rd.SetPoW(pow) != nil {
-		return nil
-	}
+	rd.SetPoW(pow)
 	return rd
 }
 
 // SetPoW sets a new PoW value in the data structure
-func (p *PoWData) SetPoW(pow uint64) error {
+func (p *PoWData) SetPoW(pow uint64) {
 	p.PoW = pow
 	p.blob = p.Blob()
-	if p.blob == nil {
-		return fmt.Errorf("invalid PoW work unit")
-	}
-	return nil
 }
 
 // GetPoW returns the last checked PoW value
 func (p *PoWData) GetPoW() uint64 {
 	if p.blob != nil {
 		var val uint64
-		binary.Read(bytes.NewReader(p.blob[:8]), binary.BigEndian, &val)
+		_ = binary.Read(bytes.NewReader(p.blob[:8]), binary.BigEndian, &val)
 		p.PoW = val
 	}
 	return p.PoW
@@ -138,14 +131,11 @@ type SignedRevData struct {
 
 // NewRevDataFromMsg initializes a new RevData instance from a GNUnet message
 func NewRevDataFromMsg(m *message.RevocationRevokeMsg) *RevData {
-	rd := &RevData{
+	return &RevData{
 		Timestamp:  m.Timestamp,
 		ZoneKeySig: m.ZoneKeySig,
+		PoWs:       util.Clone(m.PoWs),
 	}
-	for i, pow := range m.PoWs {
-		rd.PoWs[i] = pow
-	}
-	return rd
 }
 
 // Size of a serialized RevData object.

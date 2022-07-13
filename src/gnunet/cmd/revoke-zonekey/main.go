@@ -95,7 +95,6 @@ func ReadRevData(filename string, bits int, zk *crypto.ZoneKey) (rd *RevData, er
 		err = fmt.Errorf("Zone key mismatch")
 		return
 	}
-	bits = int(rd.Numbits)
 	if err = file.Close(); err != nil {
 		err = fmt.Errorf("Error closing file: " + err.Error())
 	}
@@ -313,22 +312,19 @@ func main() {
 		sigCh := make(chan os.Signal, 5)
 		signal.Notify(sigCh)
 	loop:
-		for {
-			select {
+		for sig := range sigCh {
 			// handle OS signals
-			case sig := <-sigCh:
-				switch sig {
-				case syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM:
-					log.Printf("Terminating (on signal '%s')\n", sig)
-					cancelFcn()
-					break loop
-				case syscall.SIGHUP:
-					log.Println("SIGHUP")
-				case syscall.SIGURG:
-					// TODO: https://github.com/golang/go/issues/37942
-				default:
-					log.Println("Unhandled signal: " + sig.String())
-				}
+			switch sig {
+			case syscall.SIGKILL, syscall.SIGINT, syscall.SIGTERM:
+				log.Printf("Terminating (on signal '%s')\n", sig)
+				cancelFcn()
+				break loop
+			case syscall.SIGHUP:
+				log.Println("SIGHUP")
+			case syscall.SIGURG:
+				// TODO: https://github.com/golang/go/issues/37942
+			default:
+				log.Println("Unhandled signal: " + sig.String())
 			}
 		}
 	}()

@@ -21,6 +21,8 @@ package dht
 import (
 	"gnunet/service"
 	"net/http"
+
+	"github.com/bfix/gospel/logger"
 )
 
 //----------------------------------------------------------------------
@@ -68,5 +70,7 @@ func (s *DHTService) Status(r *http.Request, req *DHTStatusRequest, reply *DHTSt
 
 // InitRPC registers RPC commands for the module
 func (m *Module) InitRPC(srv *service.JRPCServer) {
-	srv.RegisterService(dhtRPC, "DHT")
+	if err := srv.RegisterService(dhtRPC, "DHT"); err != nil {
+		logger.Printf(logger.ERROR, "[dht] Failed to init RPC: %s", err.Error())
+	}
 }

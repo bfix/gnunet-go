@@ -117,7 +117,7 @@ func (a *PeerAddrList) Add(peer *PeerID, addr *Address) (mode int) {
 	mode = 0
 	if !addr.Expires.Expired() {
 		// run add operation
-		a.list.Process(func() error {
+		_ = a.list.Process(func() error {
 			id := peer.String()
 			list, ok := a.list.Get(id)
 			if !ok {

@@ -147,5 +147,7 @@ loop:
 
 	// terminating service
 	cancel()
-	srv.Stop()
+	if err := srv.Stop(); err != nil {
+		logger.Printf(logger.ERROR, "[revocation] Failed to stop service: %s", err.Error())
+	}
 }

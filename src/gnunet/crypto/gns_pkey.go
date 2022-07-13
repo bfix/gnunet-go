@@ -27,6 +27,7 @@ import (
 
 	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/data"
+	"github.com/bfix/gospel/logger"
 	"github.com/bfix/gospel/math"
 	"golang.org/x/crypto/hkdf"
 )
@@ -76,15 +77,15 @@ func (pk *PKEYPublicImpl) Bytes() []byte {
 
 // Derive a public key from this key based on a big integer
 // (key blinding). Returns the derived key and the blinding value.
-func (pk *PKEYPublicImpl) Derive(h *math.Int) (ZoneKeyImpl, *math.Int) {
+func (pk *PKEYPublicImpl) Derive(h *math.Int) (dPk ZoneKeyImpl, hOut *math.Int, err error) {
 	// limit to allowed value range
-	h = h.Mod(ed25519.GetCurve().N)
-	derived := pk.pub.Mult(h)
-	dPk := &PKEYPublicImpl{
+	hOut = h.Mod(ed25519.GetCurve().N)
+	derived := pk.pub.Mult(hOut)
+	dPk = &PKEYPublicImpl{
 		pk.ztype,
 		derived,
 	}
-	return dPk, h
+	return
 }
 
 // Encrypt binary data (of any size). Output can be larger than input
@@ -114,7 +115,9 @@ func (pk *PKEYPublicImpl) BlockKey(label string, expires util.AbsoluteTime) (ske
 	kd := pk.pub.Bytes()
 	prk := hkdf.Extract(sha512.New, kd, []byte("gns-aes-ctx-key"))
 	rdr := hkdf.Expand(sha256.New, prk, []byte(label))
-	rdr.Read(skey[:32])
+	if _, err := rdr.Read(skey[:32]); err != nil {
+		logger.Printf(logger.ERROR, "[PKEYPublicImpl.BlockKey] failed: %s", err.Error())
+	}
 
 	// assemble initialization vector
 	iv := &struct {
@@ -128,7 +131,9 @@ func (pk *PKEYPublicImpl) BlockKey(label string, expires util.AbsoluteTime) (ske
 	}
 	prk = hkdf.Extract(sha512.New, kd, []byte("gns-aes-ctx-iv"))
 	rdr = hkdf.Expand(sha256.New, prk, []byte(label))
-	rdr.Read(iv.Nonce)
+	if _, err := rdr.Read(iv.Nonce); err != nil {
+		logger.Printf(logger.ERROR, "[PKEYPublicImpl.BlockKey] failed: %s", err.Error())
+	}
 	buf, _ := data.Marshal(iv)
 	copy(skey[32:], buf)
 	return
@@ -184,30 +189,32 @@ func (pk *PKEYPrivateImpl) Public() ZoneKeyImpl {
 
 // Derive a public key from this key based on a big integer
 // (key blinding). Returns the derived key and the blinding value.
-func (pk *PKEYPrivateImpl) Derive(h *math.Int) (ZonePrivateImpl, *math.Int) {
+func (pk *PKEYPrivateImpl) Derive(h *math.Int) (dPk ZonePrivateImpl, hOut *math.Int, err error) {
 	// limit to allowed value range
-	h = h.Mod(ed25519.GetCurve().N)
-	derived := pk.prv.Mult(h)
-	dPk := &PKEYPrivateImpl{
+	hOut = h.Mod(ed25519.GetCurve().N)
+	derived := pk.prv.Mult(hOut)
+	dPk = &PKEYPrivateImpl{
 		PKEYPublicImpl{
 			pk.ztype,
 			derived.Public(),
 		},
 		derived,
 	}
-	return dPk, h
+	return
 }
 
 // Verify a signature for binary data
-func (pk *PKEYPrivateImpl) Sign(data []byte) (*ZoneSignature, error) {
-	s, err := pk.prv.EcSign(data)
-	if err != nil {
-		return nil, err
+func (pk *PKEYPrivateImpl) Sign(data []byte) (sig *ZoneSignature, err error) {
+	var s *ed25519.EcSignature
+	if s, err = pk.prv.EcSign(data); err != nil {
+		return
 	}
 	sd := s.Bytes()
 	sigImpl := new(PKEYSigImpl)
-	sigImpl.Init(sd)
-	sig := &ZoneSignature{
+	if err = sigImpl.Init(sd); err != nil {
+		return
+	}
+	sig = &ZoneSignature{
 		ZoneKey{
 			Type:    pk.ztype,
 			KeyData: pk.pub.Bytes(),
@@ -215,7 +222,7 @@ func (pk *PKEYPrivateImpl) Sign(data []byte) (*ZoneSignature, error) {
 		sd,
 		sigImpl,
 	}
-	return sig, nil
+	return
 }
 
 //----------------------------------------------------------------------
