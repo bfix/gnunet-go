@@ -137,6 +137,56 @@ chown gnunet:gnunet /var/lib/gnunet/.local/share/gnunet/private_key.ecc
 chmod 600 /var/lib/gnunet/.local/share/gnunet/private_key.ecc
 ```
 
-For gnunet-go configuration files you need to paste the result of
+For `gnunet-go` configuration files you need to paste the result of
 `echo "<hex.seed>" | xxd -r -p | base64` into the `PrivateSeed` field in the
 `NodeConfig` section.
+
+## Using gnunet-go in your own projects
+
+`gnunet-go` is not a standard Go module for direct use (via go.mod) in other
+packages, but designed as a stand-alone application. The rationale behind was
+to **not** hard link the code to a single Git provider.
+
+If you are interested in using (parts of) `gnunet-go` in your own projects, the
+following step-by-step instructions show the easiest route.
+
+* `git clone https://github.com/bfix/gnunet-go` into folder
+`/home/user/gnunet-go` (or any other folder if you adjust the instructions
+accordingly).
+
+* create project folder and change into it
+* run `go mod init test` (replace test with the name of your project)
+* create a simple test `main.go`
+
+```go
+package main
+
+import (
+    "crypto/rand"
+    "fmt"
+    "gnunet/util"
+)
+
+func main() {
+    a := make([]byte, 32)
+    rand.Read(a)
+    fmt.Println(util.EncodeBinaryToString(a))
+}
+```
+
+* edit `go.mod` and add at end of file:
+
+```bash
+require gnunet v0.1.27
+
+replace gnunet v0.1.27 => /home/user/gnunet-go/src/gnunet
+```
+
+* run `go mod tidy`
+* build test program: `go build`
+* run test program: `./test`
+
+The only disadvantage of this approach is that you have to update the source
+code for `gnunet-go` yourself. From time to time or on demand, do a `git pull`
+followed by a `go mod tidy` described above. No version control is supported
+either because the dependency for `gnunet-go` is redirected to a local folder.
