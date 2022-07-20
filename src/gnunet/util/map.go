@@ -24,22 +24,65 @@ import (
 )
 
 //----------------------------------------------------------------------
+// ID list of active map processes:
+// An active process (wrapped in a 'Process()' and 'ProcessRange()'
+// call) locks (and unlocks) map access only once around a process, so
+// calls to map methods from within a process are safe (no lock/unlock
+// required).
+//----------------------------------------------------------------------
+
+// PIDList is a thread-safe list of active process IDs
+type PIDList struct {
+	sync.RWMutex
+	list map[int]struct{}
+}
+
+// NewPIDList creates a new PID list instance
+func NewPIDList() *PIDList {
+	return &PIDList{
+		list: make(map[int]struct{}),
+	}
+}
+
+// Add pid to list
+func (pl *PIDList) Add(pid int) {
+	pl.Lock()
+	defer pl.Unlock()
+	pl.list[pid] = struct{}{}
+}
+
+// Remove pid from list
+func (pl *PIDList) Remove(pid int) {
+	pl.Lock()
+	defer pl.Unlock()
+	delete(pl.list, pid)
+}
+
+// Contains returns true if 'pid' is a list element
+func (pl *PIDList) Contains(pid int) bool {
+	pl.RLock()
+	defer pl.RUnlock()
+	_, ok := pl.list[pid]
+	return ok
+}
+
+//----------------------------------------------------------------------
 // Thread-safe map implementation
 //----------------------------------------------------------------------
 
-// Map keys to values
+// Map comparable keys to values of any type
 type Map[K comparable, V any] struct {
 	sync.RWMutex
 
 	list      map[K]V
-	inProcess map[int]struct{}
+	inProcess *PIDList
 }
 
 // NewMap allocates a new mapping.
 func NewMap[K comparable, V any]() *Map[K, V] {
 	return &Map[K, V]{
 		list:      make(map[K]V),
-		inProcess: make(map[int]struct{}),
+		inProcess: NewPIDList(),
 	}
 }
 
@@ -51,9 +94,9 @@ func (m *Map[K, V]) Process(f func(pid int) error, readonly bool) error {
 	// handle locking
 	m.lock(readonly, 0)
 	pid := NextID()
-	m.inProcess[pid] = struct{}{}
+	m.inProcess.Add(pid)
 	defer func() {
-		delete(m.inProcess, pid)
+		m.inProcess.Remove(pid)
 		m.unlock(readonly, 0)
 	}()
 	// function call in unlocked environment
@@ -66,9 +109,9 @@ func (m *Map[K, V]) ProcessRange(f func(key K, value V, pid int) error, readonly
 	// handle locking
 	m.lock(readonly, 0)
 	pid := NextID()
-	m.inProcess[pid] = struct{}{}
+	m.inProcess.Add(pid)
 	defer func() {
-		delete(m.inProcess, pid)
+		m.inProcess.Remove(pid)
 		m.unlock(readonly, 0)
 	}()
 	// range over map and call function.
@@ -132,7 +175,7 @@ func (m *Map[K, V]) Delete(key K, pid int) {
 
 // lock with given mode (if not in processing function)
 func (m *Map[K, V]) lock(readonly bool, pid int) {
-	if _, ok := m.inProcess[pid]; !ok {
+	if !m.inProcess.Contains(pid) {
 		if readonly {
 			m.RLock()
 		} else {
@@ -143,7 +186,7 @@ func (m *Map[K, V]) lock(readonly bool, pid int) {
 
 // lock with given mode (if not in processing function)
 func (m *Map[K, V]) unlock(readonly bool, pid int) {
-	if _, ok := m.inProcess[pid]; !ok {
+	if !m.inProcess.Contains(pid) {
 		if readonly {
 			m.RUnlock()
 		} else {
