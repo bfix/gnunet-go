@@ -165,7 +165,7 @@ func (c *Core) pump(ctx context.Context) {
 		select {
 		// get (next) message from transport
 		case tm := <-c.incoming:
-			logger.Printf(logger.DBG, "[core] Message received from %s: %s", tm.Peer, transport.Dump(tm.Msg, "json"))
+			logger.Printf(logger.DBG, "[core] Message received from %s: %s", tm.Peer, util.Dump(tm.Msg, "json"))
 
 			// check if peer is already connected (has an entry in PeerAddrist)
 			_, connected := c.connected.Get(tm.Peer.String(), 0)

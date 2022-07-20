@@ -154,7 +154,7 @@ func (rf *PassResultFilter) Compare(t ResultFilter) int {
 }
 
 //======================================================================
-// Generic bllom filter with mutator
+// Generic bloom filter with mutator
 //======================================================================
 
 // BloomFilter is a space-efficient probabilistic datastructure to test if

@@ -376,6 +376,8 @@ func (bh *HelloBlockHandler) FilterResult(b Block, key *crypto.HashCode, rf Resu
 }
 
 //----------------------------------------------------------------------
+// HELLO result filter
+//----------------------------------------------------------------------
 
 // HelloResultFilter is a result  filter implementation for HELLO blocks
 type HelloResultFilter struct {

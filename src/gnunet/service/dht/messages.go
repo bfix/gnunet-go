@@ -44,11 +44,11 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			label = "dht-" + s
 		}
 	}
-	logger.Printf(logger.INFO, "[%s] message received from %s: %s", label, sender, transport.Dump(msgIn, "json"))
+	logger.Printf(logger.INFO, "[%s] message received from %s", label, sender)
 
 	// check for local message
 	if sender.Equals(m.core.PeerID()) {
-		logger.Printf(logger.WARN, "[%s] dropping local message received: %s", label, transport.Dump(msgIn, "json"))
+		logger.Printf(logger.WARN, "[%s] dropping local message received: %s", label, util.Dump(msgIn, "json"))
 		return false
 	}
 

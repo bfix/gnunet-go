@@ -27,7 +27,6 @@ import (
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
 	"gnunet/service/store"
-	"gnunet/transport"
 	"gnunet/util"
 	gmath "math"
 	"time"
@@ -320,7 +319,7 @@ func (m *Module) getHello() (msg *message.DHTP2PHelloMsg, err error) {
 			logger.Println(logger.ERROR, err.Error())
 			return
 		}
-		logger.Println(logger.DBG, "[dht] New HELLO: "+transport.Dump(msg, "hex"))
+		logger.Println(logger.DBG, "[dht] New HELLO: "+util.Dump(msg, "hex"))
 		return
 	}
 	// we have a valid HELLO for re-use.
