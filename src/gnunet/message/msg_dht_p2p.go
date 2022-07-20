@@ -71,11 +71,11 @@ type PathElement struct {
 }
 
 // NewPathElement creates a new path element from data
-func NewPathElement(key *crypto.HashCode, pred, succ *util.PeerID) *PathElement {
+func NewPathElement(bh *crypto.HashCode, pred, succ *util.PeerID, expire util.AbsoluteTime) *PathElement {
 	return &PathElement{
 		pathElementData: pathElementData{
-			Expiration:      util.AbsoluteTimeNow().Add(12 * time.Hour),
-			BlockHash:       key,
+			Expiration:      expire,
+			BlockHash:       bh,
 			PeerPredecessor: pred,
 			PeerSuccessor:   succ,
 		},
@@ -197,39 +197,39 @@ func (m *DHTP2PGetMsg) Update(pf *blocks.PeerFilter, rf blocks.ResultFilter, hop
 
 // DHTP2PPutMsg wire layout
 type DHTP2PPutMsg struct {
-	MsgSize    uint16             `order:"big"`     // total size of message
-	MsgType    uint16             `order:"big"`     // DHT_P2P_PUT (146)
-	BType      uint32             `order:"big"`     // block type
-	Flags      uint16             `order:"big"`     // processing flags
-	HopCount   uint16             `order:"big"`     // message hops
-	ReplLvl    uint16             `order:"big"`     // replication level
-	PathL      uint16             `order:"big"`     // path length
-	Expiration util.AbsoluteTime  ``                // expiration date
-	PeerFilter *blocks.PeerFilter ``                // peer bloomfilter
-	Key        *crypto.HashCode   ``                // query key to block
-	Origin     []byte             `size:"(PESize)"` // truncated origin (if TRUNCATED flag set)
-	PutPath    []*PathElementWire `size:"PathL"`    // PUT path
-	LastSig    []byte             `size:"(PESize)"` // signature of last hop (if RECORD_ROUTE flag is set)
-	Block      []byte             `size:"*"`        // block data
+	MsgSize     uint16             `order:"big"`     // total size of message
+	MsgType     uint16             `order:"big"`     // DHT_P2P_PUT (146)
+	BType       uint32             `order:"big"`     // block type
+	Flags       uint16             `order:"big"`     // processing flags
+	HopCount    uint16             `order:"big"`     // message hops
+	ReplLvl     uint16             `order:"big"`     // replication level
+	PathL       uint16             `order:"big"`     // path length
+	Expiration  util.AbsoluteTime  ``                // expiration date
+	PeerFilter  *blocks.PeerFilter ``                // peer bloomfilter
+	Key         *crypto.HashCode   ``                // query key to block
+	TruncOrigin []byte             `size:"(PESize)"` // truncated origin (if TRUNCATED flag set)
+	PutPath     []*PathElementWire `size:"PathL"`    // PUT path
+	LastSig     []byte             `size:"(PESize)"` // signature of last hop (if RECORD_ROUTE flag is set)
+	Block       []byte             `size:"*"`        // block data
 }
 
 // NewDHTP2PPutMsg creates an empty new DHTP2PPutMsg
 func NewDHTP2PPutMsg() *DHTP2PPutMsg {
 	return &DHTP2PPutMsg{
-		MsgSize:    218,                         // total size without path and block data
-		MsgType:    DHT_P2P_PUT,                 // DHT_P2P_PUT (146)
-		BType:      0,                           // block type
-		Flags:      0,                           // processing flags
-		HopCount:   0,                           // message hops
-		ReplLvl:    0,                           // replication level
-		PathL:      0,                           // no PUT path
-		Expiration: util.AbsoluteTimeNever(),    // expiration date
-		PeerFilter: blocks.NewPeerFilter(),      // peer bloom filter
-		Key:        crypto.NewHashCode(nil),     // query key
-		Origin:     nil,                         // no truncated path
-		PutPath:    make([]*PathElementWire, 0), // empty PUT path
-		LastSig:    nil,                         // no signature from last hop
-		Block:      nil,                         // no block data
+		MsgSize:     218,                         // total size without path and block data
+		MsgType:     DHT_P2P_PUT,                 // DHT_P2P_PUT (146)
+		BType:       0,                           // block type
+		Flags:       0,                           // processing flags
+		HopCount:    0,                           // message hops
+		ReplLvl:     0,                           // replication level
+		PathL:       0,                           // no PUT path
+		Expiration:  util.AbsoluteTimeNever(),    // expiration date
+		PeerFilter:  blocks.NewPeerFilter(),      // peer bloom filter
+		Key:         crypto.NewHashCode(nil),     // query key
+		TruncOrigin: nil,                         // no truncated path
+		PutPath:     make([]*PathElementWire, 0), // empty PUT path
+		LastSig:     nil,                         // no signature from last hop
+		Block:       nil,                         // no block data
 	}
 }
 

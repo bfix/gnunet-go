@@ -24,6 +24,7 @@ import (
 	"time"
 )
 
+//----------------------------------------------------------------------
 // Module is an interface for GNUnet service modules (workers).
 //
 // Modules can call other GNUnet services; these services can be used by
@@ -55,6 +56,7 @@ import (
 // Exported and imported module function are identified by name defined in the
 // Export() function. Import() functions that access functions in other modules
 // need to use the same name for linking.
+//
 type Module interface {
 	// Export functions by name
 	Export(map[string]any)
@@ -69,6 +71,10 @@ type Module interface {
 	Filter() *core.EventFilter
 }
 
+//----------------------------------------------------------------------
+// Event handling
+//----------------------------------------------------------------------
+
 // EventHandler is a function prototype for event handling
 type EventHandler func(context.Context, *core.Event)
 
@@ -77,6 +83,10 @@ type Heartbeat func(context.Context)
 
 // CtxKey is a value-context key
 type CtxKey string
+
+//----------------------------------------------------------------------
+// Generic module implementation
+//----------------------------------------------------------------------
 
 // ModuleImpl is an event-handling type used by Module implementations.
 type ModuleImpl struct {
