@@ -20,6 +20,8 @@ package util
 
 import (
 	"bytes"
+
+	"github.com/bfix/gospel/crypto/ed25519"
 )
 
 //----------------------------------------------------------------------
@@ -46,16 +48,30 @@ func NewPeerPublicKey(data []byte) *PeerPublicKey {
 	return pk
 }
 
+// Verify peer signature
+func (pk *PeerPublicKey) Verify(data []byte, sig *PeerSignature) (bool, error) {
+	xpk := ed25519.NewPublicKeyFromBytes(pk.Data)
+	xsig, err := ed25519.NewEdSignatureFromBytes(sig.Data)
+	if err != nil {
+		return false, err
+	}
+	return xpk.EdVerify(data, xsig)
+}
+
 //----------------------------------------------------------------------
 // Peer identifier:
 //----------------------------------------------------------------------
 
 // PeerID is a wrpped PeerPublicKey
-type PeerID PeerPublicKey
+type PeerID struct {
+	PeerPublicKey
+}
 
 // NewPeerID creates a new peer id from data.
 func NewPeerID(data []byte) (p *PeerID) {
-	return (*PeerID)(NewPeerPublicKey(data))
+	return &PeerID{
+		PeerPublicKey: *NewPeerPublicKey(data),
+	}
 }
 
 // Equals returns true if two peer IDs match.
