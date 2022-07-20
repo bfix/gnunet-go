@@ -119,38 +119,74 @@ type ResultFilter interface {
 }
 
 //----------------------------------------------------------------------
-// Dummy result filter
-// [Additional filters (per block type) are defined in corresponding files]
+// Generic result filter:
+// Filter duplicate blocks (identical hash value over content)
 //----------------------------------------------------------------------
 
-// PassResultFilter is a dummy result filter with no state.
-type PassResultFilter struct{}
+// GenericResultFilter is a dummy result filter with no state.
+type GenericResultFilter struct {
+	bf *BloomFilter
+}
+
+// NewGenericResultFilter creates a new empty result bloom filter
+func NewGenericResultFilter() *GenericResultFilter {
+	return &GenericResultFilter{
+		bf: NewBloomFilter(128),
+	}
+}
 
 // Add a block to the result filter.
-func (rf *PassResultFilter) Add(Block) {
+func (rf *GenericResultFilter) Add(b Block) {
+	rf.bf.Add(b.Bytes())
 }
 
 // Contains returns true if entry (binary representation) is filtered
-func (rf *PassResultFilter) Contains(Block) bool {
-	return false
+func (rf *GenericResultFilter) Contains(b Block) bool {
+	return rf.bf.Contains(b.Bytes())
 }
 
 // Bytes returns the binary representation of a result filter
-func (rf *PassResultFilter) Bytes() (buf []byte) {
-	return
+func (rf *GenericResultFilter) Bytes() (buf []byte) {
+	return rf.bf.Bytes()
 }
 
 // Merge two result filters
-func (rf *PassResultFilter) Merge(ResultFilter) bool {
+func (rf *GenericResultFilter) Merge(t ResultFilter) bool {
+	// check for correct type
+	trf, ok := t.(*GenericResultFilter)
+	if !ok {
+		return false
+	}
+	// check for identical mutator (if any)
+	if !bytes.Equal(rf.bf.mInput, trf.bf.mInput) {
+		return false
+	}
+	// check for same size
+	if len(rf.bf.Bits) != len(trf.bf.Bits) {
+		return false
+	}
+	// merge bloomfilters
+	for i := range rf.bf.Bits {
+		rf.bf.Bits[i] ^= trf.bf.Bits[i]
+	}
 	return true
 }
 
 // Compare two result filters
-func (rf *PassResultFilter) Compare(t ResultFilter) int {
-	if _, ok := t.(*PassResultFilter); ok {
+func (rf *GenericResultFilter) Compare(t ResultFilter) int {
+	trf, ok := t.(*GenericResultFilter)
+	if !ok {
+		return CMP_DIFFER
+	}
+	// check for identical mutator (if any)
+	if !bytes.Equal(rf.bf.mInput, trf.bf.mInput) {
+		return CMP_DIFFER
+	}
+	// check for identical bits
+	if bytes.Equal(rf.bf.Bits, trf.bf.Bits) {
 		return CMP_SAME
 	}
-	return CMP_DIFFER
+	return CMP_MERGE
 }
 
 //======================================================================
