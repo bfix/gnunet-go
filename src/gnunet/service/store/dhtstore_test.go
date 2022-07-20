@@ -78,7 +78,7 @@ func TestDHTFilesStore(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		buf := val.Data()
+		buf := val.Bytes()
 
 		// re-create key
 		k := crypto.Hash(buf)

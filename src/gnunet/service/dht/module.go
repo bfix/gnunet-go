@@ -113,7 +113,7 @@ func (m *Module) Get(ctx context.Context, query blocks.Query) (res chan blocks.B
 	// get the block handler for given block type to construct an empty
 	// result filter. If no handler is defined, a default PassResultFilter
 	// is created.
-	var rf blocks.ResultFilter = new(blocks.PassResultFilter)
+	var rf blocks.ResultFilter = new(blocks.GenericResultFilter)
 	blockHdlr, ok := blocks.BlockHandlers[query.Type()]
 	if ok {
 		// create result filter
@@ -184,7 +184,7 @@ func (m *Module) Put(ctx context.Context, query blocks.Query, block blocks.Block
 	msg.PeerFilter = blocks.NewPeerFilter()
 	msg.ReplLvl = 10
 	msg.Expiration = expire
-	msg.Block = block.Data()
+	msg.Block = block.Bytes()
 	msg.Key = query.Key().Clone()
 	msg.TruncOrigin = nil
 	msg.PutPath = nil

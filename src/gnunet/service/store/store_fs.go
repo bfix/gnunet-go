@@ -121,7 +121,7 @@ func (s *FileStore) Put(query blocks.Query, block blocks.Block) (err error) {
 	}
 	// write to file for storage
 	var fp *os.File
-	bd := block.Data()
+	bd := block.Bytes()
 	if fp, err = os.Create(path + "/" + fname); err == nil {
 		defer fp.Close()
 		// write block data
@@ -198,7 +198,7 @@ func (s *FileStore) GetApprox(query blocks.Query, excl func(blocks.Block) bool) 
 			// we might have a match. check block for exclusion
 			block, err = s.readBlock(md.key)
 			if err != nil {
-				logger.Printf(logger.ERROR, "[dhtstore] failed to retrieve blok for %s", hex.EncodeToString(md.key))
+				logger.Printf(logger.ERROR, "[dhtstore] failed to retrieve block for %s", hex.EncodeToString(md.key))
 				return
 			}
 			if excl(block) {

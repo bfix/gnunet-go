@@ -63,9 +63,9 @@ type Query interface {
 // DHT Block interface
 type Block interface {
 
-	// Data returns the DHT block data (unstructured without type and
+	// Bytes returns the DHT block data (unstructured without type and
 	// expiration information.
-	Data() []byte
+	Bytes() []byte
 
 	// Return the block type
 	Type() enums.BlockType
@@ -85,7 +85,7 @@ type Block interface {
 
 // Unwrap (raw) block to a specific block type
 func Unwrap(blk Block, obj interface{}) error {
-	return data.Unmarshal(obj, blk.Data())
+	return data.Unmarshal(obj, blk.Bytes())
 }
 
 //----------------------------------------------------------------------
@@ -163,8 +163,8 @@ type GenericBlock struct {
 	expire util.AbsoluteTime // expiration date
 }
 
-// Data interface method implementation
-func (b *GenericBlock) Data() []byte {
+// Bytes returns the binary representation
+func (b *GenericBlock) Bytes() []byte {
 	return b.block
 }
 

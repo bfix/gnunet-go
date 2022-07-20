@@ -202,8 +202,8 @@ func (h *HelloBlock) Type() enums.BlockType {
 	return enums.BLOCK_TYPE_DHT_URL_HELLO
 }
 
-// Data returns the raw block data
-func (h *HelloBlock) Data() []byte {
+// Bytes returns the raw block data
+func (h *HelloBlock) Bytes() []byte {
 	buf, err := data.Marshal(h)
 	if err != nil {
 		logger.Println(logger.ERROR, "[hello] Failed to serialize HELLO block: "+err.Error())

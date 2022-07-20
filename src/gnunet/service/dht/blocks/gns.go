@@ -141,8 +141,8 @@ type GNSBlock struct {
 	data      []byte // decrypted data
 }
 
-// Data block interface implementation
-func (b *GNSBlock) Data() []byte {
+// Bytes return th binary representation of block
+func (b *GNSBlock) Bytes() []byte {
 	buf, _ := data.Marshal(b)
 	return buf
 }
