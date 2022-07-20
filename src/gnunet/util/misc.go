@@ -19,7 +19,11 @@
 package util
 
 import (
+	"encoding/hex"
+	"encoding/json"
 	"strings"
+
+	"github.com/bfix/gospel/data"
 )
 
 //----------------------------------------------------------------------
@@ -79,4 +83,24 @@ func StripPathRight(s string) string {
 		return s[:idx]
 	}
 	return s
+}
+
+//----------------------------------------------------------------------
+// Dump instance
+func Dump(obj any, format string) string {
+	switch format {
+	case "json":
+		buf, err := json.Marshal(obj)
+		if err != nil {
+			return err.Error()
+		}
+		return string(buf)
+	case "hex":
+		buf, err := data.Marshal(obj)
+		if err != nil {
+			return err.Error()
+		}
+		return hex.EncodeToString(buf)
+	}
+	return "unknown message dump format"
 }

@@ -19,10 +19,7 @@
 package transport
 
 import (
-	"bytes"
 	"context"
-	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"gnunet/message"
@@ -117,26 +114,6 @@ func ReadMessage(ctx context.Context, rdr io.ReadCloser, buf []byte) (msg messag
 	}
 	err = data.Unmarshal(msg, buf[:mh.MsgSize])
 	return
-}
-
-//----------------------------------------------------------------------
-// Dump message
-func Dump(msg message.Message, format string) string {
-	switch format {
-	case "json":
-		buf, err := json.Marshal(msg)
-		if err != nil {
-			return err.Error()
-		}
-		return string(buf)
-	case "hex":
-		buf := new(bytes.Buffer)
-		if err := WriteMessageDirect(buf, msg); err != nil {
-			return err.Error()
-		}
-		return hex.EncodeToString(buf.Bytes())
-	}
-	return "unknown message dump format"
 }
 
 //----------------------------------------------------------------------
