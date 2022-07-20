@@ -23,6 +23,7 @@ import (
 	"flag"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -185,6 +186,13 @@ loop:
 		// handle heart beat
 		case now := <-tick.C:
 			logger.Println(logger.INFO, "[dht] Heart beat at "+now.String())
+			// print some system statistics
+			logger.Printf(logger.INFO, "[dht] Number of Go routines: %15d", runtime.NumGoroutine())
+			mem := new(runtime.MemStats)
+			runtime.ReadMemStats(mem)
+			logger.Printf(logger.INFO, "[dht]        Allocated heap: %15d", mem.HeapAlloc)
+			logger.Printf(logger.INFO, "[dht]             Idle heap: %15d", mem.HeapIdle)
+			logger.Printf(logger.INFO, "[dht]      Total allocation: %15d", mem.TotalAlloc)
 		}
 	}
 
