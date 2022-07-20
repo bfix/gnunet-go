@@ -85,13 +85,21 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		if !msg.PeerFilter.Contains(sender) {
 			logger.Printf(logger.WARN, "[%s] sender not in peer filter", label)
 		}
-		// parse result filter
-		var rf blocks.ResultFilter = new(blocks.PassResultFilter)
+		// parse result filter ...
+		var rf blocks.ResultFilter
 		if msg.ResFilter != nil && len(msg.ResFilter) > 0 {
 			if blockHdlr != nil {
 				rf = blockHdlr.ParseResultFilter(msg.ResFilter)
 			} else {
 				logger.Printf(logger.WARN, "[%s] unknown result filter implementation -- skipped", label)
+			}
+		} else {
+			// ... or create a new one
+			if blockHdlr != nil {
+				rf = blockHdlr.SetupResultFilter(128, util.RndUInt32())
+			} else {
+				logger.Printf(logger.WARN, "[%s] using default result filter", label)
+				rf = blocks.NewGenericResultFilter()
 			}
 		}
 		// clone peer filter
@@ -115,6 +123,13 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			logger.Println(logger.DBG, "[dht] GET message for HELLO: check cache")
 			// find best cached HELLO
 			block, dist = m.rtable.BestHello(addr, rf)
+
+			// if block is filtered, skip it
+			if block != nil && rf.Contains(block) {
+				logger.Println(logger.DBG, "[dht] GET message for HELLO: matching DHT block is filtered")
+				block = nil
+				dist = nil
+			}
 		}
 		//--------------------------------------------------------------
 		// find the closest block that has that is not filtered by the result
@@ -122,34 +137,47 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		if doResult {
 			// save best-match values from cache
 			blockCache := block
+			block = nil
 			distCache := dist
+			dist = nil
 
-			// query DHT store for exact match  (9.4.3.3c)
-			if block, err = m.store.Get(query); err != nil {
-				logger.Printf(logger.ERROR, "[%s] Failed to get DHT block from storage: %s", label, err.Error())
-				return true
-			}
-			// if block is filtered, skip it
-			if rf.Contains(block) {
-				logger.Println(logger.DBG, "[dht] GET message for HELLO: matching DHT block is filtered")
-				block = nil
-			}
-			// if we have no exact match, find approximate block if requested
-			if block == nil || approx {
-				// no exact match: find approximate (9.4.3.3b)
-				match := func(b blocks.Block) bool {
-					return rf.Contains(b)
-				}
-				block, dist, err = m.GetApprox(ctx, query, match)
-				if err != nil {
-					logger.Printf(logger.ERROR, "[%s] Failed to get (approx.) DHT block from storage: %s", label, err.Error())
+			// if we don't have an exact match, try storage lookup
+			if blockCache == nil || (distCache != nil && !distCache.Equals(math.ZERO)) {
+
+				// query DHT store for exact match  (9.4.3.3c)
+				if block, err = m.store.Get(query); err != nil {
+					logger.Printf(logger.ERROR, "[%s] Failed to get DHT block from storage: %s", label, err.Error())
 					return true
 				}
-			}
-			// if we have a block from cache, check if it is better than the
-			// block found in the DHT
-			if blockCache != nil && distCache.Cmp(dist) < 0 {
-				block = blockCache
+				if block != nil {
+					dist = math.ZERO
+				}
+
+				// if we have no exact match, find approximate block if requested
+				if block == nil || approx {
+					// no exact match: find approximate (9.4.3.3b)
+					match := func(b blocks.Block) bool {
+						return rf.Contains(b)
+					}
+					block, dist, err = m.GetApprox(ctx, query, match)
+					if err != nil {
+						logger.Printf(logger.ERROR, "[%s] Failed to get (approx.) DHT block from storage: %s", label, err.Error())
+						return true
+					}
+				}
+				// if block is filtered, skip it
+				if block != nil && rf.Contains(block) {
+					logger.Println(logger.DBG, "[dht] matching DHT block is filtered")
+					block = nil
+					dist = nil
+				}
+
+				// if we have a block from cache, check if it is better than the
+				// block found in the DHT
+				if blockCache != nil && dist != nil && distCache.Cmp(dist) < 0 {
+					block = blockCache
+					dist = distCache
+				}
 			}
 			// if we have a block, send it as response
 			if block != nil {
@@ -387,7 +415,7 @@ func (m *Module) sendResult(ctx context.Context, query blocks.Query, blk blocks.
 	out.BType = uint32(query.Type())
 	out.Expires = blk.Expire()
 	out.Query = query.Key()
-	out.Block = blk.Data()
+	out.Block = blk.Bytes()
 	out.MsgSize += uint16(len(out.Block))
 	// send message
 	return back.Send(ctx, out)
