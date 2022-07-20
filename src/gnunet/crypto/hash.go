@@ -43,7 +43,9 @@ func (hc *HashCode) Size() uint {
 
 // Clone the hash code
 func (hc *HashCode) Clone() *HashCode {
-	return NewHashCode(hc.Bits)
+	return &HashCode{
+		Bits: util.Clone(hc.Bits),
+	}
 }
 
 // String returns a hex-representation of the hash code
@@ -53,16 +55,17 @@ func (hc *HashCode) String() string {
 
 // NewHashCode creates a new (initialized) hash value
 func NewHashCode(data []byte) *HashCode {
-	hc := &HashCode{
-		Bits: make([]byte, 64),
-	}
+	hc := new(HashCode)
+	size := hc.Size()
+	v := make([]byte, size)
 	if data != nil && len(data) > 0 {
-		if len(data) < 32 {
-			util.CopyAlignedBlock(hc.Bits, data)
+		if uint(len(data)) < size {
+			util.CopyAlignedBlock(v, data)
 		} else {
-			copy(hc.Bits, data[:32])
+			copy(v, data[:size])
 		}
 	}
+	hc.Bits = v
 	return hc
 }
 

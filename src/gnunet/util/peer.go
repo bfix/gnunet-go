@@ -35,16 +35,17 @@ type PeerPublicKey struct {
 
 // NewPeerPublicKey creates a key instance from binary data
 func NewPeerPublicKey(data []byte) *PeerPublicKey {
-	pk := &PeerPublicKey{
-		Data: make([]byte, 32),
-	}
+	pk := new(PeerPublicKey)
+	size := pk.Size()
+	v := make([]byte, size)
 	if data != nil && len(data) > 0 {
-		if len(data) < 32 {
-			CopyAlignedBlock(pk.Data, data)
+		if uint(len(data)) < size {
+			CopyAlignedBlock(v, data)
 		} else {
-			copy(pk.Data, data[:32])
+			copy(v, data[:size])
 		}
 	}
+	pk.Data = v
 	return pk
 }
 
