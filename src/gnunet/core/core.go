@@ -259,6 +259,17 @@ func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addrs []*util.Addre
 	// learn all addresses for peer
 	newPeer = false
 	for _, addr := range addrs {
+		// filter out local addresses
+		s := addr.String()
+		if idx := strings.LastIndex(s, ":"); idx != -1 {
+			s = s[:idx]
+		}
+		logger.Printf(logger.DBG, "[core] Checking address %s", s)
+		ip := net.ParseIP(s)
+		if ip == nil || ip.IsLoopback() {
+			continue
+		}
+		// learn address
 		logger.Printf(logger.INFO, "[core] Learning %s for %s (expires %s)", addr.URI(), peer, addr.Expires)
 		newPeer = (c.peers.Add(peer, addr) == 1) || newPeer
 	}
