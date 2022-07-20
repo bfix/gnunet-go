@@ -20,6 +20,7 @@ package dht
 
 import (
 	"context"
+	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service/dht/blocks"
@@ -76,7 +77,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		}
 		//----------------------------------------------------------
 		// check if sender is in peer filter (9.4.3.2)
-		if !msg.PeerFilter.Contains(sender) {
+		if sender != nil && msg.PeerFilter.Contains(sender) {
 			logger.Printf(logger.WARN, "[%s] sender not in peer filter", label)
 		}
 		// parse result filter
@@ -111,7 +112,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			block, dist = m.rtable.BestHello(addr, rf)
 		}
 		//--------------------------------------------------------------
-		// find the closest block that has that is not filtered/ by the result
+		// find the closest block that has that is not filtered by the result
 		// filter (in case we did not find an appropriate block in cache).
 		if doResult {
 			// save best-match values from cache
@@ -119,7 +120,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			distCache := dist
 
 			// query DHT store for exact match  (9.4.3.3c)
-			if block, err = m.Get(ctx, query); err != nil {
+			if block, err = m.store.Get(query); err != nil {
 				logger.Printf(logger.ERROR, "[%s] Failed to get DHT block from storage: %s", label, err.Error())
 				return true
 			}
@@ -228,9 +229,37 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		}
 		//--------------------------------------------------------------
 		// check if sender is in peer filter (9.3.2.5)
-		if !msg.PeerFilter.Contains(sender) {
+		if sender != nil && !msg.PeerFilter.Contains(sender) {
 			logger.Printf(logger.WARN, "[%s] Sender not in peer filter", label)
 		}
+		//--------------------------------------------------------------
+		// verify PUT path (9.3.2.7)
+		recordPath := (msg.Flags&enums.DHT_RO_RECORD_ROUTE != 0)
+		truncated := (msg.Flags&enums.DHT_RO_TRUNCATED != 0)
+		if msg.PathL > 0 {
+			// check record-route flag
+			if !recordPath {
+				logger.Printf(logger.WARN, "[%s] PutPath NOT empty but recording flag NOT set", label)
+			}
+			// block hash and expiration
+			bh := crypto.Hash(msg.Block)
+			expire := msg.Expiration
+			var to *util.PeerID
+			// truncated origin and last hop signature
+			if truncated {
+				to = util.NewPeerID(msg.TruncOrigin)
+			}
+			var ls *util.PeerSignature
+			if recordPath {
+				ls = util.NewPeerSignature(msg.LastSig)
+			}
+			idx := m.verifyPath(sender, to, msg.PutPath, ls, bh, expire)
+			if idx != -1 {
+				// truncate path
+			}
+
+		}
+
 		//--------------------------------------------------------------
 		// check if route is recorded (9.3.2.6)
 		/*
@@ -241,11 +270,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 				msg.AppendPutPath(spe)
 			}
 		*/
-		//--------------------------------------------------------------
-		// verify PUT path (9.3.2.7)
-		if msg.PathL > 0 {
-
-		}
+		// 	m.store.Put(key, block)
 
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-PUT message done", label)
 
