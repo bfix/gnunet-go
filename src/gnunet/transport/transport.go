@@ -139,7 +139,7 @@ func (t *Transport) Send(ctx context.Context, addr net.Addr, msg *Message) (err 
 			// }
 		}
 		return nil
-	}, true)
+	}, false)
 	if err != nil {
 		return
 	}
