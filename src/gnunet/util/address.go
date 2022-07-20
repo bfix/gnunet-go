@@ -117,9 +117,9 @@ func (a *PeerAddrList) Add(peer *PeerID, addr *Address) (mode int) {
 	mode = 0
 	if !addr.Expires.Expired() {
 		// run add operation
-		_ = a.list.Process(func() error {
+		_ = a.list.Process(func(pid int) error {
 			id := peer.String()
-			list, ok := a.list.Get(id)
+			list, ok := a.list.Get(id, pid)
 			if !ok {
 				list = make([]*Address, 0)
 				mode = 1
@@ -132,7 +132,7 @@ func (a *PeerAddrList) Add(peer *PeerID, addr *Address) (mode int) {
 				mode = 2
 			}
 			list = append(list, addr)
-			a.list.Put(id, list)
+			a.list.Put(id, list, pid)
 			return nil
 		}, false)
 	}
@@ -142,7 +142,7 @@ func (a *PeerAddrList) Add(peer *PeerID, addr *Address) (mode int) {
 // Get address for peer
 func (a *PeerAddrList) Get(peer *PeerID, transport string) (res []*Address) {
 	id := peer.String()
-	list, ok := a.list.Get(id)
+	list, ok := a.list.Get(id, 0)
 	if ok {
 		for _, addr := range list {
 			// check for expired address.
@@ -163,12 +163,12 @@ func (a *PeerAddrList) Get(peer *PeerID, transport string) (res []*Address) {
 
 // Delete a list entry by key.
 func (a *PeerAddrList) Delete(peer *PeerID) {
-	a.list.Delete(peer.String())
+	a.list.Delete(peer.String(), 0)
 }
 
 // Contains checks if a peer is contained in the list. Does not check
 // for expired entries.
 func (a *PeerAddrList) Contains(peer *PeerID) (ok bool) {
-	_, ok = a.list.Get(peer.String())
+	_, ok = a.list.Get(peer.String(), 0)
 	return
 }

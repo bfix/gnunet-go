@@ -289,7 +289,7 @@ func NewResultHandlerList() *ResultHandlerList {
 func (t *ResultHandlerList) Add(hdlr ResultHandler) bool {
 	// get current list of handlers for key
 	key := hdlr.Key()
-	list, ok := t.list.Get(key)
+	list, ok := t.list.Get(key, 0)
 	modified := false
 	if !ok {
 		list = make([]ResultHandler, 0)
@@ -319,18 +319,18 @@ func (t *ResultHandlerList) Add(hdlr ResultHandler) bool {
 		// append new handler to list
 		list = append(list, hdlr)
 	}
-	t.list.Put(key, list)
+	t.list.Put(key, list, 0)
 	return true
 }
 
 // Get handler list for given key
 func (t *ResultHandlerList) Get(key string) ([]ResultHandler, bool) {
-	return t.list.Get(key)
+	return t.list.Get(key, 0)
 }
 
 // Cleanup removes expired tasks from list
 func (t *ResultHandlerList) Cleanup() {
-	err := t.list.ProcessRange(func(key string, list []ResultHandler) error {
+	err := t.list.ProcessRange(func(key string, list []ResultHandler, pid int) error {
 		var newList []ResultHandler
 		changed := false
 		for _, rh := range list {
@@ -341,7 +341,7 @@ func (t *ResultHandlerList) Cleanup() {
 			}
 		}
 		if changed {
-			t.list.Put(key, newList)
+			t.list.Put(key, newList, pid)
 		}
 		return nil
 	}, false)

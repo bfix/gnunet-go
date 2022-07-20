@@ -101,7 +101,7 @@ func TestRT(t *testing.T) {
 		t.Logf("[%6d] %s %s\n", e, task.addr, msg)
 	}
 	disconnected := func(task *Entry, e int64, msg string) {
-		rt.Remove(task.addr)
+		rt.Remove(task.addr, 0)
 		task.online = false
 		task.last = e
 		t.Logf("[%6d] %s %s\n", e, task.addr, msg)
@@ -140,10 +140,10 @@ func TestRT(t *testing.T) {
 	// execute some routing functions on remaining table
 	k := genRemotePeer()
 	pf := blocks.NewPeerFilter()
-	n := rt.SelectClosestPeer(k, pf)
+	n := rt.SelectClosestPeer(k, pf, 0)
 	t.Logf("Closest: %s -> %s\n", k, n)
 
-	n = rt.SelectRandomPeer(pf)
+	n = rt.SelectRandomPeer(pf, 0)
 	t.Logf("Random: %s\n", n)
 }
 

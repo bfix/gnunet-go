@@ -128,7 +128,7 @@ func (t *Transport) Shutdown() {
 func (t *Transport) Send(ctx context.Context, addr net.Addr, msg *Message) (err error) {
 	// select best endpoint able to handle address
 	var bestEp Endpoint
-	err = t.endpoints.ProcessRange(func(_ int, ep Endpoint) error {
+	err = t.endpoints.ProcessRange(func(_ int, ep Endpoint, _ int) error {
 		if ep.CanSendTo(addr) {
 			if bestEp == nil {
 				bestEp = ep
@@ -160,7 +160,7 @@ func (t *Transport) AddEndpoint(ctx context.Context, addr *util.Address) (ep End
 	}
 	// check if endpoint is already available
 	as := addr.Network() + "://" + addr.String()
-	if err = t.endpoints.ProcessRange(func(_ int, ep Endpoint) error {
+	if err = t.endpoints.ProcessRange(func(_ int, ep Endpoint, _ int) error {
 		ae := ep.Address().Network() + "://" + ep.Address().String()
 		if as == ae {
 			return ErrEndpExists
@@ -174,7 +174,7 @@ func (t *Transport) AddEndpoint(ctx context.Context, addr *util.Address) (ep End
 		return
 	}
 	// add endpoint to list and run it
-	t.endpoints.Put(ep.ID(), ep)
+	t.endpoints.Put(ep.ID(), ep, 0)
 	err = ep.Run(ctx, t.incoming)
 	return
 }

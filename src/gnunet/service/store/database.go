@@ -108,9 +108,9 @@ type dbPool struct {
 
 // remove a database instance from the pool based on its connect string.
 func (p *dbPool) remove(key string) error {
-	return p.insts.Process(func() (err error) {
+	return p.insts.Process(func(pid int) (err error) {
 		// get pool entry
-		pe, ok := p.insts.Get(key)
+		pe, ok := p.insts.Get(key, pid)
 		if !ok {
 			return nil
 		}
@@ -119,7 +119,7 @@ func (p *dbPool) remove(key string) error {
 		if pe.refs == 0 {
 			// no more refs: close database
 			err = pe.db.Close()
-			p.insts.Delete(key)
+			p.insts.Delete(key, pid)
 		}
 		return
 	}, false)
@@ -138,10 +138,10 @@ func (p *dbPool) remove(key string) error {
 //              information required to log into the database (e.g.
 //              "[user[:passwd]@][proto[(addr)]]/dbname[?param1=value1&...]").
 func (p *dbPool) Connect(spec string) (db *DBConn, err error) {
-	err = p.insts.Process(func() error {
+	err = p.insts.Process(func(pid int) error {
 		// check if we have a connection to this database.
 		db = new(DBConn)
-		inst, ok := p.insts.Get(spec)
+		inst, ok := p.insts.Get(spec, pid)
 		if !ok {
 			inst = new(DBPoolEntry)
 			inst.refs = 0
@@ -174,7 +174,7 @@ func (p *dbPool) Connect(spec string) (db *DBConn, err error) {
 				return ErrSQLInvalidDatabaseSpec
 			}
 			// save database in pool
-			p.insts.Put(spec, inst)
+			p.insts.Put(spec, inst, pid)
 		}
 		// increment reference count
 		inst.refs++

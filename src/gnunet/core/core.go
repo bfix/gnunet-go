@@ -168,10 +168,10 @@ func (c *Core) pump(ctx context.Context) {
 			logger.Printf(logger.DBG, "[core] Message received from %s: %s", tm.Peer, transport.Dump(tm.Msg, "json"))
 
 			// check if peer is already connected (has an entry in PeerAddrist)
-			_, connected := c.connected.Get(tm.Peer.String())
+			_, connected := c.connected.Get(tm.Peer.String(), 0)
 			if !connected {
 				// no: mark connected
-				c.connected.Put(tm.Peer.String(), true)
+				c.connected.Put(tm.Peer.String(), true, 0)
 				// generate EV_CONNECT event
 				c.dispatch(&Event{
 					ID:   EV_CONNECT,

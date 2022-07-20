@@ -107,7 +107,7 @@ type RoutingTable struct {
 	buckets    []*Bucket                             // list of buckets
 	list       *util.Map[string, *PeerAddress]       // keep list of peers
 	l2nse      float64                               // log2 of estimated network size
-	inProcess  bool                                  // flag if Process() is running
+	inProcess  map[int]struct{}                      // flag if Process() is running
 	cfg        *config.RoutingConfig                 // routing parameters
 	helloCache *util.Map[string, *blocks.HelloBlock] // HELLO block cache
 }
@@ -120,7 +120,7 @@ func NewRoutingTable(ref *PeerAddress, cfg *config.RoutingConfig) *RoutingTable 
 		list:       util.NewMap[string, *PeerAddress](),
 		buckets:    make([]*Bucket, 512),
 		l2nse:      -1,
-		inProcess:  false,
+		inProcess:  make(map[int]struct{}),
 		cfg:        cfg,
 		helloCache: util.NewMap[string, *blocks.HelloBlock](),
 	}
@@ -142,7 +142,7 @@ func (rt *RoutingTable) Add(p *PeerAddress) bool {
 	logger.Printf(logger.DBG, "[RT] Add(%s)", k)
 
 	// check if peer is already known
-	if px, ok := rt.list.Get(k); ok {
+	if px, ok := rt.list.Get(k, 0); ok {
 		logger.Println(logger.DBG, "[RT] --> already known")
 		px.lastSeen = util.AbsoluteTimeNow()
 		return false
@@ -153,7 +153,7 @@ func (rt *RoutingTable) Add(p *PeerAddress) bool {
 	if rt.buckets[idx].Add(p) {
 		logger.Println(logger.DBG, "[RT] --> entry added")
 		p.lastUsed = util.AbsoluteTimeNow()
-		rt.list.Put(k, p)
+		rt.list.Put(k, p, 0)
 		return true
 	}
 	// Full bucket: we did not add the address to the routing table.
@@ -163,7 +163,7 @@ func (rt *RoutingTable) Add(p *PeerAddress) bool {
 
 // Remove peer address from routing table.
 // Returns true if the entry was removed, false otherwise.
-func (rt *RoutingTable) Remove(p *PeerAddress) bool {
+func (rt *RoutingTable) Remove(p *PeerAddress, pid int) bool {
 	k := p.String()
 	logger.Printf(logger.DBG, "[RT] Remove(%s)", k)
 
@@ -177,9 +177,9 @@ func (rt *RoutingTable) Remove(p *PeerAddress) bool {
 		// remove from internal list
 		logger.Println(logger.DBG, "[RT] --> entry removed from internal lists only")
 	}
-	rt.list.Delete(k)
+	rt.list.Delete(k, 0)
 	// delete from HELLO cache
-	rt.helloCache.Delete(p.Peer.String())
+	rt.helloCache.Delete(p.Peer.String(), pid)
 	return rc
 }
 
@@ -189,10 +189,10 @@ func (rt *RoutingTable) Contains(p *PeerAddress) bool {
 	logger.Printf(logger.DBG, "[RT] Contains(%s)?", k)
 
 	// check for peer in internal list
-	px, ok := rt.list.Get(k)
+	px, ok := rt.list.Get(k, 0)
 	if !ok {
 		logger.Println(logger.DBG, "[RT] --> NOT found in current list:")
-		_ = rt.list.ProcessRange(func(key string, val *PeerAddress) error {
+		_ = rt.list.ProcessRange(func(key string, val *PeerAddress, _ int) error {
 			logger.Printf(logger.DBG, "[RT]    * %s", val)
 			return nil
 		}, true)
@@ -206,16 +206,17 @@ func (rt *RoutingTable) Contains(p *PeerAddress) bool {
 //----------------------------------------------------------------------
 
 // Process a function f in the locked context of a routing table
-func (rt *RoutingTable) Process(f func() error, readonly bool) error {
+func (rt *RoutingTable) Process(f func(pid int) error, readonly bool) error {
 	// handle locking
-	rt.lock(readonly)
-	rt.inProcess = true
+	rt.lock(readonly, 0)
+	pid := util.NextID()
+	rt.inProcess[pid] = struct{}{}
 	defer func() {
-		rt.inProcess = false
-		rt.unlock(readonly)
+		delete(rt.inProcess, pid)
+		rt.unlock(readonly, 0)
 	}()
 	// call function in unlocked context
-	return f()
+	return f(pid)
 }
 
 //----------------------------------------------------------------------
@@ -223,10 +224,10 @@ func (rt *RoutingTable) Process(f func() error, readonly bool) error {
 //----------------------------------------------------------------------
 
 // SelectClosestPeer for a given peer address and peer filter.
-func (rt *RoutingTable) SelectClosestPeer(p *PeerAddress, pf *blocks.PeerFilter) (n *PeerAddress) {
+func (rt *RoutingTable) SelectClosestPeer(p *PeerAddress, pf *blocks.PeerFilter, pid int) (n *PeerAddress) {
 	// no writer allowed
-	rt.RLock()
-	defer rt.RUnlock()
+	rt.lock(true, pid)
+	defer rt.unlock(true, pid)
 
 	// find closest peer in routing table
 	var dist *math.Int
@@ -245,15 +246,15 @@ func (rt *RoutingTable) SelectClosestPeer(p *PeerAddress, pf *blocks.PeerFilter)
 
 // SelectRandomPeer returns a random address from table (that is not
 // included in the bloomfilter)
-func (rt *RoutingTable) SelectRandomPeer(pf *blocks.PeerFilter) (p *PeerAddress) {
+func (rt *RoutingTable) SelectRandomPeer(pf *blocks.PeerFilter, pid int) (p *PeerAddress) {
 	// no writer allowed
-	rt.RLock()
-	defer rt.RUnlock()
+	rt.lock(true, pid)
+	defer rt.unlock(true, pid)
 
 	// select random entry from list
 	var ok bool
 	for {
-		if _, p, ok = rt.list.GetRandom(); !ok {
+		if _, p, ok = rt.list.GetRandom(pid); !ok {
 			return nil
 		}
 		if !pf.Contains(p.Peer) {
@@ -268,19 +269,19 @@ func (rt *RoutingTable) SelectRandomPeer(pf *blocks.PeerFilter) (p *PeerAddress)
 // SelectPeer selects a neighbor depending on the number of hops parameter.
 // If hops < NSE this function MUST return SelectRandomPeer() and
 // SelectClosestpeer() otherwise.
-func (rt *RoutingTable) SelectPeer(p *PeerAddress, hops int, bf *blocks.PeerFilter) *PeerAddress {
+func (rt *RoutingTable) SelectPeer(p *PeerAddress, hops int, bf *blocks.PeerFilter, pid int) *PeerAddress {
 	if float64(hops) < rt.l2nse {
-		return rt.SelectRandomPeer(bf)
+		return rt.SelectRandomPeer(bf, pid)
 	}
-	return rt.SelectClosestPeer(p, bf)
+	return rt.SelectClosestPeer(p, bf, pid)
 }
 
 // IsClosestPeer returns true if p is the closest peer for k. Peers with a
 // positive test in the Bloom filter are not considered. If p is nil, our
 // reference address is used.
-func (rt *RoutingTable) IsClosestPeer(p, k *PeerAddress, pf *blocks.PeerFilter) bool {
+func (rt *RoutingTable) IsClosestPeer(p, k *PeerAddress, pf *blocks.PeerFilter, pid int) bool {
 	// get closest peer in routing table
-	n := rt.SelectClosestPeer(k, pf)
+	n := rt.SelectClosestPeer(k, pf, pid)
 	// check SELF?
 	if p == nil {
 		// if no peer in routing table found
@@ -326,24 +327,22 @@ func (rt *RoutingTable) heartbeat(ctx context.Context) {
 	// check for dead or expired peers
 	logger.Println(logger.DBG, "[dht] RT heartbeat...")
 	timeout := util.NewRelativeTime(time.Duration(rt.cfg.PeerTTL) * time.Second)
-	if err := rt.Process(func() error {
-		return rt.list.ProcessRange(func(k string, p *PeerAddress) error {
-			// check if we can/need to drop a peer
-			drop := timeout.Compare(p.lastSeen.Elapsed()) < 0
-			if drop || timeout.Compare(p.lastUsed.Elapsed()) < 0 {
-				logger.Printf(logger.DBG, "[RT] removing %v: %v, %v", p, p.lastSeen.Elapsed(), p.lastUsed.Elapsed())
-				rt.Remove(p)
-			}
-			return nil
-		}, false)
+	if err := rt.list.ProcessRange(func(k string, p *PeerAddress, pid int) error {
+		// check if we can/need to drop a peer
+		drop := timeout.Compare(p.lastSeen.Elapsed()) < 0
+		if drop || timeout.Compare(p.lastUsed.Elapsed()) < 0 {
+			logger.Printf(logger.DBG, "[RT] removing %v: %v, %v", p, p.lastSeen.Elapsed(), p.lastUsed.Elapsed())
+			rt.Remove(p, pid)
+		}
+		return nil
 	}, false); err != nil {
 		logger.Println(logger.ERROR, "[dht] RT heartbeat failed: "+err.Error())
 	}
 
 	// drop expired entries from the HELLO cache
-	_ = rt.helloCache.ProcessRange(func(key string, val *blocks.HelloBlock) error {
+	_ = rt.helloCache.ProcessRange(func(key string, val *blocks.HelloBlock, pid int) error {
 		if val.Expires.Expired() {
-			rt.helloCache.Delete(key)
+			rt.helloCache.Delete(key, pid)
 		}
 		return nil
 	}, false)
@@ -356,7 +355,7 @@ func (rt *RoutingTable) heartbeat(ctx context.Context) {
 
 func (rt *RoutingTable) BestHello(addr *PeerAddress, rf blocks.ResultFilter) (hb *blocks.HelloBlock, dist *math.Int) {
 	// iterate over cached HELLOs to find (best) match first
-	_ = rt.helloCache.ProcessRange(func(key string, val *blocks.HelloBlock) error {
+	_ = rt.helloCache.ProcessRange(func(key string, val *blocks.HelloBlock, _ int) error {
 		// check if block is excluded by result filter
 		if !rf.Contains(val) {
 			// check for better match
@@ -374,19 +373,19 @@ func (rt *RoutingTable) BestHello(addr *PeerAddress, rf blocks.ResultFilter) (hb
 
 // CacheHello adds a HELLO block to the list of cached entries.
 func (rt *RoutingTable) CacheHello(hb *blocks.HelloBlock) {
-	rt.helloCache.Put(hb.PeerID.String(), hb)
+	rt.helloCache.Put(hb.PeerID.String(), hb, 0)
 }
 
 // GetHello returns a HELLO block for key k (if available)
 func (rt *RoutingTable) GetHello(k string) (*blocks.HelloBlock, bool) {
-	return rt.helloCache.Get(k)
+	return rt.helloCache.Get(k, 0)
 }
 
 //----------------------------------------------------------------------
 
 // lock with given mode (if not in processing function)
-func (rt *RoutingTable) lock(readonly bool) {
-	if !rt.inProcess {
+func (rt *RoutingTable) lock(readonly bool, pid int) {
+	if _, ok := rt.inProcess[pid]; !ok {
 		if readonly {
 			rt.RLock()
 		} else {
@@ -396,8 +395,8 @@ func (rt *RoutingTable) lock(readonly bool) {
 }
 
 // lock with given mode (if not in processing function)
-func (rt *RoutingTable) unlock(readonly bool) {
-	if !rt.inProcess {
+func (rt *RoutingTable) unlock(readonly bool, pid int) {
+	if _, ok := rt.inProcess[pid]; !ok {
 		if readonly {
 			rt.RUnlock()
 		} else {

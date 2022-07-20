@@ -151,7 +151,9 @@ func (m *Module) Get(ctx context.Context, query blocks.Query) (res chan blocks.B
 	lctx, cancel := context.WithTimeout(ctx, ttl)
 
 	// send message
-	go m.HandleMessage(lctx, nil, msg, hdlr)
+	self := m.core.PeerID()
+	msg.PeerFilter.Add(self)
+	go m.HandleMessage(lctx, self, msg, hdlr)
 	go func() {
 		<-lctx.Done()
 		hdlr.Close()
@@ -236,7 +238,7 @@ func (m *Module) event(ctx context.Context, ev *core.Event) {
 	case core.EV_DISCONNECT:
 		// Remove peer from routing table
 		logger.Printf(logger.INFO, "[dht] Peer %s disconnected", ev.Peer)
-		m.rtable.Remove(NewPeerAddress(ev.Peer))
+		m.rtable.Remove(NewPeerAddress(ev.Peer), 0)
 
 	// Message received.
 	case core.EV_MESSAGE:

@@ -234,14 +234,12 @@ func (ep *PaketEndpoint) CanSendTo(addr net.Addr) (ok bool) {
 		// try to convert addr to compatible type
 		switch ep.netw {
 		case "udp", "udp4", "udp6":
-			var ua *net.UDPAddr
 			var err error
-			if ua, err = net.ResolveUDPAddr(ep.netw, addr.String()); err != nil {
+			if _, err = net.ResolveUDPAddr(ep.netw, addr.String()); err != nil {
 				ok = false
 			}
-			logger.Printf(logger.DBG, "[pkt_ep] %s + %v -> %v (%v)", ep.netw, addr, ua, ok)
 		default:
-			logger.Printf(logger.DBG, "[pkt_ep] unknown network %s", ep.netw)
+			logger.Printf(logger.WARN, "[pkt_ep] unknown network %s", ep.netw)
 			ok = false
 		}
 	} else {
@@ -309,7 +307,7 @@ func (ep *StreamEndpoint) Run(ctx context.Context, hdlr chan *Message) (err erro
 				return
 			}
 			session := util.NextID()
-			ep.conns.Put(session, conn)
+			ep.conns.Put(session, conn, 0)
 			go func() {
 				for {
 					// read next message from connection
@@ -324,7 +322,7 @@ func (ep *StreamEndpoint) Run(ctx context.Context, hdlr chan *Message) (err erro
 				}
 				// connection ended.
 				conn.Close()
-				ep.conns.Delete(session)
+				ep.conns.Delete(session, 0)
 			}()
 		}
 	}()

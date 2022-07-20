@@ -32,14 +32,14 @@ type Map[K comparable, V any] struct {
 	sync.RWMutex
 
 	list      map[K]V
-	inProcess bool
+	inProcess map[int]struct{}
 }
 
 // NewMap allocates a new mapping.
 func NewMap[K comparable, V any]() *Map[K, V] {
 	return &Map[K, V]{
 		list:      make(map[K]V),
-		inProcess: false,
+		inProcess: make(map[int]struct{}),
 	}
 }
 
@@ -47,31 +47,33 @@ func NewMap[K comparable, V any]() *Map[K, V] {
 
 // Process a function in the locked map context. Calls
 // to other map functions in 'f' will skip their locks.
-func (m *Map[K, V]) Process(f func() error, readonly bool) error {
+func (m *Map[K, V]) Process(f func(pid int) error, readonly bool) error {
 	// handle locking
-	m.lock(readonly)
-	m.inProcess = true
+	m.lock(readonly, 0)
+	pid := NextID()
+	m.inProcess[pid] = struct{}{}
 	defer func() {
-		m.inProcess = false
-		m.unlock(readonly)
+		delete(m.inProcess, pid)
+		m.unlock(readonly, 0)
 	}()
 	// function call in unlocked environment
-	return f()
+	return f(pid)
 }
 
 // Process a ranged function in the locked map context. Calls
 // to other map functions in 'f' will skip their locks.
-func (m *Map[K, V]) ProcessRange(f func(key K, value V) error, readonly bool) error {
+func (m *Map[K, V]) ProcessRange(f func(key K, value V, pid int) error, readonly bool) error {
 	// handle locking
-	m.lock(readonly)
-	m.inProcess = true
+	m.lock(readonly, 0)
+	pid := NextID()
+	m.inProcess[pid] = struct{}{}
 	defer func() {
-		m.inProcess = false
-		m.unlock(readonly)
+		delete(m.inProcess, pid)
+		m.unlock(readonly, 0)
 	}()
 	// range over map and call function.
 	for key, value := range m.list {
-		if err := f(key, value); err != nil {
+		if err := f(key, value, pid); err != nil {
 			return err
 		}
 	}
@@ -86,24 +88,24 @@ func (m *Map[K, V]) Size() int {
 }
 
 // Put value into map under given key.
-func (m *Map[K, V]) Put(key K, value V) {
-	m.lock(false)
-	defer m.unlock(false)
+func (m *Map[K, V]) Put(key K, value V, pid int) {
+	m.lock(false, pid)
+	defer m.unlock(false, pid)
 	m.list[key] = value
 }
 
 // Get value with iven key from map.
-func (m *Map[K, V]) Get(key K) (value V, ok bool) {
-	m.lock(true)
-	defer m.unlock(true)
+func (m *Map[K, V]) Get(key K, pid int) (value V, ok bool) {
+	m.lock(true, pid)
+	defer m.unlock(true, pid)
 	value, ok = m.list[key]
 	return
 }
 
 // GetRandom returns a random map entry.
-func (m *Map[K, V]) GetRandom() (key K, value V, ok bool) {
-	m.lock(true)
-	defer m.unlock(true)
+func (m *Map[K, V]) GetRandom(pid int) (key K, value V, ok bool) {
+	m.lock(true, pid)
+	defer m.unlock(true, pid)
 
 	ok = false
 	if size := m.Size(); size > 0 {
@@ -120,17 +122,17 @@ func (m *Map[K, V]) GetRandom() (key K, value V, ok bool) {
 }
 
 // Delete key/value pair from map.
-func (m *Map[K, V]) Delete(key K) {
-	m.lock(false)
-	defer m.unlock(false)
+func (m *Map[K, V]) Delete(key K, pid int) {
+	m.lock(false, pid)
+	defer m.unlock(false, pid)
 	delete(m.list, key)
 }
 
 //----------------------------------------------------------------------
 
 // lock with given mode (if not in processing function)
-func (m *Map[K, V]) lock(readonly bool) {
-	if !m.inProcess {
+func (m *Map[K, V]) lock(readonly bool, pid int) {
+	if _, ok := m.inProcess[pid]; !ok {
 		if readonly {
 			m.RLock()
 		} else {
@@ -140,8 +142,8 @@ func (m *Map[K, V]) lock(readonly bool) {
 }
 
 // lock with given mode (if not in processing function)
-func (m *Map[K, V]) unlock(readonly bool) {
-	if !m.inProcess {
+func (m *Map[K, V]) unlock(readonly bool, pid int) {
+	if _, ok := m.inProcess[pid]; !ok {
 		if readonly {
 			m.RUnlock()
 		} else {

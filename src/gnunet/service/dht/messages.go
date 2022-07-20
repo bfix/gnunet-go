@@ -46,6 +46,12 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 	}
 	logger.Printf(logger.INFO, "[%s] message received from %s: %s", label, sender, transport.Dump(msgIn, "json"))
 
+	// check for local message
+	if sender.Equals(m.core.PeerID()) {
+		logger.Printf(logger.WARN, "[%s] dropping local message received: %s", label, transport.Dump(msgIn, "json"))
+		return false
+	}
+
 	// process message
 	switch msg := msgIn.(type) {
 
@@ -76,7 +82,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		}
 		//----------------------------------------------------------
 		// check if sender is in peer filter (9.4.3.2)
-		if sender != nil && msg.PeerFilter.Contains(sender) {
+		if !msg.PeerFilter.Contains(sender) {
 			logger.Printf(logger.WARN, "[%s] sender not in peer filter", label)
 		}
 		// parse result filter
@@ -94,7 +100,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		//----------------------------------------------------------
 		// check if we need to respond (and how) (9.4.3.3)
 		addr := NewQueryAddress(msg.Query)
-		closest := m.rtable.IsClosestPeer(nil, addr, msg.PeerFilter)
+		closest := m.rtable.IsClosestPeer(nil, addr, msg.PeerFilter, 0)
 		demux := int(msg.Flags)&enums.DHT_RO_DEMULTIPLEX_EVERYWHERE != 0
 		approx := int(msg.Flags)&enums.DHT_RO_FIND_APPROXIMATE != 0
 		// actions
@@ -174,7 +180,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			numForward := m.rtable.ComputeOutDegree(msg.ReplLevel, msg.HopCount)
 			key := NewQueryAddress(query.Key())
 			for n := 0; n < numForward; n++ {
-				if p := m.rtable.SelectClosestPeer(key, pf); p != nil {
+				if p := m.rtable.SelectClosestPeer(key, pf, 0); p != nil {
 					// forward message to peer
 					logger.Printf(logger.INFO, "[%s] forward DHT get message to %s", label, p.String())
 					if err := back.Send(ctx, msgOut); err != nil {
@@ -228,7 +234,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		}
 		//--------------------------------------------------------------
 		// check if sender is in peer filter (9.3.2.5)
-		if sender != nil && !msg.PeerFilter.Contains(sender) {
+		if !msg.PeerFilter.Contains(sender) {
 			logger.Printf(logger.WARN, "[%s] Sender not in peer filter", label)
 		}
 		//--------------------------------------------------------------
@@ -276,6 +282,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		if !handled {
 			logger.Printf(logger.WARN, "[%s] DHT-P2P-RESULT not processed (no handler)", label)
 		}
+		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-RESULT message done", label)
 		return handled
 
 	case *message.DHTP2PHelloMsg:
