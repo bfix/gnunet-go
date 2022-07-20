@@ -21,6 +21,7 @@ package store
 import (
 	"database/sql"
 	_ "embed"
+	"gnunet/enums"
 	"gnunet/util"
 	"os"
 )
@@ -34,7 +35,7 @@ import (
 type FileMetadata struct {
 	key       []byte            // storage key
 	size      uint64            // size of file
-	btype     uint16            // block type
+	btype     enums.BlockType   // block type
 	stored    util.AbsoluteTime // time added to store
 	expires   util.AbsoluteTime // expiration time
 	lastUsed  util.AbsoluteTime // time last used
@@ -91,7 +92,7 @@ func (db *FileMetaDB) Store(md *FileMetadata) (err error) {
 }
 
 // Get block metadata from database
-func (db *FileMetaDB) Get(key []byte, btype uint16) (md *FileMetadata, err error) {
+func (db *FileMetaDB) Get(key []byte, btype enums.BlockType) (md *FileMetadata, err error) {
 	md = new(FileMetadata)
 	md.key = util.Clone(key)
 	md.btype = btype
@@ -110,13 +111,13 @@ func (db *FileMetaDB) Get(key []byte, btype uint16) (md *FileMetadata, err error
 }
 
 // Drop metadata for block from database
-func (db *FileMetaDB) Drop(key []byte, btype uint16) error {
+func (db *FileMetaDB) Drop(key []byte, btype enums.BlockType) error {
 	_, err := db.conn.Exec("delete from meta where qkey=? and btype=?", key, btype)
 	return err
 }
 
 // Used a block from store: increment usage count and lastUsed time.
-func (db *FileMetaDB) Used(key []byte, btype uint16) error {
+func (db *FileMetaDB) Used(key []byte, btype enums.BlockType) error {
 	_, err := db.conn.Exec("update meta set usedCount=usedCount+1,lastUsed=unixepoch() where qkey=? and btype=?", key, btype)
 	return err
 }

@@ -198,8 +198,8 @@ func (h *HelloBlock) finalize() (err error) {
 }
 
 // Return the block type
-func (h *HelloBlock) Type() uint16 {
-	return uint16(enums.BLOCK_TYPE_DHT_URL_HELLO)
+func (h *HelloBlock) Type() enums.BlockType {
+	return enums.BLOCK_TYPE_DHT_URL_HELLO
 }
 
 // Data returns the raw block data

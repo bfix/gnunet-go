@@ -39,10 +39,13 @@ type Query interface {
 	Key() *crypto.HashCode
 
 	// Type returns the requested block type
-	Type() uint16
+	Type() enums.BlockType
 
 	// Flags returns the query flags
 	Flags() uint16
+
+	// Params holds additional info for queries
+	Params() util.ParameterSet
 
 	// Verify the integrity of a retrieved block (optional). Override in
 	// custom query types to implement block-specific integrity checks
@@ -65,7 +68,7 @@ type Block interface {
 	Data() []byte
 
 	// Return the block type
-	Type() uint16
+	Type() enums.BlockType
 
 	// Expire returns the block expiration
 	Expire() util.AbsoluteTime
@@ -95,13 +98,13 @@ type GenericQuery struct {
 	key *crypto.HashCode
 
 	// block type requested
-	btype uint16
+	btype enums.BlockType
 
 	// query flags
 	flags uint16
 
 	// Params holds additional query parameters
-	Params util.ParameterSet
+	params util.ParameterSet
 }
 
 // Key interface method implementation
@@ -110,13 +113,18 @@ func (q *GenericQuery) Key() *crypto.HashCode {
 }
 
 // Type returns the requested block type
-func (q *GenericQuery) Type() uint16 {
+func (q *GenericQuery) Type() enums.BlockType {
 	return q.btype
 }
 
 // Flags returns the query flags
 func (q *GenericQuery) Flags() uint16 {
 	return q.flags
+}
+
+// Params holds additional info for queries
+func (q *GenericQuery) Params() util.ParameterSet {
+	return q.params
 }
 
 // Verify interface method implementation
@@ -140,9 +148,9 @@ func (q *GenericQuery) String() string {
 func NewGenericQuery(key []byte, btype enums.BlockType, flags uint16) *GenericQuery {
 	return &GenericQuery{
 		key:    crypto.NewHashCode(key),
-		btype:  uint16(btype),
+		btype:  btype,
 		flags:  flags,
-		Params: make(util.ParameterSet),
+		params: make(util.ParameterSet),
 	}
 }
 
@@ -151,7 +159,7 @@ func NewGenericQuery(key []byte, btype enums.BlockType, flags uint16) *GenericQu
 // GenericBlock is the block in simple binary representation
 type GenericBlock struct {
 	block  []byte            // block data
-	btype  uint16            // block type
+	btype  enums.BlockType   // block type
 	expire util.AbsoluteTime // expiration date
 }
 
@@ -161,7 +169,7 @@ func (b *GenericBlock) Data() []byte {
 }
 
 // Type returns the block type
-func (b *GenericBlock) Type() uint16 {
+func (b *GenericBlock) Type() enums.BlockType {
 	return b.btype
 }
 
@@ -186,7 +194,7 @@ func (b *GenericBlock) Verify() (bool, error) {
 func NewGenericBlock(buf []byte) *GenericBlock {
 	return &GenericBlock{
 		block:  util.Clone(buf),
-		btype:  uint16(enums.BLOCK_TYPE_ANY), // unknown block type
-		expire: util.AbsoluteTimeNever(),     // never expires
+		btype:  enums.BLOCK_TYPE_ANY,     // unknown block type
+		expire: util.AbsoluteTimeNever(), // never expires
 	}
 }
