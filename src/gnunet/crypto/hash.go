@@ -28,12 +28,17 @@ import (
 
 // HashCode is the result of a 512-bit hash function (SHA-512)
 type HashCode struct {
-	Bits []byte `size:"64"`
+	Bits []byte `size:"(Size))"`
 }
 
 // Equals tests if two hash results are equal.
 func (hc *HashCode) Equals(n *HashCode) bool {
 	return bytes.Equal(hc.Bits, n.Bits)
+}
+
+// Size of binary data
+func (hc *HashCode) Size() uint {
+	return 64
 }
 
 // Clone the hash code
@@ -47,12 +52,16 @@ func (hc *HashCode) String() string {
 }
 
 // NewHashCode creates a new (initialized) hash value
-func NewHashCode(buf []byte) *HashCode {
+func NewHashCode(data []byte) *HashCode {
 	hc := &HashCode{
 		Bits: make([]byte, 64),
 	}
-	if buf != nil {
-		util.CopyAlignedBlock(hc.Bits, buf)
+	if data != nil && len(data) > 0 {
+		if len(data) < 32 {
+			util.CopyAlignedBlock(hc.Bits, data)
+		} else {
+			copy(hc.Bits, data[:32])
+		}
 	}
 	return hc
 }
