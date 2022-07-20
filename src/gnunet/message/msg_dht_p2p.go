@@ -113,39 +113,39 @@ func (m *DHTP2PGetMsg) Update(pf *blocks.PeerFilter, rf blocks.ResultFilter, hop
 
 // DHTP2PPutMsg wire layout
 type DHTP2PPutMsg struct {
-	MsgSize     uint16              `order:"big"`     // total size of message
-	MsgType     uint16              `order:"big"`     // DHT_P2P_PUT (146)
-	BType       uint32              `order:"big"`     // block type
-	Flags       uint16              `order:"big"`     // processing flags
-	HopCount    uint16              `order:"big"`     // message hops
-	ReplLvl     uint16              `order:"big"`     // replication level
-	PathL       uint16              `order:"big"`     // path length
-	Expiration  util.AbsoluteTime   ``                // expiration date
-	PeerFilter  *blocks.PeerFilter  ``                // peer bloomfilter
-	Key         *crypto.HashCode    ``                // query key to block
-	TruncOrigin []byte              `size:"(PESize)"` // truncated origin (if TRUNCATED flag set)
-	PutPath     []*path.ElementWire `size:"PathL"`    // PUT path
-	LastSig     []byte              `size:"(PESize)"` // signature of last hop (if RECORD_ROUTE flag is set)
-	Block       []byte              `size:"*"`        // block data
+	MsgSize     uint16             `order:"big"`     // total size of message
+	MsgType     uint16             `order:"big"`     // DHT_P2P_PUT (146)
+	BType       uint32             `order:"big"`     // block type
+	Flags       uint16             `order:"big"`     // processing flags
+	HopCount    uint16             `order:"big"`     // message hops
+	ReplLvl     uint16             `order:"big"`     // replication level
+	PathL       uint16             `order:"big"`     // path length
+	Expiration  util.AbsoluteTime  ``                // expiration date
+	PeerFilter  *blocks.PeerFilter ``                // peer bloomfilter
+	Key         *crypto.HashCode   ``                // query key to block
+	TruncOrigin []byte             `size:"(PESize)"` // truncated origin (if TRUNCATED flag set)
+	PutPath     []*path.Frag       `size:"PathL"`    // PUT path
+	LastSig     []byte             `size:"(PESize)"` // signature of last hop (if RECORD_ROUTE flag is set)
+	Block       []byte             `size:"*"`        // block data
 }
 
 // NewDHTP2PPutMsg creates an empty new DHTP2PPutMsg
 func NewDHTP2PPutMsg() *DHTP2PPutMsg {
 	return &DHTP2PPutMsg{
-		MsgSize:     218,                          // total size without path and block data
-		MsgType:     DHT_P2P_PUT,                  // DHT_P2P_PUT (146)
-		BType:       0,                            // block type
-		Flags:       0,                            // processing flags
-		HopCount:    0,                            // message hops
-		ReplLvl:     0,                            // replication level
-		PathL:       0,                            // no PUT path
-		Expiration:  util.AbsoluteTimeNever(),     // expiration date
-		PeerFilter:  blocks.NewPeerFilter(),       // peer bloom filter
-		Key:         crypto.NewHashCode(nil),      // query key
-		TruncOrigin: nil,                          // no truncated path
-		PutPath:     make([]*path.ElementWire, 0), // empty PUT path
-		LastSig:     nil,                          // no signature from last hop
-		Block:       nil,                          // no block data
+		MsgSize:     218,                      // total size without path and block data
+		MsgType:     DHT_P2P_PUT,              // DHT_P2P_PUT (146)
+		BType:       0,                        // block type
+		Flags:       0,                        // processing flags
+		HopCount:    0,                        // message hops
+		ReplLvl:     0,                        // replication level
+		PathL:       0,                        // no PUT path
+		Expiration:  util.AbsoluteTimeNever(), // expiration date
+		PeerFilter:  blocks.NewPeerFilter(),   // peer bloom filter
+		Key:         crypto.NewHashCode(nil),  // query key
+		TruncOrigin: nil,                      // no truncated path
+		PutPath:     make([]*path.Frag, 0),    // empty PUT path
+		LastSig:     nil,                      // no signature from last hop
+		Block:       nil,                      // no block data
 	}
 }
 
@@ -154,23 +154,93 @@ func (m *DHTP2PPutMsg) PESize(field string) uint {
 	switch field {
 	case "Origin":
 		if m.Flags&enums.DHT_RO_TRUNCATED != 0 {
-			return 32
+			return util.NewPeerID(nil).Size()
 		}
 	case "LastSig":
 		if m.Flags&enums.DHT_RO_RECORD_ROUTE != 0 {
-			return 64
+			return util.NewPeerSignature(nil).Size()
 		}
 	}
 	return 0
 }
 
-// AddPutPath adds an element to the PUT path
-func (m *DHTP2PPutMsg) AppendPutPath(pe *path.Element) {
-	pew := pe.Wire()
-	m.PutPath = append(m.PutPath, pew)
-	m.PathL++
-	m.MsgSize += pew.Size()
+//----------------------------------------------------------------------
+// Path handling (get/set path in message)
+//----------------------------------------------------------------------
+
+// Path returns the current path from message
+func (m *DHTP2PPutMsg) Path() *path.Path {
+	// create a "real" path list from message data
+	pth := path.NewPath(crypto.Hash(m.Block), m.Expiration)
+	if m.Flags&enums.DHT_RO_RECORD_ROUTE == 0 {
+		// return empty path if recording is switched off
+		return pth
+	}
+	// reconstruct path entries from fragments
+	pred := util.NewPeerID(nil)
+	if m.Flags&enums.DHT_RO_TRUNCATED != 0 {
+		pred = util.NewPeerID(m.TruncOrigin)
+	}
+	// collect the fragments and reconstruct path
+	for _, f := range m.PutPath {
+		next := f.Successor
+		pe := &path.Entry{
+			Predecessor: pred,
+			Signature:   f.Signature,
+		}
+		pth.List = append(pth.List, pe)
+		pred = next
+	}
+	// reconstruct last hop
+	pe := &path.Entry{
+		Predecessor: pred,
+		Signature:   util.NewPeerSignature(m.LastSig),
+	}
+	pth.List = append(pth.List, pe)
+	return pth
 }
+
+// Set path in message; corrects the message size accordingly
+func (m *DHTP2PPutMsg) SetPath(p *path.Path) {
+	// compute old path size
+	var pes uint
+	if len(m.PutPath) > 0 {
+		pes = m.PutPath[0].Size()
+	}
+	oldSize := uint(len(m.PutPath))*pes + m.PESize("Origin") + m.PESize("LastSig")
+	// if no new path is defined,...
+	if p == nil || len(p.List) == 0 {
+		// ... remove existing path
+		m.TruncOrigin = nil
+		m.PutPath = nil
+		m.LastSig = nil
+		m.PathL = 0
+		m.Flags &^= enums.DHT_RO_TRUNCATED
+		m.MsgSize -= uint16(oldSize)
+		return
+	}
+	// adjust message size
+	m.MsgSize += uint16(p.Size() - oldSize)
+	m.PutPath = make([]*path.Frag, 0)
+	if p.Truncated {
+		m.TruncOrigin = p.List[0].Predecessor.Bytes()
+	} else {
+		m.TruncOrigin = nil
+	}
+	sig := p.List[0].Signature
+	for _, e := range p.List[1:] {
+		f := &path.Frag{
+			Signature: sig,
+			Successor: e.Predecessor,
+		}
+		m.PutPath = append(m.PutPath, f)
+		sig = f.Signature
+	}
+	m.LastSig = sig.Bytes()
+	m.PathL = uint16(len(p.List) - 1)
+}
+
+//----------------------------------------------------------------------
 
 // String returns a human-readable representation of the message.
 func (m *DHTP2PPutMsg) String() string {
@@ -190,19 +260,19 @@ func (m *DHTP2PPutMsg) Header() *Header {
 
 // DHTP2PResultMsg wire layout
 type DHTP2PResultMsg struct {
-	MsgSize  uint16              `order:"big"`     // total size of message
-	MsgType  uint16              `order:"big"`     // DHT_P2P_RESULT (148)
-	BType    uint32              `order:"big"`     // Block type of result
-	Reserved uint32              `order:"big"`     // Reserved for further use
-	PutPathL uint16              `order:"big"`     // size of PUTPATH field
-	GetPathL uint16              `order:"big"`     // size of GETPATH field
-	Expires  util.AbsoluteTime   ``                // expiration date
-	Query    *crypto.HashCode    ``                // Query key for block
-	Origin   []byte              `size:"(PESize)"` // truncated origin (if TRUNCATED flag set)
-	PutPath  []*path.ElementWire `size:"PutPathL"` // PUTPATH
-	GetPath  []*path.ElementWire `size:"GetPathL"` // GETPATH
-	LastSig  []byte              `size:"(PESize)"` // signature of last hop (if RECORD_ROUTE flag is set)
-	Block    []byte              `size:"*"`        // block data
+	MsgSize  uint16            `order:"big"`     // total size of message
+	MsgType  uint16            `order:"big"`     // DHT_P2P_RESULT (148)
+	BType    uint32            `order:"big"`     // Block type of result
+	Reserved uint32            `order:"big"`     // Reserved for further use
+	PutPathL uint16            `order:"big"`     // size of PUTPATH field
+	GetPathL uint16            `order:"big"`     // size of GETPATH field
+	Expires  util.AbsoluteTime ``                // expiration date
+	Query    *crypto.HashCode  ``                // Query key for block
+	Origin   []byte            `size:"(PESize)"` // truncated origin (if TRUNCATED flag set)
+	PutPath  []*path.Entry     `size:"PutPathL"` // PUTPATH
+	GetPath  []*path.Entry     `size:"GetPathL"` // GETPATH
+	LastSig  []byte            `size:"(PESize)"` // signature of last hop (if RECORD_ROUTE flag is set)
+	Block    []byte            `size:"*"`        // block data
 }
 
 // NewDHTP2PResultMsg creates a new empty DHTP2PResultMsg
