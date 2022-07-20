@@ -49,11 +49,6 @@ func WriteMessage(ctx context.Context, wrt io.WriteCloser, msg message.Message) 
 	if len(buf) != int(mh.MsgSize) {
 		return errors.New("WriteMessage: message size mismatch")
 	}
-	// watch dog for write operation
-	go func() {
-		<-ctx.Done()
-		wrt.Close()
-	}()
 	// perform write operation
 	var n int
 	if n, err = wrt.Write(buf); err != nil {
