@@ -23,6 +23,7 @@ import (
 	"errors"
 	"gnunet/config"
 	"gnunet/core"
+	"gnunet/crypto"
 	"gnunet/message"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
@@ -39,6 +40,26 @@ import (
 //======================================================================
 // "DHT" implementation
 //======================================================================
+
+//----------------------------------------------------------------------
+// Responder for local message handling
+//----------------------------------------------------------------------
+
+type LocalResponder struct {
+	ch chan blocks.Block // out-going channel for incoming blocks
+}
+
+func (lr *LocalResponder) Send(ctx context.Context, msg message.Message) error {
+	return nil
+}
+
+func (lr *LocalResponder) Receiver() string {
+	return "@"
+}
+
+func (lr *LocalResponder) Close() {
+	close(lr.ch)
+}
 
 //----------------------------------------------------------------------
 // Put and get blocks into/from a DHT.
@@ -83,10 +104,61 @@ func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Mod
 }
 
 //----------------------------------------------------------------------
+// DHT methods for local use
+//----------------------------------------------------------------------
 
-// Get a block from the DHT ["dht:get"]
-func (m *Module) Get(ctx context.Context, query blocks.Query) (block blocks.Block, err error) {
-	return m.store.Get(query)
+// Get blocks from the DHT ["dht:get"]
+// Locally request blocks for a given query. The res channel will deliver the
+// returned results to the caller; the channel is closed if no further blocks
+// are expected or the query times out.
+func (m *Module) Get(ctx context.Context, query blocks.Query) (res chan blocks.Block) {
+	// get the block handler for given block type to construct an empty
+	// result filter. If no handler is defined, a default PassResultFilter
+	// is created.
+	var rf blocks.ResultFilter = new(blocks.PassResultFilter)
+	blockHdlr, ok := blocks.BlockHandlers[query.Type()]
+	if ok {
+		// create result filter
+		rf = blockHdlr.SetupResultFilter(128, util.RndUInt32())
+	} else {
+		logger.Println(logger.WARN, "[dht] unknown result filter implementation -- skipped")
+	}
+	// get additional query parameters
+	xquery, ok := util.GetParam[[]byte](query.Params(), "xquery")
+
+	// assemble a new GET message
+	msg := message.NewDHTP2PGetMsg()
+	msg.BType = uint32(query.Type())
+	msg.Flags = query.Flags()
+	msg.HopCount = 0
+	msg.ReplLevel = 10
+	msg.PeerFilter = blocks.NewPeerFilter()
+	msg.ResFilter = rf.Bytes()
+	msg.RfSize = uint16(len(msg.ResFilter))
+	msg.XQuery = xquery
+	msg.MsgSize += msg.RfSize + uint16(len(xquery))
+
+	// compose a response channel and handler
+	res = make(chan blocks.Block)
+	hdlr := &LocalResponder{
+		ch: res,
+	}
+	// time-out handling
+	ttl, ok := util.GetParam[time.Duration](query.Params(), "timeout")
+	if !ok {
+		// defaults to 10 minutes
+		ttl = 600 * time.Second
+	}
+	lctx, cancel := context.WithTimeout(ctx, ttl)
+
+	// send message
+	go m.HandleMessage(lctx, nil, msg, hdlr)
+	go func() {
+		<-lctx.Done()
+		hdlr.Close()
+		cancel()
+	}()
+	return res
 }
 
 // GetApprox returns the first block not excluded ["dht:getapprox"]
@@ -98,10 +170,35 @@ func (m *Module) GetApprox(ctx context.Context, query blocks.Query, excl func(bl
 }
 
 // Put a block into the DHT ["dht:put"]
-func (m *Module) Put(ctx context.Context, key blocks.Query, block blocks.Block) error {
-	return m.store.Put(key, block)
+func (m *Module) Put(ctx context.Context, query blocks.Query, block blocks.Block) error {
+	// get additional query parameters
+	expire, ok := util.GetParam[util.AbsoluteTime](query.Params(), "expire")
+	if !ok {
+		expire = util.AbsoluteTimeNever()
+	}
+	// assemble a new PUT message
+	msg := message.NewDHTP2PPutMsg()
+	msg.BType = uint32(query.Type())
+	msg.Flags = query.Flags()
+	msg.HopCount = 0
+	msg.PeerFilter = blocks.NewPeerFilter()
+	msg.ReplLvl = 10
+	msg.Expiration = expire
+	msg.Block = block.Data()
+	msg.Key = query.Key().Clone()
+	msg.TruncOrigin = nil
+	msg.PutPath = nil
+	msg.LastSig = nil
+	msg.MsgSize += uint16(len(msg.Block))
+
+	// send message
+	go m.HandleMessage(ctx, nil, msg, nil)
+
+	return nil
 }
 
+//----------------------------------------------------------------------
+// Event handling
 //----------------------------------------------------------------------
 
 // Filter returns the event filter for the module
@@ -158,6 +255,7 @@ func (m *Module) event(ctx context.Context, ev *core.Event) {
 	}
 }
 
+//----------------------------------------------------------------------
 // Heartbeat handler for periodic tasks
 func (m *Module) heartbeat(ctx context.Context) {
 	// run heartbeat for routing table
@@ -166,6 +264,10 @@ func (m *Module) heartbeat(ctx context.Context) {
 	// clean-up task list
 	m.reshdlrs.Cleanup()
 }
+
+//----------------------------------------------------------------------
+// HELLO handling
+//----------------------------------------------------------------------
 
 // Send the currently active HELLO to given network address
 func (m *Module) SendHello(ctx context.Context, addr *util.Address) (err error) {
@@ -222,6 +324,63 @@ func (m *Module) getHello() (msg *message.DHTP2PHelloMsg, err error) {
 	}
 	// we have a valid HELLO for re-use.
 	return m.lastHello, nil
+}
+
+//----------------------------------------------------------------------
+// Path handling
+//----------------------------------------------------------------------
+
+// Verify path: if 'truncOrigin' is not nil, the path was truncated on the left.
+// Returns the position of the first invalid signature (from right) or -1 if the
+// whole path is verified OK.
+//
+// The following synatx is used:
+//     Pi              // peer id of i.th peer (hop)
+//     Si = sig(D,Pi)  // signature over D=(...|Pi-1|Pi+1) with privkey Pi
+//     ver(D,Si,Pi)    // verify Si over data D with pubkey Pi
+//
+// A path is composed of three elements:
+//   (1) TO: peer id of truncated origin (iff truncated)
+//   (2) PP: A list of path elements [ (P1,S2), (P2,S3), (P3,S4), ... ]
+//           path element = struct { predecessor, signature }
+//   (3) LS: Last hop signature
+//
+// The path is processed from right to left (decreasing index) using the
+// following procedure on a peer:
+//
+//     vk := peer id of message sender
+//     succ := local peer id
+//     for n := len(PP)-1; n > 0; n-- {
+//         pred := PP[n].predecessor
+//         if !verify(...|pred|succ, PP[n].signature, vk)
+//             return n
+//         succ = vk
+//         vk = pred
+//     }
+//     return -1
+//
+func (m *Module) verifyPath(
+	sender, truncOrigin *util.PeerID,
+	path []*message.PathElementWire,
+	lastSig *util.PeerSignature,
+	bh *crypto.HashCode,
+	expire util.AbsoluteTime,
+) int {
+
+	vk := sender
+	succ := m.core.PeerID()
+	for i := len(path) - 1; i > 0; i-- {
+		peWire := path[i]
+		pred := peWire.Predecessor
+		pe := message.NewPathElement(bh, pred, succ, expire)
+		ok, err := pred.Verify(pe.SignedData(), peWire.Signature)
+		if err != nil || !ok {
+			return i
+		}
+		succ = vk
+		vk = pred
+	}
+	return -1
 }
 
 //----------------------------------------------------------------------
