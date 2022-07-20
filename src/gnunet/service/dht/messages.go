@@ -44,7 +44,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			label = "dht-" + s
 		}
 	}
-	logger.Printf(logger.INFO, "[%s] message received from %s", label, sender)
+	logger.Printf(logger.INFO, "[%s] message received from %s: %s", label, sender, transport.Dump(msgIn, "json"))
 
 	// process message
 	switch msg := msgIn.(type) {
@@ -105,7 +105,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 
 		//------------------------------------------------------
 		// query for a HELLO? (9.4.3.3a)
-		if msg.BType == uint32(enums.BLOCK_TYPE_DHT_URL_HELLO) {
+		if btype == enums.BLOCK_TYPE_DHT_URL_HELLO {
 			logger.Println(logger.DBG, "[dht] GET message for HELLO: check cache")
 			// find best cached HELLO
 			block, dist = m.rtable.BestHello(addr, rf)
@@ -183,7 +183,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 					pf.Add(p.Peer)
 					// create open get-forward result handler
 					rh := NewForwardResultHandler(msg, rf, back)
-					logger.Printf(logger.INFO, "[%s] DHT-P2P-GET task #%d started", label, rh.ID())
+					logger.Printf(logger.INFO, "[%s] DHT-P2P-GET task #%d (%s) started", label, rh.ID(), rh.Key())
 					m.reshdlrs.Add(rh)
 				} else {
 					break
@@ -262,12 +262,14 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 
 		// check task list for handler
 		key := msg.Query.String()
+		logger.Printf(logger.DBG, "[%s] DHT-P2P-RESULT key = %s", label, key)
 		handled := false
 		if list, ok := m.reshdlrs.Get(key); ok {
 			for _, rh := range list {
 				logger.Printf(logger.DBG, "[%s] Task #%d for DHT-P2P-RESULT found", label, rh.ID())
 				//  handle the message
 				go rh.Handle(ctx, msg)
+				handled = true
 			}
 			return true
 		}
