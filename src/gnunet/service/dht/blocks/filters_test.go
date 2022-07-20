@@ -21,6 +21,8 @@ package blocks
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/base64"
+	"gnunet/util"
 	"sort"
 	"testing"
 )
@@ -107,4 +109,26 @@ func TestBloomfilter(t *testing.T) {
 	if count > 0 {
 		t.Logf("FAILED with %d false-positives", count)
 	}
+}
+
+func TestBFCase1(t *testing.T) {
+	senderS := "83JF73PZ69ZFVCHH9VDEGY673EH4H3B4Y4XRV8XB3PQHP8SFN220"
+	pfS := "AAAAABAACAAQAAAAACAAgAAAAIAAAACAAAAAAAAABAAQAAAADAAAAABA" +
+		"AAAAAAAAAAAQAAAAAAAAAAAACAAIAAAAAACAAABAAAAAAIgEAAAABAAACAAAAA" +
+		"EAAAAAAAAAAEABAAAAAAAAFIAAEAAAAAAAAAAAAABAAIAAAAAAAAA="
+
+	// decode sender
+	buf, err := util.DecodeStringToBinary(senderS, 32)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sender := util.NewPeerID(buf)
+
+	// decode peer filter
+	if buf, err = base64.StdEncoding.DecodeString(pfS); err != nil {
+		t.Fatal(err)
+	}
+	pf := NewPeerFilterFromBytes(buf)
+	rc := pf.Contains(sender)
+	t.Logf("contains? %v", rc)
 }

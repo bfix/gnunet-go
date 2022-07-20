@@ -43,6 +43,13 @@ func NewPeerFilter() *PeerFilter {
 	}
 }
 
+// NewPeerFilterFromBytes creates a peer filter from data.
+func NewPeerFilterFromBytes(data []byte) *PeerFilter {
+	return &PeerFilter{
+		BF: NewBloomFilterFromBytes(data),
+	}
+}
+
 // Add peer id to the filter
 func (pf *PeerFilter) Add(p *util.PeerID) {
 	pf.BF.Add(p.Data)
@@ -166,6 +173,15 @@ type BloomFilter struct {
 func NewBloomFilter(n int) *BloomFilter {
 	return &BloomFilter{
 		Bits:   make([]byte, n),
+		mInput: nil,
+		mData:  nil,
+	}
+}
+
+// NewBloomFilterFromBytes creates a new filter from data
+func NewBloomFilterFromBytes(data []byte) *BloomFilter {
+	return &BloomFilter{
+		Bits:   util.Clone(data),
 		mInput: nil,
 		mData:  nil,
 	}
