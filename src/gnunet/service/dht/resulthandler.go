@@ -119,10 +119,11 @@ func (t *GenericResultHandler) Done() bool {
 
 // Compare two handlers
 func (t *GenericResultHandler) Compare(h *GenericResultHandler) int {
-	if t.key.Equals(h.key) ||
+	if !t.key.Equals(h.key) ||
 		t.btype != h.btype ||
 		t.flags != h.flags ||
 		!bytes.Equal(t.xQuery, h.xQuery) {
+		logger.Printf(logger.DBG, "[grh] base fields differ")
 		return RHC_DIFFER
 	}
 	return t.resFilter.Compare(h.resFilter)
@@ -131,6 +132,16 @@ func (t *GenericResultHandler) Compare(h *GenericResultHandler) int {
 // Merge two result handlers that are the same except for result filter
 func (t *GenericResultHandler) Merge(a *GenericResultHandler) bool {
 	return t.resFilter.Merge(a.resFilter)
+}
+
+// Proceed return true if the message is to be processed in derived implementations
+func (t *GenericResultHandler) Proceed(ctx context.Context, msg *message.DHTP2PResultMsg) bool {
+	block := blocks.NewGenericBlock(msg.Block)
+	if !t.resFilter.Contains(block) {
+		t.resFilter.Add(block)
+		return true
+	}
+	return false
 }
 
 //----------------------------------------------------------------------
@@ -159,6 +170,11 @@ func NewForwardResultHandler(msgIn message.Message, rf blocks.ResultFilter, back
 
 // Handle incoming DHT-P2P-RESULT message
 func (t *ForwardResultHandler) Handle(ctx context.Context, msg *message.DHTP2PResultMsg) bool {
+	// don't send result if it is filtered out
+	if !t.Proceed(ctx, msg) {
+		logger.Printf(logger.DBG, "[dht-task-%d] result filtered out -- already known", t.id)
+		return false
+	}
 	// send result message back to originator (result forwarding).
 	logger.Printf(logger.INFO, "[dht-task-%d] sending result back to originator", t.id)
 	if err := t.resp.Send(ctx, msg); err != nil && err != transport.ErrEndpMaybeSent {
@@ -173,10 +189,12 @@ func (t *ForwardResultHandler) Compare(h ResultHandler) int {
 	// check for correct handler type
 	ht, ok := h.(*ForwardResultHandler)
 	if !ok {
+		logger.Println(logger.DBG, "[frh] can't compare apples with oranges")
 		return RHC_DIFFER
 	}
 	// check for same recipient
 	if ht.resp.Receiver() != t.resp.Receiver() {
+		logger.Printf(logger.DBG, "[frh] recipients differ: %s -- %s", ht.resp.Receiver(), t.resp.Receiver())
 		return RHC_DIFFER
 	}
 	// check generic handler data
@@ -238,6 +256,11 @@ func NewDirectResultHandler(msgIn message.Message, rf blocks.ResultFilter, hdlr 
 
 // Handle incoming DHT-P2P-RESULT message
 func (t *DirectResultHandler) Handle(ctx context.Context, msg *message.DHTP2PResultMsg) bool {
+	// don't send result if it is filtered out
+	if !t.Proceed(ctx, msg) {
+		logger.Printf(logger.DBG, "[dht-task-%d] result filtered out -- already known", t.id)
+		return false
+	}
 	// check for correct message type and handler function
 	if t.hdlr != nil {
 		logger.Printf(logger.INFO, "[dht-task-%d] handling result message", t.id)
@@ -300,18 +323,23 @@ func (t *ResultHandlerList) Add(hdlr ResultHandler) bool {
 			switch h.Compare(hdlr) {
 			case RHC_SAME:
 				// already in list; no need to add again
+				logger.Println(logger.DBG, "[rhl] SAME")
 				return false
 			case RHC_MERGE:
 				// merge the two result handlers
+				oldMod := modified
 				modified = h.Merge(hdlr) || modified
+				logger.Printf(logger.DBG, "[rhl] MERGE (%v -- %v)", oldMod, modified)
 				break loop
 			case RHC_SIBL:
 				// replace the old handler with the new one
+				logger.Println(logger.DBG, "[rhl] SIBL: replacing entry")
 				list[i] = hdlr
 				modified = true
 				break loop
 			case RHC_DIFFER:
 				// try next
+				logger.Println(logger.DBG, "[rhl] DIFFER")
 			}
 		}
 	}
