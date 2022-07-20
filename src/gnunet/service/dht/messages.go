@@ -24,6 +24,7 @@ import (
 	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service/dht/blocks"
+	"gnunet/service/dht/path"
 	"gnunet/transport"
 	"gnunet/util"
 
@@ -253,7 +254,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			if recordPath {
 				ls = util.NewPeerSignature(msg.LastSig)
 			}
-			idx := m.verifyPath(sender, to, msg.PutPath, ls, bh, expire)
+			idx := path.Verify(sender, m.core.PeerID(), to, msg.PutPath, ls, bh, expire)
 			if idx != -1 {
 				// truncate path
 			}
