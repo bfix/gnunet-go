@@ -19,6 +19,7 @@
 package path
 
 import (
+	"errors"
 	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/util"
@@ -27,6 +28,12 @@ import (
 	"github.com/bfix/gospel/logger"
 )
 
+// Error values
+var (
+	ErrPathNoSig = errors.New("missing signature for path element verification")
+)
+
+//----------------------------------------------------------------------
 // shared path element data across types
 type elementData struct {
 	Expiration      util.AbsoluteTime // expiration date
@@ -42,6 +49,7 @@ type elementSignedData struct {
 	Elem    *elementData ``            // path element data
 }
 
+//----------------------------------------------------------------------
 // Element is the full-fledged data assembly for a path element in
 // PUT/GET pathes. It is assembled programatically (on generation[1] and
 // verification[2]) and not transferred in messages directly.
@@ -71,17 +79,6 @@ func NewElement(bh *crypto.HashCode, pred, succ *util.PeerID, expire util.Absolu
 	}
 }
 
-// ElementWire is the data stored and retrieved from messages
-type ElementWire struct {
-	Predecessor *util.PeerID        // peer id of predecessor
-	Signature   *util.PeerSignature // path signature
-}
-
-// Size returns the size of a path element in wire format
-func (pew *ElementWire) Size() uint16 {
-	return 96
-}
-
 // SignedData gets the data to be signed by peer ('Signable' interface)
 func (pe *Element) SignedData() []byte {
 	sd := &elementSignedData{
@@ -104,9 +101,45 @@ func (pe *Element) SetSignature(sig *util.PeerSignature) error {
 }
 
 // Wire returns the path element suitable for inclusion into messages
-func (pe *Element) Wire() *ElementWire {
-	return &ElementWire{
+func (pe *Element) Wire() *Entry {
+	return &Entry{
 		Predecessor: pe.PeerPredecessor,
 		Signature:   pe.Signature,
 	}
+}
+
+// Verify signature for a path element. If the signature argument
+// is zero, use the signature store with the element
+func (pe *Element) Verify(sig *util.PeerSignature) (bool, error) {
+	if sig == nil {
+		sig = pe.Signature
+		if sig == nil {
+			return false, ErrPathNoSig
+		}
+	}
+	return pe.PeerPredecessor.Verify(pe.SignedData(), sig)
+}
+
+//----------------------------------------------------------------------
+// Entry is an element of the path list
+type Entry struct {
+	Predecessor *util.PeerID        // peer id of predecessor
+	Signature   *util.PeerSignature // path signature
+}
+
+// Size returns the size of a path element in wire format
+func (pew *Entry) Size() uint {
+	return util.NewPeerID(nil).Size() + util.NewPeerSignature(nil).Size()
+}
+
+// Frag is a list element for path as stored in messages
+// A "real" path
+type Frag struct {
+	Signature *util.PeerSignature // path signature
+	Successor *util.PeerID        // peer id of successor
+}
+
+// Size returns the size of a path element in wire format
+func (f *Frag) Size() uint {
+	return 96
 }

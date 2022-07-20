@@ -20,11 +20,9 @@ package dht
 
 import (
 	"context"
-	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service/dht/blocks"
-	"gnunet/service/dht/path"
 	"gnunet/transport"
 	"gnunet/util"
 
@@ -235,30 +233,11 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		}
 		//--------------------------------------------------------------
 		// verify PUT path (9.3.2.7)
-		recordPath := (msg.Flags&enums.DHT_RO_RECORD_ROUTE != 0)
-		truncated := (msg.Flags&enums.DHT_RO_TRUNCATED != 0)
-		if msg.PathL > 0 {
-			// check record-route flag
-			if !recordPath {
-				logger.Printf(logger.WARN, "[%s] PutPath NOT empty but recording flag NOT set", label)
-			}
-			// block hash and expiration
-			bh := crypto.Hash(msg.Block)
-			expire := msg.Expiration
-			var to *util.PeerID
-			// truncated origin and last hop signature
-			if truncated {
-				to = util.NewPeerID(msg.TruncOrigin)
-			}
-			var ls *util.PeerSignature
-			if recordPath {
-				ls = util.NewPeerSignature(msg.LastSig)
-			}
-			idx := path.Verify(sender, m.core.PeerID(), to, msg.PutPath, ls, bh, expire)
-			if idx != -1 {
-				// truncate path
-			}
-
+		// pp :=
+		_, trunc := msg.Path().Verify(sender, m.core.PeerID())
+		if trunc != -1 {
+			// we need to truncate the path
+			logger.Printf(logger.WARN, "[%s] Truncating path (invalid signature at hop %d)", trunc)
 		}
 
 		//--------------------------------------------------------------
