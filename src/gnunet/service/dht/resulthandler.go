@@ -67,10 +67,10 @@ type ResultHandler interface {
 // Compare return values
 //nolint:stylecheck // allow non-camel-case in constants
 const (
-	RHC_SAME   = blocks.CMP_SAME   // the two result handlers are the same
-	RHC_MERGE  = blocks.CMP_MERGE  // the two result handlers can be merged
-	RHC_DIFFER = blocks.CMP_DIFFER // the two result handlers are different
-	RHC_SIBL   = blocks.CMP_1      // the two result handlers are siblings
+	RHC_SAME    = blocks.CMP_SAME   // the two result handlers are the same
+	RHC_MERGE   = blocks.CMP_MERGE  // the two result handlers can be merged
+	RHC_DIFFER  = blocks.CMP_DIFFER // the two result handlers are different
+	RHC_REPLACE = blocks.CMP_1      // the two result handlers are siblings
 )
 
 //----------------------------------------------------------------------
@@ -119,6 +119,7 @@ func (t *GenericResultHandler) Done() bool {
 
 // Compare two handlers
 func (t *GenericResultHandler) Compare(h *GenericResultHandler) int {
+	// check if base attributes differ
 	if !t.key.Equals(h.key) ||
 		t.btype != h.btype ||
 		t.flags != h.flags ||
@@ -126,7 +127,13 @@ func (t *GenericResultHandler) Compare(h *GenericResultHandler) int {
 		logger.Printf(logger.DBG, "[grh] base fields differ")
 		return RHC_DIFFER
 	}
-	return t.resFilter.Compare(h.resFilter)
+	// compare result filters; if they are different, replace
+	// the old filter with the new one
+	rc := t.resFilter.Compare(h.resFilter)
+	if rc == RHC_DIFFER {
+		rc = RHC_REPLACE
+	}
+	return rc
 }
 
 // Merge two result handlers that are the same except for result filter
@@ -331,9 +338,9 @@ func (t *ResultHandlerList) Add(hdlr ResultHandler) bool {
 				modified = h.Merge(hdlr) || modified
 				logger.Printf(logger.DBG, "[rhl] MERGE (%v -- %v)", oldMod, modified)
 				break loop
-			case RHC_SIBL:
+			case RHC_REPLACE:
 				// replace the old handler with the new one
-				logger.Println(logger.DBG, "[rhl] SIBL: replacing entry")
+				logger.Println(logger.DBG, "[rhl] REPLACE")
 				list[i] = hdlr
 				modified = true
 				break loop
