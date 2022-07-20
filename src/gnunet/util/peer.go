@@ -30,7 +30,7 @@ import (
 
 // PeerPublicKey is the binary representation of an Ed25519 public key
 type PeerPublicKey struct {
-	Data []byte `size:"32"` // Ed25519 public key data
+	Data []byte `size:"(Size)"` // Ed25519 public key data
 }
 
 // NewPeerPublicKey creates a key instance from binary data
@@ -38,7 +38,7 @@ func NewPeerPublicKey(data []byte) *PeerPublicKey {
 	pk := &PeerPublicKey{
 		Data: make([]byte, 32),
 	}
-	if data != nil {
+	if data != nil && len(data) > 0 {
 		if len(data) < 32 {
 			CopyAlignedBlock(pk.Data, data)
 		} else {
@@ -46,6 +46,11 @@ func NewPeerPublicKey(data []byte) *PeerPublicKey {
 		}
 	}
 	return pk
+}
+
+// Size returns the length of the binary data
+func (pk *PeerPublicKey) Size() uint {
+	return 32
 }
 
 // Verify peer signature
@@ -93,18 +98,31 @@ func (p *PeerID) Bytes() []byte {
 
 // PeerSignature is a EdDSA signature from the peer
 type PeerSignature struct {
-	Data []byte `size:"64"`
+	Data []byte `size:"(Size)"`
 }
 
 // NewPeerSignature is a EdDSA signatre with the private peer key
 func NewPeerSignature(data []byte) *PeerSignature {
-	var v []byte
-	if data == nil {
-		v = make([]byte, 64)
-	} else {
-		v = Clone(data)
+	s := new(PeerSignature)
+	size := s.Size()
+	v := make([]byte, size)
+	if data != nil && len(data) > 0 {
+		if uint(len(data)) < size {
+			CopyAlignedBlock(v, data)
+		} else {
+			copy(v, data[:size])
+		}
 	}
-	return &PeerSignature{
-		Data: v,
-	}
+	s.Data = v
+	return s
+}
+
+// Size returns the length of the binary data
+func (s *PeerSignature) Size() uint {
+	return 64
+}
+
+// Bytes returns the binary representation of a peer signature.
+func (s *PeerSignature) Bytes() []byte {
+	return Clone(s.Data)
 }
