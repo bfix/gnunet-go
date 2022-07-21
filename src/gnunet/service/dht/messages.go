@@ -267,12 +267,9 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		}
 		//--------------------------------------------------------------
 		// verify PUT path (9.3.2.7)
-		// pp :=
-		_, trunc := msg.Path().Verify(sender, m.core.PeerID())
-		if trunc != -1 {
-			// we need to truncate the path
-			logger.Printf(logger.WARN, "[%s] Truncating path (invalid signature at hop %d)", trunc)
-		}
+		// 'pp' will be used as path in forwarded messages
+		pp := msg.Path()
+		pp.Verify(sender, m.core.PeerID())
 
 		//--------------------------------------------------------------
 		// check if route is recorded (9.3.2.6)
