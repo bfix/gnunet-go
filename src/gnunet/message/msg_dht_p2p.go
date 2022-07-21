@@ -124,7 +124,7 @@ type DHTP2PPutMsg struct {
 	PeerFilter  *blocks.PeerFilter ``                // peer bloomfilter
 	Key         *crypto.HashCode   ``                // query key to block
 	TruncOrigin []byte             `size:"(PESize)"` // truncated origin (if TRUNCATED flag set)
-	PutPath     []*path.Frag       `size:"PathL"`    // PUT path
+	PutPath     []*path.Entry      `size:"PathL"`    // PUT path
 	LastSig     []byte             `size:"(PESize)"` // signature of last hop (if RECORD_ROUTE flag is set)
 	Block       []byte             `size:"*"`        // block data
 }
@@ -143,7 +143,7 @@ func NewDHTP2PPutMsg() *DHTP2PPutMsg {
 		PeerFilter:  blocks.NewPeerFilter(),   // peer bloom filter
 		Key:         crypto.NewHashCode(nil),  // query key
 		TruncOrigin: nil,                      // no truncated path
-		PutPath:     make([]*path.Frag, 0),    // empty PUT path
+		PutPath:     make([]*path.Entry, 0),   // empty PUT path
 		LastSig:     nil,                      // no signature from last hop
 		Block:       nil,                      // no block data
 	}
@@ -172,36 +172,41 @@ func (m *DHTP2PPutMsg) PESize(field string) uint {
 func (m *DHTP2PPutMsg) Path() *path.Path {
 	// create a "real" path list from message data
 	pth := path.NewPath(crypto.Hash(m.Block), m.Expiration)
+
+	// return empty path if recording is switched off
 	if m.Flags&enums.DHT_RO_RECORD_ROUTE == 0 {
-		// return empty path if recording is switched off
 		return pth
 	}
-	// reconstruct path entries from fragments
-	pred := util.NewPeerID(nil)
-	if m.Flags&enums.DHT_RO_TRUNCATED != 0 {
-		pred = util.NewPeerID(m.TruncOrigin)
-	}
-	// collect the fragments and reconstruct path
-	for _, f := range m.PutPath {
-		next := f.Successor
-		pe := &path.Entry{
-			Predecessor: pred,
-			Signature:   f.Signature,
+
+	// handle truncate origin
+	if m.Flags&enums.DHT_RO_TRUNCATED == 1 {
+		if m.TruncOrigin == nil || len(m.TruncOrigin) == 0 {
+			logger.Printf(logger.WARN, "[path] truncated but no origin - flag reset")
+			m.Flags &^= enums.DHT_RO_TRUNCATED
+		} else {
+			pth.TruncOrigin = util.NewPeerID(m.TruncOrigin)
 		}
-		pth.List = append(pth.List, pe)
-		pred = next
 	}
-	// reconstruct last hop
-	pe := &path.Entry{
-		Predecessor: pred,
-		Signature:   util.NewPeerSignature(m.LastSig),
+
+	// copy path elements
+	pth.List = util.Clone(m.PutPath)
+
+	// handle last hop signature
+	if m.LastSig == nil || len(m.LastSig) == 0 {
+		logger.Printf(logger.WARN, "[path]  - last hop signature missing - path reset")
+		return path.NewPath(crypto.Hash(m.Block), m.Expiration)
 	}
-	pth.List = append(pth.List, pe)
+	pth.LastSig = util.NewPeerSignature(m.LastSig)
 	return pth
 }
 
 // Set path in message; corrects the message size accordingly
 func (m *DHTP2PPutMsg) SetPath(p *path.Path) {
+
+	// return if recording is switched off (don't touch path)
+	if m.Flags&enums.DHT_RO_RECORD_ROUTE == 0 {
+		return
+	}
 	// compute old path size
 	var pes uint
 	if len(m.PutPath) > 0 {
@@ -209,7 +214,7 @@ func (m *DHTP2PPutMsg) SetPath(p *path.Path) {
 	}
 	oldSize := uint(len(m.PutPath))*pes + m.PESize("Origin") + m.PESize("LastSig")
 	// if no new path is defined,...
-	if p == nil || len(p.List) == 0 {
+	if p == nil {
 		// ... remove existing path
 		m.TruncOrigin = nil
 		m.PutPath = nil
@@ -221,23 +226,18 @@ func (m *DHTP2PPutMsg) SetPath(p *path.Path) {
 	}
 	// adjust message size
 	m.MsgSize += uint16(p.Size() - oldSize)
-	m.PutPath = make([]*path.Frag, 0)
-	if p.Truncated {
-		m.TruncOrigin = p.List[0].Predecessor.Bytes()
-	} else {
-		m.TruncOrigin = nil
+
+	// transfer path data
+	if p.TruncOrigin != nil {
+		// truncated path
+		m.Flags |= enums.DHT_RO_TRUNCATED
+		m.TruncOrigin = p.TruncOrigin.Bytes()
 	}
-	sig := p.List[0].Signature
-	for _, e := range p.List[1:] {
-		f := &path.Frag{
-			Signature: sig,
-			Successor: e.Predecessor,
-		}
-		m.PutPath = append(m.PutPath, f)
-		sig = f.Signature
+	m.PutPath = util.Clone(p.List)
+	m.PathL = uint16(len(m.PutPath))
+	if p.LastSig != nil {
+		m.LastSig = p.LastSig.Bytes()
 	}
-	m.LastSig = sig.Bytes()
-	m.PathL = uint16(len(p.List) - 1)
 }
 
 //----------------------------------------------------------------------
