@@ -133,9 +133,17 @@ func (p *Path) Verify(sender, local *util.PeerID) {
 		sig := p.LastSig
 		succ := local
 		num := len(p.List)
-		for i := num - 1; i > 0; i-- {
-			peWire := p.List[i]
-			pred := peWire.Signer
+		var pred *util.PeerID
+		for i := num - 1; i >= 0; i-- {
+			if i == -1 {
+				if p.TruncOrigin != nil {
+					pred = p.TruncOrigin
+				} else {
+					pred = util.NewPeerID(nil)
+				}
+			} else {
+				pred = p.List[i].Signer
+			}
 			pe := p.NewElement(pred, signer, succ)
 			ok, err := pe.Verify(sig)
 			if err != nil || !ok {
@@ -163,7 +171,9 @@ func (p *Path) Verify(sender, local *util.PeerID) {
 			// check next path element
 			succ = signer
 			signer = pred
-			sig = peWire.Signature
+			if i != -1 {
+				sig = p.List[i].Signature
+			}
 		}
 	}
 }
