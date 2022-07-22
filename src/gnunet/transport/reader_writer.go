@@ -39,12 +39,12 @@ func WriteMessage(ctx context.Context, wrt io.WriteCloser, msg message.Message) 
 	// convert message to binary data
 	var buf []byte
 	if buf, err = data.Marshal(msg); err != nil {
-		return err
+		return
 	}
 	// check message header size and packet size
 	mh, err := message.GetMsgHeader(buf)
 	if err != nil {
-		return err
+		return
 	}
 	if len(buf) != int(mh.MsgSize) {
 		return errors.New("WriteMessage: message size mismatch")
