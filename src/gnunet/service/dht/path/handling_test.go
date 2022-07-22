@@ -48,7 +48,7 @@ func sign(sd []byte, pk *ed25519.PrivateKey) (sig *util.PeerSignature, err error
 	return
 }
 
-func buildPath(n int) (pth *Path, sender, local *util.PeerID, err error) {
+func GenerateTestPath(n int) (pth *Path, local *util.PeerID, err error) {
 	// create hops
 	hops := make([]*hop, n)
 	for i := range hops {
@@ -69,7 +69,6 @@ func buildPath(n int) (pth *Path, sender, local *util.PeerID, err error) {
 		//fmt.Printf("[%d] %s\n", i, pth.String())
 		pred = hops[i].peerid
 	}
-	sender = hops[n-2].peerid
 	local = hops[n-1].peerid
 	return
 }
@@ -78,12 +77,12 @@ func TestPathSimple(t *testing.T) {
 
 	n := 10
 
-	pth, sender, local, err := buildPath(n)
+	pth, local, err := GenerateTestPath(n)
 	if err != nil {
 		t.Fatal(err)
 	}
 	ps1 := pth.String()
-	pth.Verify(sender, local)
+	pth.Verify(local)
 	ps2 := pth.String()
 	if ps1 != ps2 {
 		t.Fatal("path mismatch")
@@ -95,7 +94,7 @@ func TestPathBadElemSig(t *testing.T) {
 	n := 10
 
 	for f := 0; ; f++ {
-		pth, sender, local, err := buildPath(n)
+		pth, local, err := GenerateTestPath(n)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -104,9 +103,9 @@ func TestPathBadElemSig(t *testing.T) {
 		}
 		// invalidate signature
 		pth.List[f].Signature = util.NewPeerSignature(nil)
-		pth.Verify(sender, local)
+		pth.Verify(local)
 		ps3 := pth.String()
-		pth.Verify(sender, local)
+		pth.Verify(local)
 		ps4 := pth.String()
 		if ps3 != ps4 {
 			t.Fatal("truncated path mismatch")
@@ -118,18 +117,17 @@ func TestPathBadLastSig(t *testing.T) {
 
 	n := 10
 
-	pth, sender, local, err := buildPath(n)
+	pth, local, err := GenerateTestPath(n)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// invalidate signature
 	pth.LastSig = util.NewPeerSignature(nil)
-	pth.Verify(sender, local)
+	pth.Verify(local)
 	ps3 := pth.String()
-	pth.Verify(sender, local)
+	pth.Verify(local)
 	ps4 := pth.String()
 	if ps3 != ps4 {
 		t.Fatal("truncated path mismatch")
 	}
-	t.Log(ps3)
 }

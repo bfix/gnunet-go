@@ -169,7 +169,7 @@ func (m *DHTP2PPutMsg) PESize(field string) uint {
 //----------------------------------------------------------------------
 
 // Path returns the current path from message
-func (m *DHTP2PPutMsg) Path() *path.Path {
+func (m *DHTP2PPutMsg) Path(sender *util.PeerID) *path.Path {
 	// create a "real" path list from message data
 	pth := path.NewPath(crypto.Hash(m.Block), m.Expiration)
 
@@ -185,18 +185,22 @@ func (m *DHTP2PPutMsg) Path() *path.Path {
 			m.Flags &^= enums.DHT_RO_TRUNCATED
 		} else {
 			pth.TruncOrigin = util.NewPeerID(m.TruncOrigin)
+			pth.Flags |= path.PathTruncated
 		}
 	}
 
 	// copy path elements
 	pth.List = util.Clone(m.PutPath)
+	pth.NumList = uint16(len(pth.List))
 
 	// handle last hop signature
 	if m.LastSig == nil || len(m.LastSig) == 0 {
 		logger.Printf(logger.WARN, "[path]  - last hop signature missing - path reset")
 		return path.NewPath(crypto.Hash(m.Block), m.Expiration)
 	}
+	pth.Flags |= path.PathLastHop
 	pth.LastSig = util.NewPeerSignature(m.LastSig)
+	pth.LastHop = sender
 	return pth
 }
 

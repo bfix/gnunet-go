@@ -25,6 +25,7 @@ import (
 	"gnunet/crypto"
 	"gnunet/util"
 
+	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
 )
 
@@ -32,26 +33,60 @@ import (
 // Path handling
 //----------------------------------------------------------------------
 
+// path flags
+const (
+	PathTruncated = iota
+	PathLastHop
+)
+
 // Path is the complete list of verified hops a message travelled.
 // It also keeps the associated block hash and expiration time of
 // the request for signature verification purposes.
 type Path struct {
-	BlkHash     *crypto.HashCode    // block hash value
-	Expire      util.AbsoluteTime   // expiration time
-	TruncOrigin *util.PeerID        // truncated origin (optional)
-	List        []*Entry            // list of path entries
-	LastSig     *util.PeerSignature // last hop signature
+	Flags       uint32              `order:"big"`    // flags
+	BlkHash     *crypto.HashCode    ``               // block hash value
+	Expire      util.AbsoluteTime   ``               // expiration time
+	TruncOrigin *util.PeerID        `opt:"(IsUsed)"` // truncated origin (optional)
+	NumList     uint16              `order:"big"`    // number of list entries
+	List        []*Entry            `size:"NumList"` // list of path entries
+	LastSig     *util.PeerSignature `opt:"(Isused)"` // last hop signature
+	LastHop     *util.PeerID        `opt:"(IsUsed)"` // last hop peer id
+}
+
+// IsUsed checks if an optional field is used
+func (p *Path) IsUsed(field string) bool {
+	switch field {
+	case "TruncOrigin":
+		return p.Flags&PathTruncated != 0
+	case "LastSig", "LastHop":
+		return p.Flags&PathLastHop != 0
+	}
+	return false
 }
 
 // NewPath returns a new, empty path
 func NewPath(bh *crypto.HashCode, expire util.AbsoluteTime) *Path {
 	return &Path{
+		Flags:       0,
 		BlkHash:     bh,
 		Expire:      expire,
 		TruncOrigin: nil,
+		NumList:     0,
 		List:        make([]*Entry, 0),
 		LastSig:     nil,
+		LastHop:     nil,
 	}
+}
+
+// NewPathFromBytes reconstructs a path instance from binary data. The layout
+// of the data must match with the layout used in Path.Bytes().
+func NewPathFromBytes(buf []byte) (path *Path, err error) {
+	if buf == nil || len(buf) == 0 {
+		return
+	}
+	path = new(Path)
+	err = data.Unmarshal(&path, buf)
+	return
 }
 
 // Size of the binary representation (in message)
@@ -60,13 +95,17 @@ func (p *Path) Size() uint {
 	if p.TruncOrigin != nil {
 		size += p.TruncOrigin.Size()
 	}
-	if num := uint(len(p.List)); num > 0 {
-		size += num * p.List[0].Size()
-	}
+	size += uint(p.NumList) * p.List[0].Size()
 	if p.LastSig != nil {
-		size += p.LastSig.Size()
+		size += p.LastSig.Size() + p.LastHop.Size()
 	}
 	return size
+}
+
+// Bytes returns a binary representation
+func (p *Path) Bytes() []byte {
+	buf, _ := data.Marshal(p)
+	return buf
 }
 
 // NewElement creates a new path element from data
@@ -94,9 +133,12 @@ func (p *Path) Add(elem *Element) {
 			Signature: p.LastSig,
 		}
 		p.List = append(p.List, e)
+		p.NumList++
 	}
 	// update last hop signature
 	p.LastSig = elem.Signature
+	p.LastHop = elem.Signer
+	p.Flags |= PathLastHop
 }
 
 // Verify path: process list entries from right to left (decreasing index).
@@ -104,7 +146,7 @@ func (p *Path) Add(elem *Element) {
 // elements up to this point are included in the path (left trim).
 // The method does not return a state; if the verification fails, the path is
 // corrected (truncated or deleted) and would always verify OK.
-func (p *Path) Verify(sender, local *util.PeerID) {
+func (p *Path) Verify(local *util.PeerID) {
 
 	// do we have path elements?
 	if len(p.List) == 0 {
@@ -119,17 +161,19 @@ func (p *Path) Verify(sender, local *util.PeerID) {
 			pred = p.TruncOrigin
 		}
 		// check last hop signature
-		pe := p.NewElement(pred, sender, local)
+		pe := p.NewElement(pred, p.LastHop, local)
 		ok, err := pe.Verify(p.LastSig)
 		if err != nil || !ok {
-			// remove last hop signature (and truncated origin)
+			// remove last hop signature and truncated origin; reset flags
 			p.LastSig = nil
+			p.LastHop = nil
 			p.TruncOrigin = nil
+			p.Flags = 0
 		}
 		return
 	} else {
 		// yes: process list of path elements
-		signer := sender
+		signer := p.LastHop
 		sig := p.LastSig
 		succ := local
 		num := len(p.List)
@@ -154,11 +198,14 @@ func (p *Path) Verify(sender, local *util.PeerID) {
 				if i == num-1 {
 					// yes: the last hop signature failed -> reset path
 					p.LastSig = nil
+					p.LastHop = nil
 					p.TruncOrigin = nil
+					p.Flags = 0
 					p.List = make([]*Entry, 0)
 					return
 				}
 				// trim list
+				p.Flags |= PathTruncated
 				p.TruncOrigin = signer
 				size := num - 2 - i
 				list := make([]*Entry, size)
@@ -185,7 +232,7 @@ func (p *Path) String() string {
 	if p.TruncOrigin != nil {
 		s = p.TruncOrigin.String()
 	}
-	buf.WriteString(fmt.Sprintf("{ to=%s, (%d)[", s, len(p.List)))
+	buf.WriteString(fmt.Sprintf("{to=%s, (%d)[", s, len(p.List)))
 	for _, e := range p.List {
 		buf.WriteString(e.String())
 	}
