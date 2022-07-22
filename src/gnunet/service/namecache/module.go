@@ -69,15 +69,15 @@ func (m *Module) Import(fcm map[string]any) {
 
 // Get an entry from the cache if available.
 func (m *Module) Get(ctx context.Context, query *blocks.GNSQuery) (block *blocks.GNSBlock, err error) {
-	var b blocks.Block
-	if b, err = m.cache.Get(query); err != nil {
+	var e *store.DHTEntry
+	if e, err = m.cache.Get(query); err != nil {
 		return
 	}
-	err = blocks.Unwrap(b, block)
+	err = blocks.Unwrap(e.Blk, block)
 	return
 }
 
 // Put entry into the cache.
-func (m *Module) Put(ctx context.Context, query *blocks.GNSQuery, block *blocks.GNSBlock) error {
-	return m.cache.Put(query, block)
+func (m *Module) Put(ctx context.Context, query *blocks.GNSQuery, entry *store.DHTEntry) error {
+	return m.cache.Put(query, entry)
 }

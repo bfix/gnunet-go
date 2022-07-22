@@ -25,6 +25,7 @@ import (
 	"gnunet/service/dht/blocks"
 	"gnunet/util"
 	"math/rand"
+	"os"
 	"testing"
 )
 
@@ -38,13 +39,17 @@ const (
 // each block from storage and checks for matching hash.
 func TestDHTFilesStore(t *testing.T) {
 	// test configuration
+	path := "/tmp/dht-store"
 	cfg := make(util.ParameterSet)
 	cfg["mode"] = "file"
 	cfg["cache"] = false
-	cfg["path"] = "/var/lib/gnunet/dht/store"
+	cfg["path"] = path
 	cfg["maxGB"] = 10
 
 	// create file store
+	if _, err := os.Stat(path); err != nil {
+		os.MkdirAll(path, 0755)
+	}
 	fs, err := NewFileStore(cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -58,12 +63,15 @@ func TestDHTFilesStore(t *testing.T) {
 		size := 1024 + rand.Intn(62000)
 		buf := make([]byte, size)
 		rand.Read(buf)
-		val := blocks.NewGenericBlock(buf)
+		blk := blocks.NewGenericBlock(buf)
 		// generate associated key
 		k := crypto.Hash(buf).Bits
 		key := blocks.NewGenericQuery(k, enums.BLOCK_TYPE_ANY, 0)
 
-		// store block
+		// store entry
+		val := &DHTEntry{
+			Blk: blk,
+		}
 		if err := fs.Put(key, val); err != nil {
 			t.Fatal(err)
 		}
@@ -78,7 +86,7 @@ func TestDHTFilesStore(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		buf := val.Bytes()
+		buf := val.Blk.Bytes()
 
 		// re-create key
 		k := crypto.Hash(buf)
@@ -90,4 +98,8 @@ func TestDHTFilesStore(t *testing.T) {
 			t.Fatal("key/value mismatch")
 		}
 	}
+}
+
+func TestDHTEntryStore(t *testing.T) {
+	// pth, sender, local := path.GenerateTestPath(10)
 }

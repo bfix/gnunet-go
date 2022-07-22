@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"gnunet/service/dht/blocks"
+	"gnunet/service/dht/path"
 	"gnunet/util"
 
 	redis "github.com/go-redis/redis/v8"
@@ -70,8 +71,14 @@ type Store[K, V any] interface {
 // Types for custom store requirements
 //------------------------------------------------------------
 
+// DHTEntry to be stored/retrieved
+type DHTEntry struct {
+	Blk  blocks.Block
+	Path *path.Path
+}
+
 // DHTStore for DHT queries and blocks
-type DHTStore Store[blocks.Query, blocks.Block]
+type DHTStore Store[blocks.Query, *DHTEntry]
 
 // KVStore for key/value string pairs
 type KVStore Store[string, string]

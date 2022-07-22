@@ -23,6 +23,7 @@ import (
 	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service/dht/blocks"
+	"gnunet/service/store"
 	"gnunet/transport"
 	"gnunet/util"
 
@@ -62,7 +63,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-GET message", label)
 		query := blocks.NewGenericQuery(msg.Query.Bits, enums.BlockType(msg.BType), msg.Flags)
 
-		var block blocks.Block
+		var entry *store.DHTEntry
 		var dist *math.Int
 		var err error
 
@@ -122,13 +123,17 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		if btype == enums.BLOCK_TYPE_DHT_URL_HELLO {
 			logger.Println(logger.DBG, "[dht] GET message for HELLO: check cache")
 			// find best cached HELLO
+			var block blocks.Block
 			block, dist = m.rtable.BestHello(addr, rf)
 
 			// if block is filtered, skip it
-			if block != nil && rf.Contains(block) {
-				logger.Println(logger.DBG, "[dht] GET message for HELLO: matching DHT block is filtered")
-				block = nil
-				dist = nil
+			if block != nil {
+				if !rf.Contains(block) {
+					entry = &store.DHTEntry{Blk: block}
+				} else {
+					logger.Println(logger.DBG, "[dht] GET message for HELLO: matching DHT block is filtered")
+					dist = nil
+				}
 			}
 		}
 		//--------------------------------------------------------------
@@ -136,60 +141,59 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		// filter (in case we did not find an appropriate block in cache).
 		if doResult {
 			// save best-match values from cache
-			blockCache := block
-			block = nil
+			entryCache := entry
 			distCache := dist
 			dist = nil
 
 			// if we don't have an exact match, try storage lookup
-			if blockCache == nil || (distCache != nil && !distCache.Equals(math.ZERO)) {
+			if entryCache == nil || (distCache != nil && !distCache.Equals(math.ZERO)) {
 
 				// query DHT store for exact match  (9.4.3.3c)
-				if block, err = m.store.Get(query); err != nil {
+				if entry, err = m.store.Get(query); err != nil {
 					logger.Printf(logger.ERROR, "[%s] Failed to get DHT block from storage: %s", label, err.Error())
 					return true
 				}
-				if block != nil {
+				if entry != nil {
 					dist = math.ZERO
+					// check if we are filtered out
+					if rf.Contains(entry.Blk) {
+						logger.Println(logger.DBG, "[dht] matching DHT block is filtered")
+						entry = nil
+						dist = nil
+					}
 				}
 
 				// if we have no exact match, find approximate block if requested
-				if block == nil || approx {
+				if entry == nil || approx {
 					// no exact match: find approximate (9.4.3.3b)
-					match := func(b blocks.Block) bool {
-						return rf.Contains(b)
+					match := func(e *store.DHTEntry) bool {
+						return rf.Contains(e.Blk)
 					}
-					block, dist, err = m.GetApprox(ctx, query, match)
+					entry, dist, err = m.GetApprox(ctx, query, match)
 					if err != nil {
 						logger.Printf(logger.ERROR, "[%s] Failed to get (approx.) DHT block from storage: %s", label, err.Error())
 						return true
 					}
 				}
-				// if block is filtered, skip it
-				if block != nil && rf.Contains(block) {
-					logger.Println(logger.DBG, "[dht] matching DHT block is filtered")
-					block = nil
-					dist = nil
-				}
 
 				// if we have a block from cache, check if it is better than the
 				// block found in the DHT
-				if blockCache != nil && dist != nil && distCache.Cmp(dist) < 0 {
-					block = blockCache
+				if entryCache != nil && dist != nil && distCache.Cmp(dist) < 0 {
+					entry = entryCache
 					dist = distCache
 				}
 			}
 			// if we have a block, send it as response
-			if block != nil {
+			if entry != nil {
 				logger.Printf(logger.INFO, "[%s] sending DHT result message to caller", label)
-				if err := m.sendResult(ctx, query, block, back); err != nil {
+				if err := m.sendResult(ctx, query, entry.Blk, back); err != nil {
 					logger.Printf(logger.ERROR, "[%s] Failed to send DHT result message: %s", label, err.Error())
 				}
 			}
 		}
 		// check if we need to forward message based on filter result
-		if block != nil && blockHdlr != nil {
-			switch blockHdlr.FilterResult(block, query.Key(), rf, msg.XQuery) {
+		if entry != nil && blockHdlr != nil {
+			switch blockHdlr.FilterResult(entry.Blk, query.Key(), rf, msg.XQuery) {
 			case blocks.RF_LAST:
 				// no need for further results
 			case blocks.RF_MORE:
@@ -268,8 +272,8 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		//--------------------------------------------------------------
 		// verify PUT path (9.3.2.7)
 		// 'pp' will be used as path in forwarded messages
-		pp := msg.Path()
-		pp.Verify(sender, m.core.PeerID())
+		pp := msg.Path(sender)
+		pp.Verify(m.core.PeerID())
 
 		//--------------------------------------------------------------
 		// check if route is recorded (9.3.2.6)

@@ -22,10 +22,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"gnunet/service/dht/blocks"
+	"gnunet/service/dht/path"
 	"gnunet/util"
-	"io/ioutil"
 	"os"
 
+	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
 	"github.com/bfix/gospel/math"
 )
@@ -101,7 +102,7 @@ func (s *FileStore) Close() (err error) {
 }
 
 // Put block into storage under given key
-func (s *FileStore) Put(query blocks.Query, block blocks.Block) (err error) {
+func (s *FileStore) Put(query blocks.Query, entry *DHTEntry) (err error) {
 	// check for free space
 	if !s.cache {
 		if int(s.totalSize>>30) > s.maxSpace {
@@ -111,29 +112,18 @@ func (s *FileStore) Put(query blocks.Query, block blocks.Block) (err error) {
 	}
 	// get parameters
 	btype := query.Type()
-	expire := block.Expire()
+	expire := entry.Blk.Expire()
+	blkSize := len(entry.Blk.Bytes())
 
-	// get path and filename from key
-	path, fname := s.expandPath(query.Key().Bits)
-	// make sure the path exists
-	if err = os.MkdirAll(path, 0755); err != nil {
+	// write entry to file for storage
+	if err = s.writeEntry(query.Key().Bits, entry); err != nil {
 		return
-	}
-	// write to file for storage
-	var fp *os.File
-	bd := block.Bytes()
-	if fp, err = os.Create(path + "/" + fname); err == nil {
-		defer fp.Close()
-		// write block data
-		if _, err = fp.Write(bd); err != nil {
-			return
-		}
 	}
 	// compile metadata
 	now := util.AbsoluteTimeNow()
 	meta := &FileMetadata{
 		key:       query.Key().Bits,
-		size:      uint64(len(bd)),
+		size:      uint64(blkSize),
 		btype:     btype,
 		expires:   expire,
 		stored:    now,
@@ -156,7 +146,7 @@ func (s *FileStore) Put(query blocks.Query, block blocks.Block) (err error) {
 }
 
 // Get block with given key from storage
-func (s *FileStore) Get(query blocks.Query) (block blocks.Block, err error) {
+func (s *FileStore) Get(query blocks.Query) (entry *DHTEntry, err error) {
 	// check if we have metadata for the query
 	key := query.Key().Bits
 	btype := query.Type()
@@ -173,14 +163,14 @@ func (s *FileStore) Get(query blocks.Query) (block blocks.Block, err error) {
 	if err = s.meta.Used(key, btype); err != nil {
 		return
 	}
-	return s.readBlock(query.Key().Bits)
+	return s.readEntry(query.Key().Bits)
 }
 
 // GetApprox returns the best-matching value with given key from storage
 // that is not excluded
-func (s *FileStore) GetApprox(query blocks.Query, excl func(blocks.Block) bool) (block blocks.Block, key any, err error) {
+func (s *FileStore) GetApprox(query blocks.Query, excl func(*DHTEntry) bool) (entry *DHTEntry, key any, err error) {
 	var bestKey []byte
-	var bestBlk blocks.Block
+	var bestEntry *DHTEntry
 	var bestDist *math.Int
 	// distance function
 	dist := func(a, b []byte) *math.Int {
@@ -194,32 +184,32 @@ func (s *FileStore) GetApprox(query blocks.Query, excl func(blocks.Block) bool) 
 	check := func(md *FileMetadata) {
 		// check for better match
 		d := dist(md.key, query.Key().Bits)
+		var entry *DHTEntry
 		if bestKey == nil || d.Cmp(bestDist) < 0 {
 			// we might have a match. check block for exclusion
-			block, err = s.readBlock(md.key)
-			if err != nil {
+			if entry, err = s.readEntry(md.key); err != nil {
 				logger.Printf(logger.ERROR, "[dhtstore] failed to retrieve block for %s", hex.EncodeToString(md.key))
 				return
 			}
-			if excl(block) {
+			if excl(entry) {
 				return
 			}
 			// remember best match
 			bestKey = md.key
-			bestBlk = block
+			bestEntry = entry
 			bestDist = d
 		}
 	}
 	if err = s.meta.Traverse(check); err != nil {
 		return
 	}
-	if bestBlk != nil {
+	if bestEntry != nil {
 		// mark the block as newly used
-		if err = s.meta.Used(bestKey, bestBlk.Type()); err != nil {
+		if err = s.meta.Used(bestKey, bestEntry.Blk.Type()); err != nil {
 			return
 		}
 	}
-	return bestBlk, bestDist, nil
+	return bestEntry, bestDist, nil
 }
 
 // Get a list of all stored block keys (generic query).
@@ -227,23 +217,74 @@ func (s *FileStore) List() ([]blocks.Query, error) {
 	return nil, ErrStoreNoList
 }
 
-// read block from storage for given key
-func (s *FileStore) readBlock(key []byte) (block blocks.Block, err error) {
+//----------------------------------------------------------------------
+
+type entryLayout struct {
+	SizeBlk uint16 `order:"big"`    // size of block data
+	SizePth uint16 `order:"big"`    // size of path data
+	Block   []byte `size:"SizeBlk"` // block data
+	Path    []byte `size:"SizePth"` // path data
+}
+
+// read entry from storage for given key
+func (s *FileStore) readEntry(key []byte) (entry *DHTEntry, err error) {
 	// get path and filename from key
-	path, fname := s.expandPath(key)
-	// read file content (block data)
+	folder, fname := s.expandPath(key)
+
+	// open file for reading
 	var file *os.File
-	if file, err = os.Open(path + "/" + fname); err != nil {
+	if file, err = os.Open(folder + "/" + fname); err != nil {
 		return
 	}
 	defer file.Close()
-	// read block data
-	var data []byte
-	if data, err = ioutil.ReadAll(file); err == nil {
-		block = blocks.NewGenericBlock(data)
+
+	// get file size
+	fi, _ := file.Stat()
+	size := int(fi.Size())
+
+	// read data
+	val := new(entryLayout)
+	if err = data.UnmarshalStream(file, val, size); err != nil {
+		return
+	}
+	// assemble entry
+	entry = new(DHTEntry)
+	entry.Blk = blocks.NewGenericBlock(val.Block)
+	entry.Path, err = path.NewPathFromBytes(val.Path)
+	return
+}
+
+// write entry to storage for given key
+func (s *FileStore) writeEntry(key []byte, entry *DHTEntry) (err error) {
+	// get folder and filename from key
+	folder, fname := s.expandPath(key)
+	// make sure the folder exists
+	if err = os.MkdirAll(folder, 0755); err != nil {
+		return
+	}
+	// write to file content (block data)
+	var file *os.File
+	if file, err = os.Create(folder + "/" + fname); err != nil {
+		return
+	}
+	defer file.Close()
+
+	// assemble and write entry
+	val := new(entryLayout)
+	val.Block = entry.Blk.Bytes()
+	val.SizeBlk = uint16(len(val.Block))
+	if entry.Path != nil {
+		val.Path = entry.Path.Bytes()
+		val.SizePth = uint16(len(val.Path))
+		err = data.MarshalStream(file, val)
+	} else {
+		val.Path = nil
+		val.SizePth = 0
 	}
 	return
 }
+
+//----------------------------------------------------------------------
 
 // expandPath returns the full path to the file for given key.
 func (s *FileStore) expandPath(key []byte) (string, string) {

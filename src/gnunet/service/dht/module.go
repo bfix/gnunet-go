@@ -23,6 +23,7 @@ import (
 	"errors"
 	"gnunet/config"
 	"gnunet/core"
+	"gnunet/crypto"
 	"gnunet/message"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
@@ -162,10 +163,12 @@ func (m *Module) Get(ctx context.Context, query blocks.Query) (res chan blocks.B
 }
 
 // GetApprox returns the first block not excluded ["dht:getapprox"]
-func (m *Module) GetApprox(ctx context.Context, query blocks.Query, excl func(blocks.Block) bool) (block blocks.Block, dist *math.Int, err error) {
-	var d any
-	block, d, err = m.store.GetApprox(query, excl)
-	dist, _ = d.(*math.Int)
+func (m *Module) GetApprox(ctx context.Context, query blocks.Query, excl func(*store.DHTEntry) bool) (entry *store.DHTEntry, dist *math.Int, err error) {
+	var val any
+	entry, val, err = m.store.GetApprox(query, excl)
+	asked := NewQueryAddress(query.Key())
+	found := NewQueryAddress(val.(*crypto.HashCode))
+	dist, _ = found.Distance(asked)
 	return
 }
 
