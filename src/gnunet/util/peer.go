@@ -96,6 +96,8 @@ func (p *PeerID) Bytes() []byte {
 }
 
 //----------------------------------------------------------------------
+// Peer signature (EdDSA signature)
+//----------------------------------------------------------------------
 
 // PeerSignature is a EdDSA signature from the peer
 type PeerSignature struct {
