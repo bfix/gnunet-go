@@ -23,6 +23,7 @@ import (
 	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service/dht/blocks"
+	"gnunet/service/dht/path"
 	"gnunet/service/store"
 	"gnunet/transport"
 	"gnunet/util"
@@ -41,14 +42,15 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 	// assemble log label
 	label := "dht"
 	if v := ctx.Value("label"); v != nil {
-		if s, _ := v.(string); len(s) > 0 {
+		if s, ok := v.(string); ok && len(s) > 0 {
 			label = "dht-" + s
 		}
 	}
 	logger.Printf(logger.INFO, "[%s] message received from %s", label, sender)
+	local := m.core.PeerID()
 
 	// check for local message
-	if sender.Equals(m.core.PeerID()) {
+	if sender.Equals(local) {
 		logger.Printf(logger.WARN, "[%s] dropping local message received: %s", label, util.Dump(msgIn, "json"))
 		return false
 	}
@@ -61,11 +63,10 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		// DHT-P2P GET
 		//--------------------------------------------------------------
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-GET message", label)
-		query := blocks.NewGenericQuery(msg.Query.Bits, enums.BlockType(msg.BType), msg.Flags)
+		query := blocks.NewGenericQuery(msg.Query, enums.BlockType(msg.BType), msg.Flags)
 
 		var entry *store.DHTEntry
 		var dist *math.Int
-		var err error
 
 		//--------------------------------------------------------------
 		// validate query (based on block type requested)  (9.4.3.1)
@@ -108,33 +109,21 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 
 		//----------------------------------------------------------
 		// check if we need to respond (and how) (9.4.3.3)
-		addr := NewQueryAddress(msg.Query)
+		addr := NewQueryAddress(query.Key())
 		closest := m.rtable.IsClosestPeer(nil, addr, msg.PeerFilter, 0)
 		demux := int(msg.Flags)&enums.DHT_RO_DEMULTIPLEX_EVERYWHERE != 0
 		approx := int(msg.Flags)&enums.DHT_RO_FIND_APPROXIMATE != 0
 		// actions
 		doResult := closest || (demux && approx)
 		doForward := !closest || (demux && !approx)
-		logger.Printf(logger.DBG, "[dht] GET message: closest=%v, demux=%v, approx=%v --> result=%v, forward=%v",
-			closest, demux, approx, doResult, doForward)
+		logger.Printf(logger.DBG, "[%s] GET message: closest=%v, demux=%v, approx=%v --> result=%v, forward=%v",
+			label, closest, demux, approx, doResult, doForward)
 
 		//------------------------------------------------------
 		// query for a HELLO? (9.4.3.3a)
 		if btype == enums.BLOCK_TYPE_DHT_URL_HELLO {
-			logger.Println(logger.DBG, "[dht] GET message for HELLO: check cache")
-			// find best cached HELLO
-			var block blocks.Block
-			block, dist = m.rtable.BestHello(addr, rf)
-
-			// if block is filtered, skip it
-			if block != nil {
-				if !rf.Contains(block) {
-					entry = &store.DHTEntry{Blk: block}
-				} else {
-					logger.Println(logger.DBG, "[dht] GET message for HELLO: matching DHT block is filtered")
-					dist = nil
-				}
-			}
+			// try to find result in HELLO cache
+			entry, dist = m.getHelloCache(label, addr, rf)
 		}
 		//--------------------------------------------------------------
 		// find the closest block that has that is not filtered by the result
@@ -147,35 +136,12 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 
 			// if we don't have an exact match, try storage lookup
 			if entryCache == nil || (distCache != nil && !distCache.Equals(math.ZERO)) {
-
-				// query DHT store for exact match  (9.4.3.3c)
-				if entry, err = m.store.Get(query); err != nil {
-					logger.Printf(logger.ERROR, "[%s] Failed to get DHT block from storage: %s", label, err.Error())
-					return true
+				// get entry from local storage
+				var err error
+				if entry, dist, err = m.getLocalStorage(label, query, rf); err != nil {
+					entry = nil
+					dist = nil
 				}
-				if entry != nil {
-					dist = math.ZERO
-					// check if we are filtered out
-					if rf.Contains(entry.Blk) {
-						logger.Println(logger.DBG, "[dht] matching DHT block is filtered")
-						entry = nil
-						dist = nil
-					}
-				}
-
-				// if we have no exact match, find approximate block if requested
-				if entry == nil || approx {
-					// no exact match: find approximate (9.4.3.3b)
-					match := func(e *store.DHTEntry) bool {
-						return rf.Contains(e.Blk)
-					}
-					entry, dist, err = m.GetApprox(ctx, query, match)
-					if err != nil {
-						logger.Printf(logger.ERROR, "[%s] Failed to get (approx.) DHT block from storage: %s", label, err.Error())
-						return true
-					}
-				}
-
 				// if we have a block from cache, check if it is better than the
 				// block found in the DHT
 				if entryCache != nil && dist != nil && distCache.Cmp(dist) < 0 {
@@ -205,14 +171,13 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		}
 		if doForward {
 			// build updated GET message
-			pf.Add(m.core.PeerID())
+			pf.Add(local)
 			msgOut := msg.Update(pf, rf, msg.HopCount+1)
 
 			// forward to number of peers
 			numForward := m.rtable.ComputeOutDegree(msg.ReplLevel, msg.HopCount)
-			key := NewQueryAddress(query.Key())
 			for n := 0; n < numForward; n++ {
-				if p := m.rtable.SelectClosestPeer(key, pf, 0); p != nil {
+				if p := m.rtable.SelectClosestPeer(addr, pf, 0); p != nil {
 					// forward message to peer
 					logger.Printf(logger.INFO, "[%s] forward DHT get message to %s", label, p.String())
 					if err := back.Send(ctx, msgOut); err != nil {
@@ -235,6 +200,13 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		// DHT-P2P PUT
 		//----------------------------------------------------------
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-PUT message", label)
+
+		// assemble query and entry
+		query := blocks.NewGenericQuery(msg.Key, enums.BlockType(msg.BType), msg.Flags)
+		entry := &store.DHTEntry{
+			Blk:  blocks.NewGenericBlock(msg.Block),
+			Path: nil,
+		}
 
 		//--------------------------------------------------------------
 		// check if request is expired (9.3.2.1)
@@ -264,6 +236,16 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			logger.Printf(logger.INFO, "[%s] No validator defined for block type %s", label, btype.String())
 			blockHdlr = nil
 		}
+		// clone peer filter
+		pf := msg.PeerFilter.Clone()
+
+		//----------------------------------------------------------
+		// check if we need to respond (and how)
+		addr := NewQueryAddress(msg.Key)
+		closest := m.rtable.IsClosestPeer(nil, addr, msg.PeerFilter, 0)
+		demux := int(msg.Flags)&enums.DHT_RO_DEMULTIPLEX_EVERYWHERE != 0
+		logger.Printf(logger.DBG, "[%s] PUT message: closest=%v, demux=%v", label, closest, demux)
+
 		//--------------------------------------------------------------
 		// check if sender is in peer filter (9.3.2.5)
 		if !msg.PeerFilter.Contains(sender) {
@@ -271,22 +253,76 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		}
 		//--------------------------------------------------------------
 		// verify PUT path (9.3.2.7)
-		// 'pp' will be used as path in forwarded messages
-		pp := msg.Path(sender)
-		pp.Verify(m.core.PeerID())
+		// 'entry.Path' will be used as path in stored and forwarded messages.
+		// The resulting path is always valid; it is truncated/reset on
+		// signature failure.
+		entry.Path = msg.Path(sender)
+		entry.Path.Verify(local)
 
 		//--------------------------------------------------------------
-		// check if route is recorded (9.3.2.6)
-		/*
-			withPath := msg.Flags&enums.DHT_RO_RECORD_ROUTE != 0
-			if withPath {
-				spe := message.NewPathElement(msg.Key, sender, p)
-				m.core.Sign(spe)
-				msg.AppendPutPath(spe)
+		// store locally if we are closest peer or demux is set (9.3.2.8)
+		if closest || demux {
+			// store in local storage
+			if err := m.store.Put(query, entry); err != nil {
+				logger.Printf(logger.ERROR, "[%s] failed to store DHT entry: %s", label, err.Error())
 			}
-		*/
-		// 	m.store.Put(key, block)
+		}
 
+		//--------------------------------------------------------------
+		// if the put is for a HELLO block, add the sender to the
+		// routing table (9.3.2.9)
+		if btype == enums.BLOCK_TYPE_DHT_HELLO {
+			// get addresses from HELLO block
+			hello, err := blocks.ParseHelloFromBytes(msg.Block)
+			if err != nil {
+				logger.Printf(logger.ERROR, "[%s] failed to parse HELLO block: %s", label, err.Error())
+			} else {
+				// check state of bucket for given address
+				if m.rtable.Check(NewPeerAddress(sender)) == 0 {
+					// we could add the sender to the routing table
+					for _, addr := range hello.Addresses() {
+						if transport.CanHandleAddress(addr) {
+							// try to connect to peer (triggers EV_CONNECTED on success)
+							m.core.TryConnect(sender, addr)
+						}
+					}
+				}
+			}
+		}
+
+		//--------------------------------------------------------------
+		// check if we need to forward
+		if !closest || demux {
+			// add local node to filter
+			pf.Add(local)
+
+			// forward to computed number of peers
+			numForward := m.rtable.ComputeOutDegree(msg.ReplLvl, msg.HopCount)
+			for n := 0; n < numForward; n++ {
+				if p := m.rtable.SelectClosestPeer(addr, pf, 0); p != nil {
+					// check if route is recorded (9.3.2.6)
+					var pp *path.Path
+					if msg.Flags&enums.DHT_RO_RECORD_ROUTE != 0 {
+						// yes: add path element
+						pp = entry.Path.Clone()
+						pe := pp.NewElement(sender, local, p.Peer)
+						pp.Add(pe)
+					}
+					// build updated PUT message
+					msgOut := msg.Update(pp, pf, msg.HopCount+1)
+
+					// forward message to peer
+					logger.Printf(logger.INFO, "[%s] forward DHT put message to %s", label, p.String())
+					if err := back.Send(ctx, msgOut); err != nil {
+						logger.Printf(logger.ERROR, "[%s] Failed to forward DHT put message: %s", label, err.Error())
+					}
+					// add forward node to filter
+					pf.Add(p.Peer)
+				} else {
+					break
+				}
+			}
+		}
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-PUT message done", label)
 
 	case *message.DHTP2PResultMsg:
@@ -322,16 +358,16 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 
 		// verify integrity of message
 		if ok, err := msg.Verify(sender); !ok || err != nil {
-			logger.Println(logger.WARN, "[dht] Received invalid DHT_P2P_HELLO message")
+			logger.Printf(logger.WARN, "[%s] Received invalid DHT_P2P_HELLO message", label)
 			if err != nil {
-				logger.Println(logger.ERROR, "[dht] --> "+err.Error())
+				logger.Printf(logger.ERROR, "[%s] --> %s", label, err.Error())
 			}
 			return false
 		}
-		// keep peer addresses in core for transport
+		// keep peer addresses in core for transports
 		aList, err := msg.Addresses()
 		if err != nil {
-			logger.Println(logger.ERROR, "[dht] Failed to parse addresses from DHT_P2P_HELLO message")
+			logger.Printf(logger.ERROR, "[%s] Failed to parse addresses from DHT_P2P_HELLO message", label)
 			return false
 		}
 		if newPeer := m.core.Learn(ctx, sender, aList); newPeer {
@@ -340,7 +376,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			if msgOut, err = m.getHello(); err != nil {
 				return false
 			}
-			logger.Printf(logger.INFO, "[dht] Sending HELLO to %s: %s", sender, msgOut)
+			logger.Printf(logger.INFO, "[%s] Sending HELLO to %s: %s", label, sender, msgOut)
 			err = m.core.Send(ctx, sender, msgOut)
 			// no error if the message might have been sent
 			if err == transport.ErrEndpMaybeSent {
