@@ -25,6 +25,7 @@ import (
 	"gnunet/message"
 	"gnunet/util"
 	"net"
+	"strings"
 
 	"github.com/bfix/gospel/network"
 )
@@ -202,4 +203,20 @@ func (t *Transport) ForwardClose(id string) error {
 		return ErrTransNoUPNP
 	}
 	return t.upnp.Unassign(id)
+}
+
+//----------------------------------------------------------------------
+// Helper functions
+//----------------------------------------------------------------------
+
+// CanHandleAddress returns true, if a given address can be handled by the
+// transport framework
+func CanHandleAddress(addr *util.Address) bool {
+	// filter out local addresses
+	s := addr.String()
+	if idx := strings.LastIndex(s, ":"); idx != -1 {
+		s = s[:idx]
+	}
+	ip := net.ParseIP(s)
+	return !(ip == nil || ip.IsLoopback())
 }
