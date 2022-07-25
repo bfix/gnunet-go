@@ -23,6 +23,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"gnunet/config"
+	"gnunet/crypto"
 	"gnunet/message"
 	"gnunet/transport"
 	"gnunet/util"
@@ -259,14 +260,8 @@ func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addrs []*util.Addre
 	// learn all addresses for peer
 	newPeer = false
 	for _, addr := range addrs {
-		// filter out local addresses
-		s := addr.String()
-		if idx := strings.LastIndex(s, ":"); idx != -1 {
-			s = s[:idx]
-		}
-		logger.Printf(logger.DBG, "[core] Checking address %s", s)
-		ip := net.ParseIP(s)
-		if ip == nil || ip.IsLoopback() {
+		// filter out addresses we can't handle (including local addresses)
+		if !transport.CanHandleAddress(addr) {
 			continue
 		}
 		// learn address
@@ -298,17 +293,8 @@ func (c *Core) PeerID() *util.PeerID {
 
 //----------------------------------------------------------------------
 
-// Signable interface for objects that can get signed by peer
-type Signable interface {
-	// SignedData returns the byte array to be signed
-	SignedData() []byte
-
-	// SetSignature returns the signature to the signable object
-	SetSignature(*util.PeerSignature) error
-}
-
 // Sign a signable onject with private peer key
-func (c *Core) Sign(obj Signable) error {
+func (c *Core) Sign(obj crypto.Signable) error {
 	sd := obj.SignedData()
 	logger.Printf(logger.DBG, "[core] Signing data '%s'", hex.EncodeToString(sd))
 	sig, err := c.local.prv.EdSign(sd)
@@ -326,6 +312,7 @@ func (c *Core) Sign(obj Signable) error {
 // When the connection attempt is successful, information on the new
 // peer is offered through the PEER_CONNECTED signal.
 func (c *Core) TryConnect(peer *util.PeerID, addr net.Addr) error {
+	// TODO:
 	return nil
 }
 
@@ -333,7 +320,9 @@ func (c *Core) TryConnect(peer *util.PeerID, addr net.Addr) error {
 // connection to a peer P. Underlays are usually limited in the number
 // of active connections. With this function the DHT can indicate to the
 // underlay which connections should preferably be preserved.
-func (c *Core) Hold(peer *util.PeerID) {}
+func (c *Core) Hold(peer *util.PeerID) {
+	// TODO:
+}
 
 // Drop is a function which tells the underlay to drop the connection to a
 // peer P. This function is only there for symmetry and used during the
@@ -344,7 +333,9 @@ func (c *Core) Hold(peer *util.PeerID) {}
 // DROP() also does not imply that the underlay must close the connection:
 // it merely removes the preference to preserve the connection that was
 // established by HOLD().
-func (c *Core) Drop(peer *util.PeerID) {}
+func (c *Core) Drop(peer *util.PeerID) {
+	// TODO:
+}
 
 //----------------------------------------------------------------------
 // Event listener and event dispatch.
