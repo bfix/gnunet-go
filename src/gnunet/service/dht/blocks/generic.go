@@ -145,9 +145,9 @@ func (q *GenericQuery) String() string {
 }
 
 // NewGenericQuery creates a simple Query from hash code.
-func NewGenericQuery(key []byte, btype enums.BlockType, flags uint16) *GenericQuery {
+func NewGenericQuery(key *crypto.HashCode, btype enums.BlockType, flags uint16) *GenericQuery {
 	return &GenericQuery{
-		key:    crypto.NewHashCode(key),
+		key:    key,
 		btype:  btype,
 		flags:  flags,
 		params: make(util.ParameterSet),

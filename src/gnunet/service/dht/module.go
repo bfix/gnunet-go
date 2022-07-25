@@ -165,9 +165,15 @@ func (m *Module) Get(ctx context.Context, query blocks.Query) (res chan blocks.B
 // GetApprox returns the first block not excluded ["dht:getapprox"]
 func (m *Module) GetApprox(ctx context.Context, query blocks.Query, excl func(*store.DHTEntry) bool) (entry *store.DHTEntry, dist *math.Int, err error) {
 	var val any
-	entry, val, err = m.store.GetApprox(query, excl)
+	if entry, val, err = m.store.GetApprox(query, excl); err != nil {
+		return
+	}
+	hc, ok := val.(*crypto.HashCode)
+	if !ok {
+		err = errors.New("no approx result")
+	}
 	asked := NewQueryAddress(query.Key())
-	found := NewQueryAddress(val.(*crypto.HashCode))
+	found := NewQueryAddress(hc)
 	dist, _ = found.Distance(asked)
 	return
 }
@@ -233,27 +239,27 @@ func (m *Module) event(ctx context.Context, ev *core.Event) {
 	// New peer connected:
 	case core.EV_CONNECT:
 		// Add peer to routing table
-		logger.Printf(logger.INFO, "[dht] Peer %s connected", ev.Peer)
-		m.rtable.Add(NewPeerAddress(ev.Peer))
+		logger.Printf(logger.INFO, "[dht-event] Peer %s connected", ev.Peer)
+		m.rtable.Add(NewPeerAddress(ev.Peer), "dht-event")
 
 	// Peer disconnected:
 	case core.EV_DISCONNECT:
 		// Remove peer from routing table
-		logger.Printf(logger.INFO, "[dht] Peer %s disconnected", ev.Peer)
+		logger.Printf(logger.INFO, "[dht-event] Peer %s disconnected", ev.Peer)
 		m.rtable.Remove(NewPeerAddress(ev.Peer), 0)
 
 	// Message received.
 	case core.EV_MESSAGE:
-		logger.Printf(logger.INFO, "[dht] Message received: %s", ev.Msg.String())
+		logger.Printf(logger.INFO, "[dht-event] Message received: %s", ev.Msg.String())
 
 		// check if peer is in routing table (connected peer)
 		if !m.rtable.Contains(NewPeerAddress(ev.Peer)) {
-			logger.Printf(logger.WARN, "[dht] message %d from unregistered peer -- discarded", ev.Msg.Header().MsgType)
+			logger.Printf(logger.WARN, "[dht-event] message %d from unregistered peer -- discarded", ev.Msg.Header().MsgType)
 			return
 		}
 		// process message
 		if !m.HandleMessage(ctx, ev.Peer, ev.Msg, ev.Resp) {
-			logger.Println(logger.WARN, "[dht] Message NOT handled!")
+			logger.Println(logger.WARN, "[dht-event] Message NOT handled!")
 		}
 	}
 }

@@ -104,7 +104,7 @@ func NewGNSQuery(zkey *crypto.ZoneKey, label string) *GNSQuery {
 	if err != nil {
 		logger.Printf(logger.ERROR, "[NewGNSQuery] failed: %s", err.Error())
 	}
-	gq := crypto.Hash(pd.Bytes()).Bits
+	gq := crypto.Hash(pd.Bytes())
 	return &GNSQuery{
 		GenericQuery: *NewGenericQuery(gq, enums.BLOCK_TYPE_GNS_NAMERECORD, 0),
 		Zone:         zkey,
