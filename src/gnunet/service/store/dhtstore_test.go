@@ -40,6 +40,10 @@ const (
 func TestDHTFilesStore(t *testing.T) {
 	// test configuration
 	path := "/tmp/dht-store"
+	defer func() {
+		os.RemoveAll(path)
+	}()
+
 	cfg := make(util.ParameterSet)
 	cfg["mode"] = "file"
 	cfg["cache"] = false
@@ -65,7 +69,7 @@ func TestDHTFilesStore(t *testing.T) {
 		rand.Read(buf)
 		blk := blocks.NewGenericBlock(buf)
 		// generate associated key
-		k := crypto.Hash(buf).Bits
+		k := crypto.Hash(buf)
 		key := blocks.NewGenericQuery(k, enums.BLOCK_TYPE_ANY, 0)
 
 		// store entry
@@ -73,18 +77,18 @@ func TestDHTFilesStore(t *testing.T) {
 			Blk: blk,
 		}
 		if err := fs.Put(key, val); err != nil {
-			t.Fatal(err)
+			t.Fatalf("[%d] %s", i, err)
 		}
 		// remember key
 		keys = append(keys, key)
 	}
 
 	// Second round: retrieve blocks and check
-	for _, key := range keys {
+	for i, key := range keys {
 		// get block
 		val, err := fs.Get(key)
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("[%d] %s", i, err)
 		}
 		buf := val.Blk.Bytes()
 
