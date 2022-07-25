@@ -163,7 +163,7 @@ func (s *FileStore) Get(query blocks.Query) (entry *DHTEntry, err error) {
 	if err = s.meta.Used(key, btype); err != nil {
 		return
 	}
-	return s.readEntry(query.Key().Bits)
+	return s.readEntry(key)
 }
 
 // GetApprox returns the best-matching value with given key from storage
@@ -276,11 +276,11 @@ func (s *FileStore) writeEntry(key []byte, entry *DHTEntry) (err error) {
 	if entry.Path != nil {
 		val.Path = entry.Path.Bytes()
 		val.SizePth = uint16(len(val.Path))
-		err = data.MarshalStream(file, val)
 	} else {
 		val.Path = nil
 		val.SizePth = 0
 	}
+	err = data.MarshalStream(file, val)
 	return
 }
 
