@@ -108,6 +108,20 @@ func (p *Path) Bytes() []byte {
 	return buf
 }
 
+// Clone path instance
+func (p *Path) Clone() *Path {
+	return &Path{
+		Flags:       p.Flags,
+		BlkHash:     p.BlkHash,
+		Expire:      p.Expire,
+		TruncOrigin: p.TruncOrigin,
+		NumList:     p.NumList,
+		List:        util.Clone(p.List),
+		LastSig:     p.LastSig,
+		LastHop:     p.LastHop,
+	}
+}
+
 // NewElement creates a new path element from data
 func (p *Path) NewElement(pred, signer, succ *util.PeerID) *Element {
 	return &Element{
