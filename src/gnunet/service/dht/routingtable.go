@@ -137,28 +137,46 @@ func NewRoutingTable(ref *PeerAddress, cfg *config.RoutingConfig) *RoutingTable 
 
 // Add new peer address to routing table.
 // Returns true if the entry was added, false otherwise.
-func (rt *RoutingTable) Add(p *PeerAddress) bool {
+func (rt *RoutingTable) Add(p *PeerAddress, label string) bool {
 	k := p.String()
-	logger.Printf(logger.DBG, "[RT] Add(%s)", k)
+	logger.Printf(logger.DBG, "[%s] Add(%s)", label, k)
 
 	// check if peer is already known
 	if px, ok := rt.list.Get(k, 0); ok {
-		logger.Println(logger.DBG, "[RT] --> already known")
+		logger.Printf(logger.DBG, "[%s] --> already known", label)
 		px.lastSeen = util.AbsoluteTimeNow()
 		return false
 	}
-
 	// compute distance (bucket index) and insert address.
 	_, idx := p.Distance(rt.ref)
 	if rt.buckets[idx].Add(p) {
-		logger.Println(logger.DBG, "[RT] --> entry added")
+		logger.Printf(logger.DBG, "[%s] --> entry added", label)
 		p.lastUsed = util.AbsoluteTimeNow()
 		rt.list.Put(k, p, 0)
 		return true
 	}
 	// Full bucket: we did not add the address to the routing table.
-	logger.Println(logger.DBG, "[RT] --> bucket full -- discarded")
+	logger.Printf(logger.DBG, "[%s] --> bucket[%d] full -- discarded", label, idx)
 	return false
+}
+
+// check if peer address is in routing table (=1) or if the corresponding
+// k-bucket has free space (=0) or not (-1).
+func (rt *RoutingTable) Check(p *PeerAddress) int {
+	k := p.String()
+
+	// check if peer is already known
+	if px, ok := rt.list.Get(k, 0); ok {
+		px.lastSeen = util.AbsoluteTimeNow()
+		return 1
+	}
+	// compute distance (bucket index)
+	_, idx := p.Distance(rt.ref)
+
+	if rt.buckets[idx].FreeSpace() > 0 {
+		return 0
+	}
+	return -1
 }
 
 // Remove peer address from routing table.
@@ -438,6 +456,11 @@ func (b *Bucket) Add(p *PeerAddress) bool {
 	}
 	// full bucket: no further additions
 	return false
+}
+
+// FreeSpace returns the number of empty slots in bucket
+func (b *Bucket) FreeSpace() int {
+	return numK - len(b.list)
 }
 
 // Remove peer address from the bucket.
