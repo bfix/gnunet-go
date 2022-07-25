@@ -212,15 +212,16 @@ func applySubstitutions(x interface{}, env map[string]string) {
 				switch fld.Kind() {
 				case reflect.String:
 					// check for substitution
-					s, _ := fld.Interface().(string)
-					for {
-						s1 := substString(s, env)
-						if s1 == s {
-							break
+					if s, ok := fld.Interface().(string); ok {
+						for {
+							s1 := substString(s, env)
+							if s1 == s {
+								break
+							}
+							logger.Printf(logger.DBG, "[config] %s --> %s\n", s, s1)
+							fld.SetString(s1)
+							s = s1
 						}
-						logger.Printf(logger.DBG, "[config] %s --> %s\n", s, s1)
-						fld.SetString(s1)
-						s = s1
 					}
 
 				case reflect.Struct:
