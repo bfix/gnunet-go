@@ -87,7 +87,7 @@ func (m *DHTP2PGetMsg) Header() *Header {
 	return &Header{m.MsgSize, m.MsgType}
 }
 
-// Clone message
+// Update message (forwarding)
 func (m *DHTP2PGetMsg) Update(pf *blocks.PeerFilter, rf blocks.ResultFilter, hop uint16) *DHTP2PGetMsg {
 	buf := rf.Bytes()
 	ns := uint16(len(buf))
@@ -162,6 +162,25 @@ func (m *DHTP2PPutMsg) PESize(field string) uint {
 		}
 	}
 	return 0
+}
+
+//----------------------------------------------------------------------
+
+// Update message (forwarding)
+func (m *DHTP2PPutMsg) Update(p *path.Path, pf *blocks.PeerFilter, hop uint16) *DHTP2PPutMsg {
+	msg := NewDHTP2PPutMsg()
+	msg.Flags = m.Flags
+	msg.HopCount = hop
+	msg.PathL = m.PathL
+	msg.Expiration = m.Expiration
+	msg.PeerFilter = pf
+	msg.Key = m.Key.Clone()
+	msg.TruncOrigin = m.TruncOrigin
+	msg.PutPath = util.Clone(m.PutPath)
+	msg.LastSig = m.LastSig
+	msg.Block = util.Clone(m.Block)
+	msg.SetPath(p)
+	return msg
 }
 
 //----------------------------------------------------------------------
