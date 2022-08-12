@@ -35,8 +35,8 @@ import (
 
 // path flags
 const (
-	PathTruncated = iota
-	PathLastHop
+	PathTruncated = 1
+	PathLastHop   = 2
 )
 
 // Path is the complete list of verified hops a message travelled.
@@ -48,6 +48,7 @@ type Path struct {
 	Expire      util.AbsoluteTime   ``               // expiration time
 	TruncOrigin *util.PeerID        `opt:"(IsUsed)"` // truncated origin (optional)
 	NumList     uint16              `order:"big"`    // number of list entries
+	SplitPos    uint16              `order:"big"`    // optional split position
 	List        []*Entry            `size:"NumList"` // list of path entries
 	LastSig     *util.PeerSignature `opt:"(Isused)"` // last hop signature
 	LastHop     *util.PeerID        `opt:"(IsUsed)"` // last hop peer id
@@ -72,6 +73,7 @@ func NewPath(bh *crypto.HashCode, expire util.AbsoluteTime) *Path {
 		Expire:      expire,
 		TruncOrigin: nil,
 		NumList:     0,
+		SplitPos:    0,
 		List:        make([]*Entry, 0),
 		LastSig:     nil,
 		LastHop:     nil,
@@ -81,7 +83,7 @@ func NewPath(bh *crypto.HashCode, expire util.AbsoluteTime) *Path {
 // NewPathFromBytes reconstructs a path instance from binary data. The layout
 // of the data must match with the layout used in Path.Bytes().
 func NewPathFromBytes(buf []byte) (path *Path, err error) {
-	if buf == nil || len(buf) == 0 {
+	if len(buf) == 0 {
 		return
 	}
 	path = new(Path)
@@ -116,6 +118,7 @@ func (p *Path) Clone() *Path {
 		Expire:      p.Expire,
 		TruncOrigin: p.TruncOrigin,
 		NumList:     p.NumList,
+		SplitPos:    p.SplitPos,
 		List:        util.Clone(p.List),
 		LastSig:     p.LastSig,
 		LastHop:     p.LastHop,
