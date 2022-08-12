@@ -20,6 +20,7 @@ package dht
 
 import (
 	"context"
+	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service/dht/blocks"
@@ -57,6 +58,9 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 	// process message
 	switch msg := msgIn.(type) {
 
+	//==================================================================
+	// DHT-P2P-GET
+	//==================================================================
 	case *message.DHTP2PGetMsg:
 		//--------------------------------------------------------------
 		// DHT-P2P GET
@@ -178,6 +182,9 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		}
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-GET message done", label)
 
+	//==================================================================
+	// DHT-P2P-PUT
+	//==================================================================
 	case *message.DHTP2PPutMsg:
 		//----------------------------------------------------------
 		// DHT-P2P PUT
@@ -260,7 +267,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 				logger.Printf(logger.ERROR, "[%s] failed to parse HELLO block: %s", label, err.Error())
 			} else {
 				// check state of bucket for given address
-				if m.rtable.Check(NewPeerAddress(sender)) == 0 {
+				if m.rtable.Check(NewPeerAddress(hello.PeerID)) == 0 {
 					// we could add the sender to the routing table
 					for _, addr := range hello.Addresses() {
 						if transport.CanHandleAddress(addr) {
@@ -306,28 +313,97 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		}
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-PUT message done", label)
 
+	//==================================================================
+	// DHT-P2P-RESULT
+	//==================================================================
 	case *message.DHTP2PResultMsg:
 		//----------------------------------------------------------
 		// DHT-P2P RESULT
 		//----------------------------------------------------------
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-RESULT message", label)
 
-		// verify path
-		pth := msg.Path(sender)
-		pth.Verify(local)
-
-		// check task list for handler
+		//--------------------------------------------------------------
+		// check if request is expired (9.5.2.1)
+		if msg.Expires.Expired() {
+			logger.Printf(logger.WARN, "[%s] DHT-P2P-RESULT message expired (%s)", label, msg.Expires.String())
+			return false
+		}
+		//--------------------------------------------------------------
+		btype := enums.BlockType(msg.BType)
+		var blkKey *crypto.HashCode
+		blockHdlr, ok := blocks.BlockHandlers[btype]
+		if ok {
+			// reconstruct block instance
+			if block, err := blockHdlr.ParseBlock(msg.Block); err == nil {
+				// validate block (9.5.2.2)
+				if !blockHdlr.ValidateBlockStoreRequest(block) {
+					logger.Printf(logger.WARN, "[%s] DHT-P2P-RESULT invalid block -- discarded", label)
+					return false
+				}
+				// Compute block key (9.5.2.4)
+				if blockHdlr != nil {
+					blkKey = blockHdlr.DeriveBlockKey(block)
+				}
+			}
+		} else {
+			logger.Printf(logger.INFO, "[%s] No validator defined for block type %s", label, btype.String())
+			blockHdlr = nil
+		}
+		//--------------------------------------------------------------
+		// verify path (9.5.2.3)
+		var pth *path.Path
+		if msg.GetPathL+msg.PutPathL > 0 {
+			pth = msg.Path(sender)
+			pth.Verify(local)
+		}
+		//--------------------------------------------------------------
+		// if the put is for a HELLO block, add the originator to the
+		// routing table (9.5.2.5)
+		if btype == enums.BLOCK_TYPE_DHT_HELLO {
+			// get addresses from HELLO block
+			hello, err := blocks.ParseHelloFromBytes(msg.Block)
+			if err != nil {
+				logger.Printf(logger.ERROR, "[%s] failed to parse HELLO block: %s", label, err.Error())
+			} else {
+				// check state of bucket for given address
+				if m.rtable.Check(NewPeerAddress(hello.PeerID)) == 0 {
+					// we could add the originator to the routing table
+					for _, addr := range hello.Addresses() {
+						if transport.CanHandleAddress(addr) {
+							// try to connect to peer (triggers EV_CONNECTED on success)
+							m.core.TryConnect(sender, addr)
+						}
+					}
+				}
+			}
+		}
+		// message forwarding to responder
 		key := msg.Query.String()
 		logger.Printf(logger.DBG, "[%s] DHT-P2P-RESULT key = %s", label, key)
 		handled := false
 		if list, ok := m.reshdlrs.Get(key); ok {
 			for _, rh := range list {
 				logger.Printf(logger.DBG, "[%s] Task #%d for DHT-P2P-RESULT found", label, rh.ID())
-				//  handle the message
+
+				//--------------------------------------------------------------
+				// check task list for handler (9.5.2.6)
+				if msg.Flags&enums.DHT_RO_DEMULTIPLEX_EVERYWHERE == 0 && !blkKey.Equals(rh.Key()) {
+					// (9.5.2.6.a) derived key mismatch
+					logger.Printf(logger.ERROR, "[%s] derived block key / query key mismatch", label)
+					return false
+				}
+				// (9.5.2.6.b+c) check block against query
+				/*
+					if blockHdlr != nil {
+						blockHdlr.FilterBlockResult(block, rh.Key())
+					}
+				*/
+
+				//--------------------------------------------------------------
+				//  handle the message (forwarding)
 				go rh.Handle(ctx, msg, pth, sender, local)
 				handled = true
 			}
-			return true
 		}
 		if !handled {
 			logger.Printf(logger.WARN, "[%s] DHT-P2P-RESULT not processed (no handler)", label)
@@ -335,6 +411,9 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-RESULT message done", label)
 		return handled
 
+	//==================================================================
+	// DHT-P2P-HELLO
+	//==================================================================
 	case *message.DHTP2PHelloMsg:
 		//----------------------------------------------------------
 		// DHT-P2P HELLO
@@ -386,9 +465,9 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			})
 		}
 
-	//--------------------------------------------------------------
+	//==================================================================
 	// Legacy message types (not implemented)
-	//--------------------------------------------------------------
+	//==================================================================
 
 	case *message.DHTClientPutMsg:
 		//----------------------------------------------------------
