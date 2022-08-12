@@ -54,7 +54,7 @@ type ResultHandler interface {
 	Done() bool
 
 	// Key returns the query/store key as string
-	Key() string
+	Key() *crypto.HashCode
 
 	// Compare two result handlers
 	Compare(ResultHandler) int
@@ -110,8 +110,8 @@ func (t *GenericResultHandler) ID() int {
 }
 
 // Key returns the key string
-func (t *GenericResultHandler) Key() string {
-	return t.key.String()
+func (t *GenericResultHandler) Key() *crypto.HashCode {
+	return t.key
 }
 
 // Done returns true if the result handler is no longer active.
@@ -333,7 +333,7 @@ func NewResultHandlerList() *ResultHandlerList {
 // Add handler to list
 func (t *ResultHandlerList) Add(hdlr ResultHandler) bool {
 	// get current list of handlers for key
-	key := hdlr.Key()
+	key := hdlr.Key().String()
 	list, ok := t.list.Get(key, 0)
 	modified := false
 	if !ok {
