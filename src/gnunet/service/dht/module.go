@@ -52,8 +52,8 @@ func (lr *LocalResponder) Send(ctx context.Context, msg message.Message) error {
 	return nil
 }
 
-func (lr *LocalResponder) Receiver() string {
-	return "@"
+func (lr *LocalResponder) Receiver() *util.PeerID {
+	return nil
 }
 
 func (lr *LocalResponder) Close() {
