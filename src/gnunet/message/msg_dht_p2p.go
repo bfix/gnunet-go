@@ -113,20 +113,20 @@ func (m *DHTP2PGetMsg) Update(pf *blocks.PeerFilter, rf blocks.ResultFilter, hop
 
 // DHTP2PPutMsg wire layout
 type DHTP2PPutMsg struct {
-	MsgSize     uint16             `order:"big"`     // total size of message
-	MsgType     uint16             `order:"big"`     // DHT_P2P_PUT (146)
-	BType       uint32             `order:"big"`     // block type
-	Flags       uint16             `order:"big"`     // processing flags
-	HopCount    uint16             `order:"big"`     // message hops
-	ReplLvl     uint16             `order:"big"`     // replication level
-	PathL       uint16             `order:"big"`     // path length
-	Expiration  util.AbsoluteTime  ``                // expiration date
-	PeerFilter  *blocks.PeerFilter ``                // peer bloomfilter
-	Key         *crypto.HashCode   ``                // query key to block
-	TruncOrigin []byte             `size:"(PESize)"` // truncated origin (if TRUNCATED flag set)
-	PutPath     []*path.Entry      `size:"PathL"`    // PUT path
-	LastSig     []byte             `size:"(PESize)"` // signature of last hop (if RECORD_ROUTE flag is set)
-	Block       []byte             `size:"*"`        // block data
+	MsgSize     uint16              `order:"big"`    // total size of message
+	MsgType     uint16              `order:"big"`    // DHT_P2P_PUT (146)
+	BType       uint32              `order:"big"`    // block type
+	Flags       uint16              `order:"big"`    // processing flags
+	HopCount    uint16              `order:"big"`    // message hops
+	ReplLvl     uint16              `order:"big"`    // replication level
+	PathL       uint16              `order:"big"`    // path length
+	Expiration  util.AbsoluteTime   ``               // expiration date
+	PeerFilter  *blocks.PeerFilter  ``               // peer bloomfilter
+	Key         *crypto.HashCode    ``               // query key to block
+	TruncOrigin *util.PeerID        `opt:"(IsUsed)"` // truncated origin (if TRUNCATED flag set)
+	PutPath     []*path.Entry       `size:"PathL"`   // PUT path
+	LastSig     *util.PeerSignature `opt:"(IsUsed)"` // signature of last hop (if RECORD_ROUTE flag is set)
+	Block       []byte              `size:"*"`       // block data
 }
 
 // NewDHTP2PPutMsg creates an empty new DHTP2PPutMsg
@@ -149,19 +149,15 @@ func NewDHTP2PPutMsg() *DHTP2PPutMsg {
 	}
 }
 
-// PESize calculates field sizes based on flags and attributes
-func (m *DHTP2PPutMsg) PESize(field string) uint {
+// IsUsed returns true if an optional field is used
+func (m *DHTP2PPutMsg) IsUsed(field string) bool {
 	switch field {
 	case "Origin":
-		if m.Flags&enums.DHT_RO_TRUNCATED != 0 {
-			return util.NewPeerID(nil).Size()
-		}
+		return m.Flags&enums.DHT_RO_TRUNCATED != 0
 	case "LastSig":
-		if m.Flags&enums.DHT_RO_RECORD_ROUTE != 0 {
-			return util.NewPeerSignature(nil).Size()
-		}
+		return m.Flags&enums.DHT_RO_RECORD_ROUTE != 0
 	}
-	return 0
+	return false
 }
 
 //----------------------------------------------------------------------
@@ -171,13 +167,13 @@ func (m *DHTP2PPutMsg) Update(p *path.Path, pf *blocks.PeerFilter, hop uint16) *
 	msg := NewDHTP2PPutMsg()
 	msg.Flags = m.Flags
 	msg.HopCount = hop
-	msg.PathL = m.PathL
+	msg.PathL = p.NumList
 	msg.Expiration = m.Expiration
 	msg.PeerFilter = pf
 	msg.Key = m.Key.Clone()
-	msg.TruncOrigin = m.TruncOrigin
-	msg.PutPath = util.Clone(m.PutPath)
-	msg.LastSig = m.LastSig
+	msg.TruncOrigin = p.TruncOrigin
+	msg.PutPath = util.Clone(p.List)
+	msg.LastSig = p.LastSig
 	msg.Block = util.Clone(m.Block)
 	msg.SetPath(p)
 	return msg
@@ -199,11 +195,11 @@ func (m *DHTP2PPutMsg) Path(sender *util.PeerID) *path.Path {
 
 	// handle truncate origin
 	if m.Flags&enums.DHT_RO_TRUNCATED == 1 {
-		if m.TruncOrigin == nil || len(m.TruncOrigin) == 0 {
+		if m.TruncOrigin == nil {
 			logger.Printf(logger.WARN, "[path] truncated but no origin - flag reset")
 			m.Flags &^= enums.DHT_RO_TRUNCATED
 		} else {
-			pth.TruncOrigin = util.NewPeerID(m.TruncOrigin)
+			pth.TruncOrigin = m.TruncOrigin
 			pth.Flags |= path.PathTruncated
 		}
 	}
@@ -213,12 +209,12 @@ func (m *DHTP2PPutMsg) Path(sender *util.PeerID) *path.Path {
 	pth.NumList = uint16(len(pth.List))
 
 	// handle last hop signature
-	if m.LastSig == nil || len(m.LastSig) == 0 {
+	if m.LastSig == nil {
 		logger.Printf(logger.WARN, "[path]  - last hop signature missing - path reset")
 		return path.NewPath(crypto.Hash(m.Block), m.Expiration)
 	}
 	pth.Flags |= path.PathLastHop
-	pth.LastSig = util.NewPeerSignature(m.LastSig)
+	pth.LastSig = m.LastSig
 	pth.LastHop = sender
 	return pth
 }
@@ -235,7 +231,13 @@ func (m *DHTP2PPutMsg) SetPath(p *path.Path) {
 	if len(m.PutPath) > 0 {
 		pes = m.PutPath[0].Size()
 	}
-	oldSize := uint(len(m.PutPath))*pes + m.PESize("Origin") + m.PESize("LastSig")
+	oldSize := uint(len(m.PutPath)) * pes
+	if m.TruncOrigin != nil {
+		oldSize += m.TruncOrigin.Size()
+	}
+	if m.LastSig != nil {
+		oldSize += m.LastSig.Size()
+	}
 	// if no new path is defined,...
 	if p == nil {
 		// ... remove existing path
@@ -254,12 +256,12 @@ func (m *DHTP2PPutMsg) SetPath(p *path.Path) {
 	if p.TruncOrigin != nil {
 		// truncated path
 		m.Flags |= enums.DHT_RO_TRUNCATED
-		m.TruncOrigin = p.TruncOrigin.Bytes()
+		m.TruncOrigin = p.TruncOrigin
 	}
 	m.PutPath = util.Clone(p.List)
 	m.PathL = uint16(len(m.PutPath))
 	if p.LastSig != nil {
-		m.LastSig = p.LastSig.Bytes()
+		m.LastSig = p.LastSig
 	}
 }
 
@@ -283,51 +285,173 @@ func (m *DHTP2PPutMsg) Header() *Header {
 
 // DHTP2PResultMsg wire layout
 type DHTP2PResultMsg struct {
-	MsgSize  uint16            `order:"big"`     // total size of message
-	MsgType  uint16            `order:"big"`     // DHT_P2P_RESULT (148)
-	BType    uint32            `order:"big"`     // Block type of result
-	Reserved uint32            `order:"big"`     // Reserved for further use
-	PutPathL uint16            `order:"big"`     // size of PUTPATH field
-	GetPathL uint16            `order:"big"`     // size of GETPATH field
-	Expires  util.AbsoluteTime ``                // expiration date
-	Query    *crypto.HashCode  ``                // Query key for block
-	Origin   []byte            `size:"(PESize)"` // truncated origin (if TRUNCATED flag set)
-	PutPath  []*path.Entry     `size:"PutPathL"` // PUTPATH
-	GetPath  []*path.Entry     `size:"GetPathL"` // GETPATH
-	LastSig  []byte            `size:"(PESize)"` // signature of last hop (if RECORD_ROUTE flag is set)
-	Block    []byte            `size:"*"`        // block data
+	MsgSize     uint16              `order:"big"`      // total size of message
+	MsgType     uint16              `order:"big"`      // DHT_P2P_RESULT (148)
+	BType       uint32              `order:"big"`      // Block type of result
+	Flags       uint32              `order:"big"`      // Message flags
+	PutPathL    uint16              `order:"big"`      // size of PUTPATH field
+	GetPathL    uint16              `order:"big"`      // size of GETPATH field
+	Expires     util.AbsoluteTime   ``                 // expiration date
+	Query       *crypto.HashCode    ``                 // Query key for block
+	TruncOrigin *util.PeerID        `opt:"(IsUsed)"`   // truncated origin (if TRUNCATED flag set)
+	PathList    []*path.Entry       `size:"(NumPath)"` // PATH
+	LastSig     *util.PeerSignature `size:"(IsUsed)"`  // signature of last hop (if RECORD_ROUTE flag is set)
+	Block       []byte              `size:"*"`         // block data
 }
 
 // NewDHTP2PResultMsg creates a new empty DHTP2PResultMsg
 func NewDHTP2PResultMsg() *DHTP2PResultMsg {
 	return &DHTP2PResultMsg{
-		MsgSize:  88,                           // size of empty message
-		MsgType:  DHT_P2P_RESULT,               // DHT_P2P_RESULT (148)
-		BType:    uint32(enums.BLOCK_TYPE_ANY), // type of returned block
-		Origin:   nil,                          // no truncated origin
-		PutPathL: 0,                            // empty putpath
-		PutPath:  nil,                          // -"-
-		GetPathL: 0,                            // empty getpath
-		GetPath:  nil,                          // -"-
-		LastSig:  nil,                          // no recorded route
-		Block:    nil,                          // empty block
+		MsgSize:     88,                           // size of empty message
+		MsgType:     DHT_P2P_RESULT,               // DHT_P2P_RESULT (148)
+		BType:       uint32(enums.BLOCK_TYPE_ANY), // type of returned block
+		TruncOrigin: nil,                          // no truncated origin
+		PutPathL:    0,                            // empty putpath
+		GetPathL:    0,                            // empty getpath
+		PathList:    nil,                          // empty path list (put+get)
+		LastSig:     nil,                          // no recorded route
+		Block:       nil,                          // empty block
 	}
 }
 
-// PESize calculates field sizes based on flags and attributes
-func (m *DHTP2PResultMsg) PESize(field string) uint {
+// IsUsed returns if an optional field is present
+func (m *DHTP2PResultMsg) IsUsed(field string) bool {
 	switch field {
 	case "Origin":
-		//if m.Flags&enums.DHT_RO_TRUNCATED != 0 {
-		return 32
-		//}
+		return m.Flags&enums.DHT_RO_TRUNCATED != 0
 	case "LastSig":
-		//if m.Flags&enums.DHT_RO_RECORD_ROUTE != 0 {
-		return 64
-		//}
+		return m.Flags&enums.DHT_RO_RECORD_ROUTE != 0
 	}
-	return 0
+	return false
 }
+
+// NumPath returns the total number of entries in path
+func (m *DHTP2PResultMsg) NumPath(field string) uint {
+	return uint(m.GetPathL + m.PutPathL)
+}
+
+//----------------------------------------------------------------------
+// Path handling (get/set path in message)
+//----------------------------------------------------------------------
+
+// Path returns the current path from message
+func (m *DHTP2PResultMsg) Path(sender *util.PeerID) *path.Path {
+	// create a "real" path list from message data
+	pth := path.NewPath(crypto.Hash(m.Block), m.Expires)
+
+	// return empty path if recording is switched off
+	if m.Flags&enums.DHT_RO_RECORD_ROUTE == 0 {
+		return pth
+	}
+	// handle truncate origin
+	if m.Flags&enums.DHT_RO_TRUNCATED == 1 {
+		if m.TruncOrigin == nil {
+			logger.Printf(logger.WARN, "[path] truncated but no origin - flag reset")
+			m.Flags &^= enums.DHT_RO_TRUNCATED
+		} else {
+			pth.TruncOrigin = m.TruncOrigin
+			pth.Flags |= path.PathTruncated
+		}
+	}
+	// copy path elements
+	pth.List = util.Clone(m.PathList)
+	pth.NumList = uint16(len(pth.List))
+
+	// check consistent length values; adjust if mismatched
+	if m.GetPathL+m.PutPathL != pth.NumList {
+		logger.Printf(logger.WARN, "[path] Inconsistent PATH length -- adjusting...")
+		if sp := pth.NumList - m.PutPathL; sp > 0 {
+			pth.SplitPos = sp
+		} else {
+			pth.SplitPos = 0
+		}
+	} else {
+		pth.SplitPos = pth.NumList - m.PutPathL
+	}
+	// handle last hop signature
+	if m.LastSig == nil {
+		logger.Printf(logger.WARN, "[path]  - last hop signature missing - path reset")
+		return path.NewPath(crypto.Hash(m.Block), m.Expires)
+	}
+	pth.Flags |= path.PathLastHop
+	pth.LastSig = m.LastSig
+	pth.LastHop = sender
+	return pth
+}
+
+// Set path in message; corrects the message size accordingly
+func (m *DHTP2PResultMsg) SetPath(p *path.Path) {
+
+	// return if recording is switched off (don't touch path)
+	if m.Flags&enums.DHT_RO_RECORD_ROUTE == 0 {
+		return
+	}
+	// compute old path size
+	var pes uint
+	if len(m.PathList) > 0 {
+		pes = m.PathList[0].Size()
+	}
+	oldSize := uint(len(m.PathList)) * pes
+	if m.TruncOrigin != nil {
+		oldSize += m.TruncOrigin.Size()
+	}
+	if m.LastSig != nil {
+		oldSize += m.LastSig.Size()
+	}
+	// if no new path is defined,...
+	if p == nil {
+		// ... remove existing path
+		m.TruncOrigin = nil
+		m.PathList = make([]*path.Entry, 0)
+		m.LastSig = nil
+		m.GetPathL = 0
+		m.PutPathL = 0
+		m.Flags &^= enums.DHT_RO_TRUNCATED
+		m.MsgSize -= uint16(oldSize)
+		return
+	}
+	// adjust message size
+	m.MsgSize += uint16(p.Size() - oldSize)
+
+	// transfer path data
+	if p.TruncOrigin != nil {
+		// truncated path
+		m.Flags |= enums.DHT_RO_TRUNCATED
+		m.TruncOrigin = p.TruncOrigin
+	}
+	m.PathList = util.Clone(p.List)
+	m.PutPathL = p.SplitPos
+	m.GetPathL = p.NumList - p.SplitPos
+	if p.LastSig != nil {
+		m.LastSig = p.LastSig
+	}
+}
+
+//----------------------------------------------------------------------
+
+// Update message (forwarding)
+func (m *DHTP2PResultMsg) Update(pth *path.Path) *DHTP2PResultMsg {
+	// clone old message
+	msg := &DHTP2PResultMsg{
+		MsgSize:     m.MsgSize,
+		MsgType:     m.MsgType,
+		BType:       m.BType,
+		Flags:       m.Flags,
+		PutPathL:    m.PutPathL,
+		GetPathL:    m.GetPathL,
+		Expires:     m.Expires,
+		Query:       m.Query.Clone(),
+		TruncOrigin: m.TruncOrigin,
+		PathList:    util.Clone(m.PathList),
+		LastSig:     m.LastSig,
+		Block:       util.Clone(m.Block),
+	}
+	// set new path
+	msg.SetPath(pth)
+	return msg
+}
+
+//----------------------------------------------------------------------
 
 // String returns a human-readable representation of the message.
 func (m *DHTP2PResultMsg) String() string {
