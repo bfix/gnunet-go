@@ -21,6 +21,7 @@ package store
 import (
 	"encoding/hex"
 	"fmt"
+	"gnunet/crypto"
 	"gnunet/service/dht/blocks"
 	"gnunet/service/dht/path"
 	"gnunet/util"
@@ -35,9 +36,60 @@ import (
 // Filesystem-based storage
 //============================================================
 
-// FileStore implements a filesystem-based storage mechanism for
+//------------------------------------------------------------
+// DHT entry is an entity stored in the DHT
+//------------------------------------------------------------
+
+// DHTEntry to be stored to/retrieved from local storage
+type DHTEntry struct {
+	Blk  blocks.Block // reference to DHT block
+	Path *path.Path   // associated put path
+}
+
+//------------------------------------------------------------
+// DHT result is a single DHT result
+//------------------------------------------------------------
+
+// Result as returned by local DHT queries
+type DHTResult struct {
+	Entry *DHTEntry // reference to DHT entry
+	Dist  *math.Int // distance of entry to query key
+}
+
+//------------------------------------------------------------
+
+type DHTResultSet struct {
+	list []*DHTResult // list of DHT results
+	pos  int          // iterator position
+}
+
+func NewDHTResultSet() *DHTResultSet {
+	return &DHTResultSet{
+		list: make([]*DHTResult, 0),
+		pos:  0,
+	}
+}
+
+func (rs *DHTResultSet) Add(r *DHTResult) {
+	rs.list = append(rs.list, r)
+}
+
+func (rs *DHTResultSet) Next() (result *DHTResult) {
+	if rs.pos == len(rs.list) {
+		return nil
+	}
+	result = rs.list[rs.pos]
+	rs.pos++
+	return
+}
+
+//------------------------------------------------------------
+// DHT store
+//------------------------------------------------------------
+
+// DHTStore implements a filesystem-based storage mechanism for
 // DHT queries and blocks.
-type FileStore struct {
+type DHTStore struct {
 	path      string            // storage path
 	cache     bool              // storage works as cache
 	args      util.ParameterSet // arguments / settings
@@ -53,10 +105,10 @@ type FileStore struct {
 	size      int             // size of cache (number of entries)
 }
 
-// NewFileStore instantiates a new file storage.
-func NewFileStore(spec util.ParameterSet) (DHTStore, error) {
+// NewDHTStore instantiates a new file storage handler.
+func NewDHTStore(spec util.ParameterSet) (*DHTStore, error) {
 	// create file store handler
-	fs := new(FileStore)
+	fs := new(DHTStore)
 	fs.args = spec
 
 	// get parameter
@@ -93,7 +145,7 @@ func NewFileStore(spec util.ParameterSet) (DHTStore, error) {
 }
 
 // Close file storage.
-func (s *FileStore) Close() (err error) {
+func (s *DHTStore) Close() (err error) {
 	if !s.cache {
 		// close database connection
 		err = s.meta.Close()
@@ -102,7 +154,7 @@ func (s *FileStore) Close() (err error) {
 }
 
 // Put block into storage under given key
-func (s *FileStore) Put(query blocks.Query, entry *DHTEntry) (err error) {
+func (s *DHTStore) Put(query blocks.Query, entry *DHTEntry) (err error) {
 	// check for free space
 	if !s.cache {
 		if int(s.totalSize>>30) > s.maxSpace {
@@ -122,9 +174,10 @@ func (s *FileStore) Put(query blocks.Query, entry *DHTEntry) (err error) {
 	// compile metadata
 	now := util.AbsoluteTimeNow()
 	meta := &FileMetadata{
-		key:       query.Key().Bits,
+		key:       query.Key(),
 		size:      uint64(blkSize),
 		btype:     btype,
+		bhash:     crypto.Hash(entry.Blk.Bytes()),
 		expires:   expire,
 		stored:    now,
 		lastUsed:  now,
@@ -146,75 +199,73 @@ func (s *FileStore) Put(query blocks.Query, entry *DHTEntry) (err error) {
 }
 
 // Get block with given key from storage
-func (s *FileStore) Get(query blocks.Query) (entry *DHTEntry, err error) {
+func (s *DHTStore) Get(label string, query blocks.Query, rf blocks.ResultFilter) (results []*DHTEntry, err error) {
 	// check if we have metadata for the query
-	key := query.Key().Bits
-	btype := query.Type()
-	var md *FileMetadata
-	if md, err = s.meta.Get(key, btype); err != nil || md == nil {
+	var mds []*FileMetadata
+	if mds, err = s.meta.Get(query); err != nil || len(mds) == 0 {
 		return
 	}
-	// check for expired entry
-	if md.expires.Expired() {
-		err = s.dropFile(md)
-		return
+	// traverse list of results
+	for _, md := range mds {
+		// check for expired entry
+		if md.expires.Expired() {
+			if err = s.dropFile(md); err != nil {
+				logger.Printf(logger.ERROR, "[%s] can't drop DHT file: %s", label, err)
+			}
+			continue
+		}
+		// check for filtered block
+		if rf.ContainsHash(md.bhash) {
+			continue
+		}
+		// read entry from storage
+		var entry *DHTEntry
+		if entry, err = s.readEntry(md.key.Bits); err != nil {
+			logger.Printf(logger.ERROR, "[%s] can't read DHT entry: %s", label, err)
+			continue
+		}
+		results = append(results, entry)
+		// mark the block as newly used
+		if err = s.meta.Used(md.key.Bits, md.btype); err != nil {
+			logger.Printf(logger.ERROR, "[%s] can't flag DHT entry as used: %s", label, err)
+			continue
+		}
 	}
-	// mark the block as newly used
-	if err = s.meta.Used(key, btype); err != nil {
-		return
-	}
-	return s.readEntry(key)
+	return
 }
 
 // GetApprox returns the best-matching value with given key from storage
 // that is not excluded
-func (s *FileStore) GetApprox(query blocks.Query, excl func(*DHTEntry) bool) (entry *DHTEntry, key any, err error) {
-	var bestKey []byte
-	var bestEntry *DHTEntry
-	var bestDist *math.Int
-	// distance function
-	dist := func(a, b []byte) *math.Int {
-		c := make([]byte, len(a))
-		for i := range a {
-			c[i] = a[i] ^ b[i]
-		}
-		return math.NewIntFromBytes(c)
-	}
-	// iterate over all keys
-	check := func(md *FileMetadata) {
-		// check for better match
-		d := dist(md.key, query.Key().Bits)
-		var entry *DHTEntry
-		if bestKey == nil || d.Cmp(bestDist) < 0 {
-			// we might have a match. check block for exclusion
-			if entry, err = s.readEntry(md.key); err != nil {
-				logger.Printf(logger.ERROR, "[dhtstore] failed to retrieve block for %s", hex.EncodeToString(md.key))
-				return
-			}
-			if excl(entry) {
-				return
-			}
-			// remember best match
-			bestKey = md.key
-			bestEntry = entry
-			bestDist = d
-		}
-	}
-	if err = s.meta.Traverse(check); err != nil {
-		return
-	}
-	if bestEntry != nil {
-		// mark the block as newly used
-		if err = s.meta.Used(bestKey, bestEntry.Blk.Type()); err != nil {
+func (s *DHTStore) GetApprox(label string, query blocks.Query, rf blocks.ResultFilter) (results []*DHTResult, err error) {
+	// iterate over all keys; process each metadata instance
+	// (append to results if appropriate)
+	process := func(md *FileMetadata) {
+		// check for filtered block.
+		if rf.ContainsHash(md.bhash) {
+			// filtered out...
 			return
 		}
+		// check distance (max. 16 bucktes off)
+		dist := util.Distance(md.key.Bits, query.Key().Bits)
+		if (512 - dist.BitLen()) > 16 {
+			return
+		}
+		// read entry from storage
+		var entry *DHTEntry
+		if entry, err = s.readEntry(md.key.Bits); err != nil {
+			logger.Printf(logger.ERROR, "[%s] failed to retrieve block for %s", label, md.key.String())
+			return
+		}
+		// add to result list
+		result := &DHTResult{
+			Entry: entry,
+			Dist:  dist,
+		}
+		results = append(results, result)
 	}
-	return bestEntry, bestDist, nil
-}
-
-// Get a list of all stored block keys (generic query).
-func (s *FileStore) List() ([]blocks.Query, error) {
-	return nil, ErrStoreNoList
+	// traverse mestadata database
+	err = s.meta.Traverse(process)
+	return
 }
 
 //----------------------------------------------------------------------
@@ -227,7 +278,7 @@ type entryLayout struct {
 }
 
 // read entry from storage for given key
-func (s *FileStore) readEntry(key []byte) (entry *DHTEntry, err error) {
+func (s *DHTStore) readEntry(key []byte) (entry *DHTEntry, err error) {
 	// get path and filename from key
 	folder, fname := s.expandPath(key)
 
@@ -255,7 +306,7 @@ func (s *FileStore) readEntry(key []byte) (entry *DHTEntry, err error) {
 }
 
 // write entry to storage for given key
-func (s *FileStore) writeEntry(key []byte, entry *DHTEntry) (err error) {
+func (s *DHTStore) writeEntry(key []byte, entry *DHTEntry) (err error) {
 	// get folder and filename from key
 	folder, fname := s.expandPath(key)
 	// make sure the folder exists
@@ -287,14 +338,14 @@ func (s *FileStore) writeEntry(key []byte, entry *DHTEntry) (err error) {
 //----------------------------------------------------------------------
 
 // expandPath returns the full path to the file for given key.
-func (s *FileStore) expandPath(key []byte) (string, string) {
+func (s *DHTStore) expandPath(key []byte) (string, string) {
 	h := hex.EncodeToString(key)
 	return fmt.Sprintf("%s/%s/%s", s.path, h[:2], h[2:4]), h[4:]
 }
 
 // Prune list of file headers so we drop at least n entries.
 // returns number of removed entries.
-func (s *FileStore) prune(n int) (del int) {
+func (s *DHTStore) prune(n int) (del int) {
 	// collect obsolete records
 	obsolete, err := s.meta.Obsolete(n)
 	if err != nil {
@@ -311,16 +362,17 @@ func (s *FileStore) prune(n int) (del int) {
 }
 
 // drop file removes a file from metadatabase and the physical storage.
-func (s *FileStore) dropFile(md *FileMetadata) (err error) {
+func (s *DHTStore) dropFile(md *FileMetadata) (err error) {
 	// adjust total size
 	s.totalSize -= md.size
 	// remove from database
-	if err = s.meta.Drop(md.key, md.btype); err != nil {
+	if err = s.meta.Drop(md.key.Bits, md.btype); err != nil {
 		logger.Printf(logger.ERROR, "[store] can't remove metadata (%s,%d): %s", md.key, md.btype, err.Error())
 		return
 	}
 	// remove from filesystem
-	path := fmt.Sprintf("%s/%s/%s/%s", s.path, md.key[:2], md.key[2:4], md.key[4:])
+	h := hex.EncodeToString(md.key.Bits)
+	path := fmt.Sprintf("%s/%s/%s/%s", s.path, h[:2], h[2:4], h[4:])
 	if err = os.Remove(path); err != nil {
 		logger.Printf(logger.ERROR, "[store] can't remove file %s: %s", path, err.Error())
 	}

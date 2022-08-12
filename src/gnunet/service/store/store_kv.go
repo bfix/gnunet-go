@@ -24,8 +24,6 @@ import (
 	_ "embed" // use embedded filesystem
 	"errors"
 	"fmt"
-	"gnunet/service/dht/blocks"
-	"gnunet/service/dht/path"
 	"gnunet/util"
 
 	redis "github.com/go-redis/redis/v8"
@@ -41,65 +39,21 @@ var (
 )
 
 //------------------------------------------------------------
-// Generic storage interface. Can be used for persistent or
-// transient (caching) storage of key/value data.
-//------------------------------------------------------------
 
-// Store is a key/value storage where the type of the key is either
-// a SHA512 hash value or a string and the value is either a DHT
-// block or a string. It is possiblle to mix any key/value types,
-// but not used in this implementation.
-type Store[K, V any] interface {
+// KVStore us a eneric key/value storage interface. Can be used for
+// persistent or transient (caching) storage of stringed key/value data.
+type KVStore interface {
 	// Put value into storage under given key
-	Put(key K, val V) error
+	Put(key string, val string) error
 
 	// Get value with given key from storage
-	Get(key K) (V, error)
-
-	// GetApprox returns the best-matching value with given key from storage
-	// that is not excluded.
-	GetApprox(key K, excl func(V) bool) (V, any, error)
+	Get(key string) (string, error)
 
 	// List all store keys
-	List() ([]K, error)
+	List() ([]string, error)
 
 	// Close store
 	Close() error
-}
-
-//------------------------------------------------------------
-// Types for custom store requirements
-//------------------------------------------------------------
-
-// DHTEntry to be stored/retrieved
-type DHTEntry struct {
-	Blk  blocks.Block
-	Path *path.Path
-}
-
-// DHTStore for DHT queries and blocks
-type DHTStore Store[blocks.Query, *DHTEntry]
-
-// KVStore for key/value string pairs
-type KVStore Store[string, string]
-
-//------------------------------------------------------------
-// NewDHTStore creates a new storage handler with given spec
-// for use with DHT queries and blocks
-func NewDHTStore(spec util.ParameterSet) (DHTStore, error) {
-	// get the mode parameter
-	mode, ok := util.GetParam[string](spec, "mode")
-	if !ok {
-		return nil, ErrStoreInvalidSpec
-	}
-	switch mode {
-	//------------------------------------------------------------------
-	// File-base storage
-	//------------------------------------------------------------------
-	case "file":
-		return NewFileStore(spec)
-	}
-	return nil, ErrStoreUnknown
 }
 
 //------------------------------------------------------------
@@ -178,11 +132,6 @@ func (s *RedisStore) Get(key string) (value string, err error) {
 	return s.client.Get(context.TODO(), key).Result()
 }
 
-// GetApprox returns the best-matching value for given key from storage
-func (s *RedisStore) GetApprox(key string, crit func(string) bool) (value string, vkey any, err error) {
-	return "", "", ErrStoreNoApprox
-}
-
 // List all keys in store
 func (s *RedisStore) List() (keys []string, err error) {
 	var (
@@ -253,11 +202,6 @@ func (s *SQLStore) Get(key string) (value string, err error) {
 	row := s.db.QueryRow("select value from store where key=?", key)
 	err = row.Scan(&value)
 	return
-}
-
-// GetApprox returns the best-matching value for given key from storage
-func (s *SQLStore) GetApprox(key string, crit func(string) bool) (value string, vkey any, err error) {
-	return "", "", ErrStoreNoApprox
 }
 
 // List all keys in store

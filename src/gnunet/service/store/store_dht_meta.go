@@ -21,7 +21,9 @@ package store
 import (
 	"database/sql"
 	_ "embed"
+	"gnunet/crypto"
 	"gnunet/enums"
+	"gnunet/service/dht/blocks"
 	"gnunet/util"
 	"os"
 )
@@ -33,13 +35,22 @@ import (
 // FileMetadata holds information about a file (raw block data)
 // and is stored in a SQL database for faster access.
 type FileMetadata struct {
-	key       []byte            // storage key
+	key       *crypto.HashCode  // storage key
 	size      uint64            // size of file
 	btype     enums.BlockType   // block type
+	bhash     *crypto.HashCode  // block hash
 	stored    util.AbsoluteTime // time added to store
 	expires   util.AbsoluteTime // expiration time
 	lastUsed  util.AbsoluteTime // time last used
 	usedCount uint64            // usage count
+}
+
+// NewFileMetadata creates a new file metadata instance
+func NewFileMetadata() *FileMetadata {
+	return &FileMetadata{
+		key:   crypto.NewHashCode(nil),
+		bhash: crypto.NewHashCode(nil),
+	}
 }
 
 //------------------------------------------------------------
@@ -47,7 +58,7 @@ type FileMetadata struct {
 // blocks in file storage
 //------------------------------------------------------------
 
-//go:embed store_fs_meta.sql
+//go:embed store_dht_meta.sql
 var initScript []byte
 
 // FileMetaDB is a SQLite3 database for block metadata
@@ -86,42 +97,67 @@ func OpenMetaDB(path string) (db *FileMetaDB, err error) {
 // Store metadata in database: creates or updates a record for the metadata
 // in the database; primary key is the query key
 func (db *FileMetaDB) Store(md *FileMetadata) (err error) {
-	sql := "replace into meta(qkey,btype,size,stored,expires,lastUsed,usedCount) values(?,?,?,?,?,?,?)"
-	_, err = db.conn.Exec(sql, md.key, md.btype, md.size, md.stored.Epoch(), md.expires.Epoch(), md.lastUsed.Epoch(), md.usedCount)
+	sql := "replace into meta(qkey,btype,bhash,size,stored,expires,lastUsed,usedCount) values(?,?,?,?,?,?,?,?)"
+	_, err = db.conn.Exec(sql,
+		md.key.Bits, md.btype, md.bhash.Bits, md.size, md.stored.Epoch(),
+		md.expires.Epoch(), md.lastUsed.Epoch(), md.usedCount)
 	return
 }
 
 // Get block metadata from database
-func (db *FileMetaDB) Get(key []byte, btype enums.BlockType) (md *FileMetadata, err error) {
-	md = new(FileMetadata)
-	md.key = util.Clone(key)
-	md.btype = btype
-	stmt := "select size,stored,expires,lastUsed,usedCount from meta where qkey=? and btype=?"
-	row := db.conn.QueryRow(stmt, key, btype)
-	var st, exp, lu uint64
-	if err = row.Scan(&md.size, &st, &exp, &lu, &md.usedCount); err != nil {
-		if err == sql.ErrNoRows {
-			md = nil
-			err = nil
-		}
+func (db *FileMetaDB) Get(query blocks.Query) (mds []*FileMetadata, err error) {
+	// select rows in database matching the query
+	stmt := "select size,bhash,stored,expires,lastUsed,usedCount from meta where qkey=?"
+	btype := query.Type()
+	var rows *sql.Rows
+	if btype == enums.BLOCK_TYPE_ANY {
+		rows, err = db.conn.Query(stmt, query.Key().Bits)
 	} else {
+		rows, err = db.conn.Query(stmt+" and btype=?", query.Key().Bits, btype)
+	}
+	if err != nil {
+		return
+	}
+	// process results
+	for rows.Next() {
+		md := NewFileMetadata()
+		md.key = query.Key()
+		md.btype = btype
+		var st, exp, lu uint64
+		if err = rows.Scan(&md.size, &md.bhash.Bits, &st, &exp, &lu, &md.usedCount); err != nil {
+			if err == sql.ErrNoRows {
+				md = nil
+				err = nil
+			}
+			return
+		}
 		md.stored.Val = st * 1000000
 		md.expires.Val = exp * 1000000
 		md.lastUsed.Val = lu * 1000000
+		mds = append(mds, md)
 	}
 	return
 }
 
 // Drop metadata for block from database
-func (db *FileMetaDB) Drop(key []byte, btype enums.BlockType) error {
-	_, err := db.conn.Exec("delete from meta where qkey=? and btype=?", key, btype)
-	return err
+func (db *FileMetaDB) Drop(key []byte, btype enums.BlockType) (err error) {
+	if btype != enums.BLOCK_TYPE_ANY {
+		_, err = db.conn.Exec("delete from meta where qkey=? and btype=?", key, btype)
+	} else {
+		_, err = db.conn.Exec("delete from meta where qkey=?", key)
+	}
+	return
 }
 
 // Used a block from store: increment usage count and lastUsed time.
-func (db *FileMetaDB) Used(key []byte, btype enums.BlockType) error {
-	_, err := db.conn.Exec("update meta set usedCount=usedCount+1,lastUsed=unixepoch() where qkey=? and btype=?", key, btype)
-	return err
+func (db *FileMetaDB) Used(key []byte, btype enums.BlockType) (err error) {
+	stmt := "update meta set usedCount=usedCount+1,lastUsed=unixepoch() where qkey=?"
+	if btype != enums.BLOCK_TYPE_ANY {
+		_, err = db.conn.Exec(stmt+" and btype=?", key, btype)
+	} else {
+		_, err = db.conn.Exec(stmt, key)
+	}
+	return
 }
 
 // Obsolete collects records from the meta database that are considered
@@ -150,15 +186,15 @@ func (db *FileMetaDB) Obsolete(n int) (removable []*FileMetadata, err error) {
 
 // Traverse metadata records and call function on each record
 func (db *FileMetaDB) Traverse(f func(*FileMetadata)) error {
-	sql := "select qkey,btype,size,stored,expires,lastUsed,usedCount from meta"
+	sql := "select qkey,btype,bhash,size,stored,expires,lastUsed,usedCount from meta"
 	rows, err := db.conn.Query(sql)
 	if err != nil {
 		return err
 	}
-	md := new(FileMetadata)
+	md := NewFileMetadata()
 	for rows.Next() {
 		var st, exp, lu uint64
-		err = rows.Scan(&md.key, &md.btype, &md.size, &st, &exp, &lu, &md.usedCount)
+		err = rows.Scan(&md.key.Bits, &md.btype, &md.bhash.Bits, &md.size, &st, &exp, &lu, &md.usedCount)
 		if err != nil {
 			return err
 		}

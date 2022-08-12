@@ -54,12 +54,14 @@ func TestDHTFilesStore(t *testing.T) {
 	if _, err := os.Stat(path); err != nil {
 		os.MkdirAll(path, 0755)
 	}
-	fs, err := NewFileStore(cfg)
+	fs, err := NewDHTStore(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
 	// allocate keys
 	keys := make([]blocks.Query, 0, fsNumBlocks)
+	// create result filter
+	rf := blocks.NewGenericResultFilter()
 
 	// First round: save blocks
 	for i := 0; i < fsNumBlocks; i++ {
@@ -86,11 +88,14 @@ func TestDHTFilesStore(t *testing.T) {
 	// Second round: retrieve blocks and check
 	for i, key := range keys {
 		// get block
-		val, err := fs.Get(key)
+		vals, err := fs.Get("test", key, rf)
 		if err != nil {
 			t.Fatalf("[%d] %s", i, err)
 		}
-		buf := val.Blk.Bytes()
+		if len(vals) != 1 {
+			t.Fatalf("[%d] only one result expected", i)
+		}
+		buf := vals[0].Blk.Bytes()
 
 		// re-create key
 		k := crypto.Hash(buf)

@@ -19,6 +19,7 @@
 create table meta (
     qkey      blob,         -- key (SHA512 hash)
 	btype     integer,      -- block type
+	bhash     blob,         -- block hash
     size      integer,      -- size of file
 	stored    integer,      -- time added to store
 	expires   integer,      -- expiration time
