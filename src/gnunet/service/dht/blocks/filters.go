@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"crypto/sha512"
 	"encoding/binary"
+	"gnunet/crypto"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/logger"
@@ -105,8 +106,11 @@ type ResultFilter interface {
 	// Add entry to filter
 	Add(Block)
 
-	// Contains returns true if entry is filtered
+	// Contains returns true if block is filtered
 	Contains(Block) bool
+
+	// ContainsHash returns true if block hash is filtered
+	ContainsHash(bh *crypto.HashCode) bool
 
 	// Bytes returns the binary representation of a result filter
 	Bytes() []byte
@@ -140,9 +144,15 @@ func (rf *GenericResultFilter) Add(b Block) {
 	rf.bf.Add(b.Bytes())
 }
 
-// Contains returns true if entry (binary representation) is filtered
+// Contains returns true if a block is filtered
 func (rf *GenericResultFilter) Contains(b Block) bool {
-	return rf.bf.Contains(b.Bytes())
+	bh := crypto.Hash(b.Bytes())
+	return rf.bf.Contains(bh.Bits)
+}
+
+// ContainsHash returns true if a block hash is filtered
+func (rf *GenericResultFilter) ContainsHash(bh *crypto.HashCode) bool {
+	return rf.bf.Contains(bh.Bits)
 }
 
 // Bytes returns the binary representation of a result filter

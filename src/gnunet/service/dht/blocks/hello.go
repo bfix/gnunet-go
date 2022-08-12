@@ -428,6 +428,11 @@ func (rf *HelloResultFilter) Contains(b Block) bool {
 	return false
 }
 
+// ContainsHash checks if a block hash is contained in the result filter
+func (rf *HelloResultFilter) ContainsHash(bh *crypto.HashCode) bool {
+	return rf.bf.Contains(bh.Bits)
+}
+
 // Bytes returns a binary representation of a HELLO result filter
 func (rf *HelloResultFilter) Bytes() []byte {
 	return rf.bf.Bytes()
