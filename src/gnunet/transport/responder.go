@@ -33,8 +33,9 @@ type Responder interface {
 	// Handle outgoing message
 	Send(ctx context.Context, msg message.Message) error
 
-	// Receiver returns the receiving peer (string representation)
-	Receiver() string
+	// Receiver returns the receiving peer. Returns nil if
+	// this is a local responder (service.Connection)
+	Receiver() *util.PeerID
 }
 
 //----------------------------------------------------------------------
@@ -55,6 +56,6 @@ func (r *TransportResponder) Send(ctx context.Context, msg message.Message) erro
 }
 
 // Receiver returns the receiving peer id
-func (r *TransportResponder) Receiver() string {
-	return r.Peer.String()
+func (r *TransportResponder) Receiver() *util.PeerID {
+	return r.Peer
 }
