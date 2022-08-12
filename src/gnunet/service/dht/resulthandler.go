@@ -22,8 +22,10 @@ import (
 	"bytes"
 	"context"
 	"gnunet/crypto"
+	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service/dht/blocks"
+	"gnunet/service/dht/path"
 	"gnunet/transport"
 	"gnunet/util"
 	"time"
@@ -61,7 +63,7 @@ type ResultHandler interface {
 	Merge(ResultHandler) bool
 
 	// Handle result message
-	Handle(context.Context, *message.DHTP2PResultMsg) bool
+	Handle(ctx context.Context, msg *message.DHTP2PResultMsg, pth *path.Path, sender, local *util.PeerID) bool
 }
 
 // Compare return values
@@ -176,15 +178,28 @@ func NewForwardResultHandler(msgIn message.Message, rf blocks.ResultFilter, back
 }
 
 // Handle incoming DHT-P2P-RESULT message
-func (t *ForwardResultHandler) Handle(ctx context.Context, msg *message.DHTP2PResultMsg) bool {
+func (t *ForwardResultHandler) Handle(ctx context.Context, msg *message.DHTP2PResultMsg, pth *path.Path, sender, local *util.PeerID) bool {
 	// don't send result if it is filtered out
 	if !t.Proceed(ctx, msg) {
 		logger.Printf(logger.DBG, "[dht-task-%d] result filtered out -- already known", t.id)
 		return false
 	}
+	// extend path if route is recorded
+	pp := pth.Clone()
+	if msg.Flags&enums.DHT_RO_RECORD_ROUTE != 0 {
+		// yes: add path element for remote receivers
+		if rcv := t.resp.Receiver(); rcv != nil {
+			pe := pp.NewElement(sender, local, rcv)
+			pp.Add(pe)
+		}
+	}
+
+	// build updated PUT message
+	msgOut := msg.Update(pp)
+
 	// send result message back to originator (result forwarding).
 	logger.Printf(logger.INFO, "[dht-task-%d] sending result back to originator", t.id)
-	if err := t.resp.Send(ctx, msg); err != nil && err != transport.ErrEndpMaybeSent {
+	if err := t.resp.Send(ctx, msgOut); err != nil && err != transport.ErrEndpMaybeSent {
 		logger.Printf(logger.ERROR, "[dht-task-%d] sending result back to originator failed: %s", t.id, err.Error())
 		return false
 	}
@@ -237,7 +252,7 @@ func (t *ForwardResultHandler) Merge(h ResultHandler) bool {
 //----------------------------------------------------------------------
 
 // ResultHandlerFcn is the function prototype for custom handlers:
-type ResultHandlerFcn func(context.Context, *message.DHTP2PResultMsg, chan<- any) bool
+type ResultHandlerFcn func(context.Context, *message.DHTP2PResultMsg, *path.Path, chan<- any) bool
 
 // DirectResultHandler for local DHT-P2P-GET requests
 type DirectResultHandler struct {
@@ -262,7 +277,7 @@ func NewDirectResultHandler(msgIn message.Message, rf blocks.ResultFilter, hdlr 
 }
 
 // Handle incoming DHT-P2P-RESULT message
-func (t *DirectResultHandler) Handle(ctx context.Context, msg *message.DHTP2PResultMsg) bool {
+func (t *DirectResultHandler) Handle(ctx context.Context, msg *message.DHTP2PResultMsg, pth *path.Path, sender, local *util.PeerID) bool {
 	// don't send result if it is filtered out
 	if !t.Proceed(ctx, msg) {
 		logger.Printf(logger.DBG, "[dht-task-%d] result filtered out -- already known", t.id)
@@ -271,7 +286,7 @@ func (t *DirectResultHandler) Handle(ctx context.Context, msg *message.DHTP2PRes
 	// check for correct message type and handler function
 	if t.hdlr != nil {
 		logger.Printf(logger.INFO, "[dht-task-%d] handling result message", t.id)
-		return t.hdlr(ctx, msg, t.rc)
+		return t.hdlr(ctx, msg, pth, t.rc)
 	}
 	return false
 }

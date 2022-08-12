@@ -250,7 +250,6 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 				logger.Printf(logger.ERROR, "[%s] failed to store DHT entry: %s", label, err.Error())
 			}
 		}
-
 		//--------------------------------------------------------------
 		// if the put is for a HELLO block, add the sender to the
 		// routing table (9.3.2.9)
@@ -272,7 +271,6 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 				}
 			}
 		}
-
 		//--------------------------------------------------------------
 		// check if we need to forward
 		if !closest || demux {
@@ -314,6 +312,10 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		//----------------------------------------------------------
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-RESULT message", label)
 
+		// verify path
+		pth := msg.Path(sender)
+		pth.Verify(local)
+
 		// check task list for handler
 		key := msg.Query.String()
 		logger.Printf(logger.DBG, "[%s] DHT-P2P-RESULT key = %s", label, key)
@@ -322,7 +324,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			for _, rh := range list {
 				logger.Printf(logger.DBG, "[%s] Task #%d for DHT-P2P-RESULT found", label, rh.ID())
 				//  handle the message
-				go rh.Handle(ctx, msg)
+				go rh.Handle(ctx, msg, pth, sender, local)
 				handled = true
 			}
 			return true
