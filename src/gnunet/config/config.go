@@ -90,9 +90,9 @@ type ServiceConfig struct {
 
 // GNSConfig contains parameters for the GNU Name System service
 type GNSConfig struct {
-	Service      *ServiceConfig `json:"service"`      // socket for GNS service
-	DHTReplLevel int            `json:"dhtReplLevel"` // DHT replication level
-	MaxDepth     int            `json:"maxDepth"`     // maximum recursion depth in resolution
+	Service   *ServiceConfig `json:"service"`   // socket for GNS service
+	ReplLevel int            `json:"replLevel"` // DHT replication level
+	MaxDepth  int            `json:"maxDepth"`  // maximum recursion depth in resolution
 }
 
 //----------------------------------------------------------------------
@@ -109,7 +109,8 @@ type DHTConfig struct {
 
 // RoutingConfig holds parameters for routing tables
 type RoutingConfig struct {
-	PeerTTL int `json:"peerTTL"` // time-out for peers in table
+	PeerTTL   int `json:"peerTTL"`   // time-out for peers in table
+	ReplLevel int `json:"replLevel"` // replication level
 }
 
 //----------------------------------------------------------------------

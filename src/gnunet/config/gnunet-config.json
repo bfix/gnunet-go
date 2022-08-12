@@ -37,7 +37,8 @@
             "maxGB": 10
         },
         "routing": {
-            "peerTTL": 10800
+            "peerTTL": 10800,
+            "replLevel": 5
         },
         "heartbeat": 900
     },
@@ -48,7 +49,7 @@
                 "perm": "0770"
             }
         },
-        "dhtReplLevel": 10,
+        "replLevel": 10,
         "maxDepth": 250
     },
     "namecache": {
