@@ -20,6 +20,7 @@ package namecache
 
 import (
 	"context"
+	"errors"
 	"gnunet/config"
 	"gnunet/core"
 	"gnunet/service"
@@ -39,7 +40,7 @@ import (
 type Module struct {
 	service.ModuleImpl
 
-	cache store.DHTStore // transient block cache
+	cache *store.DHTStore // transient block cache
 }
 
 // NewModule creates a new module instance.
@@ -67,13 +68,18 @@ func (m *Module) Import(fcm map[string]any) {
 
 //----------------------------------------------------------------------
 
-// Get an entry from the cache if available.
+// Get entry from the cache if available.
 func (m *Module) Get(ctx context.Context, query *blocks.GNSQuery) (block *blocks.GNSBlock, err error) {
-	var e *store.DHTEntry
-	if e, err = m.cache.Get(query); err != nil {
+	var e []*store.DHTEntry
+	rf := blocks.NewGenericResultFilter()
+	if e, err = m.cache.Get("namecache", query, rf); err != nil {
 		return
 	}
-	err = blocks.Unwrap(e.Blk, block)
+	if len(e) != 1 {
+		err = errors.New("only one DHT entry exppected")
+	} else {
+		err = blocks.Unwrap(e[0].Blk, block)
+	}
 	return
 }
 
