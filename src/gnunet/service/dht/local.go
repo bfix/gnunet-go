@@ -19,7 +19,6 @@
 package dht
 
 import (
-	"errors"
 	"gnunet/enums"
 	"gnunet/service/dht/blocks"
 	"gnunet/service/store"
@@ -28,58 +27,37 @@ import (
 	"github.com/bfix/gospel/math"
 )
 
-// getHelloCache tries to find the requested HELLO block in the HELLO cache
-func (m *Module) getHelloCache(label string, addr *PeerAddress, rf blocks.ResultFilter) (entry *store.DHTEntry, dist *math.Int) {
+// lookupHelloCache tries to find the requested HELLO block in the HELLO cache
+func (m *Module) lookupHelloCache(label string, addr *PeerAddress, rf blocks.ResultFilter, approx bool) (results []*store.DHTResult) {
 	logger.Printf(logger.DBG, "[%s] GET message for HELLO: check cache", label)
 	// find best cached HELLO
-	var block blocks.Block
-	block, dist = m.rtable.BestHello(addr, rf)
-
-	// if block is filtered, skip it
-	if block != nil {
-		if !rf.Contains(block) {
-			entry = &store.DHTEntry{Blk: block}
-		} else {
-			logger.Printf(logger.DBG, "[%s] GET message for HELLO: matching DHT block is filtered", label)
-			entry = nil
-			dist = nil
-		}
-	}
-	return
+	return m.rtable.LookupHello(addr, rf, approx)
 }
 
 // getLocalStorage tries to find the requested block in local storage
-func (m *Module) getLocalStorage(label string, query blocks.Query, rf blocks.ResultFilter) (entry *store.DHTEntry, dist *math.Int, err error) {
+func (m *Module) getLocalStorage(label string, query blocks.Query, rf blocks.ResultFilter) (results []*store.DHTResult, err error) {
 
-	// query DHT store for exact match  (9.4.3.3c)
-	if entry, err = m.store.Get(query); err != nil {
+	// query DHT store for exact matches  (9.4.3.3c)
+	var entries []*store.DHTEntry
+	if entries, err = m.store.Get(label, query, rf); err != nil {
 		logger.Printf(logger.ERROR, "[%s] Failed to get DHT block from storage: %s", label, err.Error())
 		return
 	}
-	if entry != nil {
-		dist = math.ZERO
-		// check if we are filtered out
-		if rf.Contains(entry.Blk) {
-			logger.Printf(logger.DBG, "[%s] matching DHT block is filtered", label)
-			entry = nil
-			dist = nil
+	for _, entry := range entries {
+		// add entry to result list
+		result := &store.DHTResult{
+			Entry: entry,
+			Dist:  math.ZERO,
 		}
+		results = append(results, result)
+		// add to result filter
+		rf.Add(entry.Blk)
 	}
 	// if we have no exact match, find approximate block if requested
-	if entry == nil || query.Flags()&enums.DHT_RO_FIND_APPROXIMATE != 0 {
+	if len(results) == 0 || query.Flags()&enums.DHT_RO_FIND_APPROXIMATE != 0 {
 		// no exact match: find approximate (9.4.3.3b)
-		match := func(e *store.DHTEntry) bool {
-			return rf.Contains(e.Blk)
-		}
-		var d any
-		entry, d, err = m.store.GetApprox(query, match)
-		var ok bool
-		dist, ok = d.(*math.Int)
-		if !ok {
-			err = errors.New("no approx distance")
-		}
-		if err != nil {
-			logger.Printf(logger.ERROR, "[%s] Failed to get (approx.) DHT block from storage: %s", label, err.Error())
+		if results, err = m.store.GetApprox(label, query, rf); err != nil {
+			logger.Printf(logger.ERROR, "[%s] Failed to get (approx.) DHT blocks from storage: %s", label, err.Error())
 		}
 	}
 	return

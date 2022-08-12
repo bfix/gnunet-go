@@ -29,7 +29,6 @@ import (
 	"gnunet/util"
 
 	"github.com/bfix/gospel/logger"
-	"github.com/bfix/gospel/math"
 )
 
 //----------------------------------------------------------------------
@@ -63,10 +62,10 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		// DHT-P2P GET
 		//--------------------------------------------------------------
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-GET message", label)
-		query := blocks.NewGenericQuery(msg.Query, enums.BlockType(msg.BType), msg.Flags)
 
-		var entry *store.DHTEntry
-		var dist *math.Int
+		// assemble query and initialize (cache) results
+		query := blocks.NewGenericQuery(msg.Query, enums.BlockType(msg.BType), msg.Flags)
+		var results []*store.DHTResult
 
 		//--------------------------------------------------------------
 		// validate query (based on block type requested)  (9.4.3.1)
@@ -113,7 +112,8 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		closest := m.rtable.IsClosestPeer(nil, addr, msg.PeerFilter, 0)
 		demux := int(msg.Flags)&enums.DHT_RO_DEMULTIPLEX_EVERYWHERE != 0
 		approx := int(msg.Flags)&enums.DHT_RO_FIND_APPROXIMATE != 0
-		// actions
+
+		// enforced actions
 		doResult := closest || (demux && approx)
 		doForward := !closest || (demux && !approx)
 		logger.Printf(logger.DBG, "[%s] GET message: closest=%v, demux=%v, approx=%v --> result=%v, forward=%v",
@@ -122,53 +122,36 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		//------------------------------------------------------
 		// query for a HELLO? (9.4.3.3a)
 		if btype == enums.BLOCK_TYPE_DHT_URL_HELLO {
-			// try to find result in HELLO cache
-			entry, dist = m.getHelloCache(label, addr, rf)
+			// try to find results in HELLO cache
+			results = m.lookupHelloCache(label, addr, rf, approx)
 		}
-		//--------------------------------------------------------------
-		// find the closest block that has that is not filtered by the result
-		// filter (in case we did not find an appropriate block in cache).
-		if doResult {
-			// save best-match values from cache
-			entryCache := entry
-			distCache := dist
-			dist = nil
 
-			// if we don't have an exact match, try storage lookup
-			if entryCache == nil || (distCache != nil && !distCache.Equals(math.ZERO)) {
-				// get entry from local storage
-				var err error
-				if entry, dist, err = m.getLocalStorage(label, query, rf); err != nil {
-					entry = nil
-					dist = nil
-				}
-				// if we have a block from cache, check if it is better than the
-				// block found in the DHT
-				if entryCache != nil && dist != nil && distCache.Cmp(dist) < 0 {
-					entry = entryCache
-					dist = distCache
+		//--------------------------------------------------------------
+		// query flags demand a result
+		if doResult {
+			// if we don't have a result from cache or are in approx mode,
+			// try storage lookup
+			if len(results) == 0 || approx {
+				// get results from local storage
+				lclResults, err := m.getLocalStorage(label, query, rf)
+				if err == nil {
+					// append local results
+					results = append(results, lclResults...)
 				}
 			}
-			// if we have a block, send it as response
-			if entry != nil {
+			// if we have results, send them as response
+			for _, result := range results {
+				// update get path
+				pth := result.Entry.Path.Clone()
+
 				logger.Printf(logger.INFO, "[%s] sending DHT result message to caller", label)
-				if err := m.sendResult(ctx, query, entry.Blk, back); err != nil {
+				if err := m.sendResult(ctx, query, result.Entry.Blk, pth, back); err != nil {
 					logger.Printf(logger.ERROR, "[%s] Failed to send DHT result message: %s", label, err.Error())
 				}
 			}
 		}
-		// check if we need to forward message based on filter result
-		if entry != nil && blockHdlr != nil {
-			switch blockHdlr.FilterResult(entry.Blk, query.Key(), rf, msg.XQuery) {
-			case blocks.RF_LAST:
-				// no need for further results
-			case blocks.RF_MORE:
-				// possibly more results
-				doForward = true
-			case blocks.RF_DUPLICATE, blocks.RF_IRRELEVANT:
-				// do not forward
-			}
-		}
+		//--------------------------------------------------------------
+		// query flags demand a result
 		if doForward {
 			// build updated GET message
 			pf.Add(local)
@@ -446,7 +429,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 }
 
 // send a result back to caller
-func (m *Module) sendResult(ctx context.Context, query blocks.Query, blk blocks.Block, back transport.Responder) error {
+func (m *Module) sendResult(ctx context.Context, query blocks.Query, blk blocks.Block, pth *path.Path, back transport.Responder) error {
 	// assemble result message
 	out := message.NewDHTP2PResultMsg()
 	out.BType = uint32(query.Type())

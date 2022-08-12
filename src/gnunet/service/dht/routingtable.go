@@ -25,6 +25,7 @@ import (
 	"gnunet/config"
 	"gnunet/crypto"
 	"gnunet/service/dht/blocks"
+	"gnunet/service/store"
 	"gnunet/util"
 	"sync"
 	"time"
@@ -84,11 +85,7 @@ func (addr *PeerAddress) Equals(p *PeerAddress) bool {
 // Distance between two addresses: returns a distance value and a
 // bucket index (smaller index = less distant).
 func (addr *PeerAddress) Distance(p *PeerAddress) (*math.Int, int) {
-	d := make([]byte, 64)
-	for i := range d {
-		d[i] = addr.Key.Bits[i] ^ p.Key.Bits[i]
-	}
-	r := math.NewIntFromBytes(d)
+	r := util.Distance(addr.Key.Bits, p.Key.Bits)
 	return r, 512 - r.BitLen()
 }
 
@@ -371,18 +368,29 @@ func (rt *RoutingTable) heartbeat(ctx context.Context) {
 
 //----------------------------------------------------------------------
 
-func (rt *RoutingTable) BestHello(addr *PeerAddress, rf blocks.ResultFilter) (hb *blocks.HelloBlock, dist *math.Int) {
-	// iterate over cached HELLOs to find (best) match first
-	_ = rt.helloCache.ProcessRange(func(key string, val *blocks.HelloBlock, _ int) error {
+// LookupHello returns blocks from the HELLO cache for given query.
+func (rt *RoutingTable) LookupHello(addr *PeerAddress, rf blocks.ResultFilter, approx bool) (results []*store.DHTResult) {
+	// iterate over cached HELLOs to find matches;
+	// approximate search is limited by distance (max. diff for bucket index is 16)
+	_ = rt.helloCache.ProcessRange(func(key string, hb *blocks.HelloBlock, _ int) error {
 		// check if block is excluded by result filter
-		if !rf.Contains(val) {
-			// check for better match
-			p := NewPeerAddress(val.PeerID)
-			d, _ := addr.Distance(p)
-			if hb == nil || d.Cmp(dist) < 0 {
-				hb = val
-				dist = d
+		var result *store.DHTResult
+		if !rf.Contains(hb) {
+			// no: possible result, compute distance
+			p := NewPeerAddress(hb.PeerID)
+			dist, idx := addr.Distance(p)
+			result = &store.DHTResult{
+				Entry: &store.DHTEntry{
+					Blk: hb,
+				},
+				Dist: dist,
 			}
+			// check if we need to add result
+			if (approx && idx < 16) || idx == 0 {
+				results = append(results, result)
+			}
+		} else {
+			logger.Printf(logger.DBG, "[RT] GET-HELLO: cache block is filtered")
 		}
 		return nil
 	}, true)

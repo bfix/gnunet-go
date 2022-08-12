@@ -24,6 +24,7 @@ import (
 	"gnunet/config"
 	"gnunet/core"
 	"gnunet/crypto"
+	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
@@ -33,7 +34,6 @@ import (
 	"time"
 
 	"github.com/bfix/gospel/logger"
-	"github.com/bfix/gospel/math"
 )
 
 //======================================================================
@@ -68,8 +68,9 @@ func (lr *LocalResponder) Close() {
 type Module struct {
 	service.ModuleImpl
 
-	store store.DHTStore // reference to the block storage mechanism
-	core  *core.Core     // reference to core services
+	cfg   *config.DHTConfig // configuraion parameters
+	store *store.DHTStore   // reference to the block storage mechanism
+	core  *core.Core        // reference to core services
 
 	rtable    *RoutingTable           // routing table
 	lastHello *message.DHTP2PHelloMsg // last own HELLO message used; re-create if expired
@@ -80,7 +81,7 @@ type Module struct {
 // mechanism for persistence.
 func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Module, err error) {
 	// create permanent storage handler
-	var storage store.DHTStore
+	var storage *store.DHTStore
 	if storage, err = store.NewDHTStore(cfg.Storage); err != nil {
 		return
 	}
@@ -90,6 +91,7 @@ func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Mod
 	// return module instance
 	m = &Module{
 		ModuleImpl: *service.NewModuleImpl(),
+		cfg:        cfg,
 		store:      storage,
 		core:       c,
 		rtable:     rt,
@@ -99,6 +101,46 @@ func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Mod
 	pulse := time.Duration(cfg.Heartbeat) * time.Second
 	listener := m.Run(ctx, m.event, m.Filter(), pulse, m.heartbeat)
 	c.Register("dht", listener)
+
+	// run periodic tasks (8.2. peer discovery)
+	ticker := time.NewTicker(5 * time.Minute)
+	key := crypto.Hash(m.core.PeerID().Data)
+	flags := uint16(enums.DHT_RO_FIND_APPROXIMATE | enums.DHT_RO_DEMULTIPLEX_EVERYWHERE)
+	var resCh chan blocks.Block
+	go func() {
+		for {
+			select {
+			// initiate peer discovery
+			case <-ticker.C:
+				// query DHT for our own HELLO block
+				query := blocks.NewGenericQuery(key, enums.BLOCK_TYPE_DHT_HELLO, flags)
+				resCh = m.Get(ctx, query)
+
+			// handle peer discover results
+			case res := <-resCh:
+				// check for correct type
+				btype := res.Type()
+				if btype == enums.BLOCK_TYPE_DHT_HELLO {
+					hb, ok := res.(*blocks.HelloBlock)
+					if !ok {
+						logger.Printf(logger.WARN, "[dht] peer discovery received invalid block data")
+					} else {
+						// cache HELLO block
+						m.rtable.CacheHello(hb)
+						// add sender to routing table
+						m.rtable.Add(NewPeerAddress(hb.PeerID), "dht")
+					}
+				} else {
+					logger.Printf(logger.WARN, "[dht] peer discovery received invalid block type %s", btype.String())
+				}
+
+			// termination
+			case <-ctx.Done():
+				ticker.Stop()
+				return
+			}
+		}
+	}()
 	return
 }
 
@@ -123,14 +165,14 @@ func (m *Module) Get(ctx context.Context, query blocks.Query) (res chan blocks.B
 		logger.Println(logger.WARN, "[dht] unknown result filter implementation -- skipped")
 	}
 	// get additional query parameters
-	xquery, ok := util.GetParam[[]byte](query.Params(), "xquery")
+	xquery, _ := util.GetParam[[]byte](query.Params(), "xquery")
 
 	// assemble a new GET message
 	msg := message.NewDHTP2PGetMsg()
 	msg.BType = uint32(query.Type())
 	msg.Flags = query.Flags()
 	msg.HopCount = 0
-	msg.ReplLevel = 10
+	msg.ReplLevel = uint16(m.cfg.Routing.ReplLevel)
 	msg.PeerFilter = blocks.NewPeerFilter()
 	msg.ResFilter = rf.Bytes()
 	msg.RfSize = uint16(len(msg.ResFilter))
@@ -163,19 +205,8 @@ func (m *Module) Get(ctx context.Context, query blocks.Query) (res chan blocks.B
 }
 
 // GetApprox returns the first block not excluded ["dht:getapprox"]
-func (m *Module) GetApprox(ctx context.Context, query blocks.Query, excl func(*store.DHTEntry) bool) (entry *store.DHTEntry, dist *math.Int, err error) {
-	var val any
-	if entry, val, err = m.store.GetApprox(query, excl); err != nil {
-		return
-	}
-	hc, ok := val.(*crypto.HashCode)
-	if !ok {
-		err = errors.New("no approx result")
-	}
-	asked := NewQueryAddress(query.Key())
-	found := NewQueryAddress(hc)
-	dist, _ = found.Distance(asked)
-	return
+func (m *Module) GetApprox(ctx context.Context, query blocks.Query, rf blocks.ResultFilter) (results []*store.DHTResult, err error) {
+	return m.store.GetApprox("dht", query, rf)
 }
 
 // Put a block into the DHT ["dht:put"]
@@ -191,7 +222,7 @@ func (m *Module) Put(ctx context.Context, query blocks.Query, block blocks.Block
 	msg.Flags = query.Flags()
 	msg.HopCount = 0
 	msg.PeerFilter = blocks.NewPeerFilter()
-	msg.ReplLvl = 10
+	msg.ReplLvl = uint16(m.cfg.Routing.ReplLevel)
 	msg.Expiration = expire
 	msg.Block = block.Bytes()
 	msg.Key = query.Key().Clone()
