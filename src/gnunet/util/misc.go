@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/bfix/gospel/data"
+	"github.com/bfix/gospel/math"
 )
 
 //----------------------------------------------------------------------
@@ -75,6 +76,16 @@ func GetParam[V any](params ParameterSet, key string) (i V, ok bool) {
 //----------------------------------------------------------------------
 // additional helpers
 //----------------------------------------------------------------------
+
+// Distance returns the XOR distance between to byte arrays
+func Distance(a, b []byte) *math.Int {
+	size := len(a)
+	d := make([]byte, size)
+	for i := range d {
+		d[i] = a[i] ^ b[i]
+	}
+	return math.NewIntFromBytes(d)
+}
 
 // StripPathRight returns a dot-separated path without
 // its last (right-most) element.
