@@ -38,8 +38,8 @@ var (
 //----------------------------------------------------------------------
 // Entry is an element of the path list
 type Entry struct {
-	Signer    *util.PeerID        // path element signer
 	Signature *util.PeerSignature // path element signature
+	Signer    *util.PeerID        // path element signer
 }
 
 // Size returns the size of a path element in wire format
