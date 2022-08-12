@@ -138,8 +138,8 @@ func (s *Connection) Receive(ctx context.Context) (message.Message, error) {
 }
 
 // Receiver returns the receiving client (string representation)
-func (s *Connection) Receiver() string {
-	return fmt.Sprintf("uds:%d", s.id)
+func (s *Connection) Receiver() *util.PeerID {
+	return nil
 }
 
 //----------------------------------------------------------------------
