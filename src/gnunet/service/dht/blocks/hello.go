@@ -326,13 +326,26 @@ func (bh *HelloBlockHandler) ValidateBlockQuery(key *crypto.HashCode, xquery []b
 // ValidateBlockKey returns true if the block key is the same as the
 // query key used to access the block.
 func (bh *HelloBlockHandler) ValidateBlockKey(b Block, key *crypto.HashCode) bool {
-	hb, ok := b.(*HelloBlock)
-	if !ok {
+	// check for matching keys
+	bkey := bh.DeriveBlockKey(b)
+	if bkey == nil {
 		return false
 	}
-	// key must be the hash of the peer id
-	bkey := crypto.Hash(hb.PeerID.Bytes())
 	return key.Equals(bkey)
+}
+
+// DeriveBlockKey is used to synthesize the block key from the block
+// payload as part of PutMessage and ResultMessage processing. The special
+// return value of 'nil' implies that this block type does not permit
+// deriving the key from the block. A Key may be returned for a block that
+// is ill-formed.
+func (bh *HelloBlockHandler) DeriveBlockKey(b Block) *crypto.HashCode {
+	hb, ok := b.(*HelloBlock)
+	if !ok {
+		return nil
+	}
+	// key must be the hash of the peer id
+	return crypto.Hash(hb.PeerID.Bytes())
 }
 
 // ValidateBlockStoreRequest is used to evaluate a block payload as part of

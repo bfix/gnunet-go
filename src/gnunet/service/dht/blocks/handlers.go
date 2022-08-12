@@ -29,14 +29,21 @@ type BlockHandler interface {
 	// Parse a block instance from binary data
 	ParseBlock(buf []byte) (Block, error)
 
-	// ValidateBlockQuery is used to evaluate the request for a block as part of
-	// DHT-P2P-GET processing. Here, the block payload is unknown, but if possible
-	// the XQuery and Key SHOULD be verified.
+	// ValidateBlockQuery is used to evaluate the request for a block as part
+	// of DHT-P2P-GET processing. Here, the block payload is unknown, but if
+	// possible the XQuery and Key SHOULD be verified.
 	ValidateBlockQuery(key *crypto.HashCode, xquery []byte) bool
 
 	// ValidateBlockKey returns true if the block key is the same as the
 	// query key used to access the block.
 	ValidateBlockKey(b Block, key *crypto.HashCode) bool
+
+	// DeriveBlockKey is used to synthesize the block key from the block
+	// payload as part of PutMessage and ResultMessage processing. The special
+	// return value of 'nil' implies that this block type does not permit
+	// deriving the key from the block. A Key may be returned for a block that
+	// is ill-formed.
+	DeriveBlockKey(b Block) *crypto.HashCode
 
 	// ValidateBlockStoreRequest is used to evaluate a block payload as part of
 	// PutMessage and ResultMessage processing.
