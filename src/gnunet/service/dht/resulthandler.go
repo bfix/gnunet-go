@@ -215,7 +215,7 @@ func (t *ForwardResultHandler) Compare(h ResultHandler) int {
 		return RHC_DIFFER
 	}
 	// check for same recipient
-	if ht.resp.Receiver() != t.resp.Receiver() {
+	if ht.resp.Receiver().Equals(t.resp.Receiver()) {
 		logger.Printf(logger.DBG, "[frh] recipients differ: %s -- %s", ht.resp.Receiver(), t.resp.Receiver())
 		return RHC_DIFFER
 	}
