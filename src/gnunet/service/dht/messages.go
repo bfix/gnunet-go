@@ -262,7 +262,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		// routing table (9.3.2.9)
 		if btype == enums.BLOCK_TYPE_DHT_HELLO {
 			// get addresses from HELLO block
-			hello, err := blocks.ParseHelloFromBytes(msg.Block)
+			hello, err := blocks.ParseHelloBlockFromBytes(msg.Block)
 			if err != nil {
 				logger.Printf(logger.ERROR, "[%s] failed to parse HELLO block: %s", label, err.Error())
 			} else {
@@ -320,12 +320,14 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		//----------------------------------------------------------
 		// DHT-P2P RESULT
 		//----------------------------------------------------------
-		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-RESULT message", label)
+		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-RESULT message for type %s",
+			label, enums.BlockType(msg.BType).String())
 
 		//--------------------------------------------------------------
 		// check if request is expired (9.5.2.1)
 		if msg.Expires.Expired() {
-			logger.Printf(logger.WARN, "[%s] DHT-P2P-RESULT message expired (%s)", label, msg.Expires.String())
+			logger.Printf(logger.WARN, "[%s] DHT-P2P-RESULT message expired (%s)",
+				label, msg.Expires.String())
 			return false
 		}
 		//--------------------------------------------------------------
@@ -341,9 +343,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 					return false
 				}
 				// Compute block key (9.5.2.4)
-				if blockHdlr != nil {
-					blkKey = blockHdlr.DeriveBlockKey(block)
-				}
+				blkKey = blockHdlr.DeriveBlockKey(block)
 			}
 		} else {
 			logger.Printf(logger.INFO, "[%s] No validator defined for block type %s", label, btype.String())
@@ -361,7 +361,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		// routing table (9.5.2.5)
 		if btype == enums.BLOCK_TYPE_DHT_HELLO {
 			// get addresses from HELLO block
-			hello, err := blocks.ParseHelloFromBytes(msg.Block)
+			hello, err := blocks.ParseHelloBlockFromBytes(msg.Block)
 			if err != nil {
 				logger.Printf(logger.ERROR, "[%s] failed to parse HELLO block: %s", label, err.Error())
 			} else {
@@ -387,9 +387,10 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 
 				//--------------------------------------------------------------
 				// check task list for handler (9.5.2.6)
-				if msg.Flags&enums.DHT_RO_DEMULTIPLEX_EVERYWHERE == 0 && !blkKey.Equals(rh.Key()) {
+				if rh.Flags()&enums.DHT_RO_FIND_APPROXIMATE == 0 && blkKey != nil && !blkKey.Equals(rh.Key()) {
 					// (9.5.2.6.a) derived key mismatch
-					logger.Printf(logger.ERROR, "[%s] derived block key / query key mismatch", label)
+					logger.Printf(logger.ERROR, "[%s] derived block key / query key mismatch:", label)
+					logger.Printf(logger.ERROR, "[%s]   --> %s != %s", label, blkKey.String(), rh.Key().String())
 					return false
 				}
 				// (9.5.2.6.b+c) check block against query
