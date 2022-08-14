@@ -137,7 +137,7 @@ func main() {
 		// check for HELLO URL
 		if strings.HasPrefix(bs, "gnunet://hello/") {
 			var hb *blocks.HelloBlock
-			if hb, err = blocks.ParseHelloURL(bs, true); err != nil {
+			if hb, err = blocks.ParseHelloBlockFromURL(bs, true); err != nil {
 				logger.Printf(logger.ERROR, "[dht] failed bootstrap HELLO URL %s: %s", bs, err.Error())
 				continue
 			}

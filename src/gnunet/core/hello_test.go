@@ -64,7 +64,7 @@ var (
 
 func TestHelloURLDirect(t *testing.T) {
 	for _, hu := range helloURL {
-		if _, err := blocks.ParseHelloURL(hu, false); err != nil {
+		if _, err := blocks.ParseHelloBlockFromURL(hu, false); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -93,7 +93,7 @@ func TestHelloURL(t *testing.T) {
 
 	// convert to and from HELLO URL
 	url1 := hd.URL()
-	hd2, err := blocks.ParseHelloURL(url1, true)
+	hd2, err := blocks.ParseHelloBlockFromURL(url1, true)
 	if err != nil {
 		t.Fatal(err)
 	}

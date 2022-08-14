@@ -67,7 +67,7 @@ func TestPeerHello(t *testing.T) {
 	// convert to URL and back
 	u := h.URL()
 	t.Log(u)
-	h2, err := blocks.ParseHelloURL(u, true)
+	h2, err := blocks.ParseHelloBlockFromURL(u, true)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -30,6 +30,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bfix/gospel/crypto/ed25519"
 	"github.com/bfix/gospel/data"
@@ -63,8 +64,21 @@ type HelloBlock struct {
 	addrs []*util.Address // cooked address data
 }
 
+// NewHelloBlock initializes a new HELLO block (unsigned)
+func NewHelloBlock(peer *util.PeerID, addrs []*util.Address, ttl time.Duration) *HelloBlock {
+	hb := new(HelloBlock)
+	hb.PeerID = peer
+	// limit expiration to second precision (HELLO-URL compatibility)
+	hb.Expires = util.NewAbsoluteTimeEpoch(uint64(time.Now().Add(ttl).Unix()))
+	hb.SetAddresses(addrs)
+	return hb
+}
+
 // SetAddresses adds a bulk of addresses for this HELLO block.
 func (h *HelloBlock) SetAddresses(a []*util.Address) {
+	if len(a) == 0 {
+		return
+	}
 	h.addrs = util.Clone(a)
 	if err := h.finalize(); err != nil {
 		logger.Printf(logger.ERROR, "[HelloBlock.SetAddresses] failed: %s", err.Error())
@@ -76,10 +90,10 @@ func (h *HelloBlock) Addresses() []*util.Address {
 	return util.Clone(h.addrs)
 }
 
-// ParseHelloURL parses a HELLO URL of the following form:
+// ParseHelloBlockFromURL parses a HELLO URL of the following form:
 //     gnunet://hello/<PeerID>/<signature>/<expire>?<addrs>
 // The addresses are encoded.
-func ParseHelloURL(u string, checkExpiry bool) (h *HelloBlock, err error) {
+func ParseHelloBlockFromURL(u string, checkExpiry bool) (h *HelloBlock, err error) {
 	// check and trim prefix
 	if !strings.HasPrefix(u, helloPrefix) {
 		err = fmt.Errorf("invalid HELLO-URL prefix: '%s'", u)
@@ -158,8 +172,8 @@ func ParseHelloURL(u string, checkExpiry bool) (h *HelloBlock, err error) {
 	return
 }
 
-// ParseHelloFromBytes converts a byte array into a HelloBlock instance.
-func ParseHelloFromBytes(buf []byte) (h *HelloBlock, err error) {
+// ParseHelloBlockFromBytes converts a byte array into a HelloBlock instance.
+func ParseHelloBlockFromBytes(buf []byte) (h *HelloBlock, err error) {
 	h = new(HelloBlock)
 	if err = data.Unmarshal(h, buf); err == nil {
 		err = h.finalize()
@@ -289,7 +303,7 @@ func (h *HelloBlock) SignedData() []byte {
 	err := binary.Write(buf, binary.BigEndian, size)
 	if err == nil {
 		if err = binary.Write(buf, binary.BigEndian, purpose); err == nil {
-			if err = binary.Write(buf, binary.BigEndian, h.Expires.Epoch()*1000000); err == nil {
+			if err = binary.Write(buf, binary.BigEndian, h.Expires /*.Epoch()*1000000*/); err == nil {
 				if n, err = buf.Write(hAddr[:]); err == nil {
 					if n != len(hAddr[:]) {
 						err = errors.New("signed data size mismatch")
@@ -313,7 +327,7 @@ type HelloBlockHandler struct{}
 
 // Parse a block instance from binary data
 func (bh *HelloBlockHandler) ParseBlock(buf []byte) (Block, error) {
-	return ParseHelloFromBytes(buf)
+	return ParseHelloBlockFromBytes(buf)
 }
 
 // ValidateHelloBlockQuery validates query parameters for a
@@ -329,6 +343,7 @@ func (bh *HelloBlockHandler) ValidateBlockKey(b Block, key *crypto.HashCode) boo
 	// check for matching keys
 	bkey := bh.DeriveBlockKey(b)
 	if bkey == nil {
+		logger.Println(logger.WARN, "[HelloHdlr] ValidateBlockKey: not a HELLO block")
 		return false
 	}
 	return key.Equals(bkey)
@@ -340,8 +355,10 @@ func (bh *HelloBlockHandler) ValidateBlockKey(b Block, key *crypto.HashCode) boo
 // deriving the key from the block. A Key may be returned for a block that
 // is ill-formed.
 func (bh *HelloBlockHandler) DeriveBlockKey(b Block) *crypto.HashCode {
+	// check for correct type
 	hb, ok := b.(*HelloBlock)
 	if !ok {
+		logger.Println(logger.WARN, "[HelloHdlr] DeriveBlockKey: not a HELLO block")
 		return nil
 	}
 	// key must be the hash of the peer id
@@ -350,9 +367,22 @@ func (bh *HelloBlockHandler) DeriveBlockKey(b Block) *crypto.HashCode {
 
 // ValidateBlockStoreRequest is used to evaluate a block payload as part of
 // PutMessage and ResultMessage processing.
+// To validate a block store request is to verify the EdDSA SIGNATURE over
+// the hashed ADDRESSES against the public key from the peer ID field. If the
+// signature is valid true is returned.
 func (bh *HelloBlockHandler) ValidateBlockStoreRequest(b Block) bool {
-	// TODO: verify block payload
-	return true
+	// check for correct type
+	hb, ok := b.(*HelloBlock)
+	if !ok {
+		logger.Println(logger.WARN, "[HelloHdlr] ValidateBlockStoreRequest: not a HELLO block")
+		return false
+	}
+	// verify signature
+	ok, err := hb.Verify()
+	if err != nil {
+		ok = false
+	}
+	return ok
 }
 
 // SetupResultFilter is used to setup an empty result filter. The arguments
