@@ -56,6 +56,9 @@ type ResultHandler interface {
 	// Key returns the query/store key as string
 	Key() *crypto.HashCode
 
+	// Flags returns the query flags
+	Flags() uint16
+
 	// Compare two result handlers
 	Compare(ResultHandler) int
 
@@ -112,6 +115,11 @@ func (t *GenericResultHandler) ID() int {
 // Key returns the key string
 func (t *GenericResultHandler) Key() *crypto.HashCode {
 	return t.key
+}
+
+// Flags returns the query flags
+func (t *GenericResultHandler) Flags() uint16 {
+	return t.flags
 }
 
 // Done returns true if the result handler is no longer active.
