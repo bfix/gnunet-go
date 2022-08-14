@@ -58,7 +58,7 @@ func NewHashCode(data []byte) *HashCode {
 	hc := new(HashCode)
 	size := hc.Size()
 	v := make([]byte, size)
-	if data != nil && len(data) > 0 {
+	if len(data) > 0 {
 		if uint(len(data)) < size {
 			util.CopyAlignedBlock(v, data)
 		} else {

@@ -272,7 +272,9 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 					for _, addr := range hello.Addresses() {
 						if transport.CanHandleAddress(addr) {
 							// try to connect to peer (triggers EV_CONNECTED on success)
-							m.core.TryConnect(sender, addr)
+							if err := m.core.TryConnect(sender, addr); err != nil {
+								logger.Printf(logger.ERROR, "[%s] try-connection to %s failed: %s", label, addr.URI(), err.Error())
+							}
 						}
 					}
 				}
@@ -371,7 +373,9 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 					for _, addr := range hello.Addresses() {
 						if transport.CanHandleAddress(addr) {
 							// try to connect to peer (triggers EV_CONNECTED on success)
-							m.core.TryConnect(sender, addr)
+							if err := m.core.TryConnect(sender, addr); err != nil {
+								logger.Printf(logger.ERROR, "[%s] try-connection to %s failed: %s", label, addr.URI(), err.Error())
+							}
 						}
 					}
 				}
@@ -444,8 +448,8 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			logger.Printf(logger.INFO, "[%s] Sending HELLO to %s: %s", label, sender, msgOut)
 			err = m.core.Send(ctx, sender, msgOut)
 			// no error if the message might have been sent
-			if err == transport.ErrEndpMaybeSent {
-				err = nil
+			if err != nil && err != transport.ErrEndpMaybeSent {
+				logger.Printf(logger.ERROR, "[%s] Failed to send HELLO message: %s", label, err.Error())
 			}
 		}
 

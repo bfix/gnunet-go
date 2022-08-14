@@ -38,7 +38,7 @@ func NewPeerPublicKey(data []byte) *PeerPublicKey {
 	pk := new(PeerPublicKey)
 	size := pk.Size()
 	v := make([]byte, size)
-	if data != nil && len(data) > 0 {
+	if len(data) > 0 {
 		if uint(len(data)) < size {
 			CopyAlignedBlock(v, data)
 		} else {
@@ -68,7 +68,7 @@ func (pk *PeerPublicKey) Verify(data []byte, sig *PeerSignature) (bool, error) {
 // Peer identifier:
 //----------------------------------------------------------------------
 
-// PeerID is a wrpped PeerPublicKey
+// PeerID is a wrapped PeerPublicKey
 type PeerID struct {
 	PeerPublicKey
 }
@@ -109,7 +109,7 @@ func NewPeerSignature(data []byte) *PeerSignature {
 	s := new(PeerSignature)
 	size := s.Size()
 	v := make([]byte, size)
-	if data != nil && len(data) > 0 {
+	if len(data) > 0 {
 		if uint(len(data)) < size {
 			CopyAlignedBlock(v, data)
 		} else {

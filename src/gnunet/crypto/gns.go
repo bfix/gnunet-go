@@ -417,7 +417,9 @@ func NewZoneSignature(d []byte) (sig *ZoneSignature, err error) {
 	}
 	// set signature implementation
 	zs := impl.NewSignature()
-	err = zs.Init(sig.Signature)
+	if err = zs.Init(sig.Signature); err != nil {
+		return
+	}
 	sig.impl = zs
 	// set public key implementation
 	zk := impl.NewPublic()

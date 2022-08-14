@@ -37,10 +37,12 @@ var (
 )
 
 func setup(t *testing.T) {
+	t.Helper()
+
+	// check for initialized values
 	if block != nil {
 		return
 	}
-
 	// generate keys
 	var pk *ed25519.PublicKey
 	pk, sk = ed25519.NewKeypair()

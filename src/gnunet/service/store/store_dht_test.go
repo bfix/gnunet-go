@@ -52,7 +52,9 @@ func TestDHTFilesStore(t *testing.T) {
 
 	// create file store
 	if _, err := os.Stat(path); err != nil {
-		os.MkdirAll(path, 0755)
+		if err = os.MkdirAll(path, 0755); err != nil {
+			t.Fatal(err)
+		}
 	}
 	fs, err := NewDHTStore(cfg)
 	if err != nil {
