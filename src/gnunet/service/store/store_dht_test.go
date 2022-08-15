@@ -68,9 +68,11 @@ func TestDHTFilesStore(t *testing.T) {
 	// First round: save blocks
 	for i := 0; i < fsNumBlocks; i++ {
 		// generate random block
-		size := 1024 + rand.Intn(62000)
+		size := 1024 + rand.Intn(62000) //nolint:gosec // good enough for testing
 		buf := make([]byte, size)
-		rand.Read(buf)
+		if _, err = rand.Read(buf); err != nil { //nolint:gosec // good enough for testing
+			t.Fatal(err)
+		}
 		blk := blocks.NewGenericBlock(buf)
 		// generate associated key
 		k := crypto.Hash(buf)

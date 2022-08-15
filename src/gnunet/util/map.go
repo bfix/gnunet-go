@@ -152,7 +152,7 @@ func (m *Map[K, V]) GetRandom(pid int) (key K, value V, ok bool) {
 
 	ok = false
 	if size := m.Size(); size > 0 {
-		idx := rand.Intn(size)
+		idx := rand.Intn(size) //nolint:gosec // good enough for selection
 		for key, value = range m.list {
 			if idx == 0 {
 				ok = true

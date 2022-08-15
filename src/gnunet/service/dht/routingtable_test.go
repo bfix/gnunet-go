@@ -70,7 +70,7 @@ func TestRT(t *testing.T) {
 	// helper functions
 	genRemotePeer := func() *PeerAddress {
 		d := make([]byte, 32)
-		_, _ = rand.Read(d)
+		_, _ = rand.Read(d) //nolint:gosec // good enough for testing
 		return NewPeerAddress(util.NewPeerID(d))
 	}
 
@@ -86,10 +86,10 @@ func TestRT(t *testing.T) {
 	for i := range tasks {
 		tasks[i] = new(Entry)
 		tasks[i].addr = genRemotePeer()
-		tasks[i].born = rand.Int63n(EPOCHS)
-		tasks[i].ttl = 1000 + rand.Int63n(7000)
-		tasks[i].drop = 2000 + rand.Int63n(3000)
-		tasks[i].revive = rand.Int63n(2000)
+		tasks[i].born = rand.Int63n(EPOCHS)      //nolint:gosec // good enough for testing
+		tasks[i].ttl = 1000 + rand.Int63n(7000)  //nolint:gosec // good enough for testing
+		tasks[i].drop = 2000 + rand.Int63n(3000) //nolint:gosec // good enough for testing
+		tasks[i].revive = rand.Int63n(2000)      //nolint:gosec // good enough for testing
 		tasks[i].online = false
 	}
 

@@ -200,6 +200,7 @@ func (m *Module) ResolveAbsolute(
 // ResolveRelative resolves a relative path (to a given zone) recursively by
 // processing simple (PKEY,Label) lookups in sequence and handle intermediate
 // GNS record types
+//nolint:gocyclo // life sometimes is complex...
 func (m *Module) ResolveRelative(
 	ctx context.Context,
 	labels []string,

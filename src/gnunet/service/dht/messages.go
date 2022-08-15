@@ -38,6 +38,7 @@ import (
 
 // HandleMessage handles a DHT request/response message. Responses are sent
 // to the specified responder.
+//nolint:gocyclo // life sometimes is complex...
 func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn message.Message, back transport.Responder) bool {
 	// assemble log label
 	label := "dht"

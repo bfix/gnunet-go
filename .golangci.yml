@@ -20,15 +20,16 @@ linters-settings:
 linters:
   disable-all: true
   enable:
-    - bodyclose
     - deadcode
     - depguard
     - dogsled
     - dupl
     - errcheck
     - exportloopref
+    - gocyclo
     - gofmt
     - goimports
+    - gosec
     - gosimple
     - govet
     - ineffassign
@@ -37,13 +38,10 @@ linters:
     - prealloc
     - predeclared
     - staticcheck
-    - structcheck
     - stylecheck
     - thelper
-    - tparallel
     - typecheck
     - unconvert
-    - unparam
     - varcheck
 
 run:
