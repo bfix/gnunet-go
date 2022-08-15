@@ -41,22 +41,51 @@ import (
 //======================================================================
 
 //----------------------------------------------------------------------
-// Responder for local message handling
+// Responder for local message handling (API, not message-based)
 //----------------------------------------------------------------------
 
-type LocalResponder struct {
-	ch chan blocks.Block // out-going channel for incoming blocks
+// LocalBlockResponder is a message handler used to handle results for
+// locally initiated GET calls
+type LocalBlockResponder struct {
+	ch chan blocks.Block   // out-going channel for incoming block results
+	rf blocks.ResultFilter // filter out duplicates
 }
 
-func (lr *LocalResponder) Send(ctx context.Context, msg message.Message) error {
+// NewLocalBlockResponder returns a new instance
+func NewLocalBlockResponder() *LocalBlockResponder {
+	return &LocalBlockResponder{
+		ch: make(chan blocks.Block),
+		rf: blocks.NewGenericResultFilter(),
+	}
+}
+
+// C returns the back-channel
+func (lr *LocalBlockResponder) C() <-chan blocks.Block {
+	return lr.ch
+}
+
+// Send interface method: dissect message and relay block if appropriate
+func (lr *LocalBlockResponder) Send(ctx context.Context, msg message.Message) error {
+	// check if incoming message is a DHT-RESULT
+	switch res := msg.(type) {
+	case *message.DHTP2PResultMsg:
+		// deliver incoming blocks
+		go func() {
+			lr.ch <- blocks.NewGenericBlock(res.Block)
+		}()
+	default:
+		logger.Println(logger.WARN, "[local] not a DHT-RESULT -- skipped")
+	}
 	return nil
 }
 
-func (lr *LocalResponder) Receiver() *util.PeerID {
+// Receiver is nil for local responders.
+func (lr *LocalBlockResponder) Receiver() *util.PeerID {
 	return nil
 }
 
-func (lr *LocalResponder) Close() {
+// Close back-channel
+func (lr *LocalBlockResponder) Close() {
 	close(lr.ch)
 }
 
@@ -106,7 +135,7 @@ func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Mod
 	ticker := time.NewTicker(5 * time.Minute)
 	key := crypto.Hash(m.core.PeerID().Data)
 	flags := uint16(enums.DHT_RO_FIND_APPROXIMATE | enums.DHT_RO_DEMULTIPLEX_EVERYWHERE)
-	var resCh chan blocks.Block
+	var resCh <-chan blocks.Block
 	go func() {
 		for {
 			select {
@@ -145,14 +174,14 @@ func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Mod
 }
 
 //----------------------------------------------------------------------
-// DHT methods for local use
+// DHT methods for local use (API)
 //----------------------------------------------------------------------
 
 // Get blocks from the DHT ["dht:get"]
 // Locally request blocks for a given query. The res channel will deliver the
 // returned results to the caller; the channel is closed if no further blocks
 // are expected or the query times out.
-func (m *Module) Get(ctx context.Context, query blocks.Query) (res chan blocks.Block) {
+func (m *Module) Get(ctx context.Context, query blocks.Query) <-chan blocks.Block {
 	// get the block handler for given block type to construct an empty
 	// result filter. If no handler is defined, a default PassResultFilter
 	// is created.
@@ -180,15 +209,13 @@ func (m *Module) Get(ctx context.Context, query blocks.Query) (res chan blocks.B
 	msg.MsgSize += msg.RfSize + uint16(len(xquery))
 
 	// compose a response channel and handler
-	res = make(chan blocks.Block)
-	hdlr := &LocalResponder{
-		ch: res,
-	}
+	hdlr := NewLocalBlockResponder()
+
 	// time-out handling
 	ttl, ok := util.GetParam[time.Duration](query.Params(), "timeout")
 	if !ok {
 		// defaults to 10 minutes
-		ttl = 600 * time.Second
+		ttl = 10 * time.Minute
 	}
 	lctx, cancel := context.WithTimeout(ctx, ttl)
 
@@ -201,7 +228,7 @@ func (m *Module) Get(ctx context.Context, query blocks.Query) (res chan blocks.B
 		hdlr.Close()
 		cancel()
 	}()
-	return res
+	return hdlr.C()
 }
 
 // GetApprox returns the first block not excluded ["dht:getapprox"]
