@@ -146,8 +146,15 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			}
 			// if we have results, send them as response
 			for _, result := range results {
-				// update get path
-				pth := result.Entry.Path.Clone()
+				var pth *path.Path
+				// check if record the route
+				if msg.Flags&enums.DHT_RO_RECORD_ROUTE != 0 && result.Entry.Path != nil {
+					// update get path
+					pth = result.Entry.Path.Clone()
+					pth.SplitPos = pth.NumList
+					pe := pth.NewElement(pth.LastHop, local, back.Receiver())
+					pth.Add(pe)
+				}
 
 				logger.Printf(logger.INFO, "[%s] sending DHT result message to caller", label)
 				if err := m.sendResult(ctx, query, result.Entry.Blk, pth, back); err != nil {
