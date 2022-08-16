@@ -20,7 +20,6 @@ package core
 
 import (
 	"context"
-	"encoding/hex"
 	"errors"
 	"gnunet/config"
 	"gnunet/crypto"
@@ -166,7 +165,8 @@ func (c *Core) pump(ctx context.Context) {
 		select {
 		// get (next) message from transport
 		case tm := <-c.incoming:
-			logger.Printf(logger.DBG, "[core] Message received from %s: %s", tm.Peer, util.Dump(tm.Msg, "json"))
+			logger.Printf(logger.DBG, "[core] Message received from %s:", tm.Peer)
+			logger.Printf(logger.DBG, "[core]  -> %s", tm.Msg.String())
 
 			// check if peer is already connected (has an entry in PeerAddrist)
 			_, connected := c.connected.Get(tm.Peer.String(), 0)
@@ -296,12 +296,10 @@ func (c *Core) PeerID() *util.PeerID {
 // Sign a signable onject with private peer key
 func (c *Core) Sign(obj crypto.Signable) error {
 	sd := obj.SignedData()
-	logger.Printf(logger.DBG, "[core] Signing data '%s'", hex.EncodeToString(sd))
 	sig, err := c.local.prv.EdSign(sd)
 	if err != nil {
 		return err
 	}
-	logger.Printf(logger.DBG, "[core] --> signature '%s'", hex.EncodeToString(sig.Bytes()))
 	return obj.SetSignature(util.NewPeerSignature(sig.Bytes()))
 }
 
