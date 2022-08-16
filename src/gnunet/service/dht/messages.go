@@ -50,12 +50,6 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 	logger.Printf(logger.INFO, "[%s] message received from %s", label, sender)
 	local := m.core.PeerID()
 
-	// check for local message
-	if sender.Equals(local) {
-		logger.Printf(logger.WARN, "[%s] dropping local message received: %s", label, util.Dump(msgIn, "json"))
-		return false
-	}
-
 	// process message
 	switch msg := msgIn.(type) {
 
@@ -174,14 +168,15 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			for n := 0; n < numForward; n++ {
 				if p := m.rtable.SelectClosestPeer(addr, pf, 0); p != nil {
 					// forward message to peer
-					logger.Printf(logger.INFO, "[%s] forward DHT get message to %s", label, p.String())
+					logger.Printf(logger.INFO, "[%s] forward DHT get message to %s", label, util.Shorten(p.String(), 20))
 					if err := back.Send(ctx, msgOut); err != nil {
 						logger.Printf(logger.ERROR, "[%s] Failed to forward DHT get message: %s", label, err.Error())
 					}
 					pf.Add(p.Peer)
 					// create open get-forward result handler
 					rh := NewResultHandler(msg, rf, back)
-					logger.Printf(logger.INFO, "[%s] DHT-P2P-GET task #%d (%s) started", label, rh.ID(), rh.Key())
+					logger.Printf(logger.INFO, "[%s] DHT-P2P-GET task #%d (%s) started",
+						label, rh.ID(), util.Shorten(rh.Key().String(), 20))
 					m.reshdlrs.Add(rh)
 				} else {
 					break
@@ -200,9 +195,15 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-PUT message", label)
 
 		// assemble query and entry
-		query := blocks.NewGenericQuery(msg.Key, enums.BlockType(msg.BType), msg.Flags)
+		btype := enums.BlockType(msg.BType)
+		query := blocks.NewGenericQuery(msg.Key, btype, msg.Flags)
+		blk, err := blocks.NewBlock(btype, msg.Expiration, msg.Block)
+		if err != nil {
+			logger.Printf(logger.ERROR, "[%s] DHT-P2P-PUT message block problem: %s", label, err.Error())
+			return false
+		}
 		entry := &store.DHTEntry{
-			Blk:  blocks.NewGenericBlock(msg.Block),
+			Blk:  blk,
 			Path: nil,
 		}
 
@@ -212,7 +213,6 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			logger.Printf(logger.WARN, "[%s] DHT-P2P-PUT message expired (%s)", label, msg.Expiration.String())
 			return false
 		}
-		btype := enums.BlockType(msg.BType)
 		blockHdlr, ok := blocks.BlockHandlers[btype]
 		if ok { // (9.3.2.2)
 			// reconstruct block instance
@@ -453,11 +453,11 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			if msgOut, err = m.getHello(); err != nil {
 				return false
 			}
-			logger.Printf(logger.INFO, "[%s] Sending HELLO to %s: %s", label, sender, msgOut)
+			logger.Printf(logger.INFO, "[%s] Sending own HELLO to %s", label, sender)
 			err = m.core.Send(ctx, sender, msgOut)
 			// no error if the message might have been sent
 			if err != nil && err != transport.ErrEndpMaybeSent {
-				logger.Printf(logger.ERROR, "[%s] Failed to send HELLO message: %s", label, err.Error())
+				logger.Printf(logger.ERROR, "[%s] -> failed to send HELLO message: %s", label, err.Error())
 			}
 		}
 
@@ -527,10 +527,13 @@ func (m *Module) sendResult(ctx context.Context, query blocks.Query, blk blocks.
 	// assemble result message
 	out := message.NewDHTP2PResultMsg()
 	out.BType = uint32(query.Type())
+	out.Flags = uint32(query.Flags())
 	out.Expires = blk.Expire()
 	out.Query = query.Key()
 	out.Block = blk.Bytes()
 	out.MsgSize += uint16(len(out.Block))
+	out.SetPath(pth)
+
 	// send message
 	return back.Send(ctx, out)
 }
