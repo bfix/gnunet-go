@@ -29,6 +29,7 @@ import (
 	"gnunet/service/dht/blocks"
 	"gnunet/service/dht/path"
 	"gnunet/util"
+	"strings"
 	"time"
 
 	"github.com/bfix/gospel/crypto/ed25519"
@@ -78,8 +79,8 @@ func NewDHTP2PGetMsg() *DHTP2PGetMsg {
 
 // String returns a human-readable representation of the message.
 func (m *DHTP2PGetMsg) String() string {
-	return fmt.Sprintf("DHTP2PGetMsg{btype=%s,hops=%d,flags=%d}",
-		enums.BlockType(m.BType).String(), m.HopCount, m.Flags)
+	return fmt.Sprintf("DHTP2PGetMsg{btype=%s,hops=%d,flags=%s}",
+		enums.BlockType(m.BType).String(), m.HopCount, dhtFlags(m.Flags))
 }
 
 // Header returns the message header in a separate instance.
@@ -269,8 +270,8 @@ func (m *DHTP2PPutMsg) SetPath(p *path.Path) {
 
 // String returns a human-readable representation of the message.
 func (m *DHTP2PPutMsg) String() string {
-	return fmt.Sprintf("DHTP2PPutMsg{btype=%s,hops=%d,flags=%d}",
-		enums.BlockType(m.BType).String(), m.HopCount, m.Flags)
+	return fmt.Sprintf("DHTP2PPutMsg{btype=%s,hops=%d,flags=%s}",
+		enums.BlockType(m.BType).String(), m.HopCount, dhtFlags(m.Flags))
 }
 
 // Header returns the message header in a separate instance.
@@ -455,8 +456,8 @@ func (m *DHTP2PResultMsg) Update(pth *path.Path) *DHTP2PResultMsg {
 
 // String returns a human-readable representation of the message.
 func (m *DHTP2PResultMsg) String() string {
-	return fmt.Sprintf("DHTP2PResultMsg{btype=%s,putl=%d,getl=%d}",
-		enums.BlockType(m.BType).String(), m.PutPathL, m.GetPathL)
+	return fmt.Sprintf("DHTP2PResultMsg{btype=%s,putl=%d,getl=%d,flags=%s}",
+		enums.BlockType(m.BType).String(), m.PutPathL, m.GetPathL, dhtFlags(uint16(m.Flags)))
 }
 
 // Header returns the message header in a separate instance.
@@ -543,15 +544,7 @@ func (m *DHTP2PHelloMsg) SetAddresses(list []*util.Address) {
 
 // String returns a human-readable representation of the message.
 func (m *DHTP2PHelloMsg) String() string {
-	addrs, _ := m.Addresses()
-	aList := ""
-	for i, a := range addrs {
-		if i > 0 {
-			aList += ","
-		}
-		aList += a.URI()
-	}
-	return fmt.Sprintf("DHTP2PHelloMsg{expire:%s,addrs=%d:[%s]}", m.Expires, m.NumAddr, aList)
+	return fmt.Sprintf("DHTP2PHelloMsg{expire:%s,addrs=[%d]}", m.Expires, m.NumAddr)
 }
 
 // Header returns the message header in a separate instance.
@@ -603,4 +596,27 @@ func (m *DHTP2PHelloMsg) SignedData() []byte {
 		logger.Printf(logger.ERROR, "[DHTP2PHelloMsg.SignedData] failed: %s", err.Error())
 	}
 	return buf.Bytes()
+}
+
+//----------------------------------------------------------------------
+// Helper functions
+//----------------------------------------------------------------------
+
+// get human-readable flags
+func dhtFlags(flags uint16) string {
+	var list []string
+	if flags&enums.DHT_RO_DEMULTIPLEX_EVERYWHERE != 0 {
+		list = append(list, "DEMUX")
+	}
+	if flags&enums.DHT_RO_RECORD_ROUTE != 0 {
+		list = append(list, "ROUTE")
+	}
+	if flags&enums.DHT_RO_FIND_APPROXIMATE != 0 {
+		list = append(list, "APPROX")
+	}
+	if flags&enums.DHT_RO_TRUNCATED != 0 {
+		list = append(list, "TRUNC")
+	}
+	s := strings.Join(list, "|")
+	return "<" + s + ">"
 }
