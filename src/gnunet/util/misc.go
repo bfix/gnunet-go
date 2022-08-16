@@ -96,6 +96,18 @@ func StripPathRight(s string) string {
 	return s
 }
 
+// Shorten string for output
+func Shorten(s string, n int) string {
+	l := len(s)
+	p := n - 3
+	if p < 3 {
+		return s
+	}
+	k := p % 2
+	p /= 2
+	return s[:p+k] + "..." + s[l-p:]
+}
+
 //----------------------------------------------------------------------
 // Dump instance
 func Dump(obj any, format string) string {
