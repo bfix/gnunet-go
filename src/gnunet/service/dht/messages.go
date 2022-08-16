@@ -113,8 +113,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		approx := int(msg.Flags)&enums.DHT_RO_FIND_APPROXIMATE != 0
 
 		// enforced actions
-		doResult := closest || (demux && approx)
-		doForward := !closest || (demux && !approx)
+		doResult, doForward := getActions(closest, demux, approx)
 		logger.Printf(logger.DBG, "[%s] GET message: closest=%v, demux=%v, approx=%v --> result=%v, forward=%v",
 			label, closest, demux, approx, doResult, doForward)
 
@@ -242,6 +241,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		addr := NewQueryAddress(msg.Key)
 		closest := m.rtable.IsClosestPeer(nil, addr, msg.PeerFilter, 0)
 		demux := int(msg.Flags)&enums.DHT_RO_DEMULTIPLEX_EVERYWHERE != 0
+		doStore, doForward := putActions(closest, demux)
 		logger.Printf(logger.DBG, "[%s] PUT message: closest=%v, demux=%v", label, closest, demux)
 
 		//--------------------------------------------------------------
@@ -259,7 +259,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 
 		//--------------------------------------------------------------
 		// store locally if we are closest peer or demux is set (9.3.2.8)
-		if closest || demux {
+		if doStore {
 			// store in local storage
 			if err := m.store.Put(query, entry); err != nil {
 				logger.Printf(logger.ERROR, "[%s] failed to store DHT entry: %s", label, err.Error())
@@ -290,7 +290,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		}
 		//--------------------------------------------------------------
 		// check if we need to forward
-		if !closest || demux {
+		if doForward {
 			// add local node to filter
 			pf.Add(local)
 
@@ -522,6 +522,10 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 	return true
 }
 
+//----------------------------------------------------------------------
+// Helpers
+//----------------------------------------------------------------------
+
 // send a result back to caller
 func (m *Module) sendResult(ctx context.Context, query blocks.Query, blk blocks.Block, pth *path.Path, back transport.Responder) error {
 	// assemble result message
@@ -536,4 +540,14 @@ func (m *Module) sendResult(ctx context.Context, query blocks.Query, blk blocks.
 
 	// send message
 	return back.Send(ctx, out)
+}
+
+// get enforced action for GET message
+func getActions(closest, demux, approx bool) (doResult, doForward bool) {
+	return closest || (demux && approx), !closest || (demux && !approx)
+}
+
+// get enforced action for PUT message
+func putActions(closest, demux bool) (doStore, doForward bool) {
+	return closest || demux, !closest || demux
 }
