@@ -220,7 +220,7 @@ func (s *DHTStore) Get(label string, query blocks.Query, rf blocks.ResultFilter)
 		}
 		// read entry from storage
 		var entry *DHTEntry
-		if entry, err = s.readEntry(md.key.Bits); err != nil {
+		if entry, err = s.readEntry(md); err != nil {
 			logger.Printf(logger.ERROR, "[%s] can't read DHT entry: %s", label, err)
 			continue
 		}
@@ -252,7 +252,7 @@ func (s *DHTStore) GetApprox(label string, query blocks.Query, rf blocks.ResultF
 		}
 		// read entry from storage
 		var entry *DHTEntry
-		if entry, err = s.readEntry(md.key.Bits); err != nil {
+		if entry, err = s.readEntry(md); err != nil {
 			logger.Printf(logger.ERROR, "[%s] failed to retrieve block for %s", label, md.key.String())
 			return
 		}
@@ -278,9 +278,9 @@ type entryLayout struct {
 }
 
 // read entry from storage for given key
-func (s *DHTStore) readEntry(key []byte) (entry *DHTEntry, err error) {
+func (s *DHTStore) readEntry(md *FileMetadata) (entry *DHTEntry, err error) {
 	// get path and filename from key
-	folder, fname := s.expandPath(key)
+	folder, fname := s.expandPath(md.key.Bits)
 
 	// open file for reading
 	var file *os.File
@@ -300,7 +300,9 @@ func (s *DHTStore) readEntry(key []byte) (entry *DHTEntry, err error) {
 	}
 	// assemble entry
 	entry = new(DHTEntry)
-	entry.Blk = blocks.NewGenericBlock(val.Block)
+	if entry.Blk, err = blocks.NewBlock(md.btype, md.expires, val.Block); err != nil {
+		return
+	}
 	entry.Path, err = path.NewPathFromBytes(val.Path)
 	return
 }
