@@ -168,8 +168,8 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			for n := 0; n < numForward; n++ {
 				if p := m.rtable.SelectClosestPeer(addr, pf, 0); p != nil {
 					// forward message to peer
-					logger.Printf(logger.INFO, "[%s] forward DHT get message to %s", label, util.Shorten(p.String(), 20))
-					if err := back.Send(ctx, msgOut); err != nil {
+					logger.Printf(logger.INFO, "[%s] forward DHT get message to %s", label, util.Shorten(p.Peer.String(), 20))
+					if err := m.core.Send(ctx, p.Peer, msgOut); err != nil {
 						logger.Printf(logger.ERROR, "[%s] Failed to forward DHT get message: %s", label, err.Error())
 					}
 					pf.Add(p.Peer)
@@ -310,8 +310,8 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 					msgOut := msg.Update(pp, pf, msg.HopCount+1)
 
 					// forward message to peer
-					logger.Printf(logger.INFO, "[%s] forward DHT put message to %s", label, p.String())
-					if err := back.Send(ctx, msgOut); err != nil {
+					logger.Printf(logger.INFO, "[%s] forward DHT put message to %s", label, p.Peer.String())
+					if err := m.core.Send(ctx, p.Peer, msgOut); err != nil {
 						logger.Printf(logger.ERROR, "[%s] Failed to forward DHT put message: %s", label, err.Error())
 					}
 					// add forward node to filter
