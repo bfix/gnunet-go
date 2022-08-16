@@ -19,13 +19,13 @@
 package blocks
 
 import (
-	"encoding/hex"
 	"fmt"
 	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/data"
+	"github.com/bfix/gospel/logger"
 )
 
 //----------------------------------------------------------------------
@@ -141,7 +141,7 @@ func (q *GenericQuery) Decrypt(b Block) error {
 
 // String returns the human-readable representation of a block
 func (q *GenericQuery) String() string {
-	return fmt.Sprintf("GenericQuery{btype=%d,key=%s}", q.btype, hex.EncodeToString(q.Key().Bits))
+	return fmt.Sprintf("GenericQuery{btype=%s,key=%s}", q.btype, util.Shorten(q.Key().String(), 20))
 }
 
 // NewGenericQuery creates a simple Query from hash code.
@@ -155,46 +155,77 @@ func NewGenericQuery(key *crypto.HashCode, btype enums.BlockType, flags uint16) 
 }
 
 //----------------------------------------------------------------------
+// Generic block (custom implementation unknown to gnunet-go)
+//----------------------------------------------------------------------
 
-// GenericBlock is the block in simple binary representation
+// GenericBlock is used for custom blocks not known to the DHT
 type GenericBlock struct {
-	block  []byte            // block data
-	btype  enums.BlockType   // block type
-	expire util.AbsoluteTime // expiration date
+	BType   enums.BlockType   // block type
+	Expires util.AbsoluteTime // expiration time
+	Data    []byte            // block data
 }
 
-// Bytes returns the binary representation
+// NewGenericBlock creates a custom block instance
+func NewGenericBlock(btype enums.BlockType, expire util.AbsoluteTime, blk []byte) Block {
+	return &GenericBlock{
+		BType:   btype,
+		Expires: expire,
+		Data:    util.Clone(blk),
+	}
+}
+
+// Bytes returns the DHT block data (unstructured without type and
+// expiration information.
 func (b *GenericBlock) Bytes() []byte {
-	return b.block
+	return util.Clone(b.Data)
 }
 
-// Type returns the block type
+// Return the block type
 func (b *GenericBlock) Type() enums.BlockType {
-	return b.btype
+	return b.BType
 }
 
-// Expire returns the block expiration
+// Expire returns the block expiration (never for custom blocks)
 func (b *GenericBlock) Expire() util.AbsoluteTime {
-	return b.expire
+	return util.AbsoluteTimeNever()
+}
+
+// Verify the integrity of a block (optional). Override in custom query
+// types to implement block-specific integrity checks (see GNSBlock for
+// example). This verification is usually weaker than the verification
+// method from a Query (see GNSBlock.Verify for explanation).
+func (b *GenericBlock) Verify() (bool, error) {
+	return true, nil
 }
 
 // String returns the human-readable representation of a block
 func (b *GenericBlock) String() string {
-	return fmt.Sprintf("GenericBlock{type=%d,expires=%s,data=[%d]}",
-		b.btype, b.expire.String(), len(b.block))
+	return fmt.Sprintf("Block{type=%s,expire=%s,data=[%d]", b.BType, b.Expires, len(b.Data))
 }
 
-// Verify interface method implementation
-func (b *GenericBlock) Verify() (bool, error) {
-	// no verification, no errors ;)
-	return true, nil
-}
+//----------------------------------------------------------------------
+// Block factory: extend for custom block types
+//----------------------------------------------------------------------
+
+// Known block factories
+var (
+	blkFactory = map[enums.BlockType]func() Block{
+		enums.BLOCK_TYPE_GNS_NAMERECORD: NewGNSBlock,
+		enums.BLOCK_TYPE_DHT_URL_HELLO:  NewHelloBlock,
+	}
+)
 
 // NewGenericBlock creates a Block from binary data.
-func NewGenericBlock(buf []byte) *GenericBlock {
-	return &GenericBlock{
-		block:  util.Clone(buf),
-		btype:  enums.BLOCK_TYPE_ANY,     // unknown block type
-		expire: util.AbsoluteTimeNever(), // never expires
+func NewBlock(btype enums.BlockType, expires util.AbsoluteTime, blk []byte) (b Block, err error) {
+	fac, ok := blkFactory[btype]
+	if !ok {
+		return NewGenericBlock(btype, expires, blk), nil
 	}
+	b = fac()
+	if err = data.Unmarshal(b, blk); err == nil {
+		if b.Expire().Compare(expires) != 0 {
+			logger.Printf(logger.WARN, "[newblock] expire mismatch")
+		}
+	}
+	return
 }

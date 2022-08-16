@@ -128,7 +128,6 @@ type SignedGNSBlockData struct {
 // An encrypted and signed container for GNS resource records that represents
 // the "atomic" data structure associated with a GNS label in a given zone.
 type GNSBlock struct {
-	GenericBlock
 
 	// persistent
 	DerivedKeySig *crypto.ZoneSignature // Derived key used for signing
@@ -147,19 +146,28 @@ func (b *GNSBlock) Bytes() []byte {
 	return buf
 }
 
+// Expire returns the expiration date of the block.
+func (b *GNSBlock) Expire() util.AbsoluteTime {
+	return b.Body.Expire
+}
+
+// Type returns the requested block type
+func (b *GNSBlock) Type() enums.BlockType {
+	return enums.BLOCK_TYPE_GNS_NAMERECORD
+}
+
 // String returns the human-readable representation of a GNSBlock
 func (b *GNSBlock) String() string {
 	return fmt.Sprintf("GNSBlock{Verified=%v,Decrypted=%v,data=[%d]}",
 		b.verified, b.decrypted, len(b.Body.Data))
 }
 
-// NewBlock instantiates an empty GNS block
-func NewBlock() *GNSBlock {
+// NewGNSBlock instantiates an empty GNS block
+func NewGNSBlock() Block {
 	return &GNSBlock{
 		DerivedKeySig: nil,
 		Body: &SignedGNSBlockData{
 			Purpose: new(crypto.SignaturePurpose),
-			Expire:  *new(util.AbsoluteTime),
 			Data:    nil,
 		},
 		checked:   false,

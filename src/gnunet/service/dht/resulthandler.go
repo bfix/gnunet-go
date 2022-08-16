@@ -105,7 +105,7 @@ func (t *ResultHandler) Done() bool {
 // Compare two handlers
 func (t *ResultHandler) Compare(h *ResultHandler) int {
 	// check for same recipient
-	if h.resp.Receiver().Equals(t.resp.Receiver()) {
+	if !h.resp.Receiver().Equals(t.resp.Receiver()) {
 		logger.Printf(logger.DBG, "[rh] recipients differ: %s -- %s", h.resp.Receiver(), t.resp.Receiver())
 		return RHC_DIFFER
 	}
@@ -133,9 +133,9 @@ func (t *ResultHandler) Merge(a *ResultHandler) bool {
 
 // Proceed return true if the message is to be processed in derived implementations
 func (t *ResultHandler) Proceed(ctx context.Context, msg *message.DHTP2PResultMsg) bool {
-	block := blocks.NewGenericBlock(msg.Block)
-	if !t.resFilter.Contains(block) {
-		t.resFilter.Add(block)
+	blk, err := blocks.NewBlock(enums.BlockType(msg.BType), msg.Expires, msg.Block)
+	if err == nil && !t.resFilter.Contains(blk) {
+		t.resFilter.Add(blk)
 		return true
 	}
 	return false
@@ -215,7 +215,7 @@ func (t *ResultHandlerList) Add(hdlr *ResultHandler) bool {
 				break loop
 			case RHC_REPLACE:
 				// replace the old handler with the new one
-				logger.Println(logger.DBG, "[rhl] REPLACE")
+				logger.Printf(logger.DBG, "[rhl] REPLACE #%d with #%d", list[i].id, hdlr.id)
 				list[i] = hdlr
 				modified = true
 				break loop

@@ -66,6 +66,8 @@ func TestDHTFilesStore(t *testing.T) {
 	rf := blocks.NewGenericResultFilter()
 
 	// First round: save blocks
+	btype := enums.BLOCK_TYPE_TEST
+	expire := util.AbsoluteTimeNever()
 	for i := 0; i < fsNumBlocks; i++ {
 		// generate random block
 		size := 1024 + rand.Intn(62000) //nolint:gosec // good enough for testing
@@ -73,10 +75,13 @@ func TestDHTFilesStore(t *testing.T) {
 		if _, err = rand.Read(buf); err != nil { //nolint:gosec // good enough for testing
 			t.Fatal(err)
 		}
-		blk := blocks.NewGenericBlock(buf)
+		var blk blocks.Block
+		if blk, err = blocks.NewBlock(btype, expire, buf); err != nil {
+			t.Fatal(err)
+		}
 		// generate associated key
 		k := crypto.Hash(buf)
-		key := blocks.NewGenericQuery(k, enums.BLOCK_TYPE_ANY, 0)
+		key := blocks.NewGenericQuery(k, enums.BLOCK_TYPE_TEST, 0)
 
 		// store entry
 		val := &DHTEntry{

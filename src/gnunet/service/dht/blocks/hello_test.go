@@ -64,7 +64,7 @@ func setup(t *testing.T) {
 	}
 
 	// create new HELLO block
-	block = NewHelloBlock(peer, addrList, time.Hour)
+	block = InitHelloBlock(peer, addrList, time.Hour)
 
 	// sign block.
 	sig, err := sk.EdSign(block.SignedData())

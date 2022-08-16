@@ -64,8 +64,13 @@ type HelloBlock struct {
 	addrs []*util.Address // cooked address data
 }
 
-// NewHelloBlock initializes a new HELLO block (unsigned)
-func NewHelloBlock(peer *util.PeerID, addrs []*util.Address, ttl time.Duration) *HelloBlock {
+// NewHelloBlock initializes an empty HELLO block
+func NewHelloBlock() Block {
+	return new(HelloBlock)
+}
+
+// InitHelloBlock initializes a new HELLO block (unsigned)
+func InitHelloBlock(peer *util.PeerID, addrs []*util.Address, ttl time.Duration) *HelloBlock {
 	hb := new(HelloBlock)
 	hb.PeerID = peer
 	// limit expiration to second precision (HELLO-URL compatibility)
