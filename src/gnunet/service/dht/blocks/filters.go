@@ -103,14 +103,14 @@ const (
 // by the local peer.
 type ResultFilter interface {
 
-	// Add entry to filter
+	// Add block to filter
 	Add(Block)
 
 	// Contains returns true if block is filtered
 	Contains(Block) bool
 
 	// ContainsHash returns true if block hash is filtered
-	ContainsHash(bh *crypto.HashCode) bool
+	ContainsHash(*crypto.HashCode) bool
 
 	// Bytes returns the binary representation of a result filter
 	Bytes() []byte
@@ -141,7 +141,8 @@ func NewGenericResultFilter() *GenericResultFilter {
 
 // Add a block to the result filter.
 func (rf *GenericResultFilter) Add(b Block) {
-	rf.bf.Add(b.Bytes())
+	bh := crypto.Hash(b.Bytes())
+	rf.bf.Add(bh.Bits)
 }
 
 // Contains returns true if a block is filtered
