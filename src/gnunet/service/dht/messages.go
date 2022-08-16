@@ -180,7 +180,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 					}
 					pf.Add(p.Peer)
 					// create open get-forward result handler
-					rh := NewForwardResultHandler(msg, rf, back)
+					rh := NewResultHandler(msg, rf, back)
 					logger.Printf(logger.INFO, "[%s] DHT-P2P-GET task #%d (%s) started", label, rh.ID(), rh.Key())
 					m.reshdlrs.Add(rh)
 				} else {
