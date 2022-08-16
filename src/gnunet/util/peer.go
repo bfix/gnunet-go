@@ -82,6 +82,9 @@ func NewPeerID(data []byte) (p *PeerID) {
 
 // Equals returns true if two peer IDs match.
 func (p *PeerID) Equals(q *PeerID) bool {
+	if q == nil {
+		return false
+	}
 	return bytes.Equal(p.Data, q.Data)
 }
 
