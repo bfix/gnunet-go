@@ -136,7 +136,7 @@ func NewRoutingTable(ref *PeerAddress, cfg *config.RoutingConfig) *RoutingTable 
 // Returns true if the entry was added, false otherwise.
 func (rt *RoutingTable) Add(p *PeerAddress, label string) bool {
 	k := p.String()
-	logger.Printf(logger.DBG, "[%s] Add(%s)", label, k)
+	logger.Printf(logger.DBG, "[%s] Add(%s)", label, util.Shorten(k, 20))
 
 	// check if peer is already known
 	if px, ok := rt.list.Get(k, 0); ok {
@@ -201,18 +201,17 @@ func (rt *RoutingTable) Remove(p *PeerAddress, pid int) bool {
 // Contains checks if a peer is available in the routing table
 func (rt *RoutingTable) Contains(p *PeerAddress) bool {
 	k := p.String()
-	logger.Printf(logger.DBG, "[RT] Contains(%s)?", k)
 
 	// check for peer in internal list
 	px, ok := rt.list.Get(k, 0)
 	if !ok {
-		logger.Println(logger.DBG, "[RT] --> NOT found in current list:")
+		logger.Printf(logger.WARN, "[RT] %s NOT found in current list:", util.Shorten(k, 20))
 		_ = rt.list.ProcessRange(func(key string, val *PeerAddress, _ int) error {
-			logger.Printf(logger.DBG, "[RT]    * %s", val)
+			logger.Printf(logger.DBG, "[RT]    * %s", util.Shorten(val.String(), 20))
 			return nil
 		}, true)
 	} else {
-		logger.Println(logger.DBG, "[RT] --> found in current list")
+		//logger.Println(logger.DBG, "[RT] --> found in current list")
 		px.lastSeen = util.AbsoluteTimeNow()
 	}
 	return ok
