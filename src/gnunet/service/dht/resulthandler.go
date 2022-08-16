@@ -105,8 +105,11 @@ func (t *ResultHandler) Done() bool {
 // Compare two handlers
 func (t *ResultHandler) Compare(h *ResultHandler) int {
 	// check for same recipient
-	if !h.resp.Receiver().Equals(t.resp.Receiver()) {
-		logger.Printf(logger.DBG, "[rh] recipients differ: %s -- %s", h.resp.Receiver(), t.resp.Receiver())
+	hRcv := h.resp.Receiver()
+	tRcv := t.resp.Receiver()
+	if (hRcv == nil && tRcv != nil) || (hRcv != nil && tRcv == nil) || !hRcv.Equals(tRcv) {
+		logger.Printf(logger.DBG, "[rh] recipients differ: %v -- %v",
+			h.resp.Receiver(), t.resp.Receiver())
 		return RHC_DIFFER
 	}
 	// check if base attributes differ
