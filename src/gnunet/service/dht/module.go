@@ -20,6 +20,7 @@ package dht
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"gnunet/config"
 	"gnunet/core"
@@ -71,10 +72,16 @@ func (lr *LocalBlockResponder) Send(ctx context.Context, msg message.Message) er
 	case *message.DHTP2PResultMsg:
 		// deliver incoming blocks
 		go func() {
-			lr.ch <- blocks.NewGenericBlock(res.Block)
+			blk, err := blocks.NewBlock(enums.BlockType(res.BType), res.Expires, res.Block)
+			if err == nil {
+				lr.ch <- blk
+			} else {
+				logger.Println(logger.WARN, "[local] DHT-RESULT block problem: "+err.Error())
+			}
 		}()
 	default:
 		logger.Println(logger.WARN, "[local] not a DHT-RESULT -- skipped")
+		panic("@@@")
 	}
 	return nil
 }
@@ -133,7 +140,7 @@ func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Mod
 
 	// run periodic tasks (8.2. peer discovery)
 	ticker := time.NewTicker(5 * time.Minute)
-	key := crypto.Hash(m.core.PeerID().Data)
+	key := crypto.Hash(m.core.PeerID().Bytes())
 	flags := uint16(enums.DHT_RO_FIND_APPROXIMATE | enums.DHT_RO_DEMULTIPLEX_EVERYWHERE)
 	var resCh <-chan blocks.Block
 	go func() {
@@ -142,17 +149,19 @@ func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Mod
 			// initiate peer discovery
 			case <-ticker.C:
 				// query DHT for our own HELLO block
-				query := blocks.NewGenericQuery(key, enums.BLOCK_TYPE_DHT_HELLO, flags)
+				query := blocks.NewGenericQuery(key, enums.BLOCK_TYPE_DHT_URL_HELLO, flags)
+				logger.Printf(logger.DBG, "[dht] peer discovery: %s", query.String())
 				resCh = m.Get(ctx, query)
 
 			// handle peer discover results
 			case res := <-resCh:
 				// check for correct type
 				btype := res.Type()
-				if btype == enums.BLOCK_TYPE_DHT_HELLO {
+				if btype == enums.BLOCK_TYPE_DHT_URL_HELLO {
 					hb, ok := res.(*blocks.HelloBlock)
 					if !ok {
-						logger.Printf(logger.WARN, "[dht] peer discovery received invalid block data")
+						logger.Println(logger.WARN, "[dht] peer discovery received invalid block data")
+						logger.Printf(logger.DBG, "[dht] -> %s", hex.EncodeToString(res.Bytes()))
 					} else {
 						// cache HELLO block
 						m.rtable.CacheHello(hb)
@@ -160,7 +169,7 @@ func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Mod
 						m.rtable.Add(NewPeerAddress(hb.PeerID), "dht")
 					}
 				} else {
-					logger.Printf(logger.WARN, "[dht] peer discovery received invalid block type %s", btype.String())
+					logger.Printf(logger.WARN, "[dht] peer discovery received invalid block type %s", btype)
 				}
 
 			// termination
@@ -231,11 +240,6 @@ func (m *Module) Get(ctx context.Context, query blocks.Query) <-chan blocks.Bloc
 	return hdlr.C()
 }
 
-// GetApprox returns the first block not excluded ["dht:getapprox"]
-func (m *Module) GetApprox(ctx context.Context, query blocks.Query, rf blocks.ResultFilter) (results []*store.DHTResult, err error) {
-	return m.store.GetApprox("dht", query, rf)
-}
-
 // Put a block into the DHT ["dht:put"]
 func (m *Module) Put(ctx context.Context, query blocks.Query, block blocks.Block) error {
 	// get additional query parameters
@@ -259,7 +263,9 @@ func (m *Module) Put(ctx context.Context, query blocks.Query, block blocks.Block
 	msg.MsgSize += uint16(len(msg.Block))
 
 	// send message
-	go m.HandleMessage(ctx, nil, msg, nil)
+	self := m.core.PeerID()
+	msg.PeerFilter.Add(self)
+	go m.HandleMessage(ctx, self, msg, nil)
 
 	return nil
 }
@@ -343,7 +349,7 @@ func (m *Module) SendHello(ctx context.Context, addr *util.Address) (err error) 
 	if msg, err = m.getHello(); err != nil {
 		return
 	}
-	logger.Printf(logger.INFO, "[core] Sending HELLO to %s: %s", addr.URI(), msg)
+	logger.Printf(logger.INFO, "[core] Sending own HELLO to %s", addr.URI())
 	return m.core.SendToAddr(ctx, addr, msg)
 }
 
@@ -386,7 +392,7 @@ func (m *Module) getHello() (msg *message.DHTP2PHelloMsg, err error) {
 			logger.Println(logger.ERROR, err.Error())
 			return
 		}
-		logger.Println(logger.DBG, "[dht] New HELLO: "+util.Dump(msg, "hex"))
+		logger.Println(logger.DBG, "[dht] new own HELLO created")
 		return
 	}
 	// we have a valid HELLO for re-use.
@@ -401,7 +407,6 @@ func (m *Module) getHello() (msg *message.DHTP2PHelloMsg, err error) {
 func (m *Module) Export(fcn map[string]any) {
 	// add exported functions from module
 	fcn["dht:get"] = m.Get
-	fcn["dht:getapprox"] = m.GetApprox
 	fcn["dht:put"] = m.Put
 }
 
