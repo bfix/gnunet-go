@@ -66,7 +66,7 @@ func NewPeerAddress(peer *util.PeerID) *PeerAddress {
 func NewQueryAddress(key *crypto.HashCode) *PeerAddress {
 	return &PeerAddress{
 		Peer:     nil,
-		Key:      crypto.NewHashCode(key.Bits),
+		Key:      crypto.NewHashCode(key.Data),
 		lastSeen: util.AbsoluteTimeNow(),
 		lastUsed: util.AbsoluteTimeNow(),
 	}
@@ -74,18 +74,18 @@ func NewQueryAddress(key *crypto.HashCode) *PeerAddress {
 
 // String returns a human-readble representation of an address.
 func (addr *PeerAddress) String() string {
-	return hex.EncodeToString(addr.Key.Bits)
+	return hex.EncodeToString(addr.Key.Data)
 }
 
-// Equals returns true if two peer addresses are the same.
-func (addr *PeerAddress) Equals(p *PeerAddress) bool {
-	return bytes.Equal(addr.Key.Bits, p.Key.Bits)
+// Equal returns true if two peer addresses are the same.
+func (addr *PeerAddress) Equal(p *PeerAddress) bool {
+	return bytes.Equal(addr.Key.Data, p.Key.Data)
 }
 
 // Distance between two addresses: returns a distance value and a
 // bucket index (smaller index = less distant).
 func (addr *PeerAddress) Distance(p *PeerAddress) (*math.Int, int) {
-	r := util.Distance(addr.Key.Bits, p.Key.Bits)
+	r := util.Distance(addr.Key.Data, p.Key.Data)
 	return r, 512 - r.BitLen()
 }
 
@@ -309,7 +309,7 @@ func (rt *RoutingTable) IsClosestPeer(p, k *PeerAddress, pf *blocks.PeerFilter, 
 		return d1.Cmp(d0) < 0
 	}
 	// check if p is closest peer
-	return n.Equals(p)
+	return n.Equal(p)
 }
 
 // ComputeOutDegree computes the number of neighbors that a message should be forwarded to.
@@ -355,7 +355,7 @@ func (rt *RoutingTable) heartbeat(ctx context.Context) {
 
 	// drop expired entries from the HELLO cache
 	_ = rt.helloCache.ProcessRange(func(key string, val *blocks.HelloBlock, pid int) error {
-		if val.Expires.Expired() {
+		if val.Expire_.Expired() {
 			rt.helloCache.Delete(key, pid)
 		}
 		return nil
@@ -478,7 +478,7 @@ func (b *Bucket) Remove(p *PeerAddress) bool {
 	defer b.Unlock()
 
 	for i, pe := range b.list {
-		if pe.Equals(p) {
+		if pe.Equal(p) {
 			// found entry: remove it
 			b.list = append(b.list[:i], b.list[i+1:]...)
 			return true

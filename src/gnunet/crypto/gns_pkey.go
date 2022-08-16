@@ -121,13 +121,13 @@ func (pk *PKEYPublicImpl) BlockKey(label string, expires util.AbsoluteTime) (ske
 
 	// assemble initialization vector
 	iv := &struct {
-		Nonce      []byte            `size:"4"`    // 32 bit Nonce
-		Expiration util.AbsoluteTime ``            // Expiration time of block
-		Counter    uint32            `order:"big"` // Block counter
+		Nonce   []byte            `size:"4"`    // 32 bit Nonce
+		Expire  util.AbsoluteTime ``            // Expiration time of block
+		Counter uint32            `order:"big"` // Block counter
 	}{
-		Nonce:      make([]byte, 4),
-		Expiration: expires,
-		Counter:    1,
+		Nonce:   make([]byte, 4),
+		Expire:  expires,
+		Counter: 1,
 	}
 	prk = hkdf.Extract(sha512.New, kd, []byte("gns-aes-ctx-iv"))
 	rdr = hkdf.Expand(sha256.New, prk, []byte(label))

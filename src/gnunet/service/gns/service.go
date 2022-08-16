@@ -238,7 +238,7 @@ func (s *Service) RevokeKey(ctx context.Context, rd *revocation.RevData) (succes
 
 // LookupNamecache returns a cached lookup (if available)
 func (s *Service) LookupNamecache(ctx context.Context, query *blocks.GNSQuery) (block *blocks.GNSBlock, err error) {
-	logger.Printf(logger.DBG, "[gns] LookupNamecache(%s)...\n", hex.EncodeToString(query.Key().Bits))
+	logger.Printf(logger.DBG, "[gns] LookupNamecache(%s)...\n", hex.EncodeToString(query.Key().Data))
 
 	// assemble Namecache request
 	req := message.NewNamecacheLookupMsg(query.Key())
@@ -340,7 +340,7 @@ func (s *Service) StoreNamecache(ctx context.Context, query *blocks.GNSQuery, bl
 
 // LookupDHT gets a GNS block from the DHT for the given query key.
 func (s *Service) LookupDHT(ctx context.Context, query blocks.Query) (block blocks.Block, err error) {
-	logger.Printf(logger.DBG, "[gns] LookupDHT(%s)...\n", hex.EncodeToString(query.Key().Bits))
+	logger.Printf(logger.DBG, "[gns] LookupDHT(%s)...\n", hex.EncodeToString(query.Key().Data))
 	block = nil
 
 	// client-connect to the DHT service

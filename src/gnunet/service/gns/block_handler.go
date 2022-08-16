@@ -132,10 +132,10 @@ func NewBlockHandlerList(records []*message.ResourceRecord, labels []string) (*B
 			continue
 		}
 		// check for expired record
-		if rec.Expires.Expired() {
+		if rec.Expire.Expired() {
 			// do we have an associated shadow record?
 			for _, shadow := range shadows {
-				if shadow.Type == rec.Type && !shadow.Expires.Expired() {
+				if shadow.Type == rec.Type && !shadow.Expire.Expired() {
 					// deliver un-expired shadow record instead.
 					shadow.Flags &^= uint32(enums.GNS_FLAG_SHADOW)
 					active = append(active, shadow)
@@ -417,7 +417,7 @@ func (h *BoxHandler) Records(kind RRTypeList) *message.RecordSet {
 		if kind.HasType(enums.GNSType(box.Type)) {
 			// valid box found: assemble new resource record.
 			rr := new(message.ResourceRecord)
-			rr.Expires = box.rec.Expires
+			rr.Expire = box.rec.Expire
 			rr.Flags = box.rec.Flags
 			rr.Type = box.Type
 			rr.Size = uint32(len(box.RR))

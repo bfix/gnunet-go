@@ -43,8 +43,8 @@ type HelloAddress struct {
 func NewHelloAddress(a *util.Address) *HelloAddress {
 	// use default expiration time, but adjust it if address expires earlier
 	exp := util.NewAbsoluteTime(time.Now().Add(HelloAddressExpiration))
-	if exp.Compare(a.Expires) > 0 {
-		exp = a.Expires
+	if exp.Compare(a.Expire) > 0 {
+		exp = a.Expire
 	}
 	// convert address
 	addr := &HelloAddress{
@@ -101,7 +101,7 @@ func ParseHelloAddr(rdr io.Reader) (a *HelloAddress, err error) {
 // Wrap a HelloAddress into a uitl.Address
 func (a *HelloAddress) Wrap() (addr *util.Address) {
 	addr = util.NewAddress(a.transport, string(a.address))
-	addr.Expires = a.expires
+	addr.Expire = a.expires
 	return
 }
 

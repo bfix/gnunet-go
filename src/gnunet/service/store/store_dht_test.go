@@ -110,9 +110,9 @@ func TestDHTFilesStore(t *testing.T) {
 		k := crypto.Hash(buf)
 
 		// do the keys match?
-		if !k.Equals(key.Key()) {
-			t.Log(hex.EncodeToString(k.Bits))
-			t.Log(hex.EncodeToString(key.Key().Bits))
+		if !k.Equal(key.Key()) {
+			t.Log(hex.EncodeToString(k.Data))
+			t.Log(hex.EncodeToString(key.Key().Data))
 			t.Fatal("key/value mismatch")
 		}
 	}

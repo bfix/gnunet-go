@@ -99,7 +99,7 @@ func OpenMetaDB(path string) (db *FileMetaDB, err error) {
 func (db *FileMetaDB) Store(md *FileMetadata) (err error) {
 	sql := "replace into meta(qkey,btype,bhash,size,stored,expires,lastUsed,usedCount) values(?,?,?,?,?,?,?,?)"
 	_, err = db.conn.Exec(sql,
-		md.key.Bits, md.btype, md.bhash.Bits, md.size, md.stored.Epoch(),
+		md.key.Data, md.btype, md.bhash.Data, md.size, md.stored.Epoch(),
 		md.expires.Epoch(), md.lastUsed.Epoch(), md.usedCount)
 	return
 }
@@ -111,9 +111,9 @@ func (db *FileMetaDB) Get(query blocks.Query) (mds []*FileMetadata, err error) {
 	btype := query.Type()
 	var rows *sql.Rows
 	if btype == enums.BLOCK_TYPE_ANY {
-		rows, err = db.conn.Query(stmt, query.Key().Bits)
+		rows, err = db.conn.Query(stmt, query.Key().Data)
 	} else {
-		rows, err = db.conn.Query(stmt+" and btype=?", query.Key().Bits, btype)
+		rows, err = db.conn.Query(stmt+" and btype=?", query.Key().Data, btype)
 	}
 	if err != nil {
 		return
@@ -124,7 +124,7 @@ func (db *FileMetaDB) Get(query blocks.Query) (mds []*FileMetadata, err error) {
 		md.key = query.Key()
 		md.btype = btype
 		var st, exp, lu uint64
-		if err = rows.Scan(&md.size, &md.bhash.Bits, &st, &exp, &lu, &md.usedCount); err != nil {
+		if err = rows.Scan(&md.size, &md.bhash.Data, &st, &exp, &lu, &md.usedCount); err != nil {
 			if err == sql.ErrNoRows {
 				md = nil
 				err = nil
@@ -194,7 +194,7 @@ func (db *FileMetaDB) Traverse(f func(*FileMetadata)) error {
 	md := NewFileMetadata()
 	for rows.Next() {
 		var st, exp, lu uint64
-		err = rows.Scan(&md.key.Bits, &md.btype, &md.bhash.Bits, &md.size, &st, &exp, &lu, &md.usedCount)
+		err = rows.Scan(&md.key.Data, &md.btype, &md.bhash.Data, &md.size, &st, &exp, &lu, &md.usedCount)
 		if err != nil {
 			return err
 		}

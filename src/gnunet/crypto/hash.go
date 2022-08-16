@@ -28,12 +28,12 @@ import (
 
 // HashCode is the result of a 512-bit hash function (SHA-512)
 type HashCode struct {
-	Bits []byte `size:"(Size))"`
+	Data []byte `size:"(Size)"`
 }
 
-// Equals tests if two hash results are equal.
-func (hc *HashCode) Equals(n *HashCode) bool {
-	return bytes.Equal(hc.Bits, n.Bits)
+// Equal tests if two hash results are equal.
+func (hc *HashCode) Equal(n *HashCode) bool {
+	return bytes.Equal(hc.Data, n.Data)
 }
 
 // Size of binary data
@@ -44,13 +44,13 @@ func (hc *HashCode) Size() uint {
 // Clone the hash code
 func (hc *HashCode) Clone() *HashCode {
 	return &HashCode{
-		Bits: util.Clone(hc.Bits),
+		Data: util.Clone(hc.Data),
 	}
 }
 
 // String returns a hex-representation of the hash code
 func (hc *HashCode) String() string {
-	return hex.EncodeToString(hc.Bits)
+	return hex.EncodeToString(hc.Data)
 }
 
 // NewHashCode creates a new (initialized) hash value
@@ -65,7 +65,7 @@ func NewHashCode(data []byte) *HashCode {
 			copy(v, data[:size])
 		}
 	}
-	hc.Bits = v
+	hc.Data = v
 	return hc
 }
 
@@ -73,6 +73,6 @@ func NewHashCode(data []byte) *HashCode {
 func Hash(data []byte) *HashCode {
 	val := sha512.Sum512(data)
 	return &HashCode{
-		Bits: util.Clone(val[:]),
+		Data: util.Clone(val[:]),
 	}
 }

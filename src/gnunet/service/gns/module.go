@@ -299,8 +299,8 @@ func (m *Module) ResolveRelative(
 				// the longest-living record in the current set.
 				expires := util.AbsoluteTimeNow()
 				for _, rec := range set.Records {
-					if rec.Expires.Compare(expires) > 0 {
-						expires = rec.Expires
+					if rec.Expire.Compare(expires) > 0 {
+						expires = rec.Expire
 					}
 				}
 				set.Records = append(set.Records, m.newLEHORecord(inst.Query, expires))
@@ -472,7 +472,7 @@ func (m *Module) Lookup(
 // newLEHORecord creates a new supplemental GNS record of type LEHO.
 func (m *Module) newLEHORecord(name string, expires util.AbsoluteTime) *message.ResourceRecord {
 	rr := new(message.ResourceRecord)
-	rr.Expires = expires
+	rr.Expire = expires
 	rr.Flags = uint32(enums.GNS_FLAG_SUPPL)
 	rr.Type = uint32(enums.GNS_TYPE_LEHO)
 	rr.Size = uint32(len(name) + 1)

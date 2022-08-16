@@ -176,7 +176,7 @@ func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *message.Reco
 				// create a new GNS resource record
 				rr := new(message.ResourceRecord)
 				expires := time.Now().Add(time.Duration(record.Header().Ttl) * time.Second)
-				rr.Expires = util.NewAbsoluteTime(expires)
+				rr.Expire = util.NewAbsoluteTime(expires)
 				rr.Flags = 0
 				rr.Type = uint32(record.Header().Rrtype)
 				rr.Size = uint32(record.Header().Rdlength)

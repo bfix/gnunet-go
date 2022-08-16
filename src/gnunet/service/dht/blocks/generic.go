@@ -161,7 +161,7 @@ func NewGenericQuery(key *crypto.HashCode, btype enums.BlockType, flags uint16) 
 // GenericBlock is used for custom blocks not known to the DHT
 type GenericBlock struct {
 	BType   enums.BlockType   // block type
-	Expires util.AbsoluteTime // expiration time
+	Expire_ util.AbsoluteTime // expiration time
 	Data    []byte            // block data
 }
 
@@ -169,7 +169,7 @@ type GenericBlock struct {
 func NewGenericBlock(btype enums.BlockType, expire util.AbsoluteTime, blk []byte) Block {
 	return &GenericBlock{
 		BType:   btype,
-		Expires: expire,
+		Expire_: expire,
 		Data:    util.Clone(blk),
 	}
 }
@@ -200,7 +200,7 @@ func (b *GenericBlock) Verify() (bool, error) {
 
 // String returns the human-readable representation of a block
 func (b *GenericBlock) String() string {
-	return fmt.Sprintf("Block{type=%s,expire=%s,data=[%d]", b.BType, b.Expires, len(b.Data))
+	return fmt.Sprintf("Block{type=%s,expire=%s,data=[%d]", b.BType, b.Expire_, len(b.Data))
 }
 
 //----------------------------------------------------------------------

@@ -54,7 +54,7 @@ func NewNamecacheLookupMsg(query *crypto.HashCode) *NamecacheLookupMsg {
 // String returns a human-readable representation of the message.
 func (m *NamecacheLookupMsg) String() string {
 	return fmt.Sprintf("NamecacheLookupMsg{Id=%d,Query=%s}",
-		m.ID, hex.EncodeToString(m.Query.Bits))
+		m.ID, hex.EncodeToString(m.Query.Data))
 }
 
 // Header returns the message header in a separate instance.

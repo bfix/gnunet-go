@@ -72,7 +72,7 @@ func (lr *LocalBlockResponder) Send(ctx context.Context, msg message.Message) er
 	case *message.DHTP2PResultMsg:
 		// deliver incoming blocks
 		go func() {
-			blk, err := blocks.NewBlock(enums.BlockType(res.BType), res.Expires, res.Block)
+			blk, err := blocks.NewBlock(enums.BlockType(res.BType), res.Expire, res.Block)
 			if err == nil {
 				lr.ch <- blk
 			} else {
@@ -254,7 +254,7 @@ func (m *Module) Put(ctx context.Context, query blocks.Query, block blocks.Block
 	msg.HopCount = 0
 	msg.PeerFilter = blocks.NewPeerFilter()
 	msg.ReplLvl = uint16(m.cfg.Routing.ReplLevel)
-	msg.Expiration = expire
+	msg.Expire = expire
 	msg.Block = block.Bytes()
 	msg.Key = query.Key().Clone()
 	msg.TruncOrigin = nil
@@ -356,7 +356,7 @@ func (m *Module) SendHello(ctx context.Context, addr *util.Address) (err error) 
 // get the recent HELLO if it is defined and not expired;
 // create a new HELLO otherwise.
 func (m *Module) getHello() (msg *message.DHTP2PHelloMsg, err error) {
-	if m.lastHello == nil || m.lastHello.Expires.Expired() {
+	if m.lastHello == nil || m.lastHello.Expire.Expired() {
 		// assemble new (signed) HELLO block
 		var addrList []*util.Address
 		if addrList, err = m.core.Addresses(); err != nil {
@@ -365,7 +365,7 @@ func (m *Module) getHello() (msg *message.DHTP2PHelloMsg, err error) {
 		// assemble HELLO data
 		hb := new(blocks.HelloBlock)
 		hb.PeerID = m.core.PeerID()
-		hb.Expires = util.NewAbsoluteTime(time.Now().Add(message.HelloAddressExpiration))
+		hb.Expire_ = util.NewAbsoluteTime(time.Now().Add(message.HelloAddressExpiration))
 		hb.SetAddresses(addrList)
 
 		// sign HELLO block
@@ -374,7 +374,7 @@ func (m *Module) getHello() (msg *message.DHTP2PHelloMsg, err error) {
 		}
 		// assemble HELLO message
 		msg = message.NewDHTP2PHelloMsg()
-		msg.Expires = hb.Expires
+		msg.Expire = hb.Expire_
 		msg.SetAddresses(hb.Addresses())
 		if err = m.core.Sign(msg); err != nil {
 			return

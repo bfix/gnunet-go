@@ -144,8 +144,8 @@ func TestHelloDebug(t *testing.T) {
 		t.Log("Block: " + hex.EncodeToString(buf))
 		t.Log("PeerID: " + hb.PeerID.String())
 		t.Log("  ->  " + hex.EncodeToString(hb.PeerID.Bytes()))
-		t.Logf("Expire: %d", hb.Expires.Val)
-		t.Logf("  -> " + hb.Expires.String())
+		t.Logf("Expire: %d", hb.Expire_.Val)
+		t.Logf("  -> " + hb.Expire_.String())
 		var exp util.AbsoluteTime
 		if err = data.Unmarshal(&exp, buf[32:40]); err != nil {
 			t.Fatal(err)

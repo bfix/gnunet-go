@@ -129,7 +129,7 @@ func (p *Path) Clone() *Path {
 func (p *Path) NewElement(pred, signer, succ *util.PeerID) *Element {
 	return &Element{
 		elementData: elementData{
-			Expiration:      p.Expire,
+			Expire:          p.Expire,
 			BlockHash:       p.BlkHash,
 			PeerPredecessor: pred,
 			PeerSuccessor:   succ,

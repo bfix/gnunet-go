@@ -142,18 +142,18 @@ func NewGenericResultFilter() *GenericResultFilter {
 // Add a block to the result filter.
 func (rf *GenericResultFilter) Add(b Block) {
 	bh := crypto.Hash(b.Bytes())
-	rf.bf.Add(bh.Bits)
+	rf.bf.Add(bh.Data)
 }
 
 // Contains returns true if a block is filtered
 func (rf *GenericResultFilter) Contains(b Block) bool {
 	bh := crypto.Hash(b.Bytes())
-	return rf.bf.Contains(bh.Bits)
+	return rf.bf.Contains(bh.Data)
 }
 
 // ContainsHash returns true if a block hash is filtered
 func (rf *GenericResultFilter) ContainsHash(bh *crypto.HashCode) bool {
-	return rf.bf.Contains(bh.Bits)
+	return rf.bf.Contains(bh.Data)
 }
 
 // Bytes returns the binary representation of a result filter

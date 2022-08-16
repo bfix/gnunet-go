@@ -105,15 +105,14 @@ func (t *ResultHandler) Done() bool {
 // Compare two handlers
 func (t *ResultHandler) Compare(h *ResultHandler) int {
 	// check for same recipient
-	hRcv := h.resp.Receiver()
 	tRcv := t.resp.Receiver()
-	if (hRcv == nil && tRcv != nil) || (hRcv != nil && tRcv == nil) || !hRcv.Equals(tRcv) {
-		logger.Printf(logger.DBG, "[rh] recipients differ: %v -- %v",
-			h.resp.Receiver(), t.resp.Receiver())
+	hRcv := h.resp.Receiver()
+	if !hRcv.Equal(tRcv) {
+		logger.Printf(logger.DBG, "[rh] recipients differ: %v -- %v", hRcv, tRcv)
 		return RHC_DIFFER
 	}
 	// check if base attributes differ
-	if !t.key.Equals(h.key) ||
+	if !t.key.Equal(h.key) ||
 		t.btype != h.btype ||
 		t.flags != h.flags ||
 		!bytes.Equal(t.xQuery, h.xQuery) {
@@ -136,7 +135,7 @@ func (t *ResultHandler) Merge(a *ResultHandler) bool {
 
 // Proceed return true if the message is to be processed in derived implementations
 func (t *ResultHandler) Proceed(ctx context.Context, msg *message.DHTP2PResultMsg) bool {
-	blk, err := blocks.NewBlock(enums.BlockType(msg.BType), msg.Expires, msg.Block)
+	blk, err := blocks.NewBlock(enums.BlockType(msg.BType), msg.Expire, msg.Block)
 	if err == nil && !t.resFilter.Contains(blk) {
 		t.resFilter.Add(blk)
 		return true

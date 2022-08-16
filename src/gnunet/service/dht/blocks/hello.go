@@ -57,7 +57,7 @@ const helloPrefix = "gnunet://hello/"
 type HelloBlock struct {
 	PeerID    *util.PeerID        ``         // peer identifier
 	Signature *util.PeerSignature ``         // signature
-	Expires   util.AbsoluteTime   ``         // Expiration date
+	Expire_   util.AbsoluteTime   ``         // Expiration date
 	AddrBin   []byte              `size:"*"` // raw address data
 
 	// transient attributes
@@ -74,7 +74,7 @@ func InitHelloBlock(peer *util.PeerID, addrs []*util.Address, ttl time.Duration)
 	hb := new(HelloBlock)
 	hb.PeerID = peer
 	// limit expiration to second precision (HELLO-URL compatibility)
-	hb.Expires = util.NewAbsoluteTimeEpoch(uint64(time.Now().Add(ttl).Unix()))
+	hb.Expire_ = util.NewAbsoluteTimeEpoch(uint64(time.Now().Add(ttl).Unix()))
 	hb.SetAddresses(addrs)
 	return hb
 }
@@ -137,8 +137,8 @@ func ParseHelloBlockFromURL(u string, checkExpiry bool) (h *HelloBlock, err erro
 	if exp, err = strconv.ParseUint(q[0], 10, 64); err != nil {
 		return
 	}
-	h.Expires = util.NewAbsoluteTimeEpoch(exp)
-	if checkExpiry && h.Expires.Expired() {
+	h.Expire_ = util.NewAbsoluteTimeEpoch(exp)
+	if checkExpiry && h.Expire_.Expired() {
 		err = ErrHelloExpired
 		return
 	}
@@ -233,13 +233,13 @@ func (h *HelloBlock) Bytes() []byte {
 
 // Expire returns the block expiration
 func (h *HelloBlock) Expire() util.AbsoluteTime {
-	return h.Expires
+	return h.Expire_
 }
 
 // String returns the human-readable representation of a block
 func (h *HelloBlock) String() string {
 	return fmt.Sprintf("HelloBlock{peer=%s,expires=%s,addrs=[%d]}",
-		h.PeerID, h.Expires, len(h.Addresses()))
+		h.PeerID, h.Expire_, len(h.Addresses()))
 }
 
 // URL returns the HELLO URL for the data.
@@ -248,7 +248,7 @@ func (h *HelloBlock) URL() string {
 		helloPrefix,
 		h.PeerID.String(),
 		util.EncodeBinaryToString(h.Signature.Data),
-		h.Expires.Epoch(),
+		h.Expire_.Epoch(),
 	)
 	for i, a := range h.addrs {
 		if i > 0 {
@@ -261,16 +261,16 @@ func (h *HelloBlock) URL() string {
 	return u
 }
 
-// Equals returns true if two HELLOs are the same. The expiration
+// Equal returns true if two HELLOs are the same. The expiration
 // timestamp is ignored in the comparison.
-func (h *HelloBlock) Equals(g *HelloBlock) bool {
-	if !h.PeerID.Equals(g.PeerID) ||
-		!util.Equals(h.Signature.Data, g.Signature.Data) ||
+func (h *HelloBlock) Equal(g *HelloBlock) bool {
+	if !h.PeerID.Equal(g.PeerID) ||
+		!util.Equal(h.Signature.Data, g.Signature.Data) ||
 		len(h.addrs) != len(g.addrs) {
 		return false
 	}
 	for i, a := range h.addrs {
-		if !a.Equals(g.addrs[i]) {
+		if !a.Equal(g.addrs[i]) {
 			return false
 		}
 	}
@@ -308,7 +308,7 @@ func (h *HelloBlock) SignedData() []byte {
 	err := binary.Write(buf, binary.BigEndian, size)
 	if err == nil {
 		if err = binary.Write(buf, binary.BigEndian, purpose); err == nil {
-			if err = binary.Write(buf, binary.BigEndian, h.Expires /*.Epoch()*1000000*/); err == nil {
+			if err = binary.Write(buf, binary.BigEndian, h.Expire_ /*.Epoch()*1000000*/); err == nil {
 				if n, err = buf.Write(hAddr[:]); err == nil {
 					if n != len(hAddr[:]) {
 						err = errors.New("signed data size mismatch")
@@ -351,7 +351,7 @@ func (bh *HelloBlockHandler) ValidateBlockKey(b Block, key *crypto.HashCode) boo
 		logger.Println(logger.WARN, "[HelloHdlr] ValidateBlockKey: not a HELLO block")
 		return false
 	}
-	return key.Equals(bkey)
+	return key.Equal(bkey)
 }
 
 // DeriveBlockKey is used to synthesize the block key from the block
@@ -478,7 +478,7 @@ func (rf *HelloResultFilter) Contains(b Block) bool {
 
 // ContainsHash checks if a block hash is contained in the result filter
 func (rf *HelloResultFilter) ContainsHash(bh *crypto.HashCode) bool {
-	return rf.bf.Contains(bh.Bits)
+	return rf.bf.Contains(bh.Data)
 }
 
 // Bytes returns a binary representation of a HELLO result filter

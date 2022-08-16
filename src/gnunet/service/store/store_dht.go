@@ -168,7 +168,7 @@ func (s *DHTStore) Put(query blocks.Query, entry *DHTEntry) (err error) {
 	blkSize := len(entry.Blk.Bytes())
 
 	// write entry to file for storage
-	if err = s.writeEntry(query.Key().Bits, entry); err != nil {
+	if err = s.writeEntry(query.Key().Data, entry); err != nil {
 		return
 	}
 	// compile metadata
@@ -226,7 +226,7 @@ func (s *DHTStore) Get(label string, query blocks.Query, rf blocks.ResultFilter)
 		}
 		results = append(results, entry)
 		// mark the block as newly used
-		if err = s.meta.Used(md.key.Bits, md.btype); err != nil {
+		if err = s.meta.Used(md.key.Data, md.btype); err != nil {
 			logger.Printf(logger.ERROR, "[%s] can't flag DHT entry as used: %s", label, err)
 			continue
 		}
@@ -246,7 +246,7 @@ func (s *DHTStore) GetApprox(label string, query blocks.Query, rf blocks.ResultF
 			return
 		}
 		// check distance (max. 16 bucktes off)
-		dist := util.Distance(md.key.Bits, query.Key().Bits)
+		dist := util.Distance(md.key.Data, query.Key().Data)
 		if (512 - dist.BitLen()) > 16 {
 			return
 		}
@@ -280,7 +280,7 @@ type entryLayout struct {
 // read entry from storage for given key
 func (s *DHTStore) readEntry(md *FileMetadata) (entry *DHTEntry, err error) {
 	// get path and filename from key
-	folder, fname := s.expandPath(md.key.Bits)
+	folder, fname := s.expandPath(md.key.Data)
 
 	// open file for reading
 	var file *os.File
@@ -368,12 +368,12 @@ func (s *DHTStore) dropFile(md *FileMetadata) (err error) {
 	// adjust total size
 	s.totalSize -= md.size
 	// remove from database
-	if err = s.meta.Drop(md.key.Bits, md.btype); err != nil {
+	if err = s.meta.Drop(md.key.Data, md.btype); err != nil {
 		logger.Printf(logger.ERROR, "[store] can't remove metadata (%s,%d): %s", md.key, md.btype, err.Error())
 		return
 	}
 	// remove from filesystem
-	h := hex.EncodeToString(md.key.Bits)
+	h := hex.EncodeToString(md.key.Data)
 	path := fmt.Sprintf("%s/%s/%s/%s", s.path, h[:2], h[2:4], h[4:])
 	if err = os.Remove(path); err != nil {
 		logger.Printf(logger.ERROR, "[store] can't remove file %s: %s", path, err.Error())

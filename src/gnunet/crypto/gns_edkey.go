@@ -132,7 +132,7 @@ func (pk *EDKEYPublicImpl) Verify(data []byte, zs *ZoneSignature) (ok bool, err 
 
 // BlockKey return the symmetric key (and initialization vector) based on
 // label and expiration time.
-func (pk *EDKEYPublicImpl) BlockKey(label string, expires util.AbsoluteTime) (skey []byte) {
+func (pk *EDKEYPublicImpl) BlockKey(label string, expire util.AbsoluteTime) (skey []byte) {
 	// generate symmetric key
 	skey = make([]byte, 56)
 	kd := pk.Bytes()
@@ -143,11 +143,11 @@ func (pk *EDKEYPublicImpl) BlockKey(label string, expires util.AbsoluteTime) (sk
 	}
 	// assemble initialization vector
 	iv := &struct {
-		Nonce      []byte            `size:"16"` // Nonce
-		Expiration util.AbsoluteTime ``          // Expiration time of block
+		Nonce  []byte            `size:"16"` // Nonce
+		Expire util.AbsoluteTime ``          // Expiration time of block
 	}{
-		Nonce:      make([]byte, 16),
-		Expiration: expires,
+		Nonce:  make([]byte, 16),
+		Expire: expire,
 	}
 	prk = hkdf.Extract(sha512.New, kd, []byte("gns-xsalsa-ctx-iv"))
 	rdr = hkdf.Expand(sha256.New, prk, []byte(label))

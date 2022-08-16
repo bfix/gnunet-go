@@ -43,8 +43,8 @@ func Clone[T []E, E any](d T) T {
 	return r
 }
 
-// Equals returns true if two arrays match.
-func Equals[T []E, E comparable](a, b T) bool {
+// Equal returns true if two arrays match.
+func Equal[T []E, E comparable](a, b T) bool {
 	if len(a) != len(b) {
 		return false
 	}

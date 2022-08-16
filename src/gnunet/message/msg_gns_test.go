@@ -54,7 +54,7 @@ func TestRecordsetPKEY(t *testing.T) {
 			Count: 2,
 			Records: []*ResourceRecord{
 				{
-					Expires: util.AbsoluteTime{
+					Expire: util.AbsoluteTime{
 						Val: uint64(14888744139323793),
 					},
 					Size:  4,
@@ -65,7 +65,7 @@ func TestRecordsetPKEY(t *testing.T) {
 					},
 				},
 				{
-					Expires: util.AbsoluteTime{
+					Expire: util.AbsoluteTime{
 						Val: uint64(26147096139323793),
 					},
 					Size:  36,
@@ -164,7 +164,7 @@ func TestRecordsetPKEY(t *testing.T) {
 	}
 
 	// check symmetric keys and nonce
-	expires := RECSET.Expires()
+	expires := RECSET.Expire()
 	skey := zk.BlockKey(LABEL, expires)
 	if !bytes.Equal(skey[32:], NONCE) {
 		t.Logf("nonce = %s\n", hex.EncodeToString(skey[32:]))
@@ -214,7 +214,7 @@ func TestRecordsetEDKEY(t *testing.T) {
 			Count: 2,
 			Records: []*ResourceRecord{
 				{
-					Expires: util.AbsoluteTime{
+					Expire: util.AbsoluteTime{
 						Val: uint64(2463385894000000),
 					},
 					Size:  4,
@@ -225,7 +225,7 @@ func TestRecordsetEDKEY(t *testing.T) {
 					},
 				},
 				{
-					Expires: util.AbsoluteTime{
+					Expire: util.AbsoluteTime{
 						Val: uint64(49556645701000000),
 					},
 					Size:  36,
@@ -327,7 +327,7 @@ func TestRecordsetEDKEY(t *testing.T) {
 	}
 
 	// check symmetric keys and nonce
-	expires := RECSET.Expires()
+	expires := RECSET.Expire()
 	skey := zk.BlockKey(LABEL, expires)
 	if !bytes.Equal(skey[32:], NONCE) {
 		t.Logf("nonce = %s\n", hex.EncodeToString(skey[32:]))

@@ -29,7 +29,7 @@ import (
 type Address struct {
 	Netw    string       // network protocol
 	Options uint32       // address options
-	Expires AbsoluteTime // expiration date for address
+	Expire  AbsoluteTime // expiration date for address
 	Address []byte       // address data (protocol-dependent)
 }
 
@@ -39,7 +39,7 @@ func NewAddress(transport string, addr string) *Address {
 		Netw:    transport,
 		Options: 0,
 		Address: Clone([]byte(addr)),
-		Expires: AbsoluteTimeNever(),
+		Expire:  AbsoluteTimeNever(),
 	}
 }
 
@@ -50,7 +50,7 @@ func NewAddressWrap(addr net.Addr) *Address {
 		Netw:    addr.Network(),
 		Options: 0,
 		Address: []byte(addr.String()),
-		Expires: AbsoluteTimeNever(),
+		Expire:  AbsoluteTimeNever(),
 	}
 }
 
@@ -67,8 +67,8 @@ func ParseAddress(s string) (addr *Address, err error) {
 	return
 }
 
-// Equals return true if two addresses match.
-func (a *Address) Equals(b *Address) bool {
+// Equal return true if two addresses match.
+func (a *Address) Equal(b *Address) bool {
 	return a.Netw == b.Netw &&
 		a.Options == b.Options &&
 		bytes.Equal(a.Address, b.Address)
@@ -115,7 +115,7 @@ func NewPeerAddrList() *PeerAddrList {
 func (a *PeerAddrList) Add(peer *PeerID, addr *Address) (mode int) {
 	// check for expired address.
 	mode = 0
-	if !addr.Expires.Expired() {
+	if !addr.Expire.Expired() {
 		// run add operation
 		_ = a.list.Process(func(pid int) error {
 			id := peer.String()
@@ -125,7 +125,7 @@ func (a *PeerAddrList) Add(peer *PeerID, addr *Address) (mode int) {
 				mode = 1
 			} else {
 				for _, a := range list {
-					if a.Equals(addr) {
+					if a.Equal(addr) {
 						return nil
 					}
 				}
@@ -146,7 +146,7 @@ func (a *PeerAddrList) Get(peer *PeerID, transport string) (res []*Address) {
 	if ok {
 		for _, addr := range list {
 			// check for expired address.
-			if addr.Expires.Expired() {
+			if addr.Expire.Expired() {
 				// skip expired
 				continue
 			}

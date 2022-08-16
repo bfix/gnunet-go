@@ -67,7 +67,7 @@ func NewDHTClientPutMsg(key *crypto.HashCode, btype int, data []byte) *DHTClient
 // String returns a human-readable representation of the message.
 func (m *DHTClientPutMsg) String() string {
 	return fmt.Sprintf("DHTClientPutMsg{Type=%d,Expire=%s,Options=%d,Repl=%d,Key=%s}",
-		m.Type, m.Expire, m.Options, m.ReplLevel, hex.EncodeToString(m.Key.Bits))
+		m.Type, m.Expire, m.Options, m.ReplLevel, hex.EncodeToString(m.Key.Data))
 }
 
 // Header returns the message header in a separate instance.
@@ -120,7 +120,7 @@ func (m *DHTClientGetMsg) SetXQuery(xq []byte) []byte {
 // String returns a human-readable representation of the message.
 func (m *DHTClientGetMsg) String() string {
 	return fmt.Sprintf("DHTClientGetMsg{Id:%d,Type=%d,Options=%d,Repl=%d,Key=%s}",
-		m.ID, m.Type, m.Options, m.ReplLevel, hex.EncodeToString(m.Key.Bits))
+		m.ID, m.Type, m.Options, m.ReplLevel, hex.EncodeToString(m.Key.Data))
 }
 
 // Header returns the message header in a separate instance.
@@ -204,7 +204,7 @@ func NewDHTClientGetStopMsg(key *crypto.HashCode) *DHTClientGetStopMsg {
 
 // String returns a human-readable representation of the message.
 func (m *DHTClientGetStopMsg) String() string {
-	return fmt.Sprintf("DHTClientGetStopMsg{Id:%d,Key=%s}", m.ID, hex.EncodeToString(m.Key.Bits))
+	return fmt.Sprintf("DHTClientGetStopMsg{Id:%d,Key=%s}", m.ID, hex.EncodeToString(m.Key.Data))
 }
 
 // Header returns the message header in a separate instance.
@@ -249,7 +249,7 @@ func (m *DHTClientGetResultsKnownMsg) AddKnown(hc *crypto.HashCode) {
 // String returns a human-readable representation of the message.
 func (m *DHTClientGetResultsKnownMsg) String() string {
 	return fmt.Sprintf("DHTClientGetResultsKnownMsg{Id:%d,Key=%s,Num=%d}",
-		m.ID, hex.EncodeToString(m.Key.Bits), len(m.Known))
+		m.ID, hex.EncodeToString(m.Key.Data), len(m.Known))
 }
 
 // Header returns the message header in a separate instance.

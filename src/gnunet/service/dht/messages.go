@@ -196,7 +196,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		// assemble query and entry
 		btype := enums.BlockType(msg.BType)
 		query := blocks.NewGenericQuery(msg.Key, btype, msg.Flags)
-		blk, err := blocks.NewBlock(btype, msg.Expiration, msg.Block)
+		blk, err := blocks.NewBlock(btype, msg.Expire, msg.Block)
 		if err != nil {
 			logger.Printf(logger.ERROR, "[%s] DHT-P2P-PUT message block problem: %s", label, err.Error())
 			return false
@@ -208,8 +208,8 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 
 		//--------------------------------------------------------------
 		// check if request is expired (9.3.2.1)
-		if msg.Expiration.Expired() {
-			logger.Printf(logger.WARN, "[%s] DHT-P2P-PUT message expired (%s)", label, msg.Expiration.String())
+		if msg.Expire.Expired() {
+			logger.Printf(logger.WARN, "[%s] DHT-P2P-PUT message expired (%s)", label, msg.Expire.String())
 			return false
 		}
 		blockHdlr, ok := blocks.BlockHandlers[btype]
@@ -335,9 +335,9 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 
 		//--------------------------------------------------------------
 		// check if request is expired (9.5.2.1)
-		if msg.Expires.Expired() {
+		if msg.Expire.Expired() {
 			logger.Printf(logger.WARN, "[%s] DHT-P2P-RESULT message expired (%s)",
-				label, msg.Expires.String())
+				label, msg.Expire.String())
 			return false
 		}
 		//--------------------------------------------------------------
@@ -399,7 +399,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 
 				//--------------------------------------------------------------
 				// check task list for handler (9.5.2.6)
-				if rh.Flags()&enums.DHT_RO_FIND_APPROXIMATE == 0 && blkKey != nil && !blkKey.Equals(rh.Key()) {
+				if rh.Flags()&enums.DHT_RO_FIND_APPROXIMATE == 0 && blkKey != nil && !blkKey.Equal(rh.Key()) {
 					// (9.5.2.6.a) derived key mismatch
 					logger.Printf(logger.ERROR, "[%s] derived block key / query key mismatch:", label)
 					logger.Printf(logger.ERROR, "[%s]   --> %s != %s", label, blkKey.String(), rh.Key().String())
@@ -466,14 +466,14 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		isNew := true
 		if hb, ok := m.rtable.GetHello(k); ok {
 			// cache entry exists: is the HELLO message more recent?
-			_, isNew = hb.Expires.Diff(msg.Expires)
+			_, isNew = hb.Expire_.Diff(msg.Expire)
 		}
 		// we need to cache a new(er) HELLO
 		if isNew {
 			m.rtable.CacheHello(&blocks.HelloBlock{
 				PeerID:    sender,
 				Signature: msg.Signature,
-				Expires:   msg.Expires,
+				Expire_:   msg.Expire,
 				AddrBin:   util.Clone(msg.AddrList),
 			})
 		}
@@ -532,7 +532,7 @@ func (m *Module) sendResult(ctx context.Context, query blocks.Query, blk blocks.
 	out := message.NewDHTP2PResultMsg()
 	out.BType = uint32(query.Type())
 	out.Flags = uint32(query.Flags())
-	out.Expires = blk.Expire()
+	out.Expire = blk.Expire()
 	out.Query = query.Key()
 	out.Block = blk.Bytes()
 	out.MsgSize += uint16(len(out.Block))

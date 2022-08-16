@@ -60,7 +60,7 @@ func (e *Entry) String() string {
 //----------------------------------------------------------------------
 // shared path element data across types
 type elementData struct {
-	Expiration      util.AbsoluteTime // expiration date
+	Expire          util.AbsoluteTime // expiration date
 	BlockHash       *crypto.HashCode  // block hash
 	PeerPredecessor *util.PeerID      // predecessor peer
 	PeerSuccessor   *util.PeerID      // successor peer

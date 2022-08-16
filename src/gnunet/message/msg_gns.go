@@ -128,14 +128,14 @@ func (rs *RecordSet) SetPadding() {
 	rs.Padding = make([]byte, n-size)
 }
 
-// Expires returns the earliest expiration timestamp for the records.
-func (rs *RecordSet) Expires() util.AbsoluteTime {
+// Expire returns the earliest expiration timestamp for the records.
+func (rs *RecordSet) Expire() util.AbsoluteTime {
 	var expires util.AbsoluteTime
 	for i, rr := range rs.Records {
 		if i == 0 {
-			expires = rr.Expires
-		} else if rr.Expires.Compare(expires) < 0 {
-			expires = rr.Expires
+			expires = rr.Expire
+		} else if rr.Expire.Compare(expires) < 0 {
+			expires = rr.Expire
 		}
 	}
 	return expires
@@ -144,17 +144,17 @@ func (rs *RecordSet) Expires() util.AbsoluteTime {
 // ResourceRecord is the GNUnet-specific representation of resource
 // records (not to be confused with DNS resource records).
 type ResourceRecord struct {
-	Expires util.AbsoluteTime // Expiration time for the record
-	Size    uint32            `order:"big"` // Number of bytes in 'Data'
-	Type    uint32            `order:"big"` // Type of the GNS/DNS record
-	Flags   uint32            `order:"big"` // Flags for the record
-	Data    []byte            `size:"Size"` // Record data
+	Expire util.AbsoluteTime // Expiration time for the record
+	Size   uint32            `order:"big"` // Number of bytes in 'Data'
+	Type   uint32            `order:"big"` // Type of the GNS/DNS record
+	Flags  uint32            `order:"big"` // Flags for the record
+	Data   []byte            `size:"Size"` // Record data
 }
 
 // String returns a human-readable representation of the message.
 func (r *ResourceRecord) String() string {
 	return fmt.Sprintf("GNSResourceRecord{type=%s,expire=%s,flags=%d,size=%d}",
-		enums.GNSType(r.Type).String(), r.Expires, r.Flags, r.Size)
+		enums.GNSType(r.Type).String(), r.Expire, r.Flags, r.Size)
 }
 
 // LookupResultMsg is a response message for a GNS name lookup request

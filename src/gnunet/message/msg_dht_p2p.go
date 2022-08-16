@@ -121,7 +121,7 @@ type DHTP2PPutMsg struct {
 	HopCount    uint16              `order:"big"`    // message hops
 	ReplLvl     uint16              `order:"big"`    // replication level
 	PathL       uint16              `order:"big"`    // path length
-	Expiration  util.AbsoluteTime   ``               // expiration date
+	Expire      util.AbsoluteTime   ``               // expiration date
 	PeerFilter  *blocks.PeerFilter  ``               // peer bloomfilter
 	Key         *crypto.HashCode    ``               // query key to block
 	TruncOrigin *util.PeerID        `opt:"(IsUsed)"` // truncated origin (if TRUNCATED flag set)
@@ -140,7 +140,7 @@ func NewDHTP2PPutMsg() *DHTP2PPutMsg {
 		HopCount:    0,                        // message hops
 		ReplLvl:     0,                        // replication level
 		PathL:       0,                        // no PUT path
-		Expiration:  util.AbsoluteTimeNever(), // expiration date
+		Expire:      util.AbsoluteTimeNever(), // expiration date
 		PeerFilter:  blocks.NewPeerFilter(),   // peer bloom filter
 		Key:         crypto.NewHashCode(nil),  // query key
 		TruncOrigin: nil,                      // no truncated path
@@ -169,7 +169,7 @@ func (m *DHTP2PPutMsg) Update(p *path.Path, pf *blocks.PeerFilter, hop uint16) *
 	msg.Flags = m.Flags
 	msg.HopCount = hop
 	msg.PathL = p.NumList
-	msg.Expiration = m.Expiration
+	msg.Expire = m.Expire
 	msg.PeerFilter = pf
 	msg.Key = m.Key.Clone()
 	msg.TruncOrigin = p.TruncOrigin
@@ -187,7 +187,7 @@ func (m *DHTP2PPutMsg) Update(p *path.Path, pf *blocks.PeerFilter, hop uint16) *
 // Path returns the current path from message
 func (m *DHTP2PPutMsg) Path(sender *util.PeerID) *path.Path {
 	// create a "real" path list from message data
-	pth := path.NewPath(crypto.Hash(m.Block), m.Expiration)
+	pth := path.NewPath(crypto.Hash(m.Block), m.Expire)
 
 	// return empty path if recording is switched off
 	if m.Flags&enums.DHT_RO_RECORD_ROUTE == 0 {
@@ -212,7 +212,7 @@ func (m *DHTP2PPutMsg) Path(sender *util.PeerID) *path.Path {
 	// handle last hop signature
 	if m.LastSig == nil {
 		logger.Printf(logger.WARN, "[path]  - last hop signature missing - path reset")
-		return path.NewPath(crypto.Hash(m.Block), m.Expiration)
+		return path.NewPath(crypto.Hash(m.Block), m.Expire)
 	}
 	pth.Flags |= path.PathLastHop
 	pth.LastSig = m.LastSig
@@ -292,7 +292,7 @@ type DHTP2PResultMsg struct {
 	Flags       uint32              `order:"big"`      // Message flags
 	PutPathL    uint16              `order:"big"`      // size of PUTPATH field
 	GetPathL    uint16              `order:"big"`      // size of GETPATH field
-	Expires     util.AbsoluteTime   ``                 // expiration date
+	Expire      util.AbsoluteTime   ``                 // expiration date
 	Query       *crypto.HashCode    ``                 // Query key for block
 	TruncOrigin *util.PeerID        `opt:"(IsUsed)"`   // truncated origin (if TRUNCATED flag set)
 	PathList    []*path.Entry       `size:"(NumPath)"` // PATH
@@ -338,7 +338,7 @@ func (m *DHTP2PResultMsg) NumPath(field string) uint {
 // Path returns the current path from message
 func (m *DHTP2PResultMsg) Path(sender *util.PeerID) *path.Path {
 	// create a "real" path list from message data
-	pth := path.NewPath(crypto.Hash(m.Block), m.Expires)
+	pth := path.NewPath(crypto.Hash(m.Block), m.Expire)
 
 	// return empty path if recording is switched off
 	if m.Flags&enums.DHT_RO_RECORD_ROUTE == 0 {
@@ -372,7 +372,7 @@ func (m *DHTP2PResultMsg) Path(sender *util.PeerID) *path.Path {
 	// handle last hop signature
 	if m.LastSig == nil {
 		logger.Printf(logger.WARN, "[path]  - last hop signature missing - path reset")
-		return path.NewPath(crypto.Hash(m.Block), m.Expires)
+		return path.NewPath(crypto.Hash(m.Block), m.Expire)
 	}
 	pth.Flags |= path.PathLastHop
 	pth.LastSig = m.LastSig
@@ -440,7 +440,7 @@ func (m *DHTP2PResultMsg) Update(pth *path.Path) *DHTP2PResultMsg {
 		Flags:       m.Flags,
 		PutPathL:    m.PutPathL,
 		GetPathL:    m.GetPathL,
-		Expires:     m.Expires,
+		Expire:      m.Expire,
 		Query:       m.Query.Clone(),
 		TruncOrigin: m.TruncOrigin,
 		PathList:    util.Clone(m.PathList),
@@ -480,7 +480,7 @@ type DHTP2PHelloMsg struct {
 	Reserved  uint16              `order:"big"` // Reserved for further use
 	NumAddr   uint16              `order:"big"` // Number of addresses in list
 	Signature *util.PeerSignature ``            // Signature
-	Expires   util.AbsoluteTime   ``            // expiration time
+	Expire    util.AbsoluteTime   ``            // expiration time
 	AddrList  []byte              `size:"*"`    // List of end-point addresses (HelloAddress)
 }
 
@@ -494,7 +494,7 @@ func NewDHTP2PHelloMsg() *DHTP2PHelloMsg {
 		Reserved:  0,                          // not used here
 		NumAddr:   0,                          // start with empty address list
 		Signature: util.NewPeerSignature(nil), // signature
-		Expires:   util.NewAbsoluteTime(exp),  // default expiration
+		Expire:    util.NewAbsoluteTime(exp),  // default expiration
 		AddrList:  make([]byte, 0),            // list of addresses
 	}
 }
@@ -512,7 +512,7 @@ func (m *DHTP2PHelloMsg) Addresses() (list []*util.Address, err error) {
 		if addr, err = util.ParseAddress(as); err != nil {
 			return
 		}
-		addr.Expires = m.Expires
+		addr.Expire = m.Expire
 		list = append(list, addr)
 		num++
 	}
@@ -530,21 +530,21 @@ func (m *DHTP2PHelloMsg) SetAddresses(list []*util.Address) {
 	wrt := new(bytes.Buffer)
 	for _, addr := range list {
 		// check if address expires before current expire
-		if exp.Compare(addr.Expires) > 0 {
-			exp = addr.Expires
+		if exp.Compare(addr.Expire) > 0 {
+			exp = addr.Expire
 		}
 		n, _ := wrt.Write([]byte(addr.URI()))
 		wrt.WriteByte(0)
 		m.MsgSize += uint16(n + 1)
 	}
 	m.AddrList = wrt.Bytes()
-	m.Expires = exp
+	m.Expire = exp
 	m.NumAddr = uint16(len(list))
 }
 
 // String returns a human-readable representation of the message.
 func (m *DHTP2PHelloMsg) String() string {
-	return fmt.Sprintf("DHTP2PHelloMsg{expire:%s,addrs=[%d]}", m.Expires, m.NumAddr)
+	return fmt.Sprintf("DHTP2PHelloMsg{expire:%s,addrs=[%d]}", m.Expire, m.NumAddr)
 }
 
 // Header returns the message header in a separate instance.
@@ -583,7 +583,7 @@ func (m *DHTP2PHelloMsg) SignedData() []byte {
 	err := binary.Write(buf, binary.BigEndian, size)
 	if err == nil {
 		if err = binary.Write(buf, binary.BigEndian, purpose); err == nil {
-			if err = binary.Write(buf, binary.BigEndian, m.Expires.Epoch()*1000000); err == nil {
+			if err = binary.Write(buf, binary.BigEndian, m.Expire.Epoch()*1000000); err == nil {
 				if n, err = buf.Write(hAddr[:]); err == nil {
 					if n != len(hAddr[:]) {
 						err = errors.New("write failed")

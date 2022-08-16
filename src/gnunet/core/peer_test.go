@@ -75,7 +75,7 @@ func TestPeerHello(t *testing.T) {
 	t.Log(u2)
 
 	// check if HELLO data is the same
-	if !h.Equals(h2) {
+	if !h.Equal(h2) {
 		t.Fatal("HELLO data mismatch")
 	}
 	// verify signature
