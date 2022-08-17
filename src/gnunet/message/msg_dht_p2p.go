@@ -280,7 +280,7 @@ type DHTP2PResultMsg struct {
 	Query       *crypto.HashCode    ``                 // Query key for block
 	TruncOrigin *util.PeerID        `opt:"(IsUsed)"`   // truncated origin (if TRUNCATED flag set)
 	PathList    []*path.Entry       `size:"(NumPath)"` // PATH
-	LastSig     *util.PeerSignature `size:"(IsUsed)"`  // signature of last hop (if RECORD_ROUTE flag is set)
+	LastSig     *util.PeerSignature `opt:"(IsUsed)"`   // signature of last hop (if RECORD_ROUTE flag is set)
 	Block       []byte              `size:"*"`         // block data
 }
 
