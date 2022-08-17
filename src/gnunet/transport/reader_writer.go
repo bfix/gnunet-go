@@ -41,6 +41,13 @@ func WriteMessage(ctx context.Context, wrt io.WriteCloser, msg message.Message) 
 	if buf, err = data.Marshal(msg); err != nil {
 		return
 	}
+	/*
+		// debug for outgoing messages
+		if msg.Type() == enums.MSG_DHT_P2P_HELLO {
+			logger.Printf(logger.DBG, "[rw_msg] msg=%s", hex.EncodeToString(buf))
+			logger.Printf(logger.DBG, "[rw_msg] msg=%s", util.Dump(msg, "json"))
+		}
+	*/
 	// check message header size and packet size
 	mh, err := message.GetMsgHeader(buf)
 	if err != nil {
@@ -108,6 +115,13 @@ func ReadMessage(ctx context.Context, rdr io.ReadCloser, buf []byte) (msg messag
 		return
 	}
 	err = data.Unmarshal(msg, buf[:mh.MsgSize])
+	/*
+		// debug for incoming messages
+		if mh.MsgType == enums.MSG_DHT_P2P_RESULT {
+			logger.Printf(logger.DBG, "[rw_msg] msg=%s", hex.EncodeToString(buf[:mh.MsgSize]))
+			logger.Printf(logger.DBG, "[rw_msg] msg=%s", util.Dump(msg, "json"))
+		}
+	*/
 	return
 }
 
