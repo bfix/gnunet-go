@@ -3,7 +3,7 @@
 //nolint:stylecheck // allow non-camel-case for constants
 package enums
 
-type BlockType uint16
+type BlockType uint32
 
 // DHT block types
 const (
