@@ -26,6 +26,8 @@ const (
 	DHT_RO_RECORD_ROUTE           = 2 // keep track of the route that the message took in the P2P network.
 	DHT_RO_FIND_APPROXIMATE       = 4 // Approximate results are fine.
 	DHT_RO_TRUNCATED              = 8 // Flag if path is truncated
+
+	DHT_RO_DISCOVERY = 32768 // Peer discovery
 )
 
 //go:generate go run generate.go gnunet-dht.rec gnunet-dht.tpl dht_block_type.go
