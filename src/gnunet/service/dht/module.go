@@ -81,7 +81,6 @@ func (lr *LocalBlockResponder) Send(ctx context.Context, msg message.Message) er
 		}()
 	default:
 		logger.Printf(logger.WARN, "[local] %d not a DHT-RESULT -- skipped", "")
-		panic("@@@")
 	}
 	return nil
 }
@@ -210,6 +209,7 @@ func (m *Module) Get(ctx context.Context, query blocks.Query) <-chan blocks.Bloc
 	msg.BType = query.Type()
 	msg.Flags = query.Flags()
 	msg.HopCount = 0
+	msg.Query = query.Key()
 	msg.ReplLevel = uint16(m.cfg.Routing.ReplLevel)
 	msg.PeerFilter = blocks.NewPeerFilter()
 	msg.ResFilter = rf.Bytes()
