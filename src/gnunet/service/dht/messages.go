@@ -174,6 +174,9 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 					pf.Add(p.Peer)
 					// create open get-forward result handler
 					rh := NewResultHandler(msg, rf, back)
+					if rh.Key().String()[:8] == "00000000" {
+						panic("@@@")
+					}
 					logger.Printf(logger.INFO, "[%s] DHT-P2P-GET task #%d (%s) started",
 						label, rh.ID(), util.Shorten(rh.Key().String(), 20))
 					m.reshdlrs.Add(rh)
@@ -516,7 +519,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		//----------------------------------------------------------
 		// UNKNOWN message type received
 		//----------------------------------------------------------
-		logger.Printf(logger.ERROR, "[%s] Unhandled message of type (%d)\n", label, msgIn.Header().MsgType)
+		logger.Printf(logger.ERROR, "[%s] Unhandled message of type (%s)\n", label, msgIn.Type())
 		return false
 	}
 	return true
@@ -530,7 +533,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 func (m *Module) sendResult(ctx context.Context, query blocks.Query, blk blocks.Block, pth *path.Path, back transport.Responder) error {
 	// assemble result message
 	out := message.NewDHTP2PResultMsg()
-	out.BType = uint32(query.Type())
+	out.BType = query.Type()
 	out.Flags = uint32(query.Flags())
 	out.Expire = blk.Expire()
 	out.Query = query.Key()

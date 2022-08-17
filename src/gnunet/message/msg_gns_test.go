@@ -58,7 +58,7 @@ func TestRecordsetPKEY(t *testing.T) {
 						Val: uint64(14888744139323793),
 					},
 					Size:  4,
-					Type:  1,
+					RType: 1,
 					Flags: 0,
 					Data: []byte{
 						0x01, 0x02, 0x03, 0x04,
@@ -69,7 +69,7 @@ func TestRecordsetPKEY(t *testing.T) {
 						Val: uint64(26147096139323793),
 					},
 					Size:  36,
-					Type:  crypto.ZONE_PKEY,
+					RType: crypto.ZONE_PKEY,
 					Flags: 2,
 					Data: []byte{
 						0x00, 0x01, 0x00, 0x00,
@@ -218,7 +218,7 @@ func TestRecordsetEDKEY(t *testing.T) {
 						Val: uint64(2463385894000000),
 					},
 					Size:  4,
-					Type:  1,
+					RType: 1,
 					Flags: 0,
 					Data: []byte{
 						0x01, 0x02, 0x03, 0x04,
@@ -229,7 +229,7 @@ func TestRecordsetEDKEY(t *testing.T) {
 						Val: uint64(49556645701000000),
 					},
 					Size:  36,
-					Type:  uint32(enums.GNS_TYPE_NICK),
+					RType: uint32(enums.GNS_TYPE_NICK),
 					Flags: 2,
 					Data: []byte{
 						0x4d, 0x79, 0x20, 0x4e, 0x69, 0x63, 0x6b, 0x00,

@@ -80,7 +80,7 @@ func (lr *LocalBlockResponder) Send(ctx context.Context, msg message.Message) er
 			}
 		}()
 	default:
-		logger.Println(logger.WARN, "[local] not a DHT-RESULT -- skipped")
+		logger.Printf(logger.WARN, "[local] %d not a DHT-RESULT -- skipped", "")
 		panic("@@@")
 	}
 	return nil
@@ -207,7 +207,7 @@ func (m *Module) Get(ctx context.Context, query blocks.Query) <-chan blocks.Bloc
 
 	// assemble a new GET message
 	msg := message.NewDHTP2PGetMsg()
-	msg.BType = uint32(query.Type())
+	msg.BType = query.Type()
 	msg.Flags = query.Flags()
 	msg.HopCount = 0
 	msg.ReplLevel = uint16(m.cfg.Routing.ReplLevel)
@@ -249,7 +249,7 @@ func (m *Module) Put(ctx context.Context, query blocks.Query, block blocks.Block
 	}
 	// assemble a new PUT message
 	msg := message.NewDHTP2PPutMsg()
-	msg.BType = uint32(query.Type())
+	msg.BType = query.Type()
 	msg.Flags = query.Flags()
 	msg.HopCount = 0
 	msg.PeerFilter = blocks.NewPeerFilter()
@@ -283,16 +283,16 @@ func (m *Module) Filter() *core.EventFilter {
 
 	// messages we are interested in:
 	// (1) DHT_P2P messages
-	f.AddMsgType(message.DHT_P2P_PUT)
-	f.AddMsgType(message.DHT_P2P_GET)
-	f.AddMsgType(message.DHT_P2P_RESULT)
-	f.AddMsgType(message.DHT_P2P_HELLO)
+	f.AddMsgType(enums.MSG_DHT_P2P_PUT)
+	f.AddMsgType(enums.MSG_DHT_P2P_GET)
+	f.AddMsgType(enums.MSG_DHT_P2P_RESULT)
+	f.AddMsgType(enums.MSG_DHT_P2P_HELLO)
 	// (2) DHT messages (legacy, not implemented)
-	f.AddMsgType(message.DHT_CLIENT_GET)
-	f.AddMsgType(message.DHT_CLIENT_GET_RESULTS_KNOWN)
-	f.AddMsgType(message.DHT_CLIENT_GET_STOP)
-	f.AddMsgType(message.DHT_CLIENT_PUT)
-	f.AddMsgType(message.DHT_CLIENT_RESULT)
+	f.AddMsgType(enums.MSG_DHT_CLIENT_GET)
+	f.AddMsgType(enums.MSG_DHT_CLIENT_GET_RESULTS_KNOWN)
+	f.AddMsgType(enums.MSG_DHT_CLIENT_GET_STOP)
+	f.AddMsgType(enums.MSG_DHT_CLIENT_PUT)
+	f.AddMsgType(enums.MSG_DHT_CLIENT_RESULT)
 
 	return f
 }
@@ -318,7 +318,7 @@ func (m *Module) event(ctx context.Context, ev *core.Event) {
 
 		// check if peer is in routing table (connected peer)
 		if !m.rtable.Contains(NewPeerAddress(ev.Peer)) {
-			logger.Printf(logger.WARN, "[dht-event] message %d from unregistered peer -- discarded", ev.Msg.Header().MsgType)
+			logger.Printf(logger.WARN, "[dht-event] message %d from unregistered peer -- discarded", ev.Msg.Type())
 			return
 		}
 		// process message

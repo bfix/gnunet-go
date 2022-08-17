@@ -34,27 +34,25 @@ import (
 
 // LookupMsg is a request message for a GNS name lookup
 type LookupMsg struct {
-	MsgSize  uint16          `order:"big"` // total size of message
-	MsgType  uint16          `order:"big"` // GNS_LOOKUP (500)
+	MsgHeader
 	ID       uint32          `order:"big"` // Unique identifier for this request (for key collisions).
 	Zone     *crypto.ZoneKey ``            // Zone that is to be used for lookup
 	Options  uint16          `order:"big"` // Local options for where to look for results
 	Reserved uint16          `order:"big"` // Always 0
-	Type     uint32          `order:"big"` // the type of record to look up
+	RType    uint32          `order:"big"` // the type of record to look up
 	Name     []byte          `size:"*"`    // zero-terminated name to look up
 }
 
 // NewGNSLookupMsg creates a new default message.
 func NewGNSLookupMsg() *LookupMsg {
 	return &LookupMsg{
-		MsgSize:  48, // record size with no name
-		MsgType:  GNS_LOOKUP,
-		ID:       0,
-		Zone:     nil,
-		Options:  uint16(enums.GNS_LO_DEFAULT),
-		Reserved: 0,
-		Type:     uint32(enums.GNS_TYPE_ANY),
-		Name:     nil,
+		MsgHeader: MsgHeader{48, enums.MSG_GNS_LOOKUP},
+		ID:        0,
+		Zone:      nil,
+		Options:   uint16(enums.GNS_LO_DEFAULT),
+		Reserved:  0,
+		RType:     uint32(enums.GNS_TYPE_ANY),
+		Name:      nil,
 	}
 }
 
@@ -79,12 +77,7 @@ func (m *LookupMsg) GetName() string {
 func (m *LookupMsg) String() string {
 	return fmt.Sprintf(
 		"GNSLookupMsg{Id=%d,Zone=%s,Options=%d,Type=%d,Name=%s}",
-		m.ID, m.Zone.ID(), m.Options, m.Type, m.GetName())
-}
-
-// Header returns the message header in a separate instance.
-func (m *LookupMsg) Header() *Header {
-	return &Header{m.MsgSize, m.MsgType}
+		m.ID, m.Zone.ID(), m.Options, m.RType, m.GetName())
 }
 
 //----------------------------------------------------------------------
@@ -146,7 +139,7 @@ func (rs *RecordSet) Expire() util.AbsoluteTime {
 type ResourceRecord struct {
 	Expire util.AbsoluteTime // Expiration time for the record
 	Size   uint32            `order:"big"` // Number of bytes in 'Data'
-	Type   uint32            `order:"big"` // Type of the GNS/DNS record
+	RType  uint32            `order:"big"` // Type of the GNS/DNS record
 	Flags  uint32            `order:"big"` // Flags for the record
 	Data   []byte            `size:"Size"` // Record data
 }
@@ -154,13 +147,12 @@ type ResourceRecord struct {
 // String returns a human-readable representation of the message.
 func (r *ResourceRecord) String() string {
 	return fmt.Sprintf("GNSResourceRecord{type=%s,expire=%s,flags=%d,size=%d}",
-		enums.GNSType(r.Type).String(), r.Expire, r.Flags, r.Size)
+		enums.GNSType(r.RType).String(), r.Expire, r.Flags, r.Size)
 }
 
 // LookupResultMsg is a response message for a GNS name lookup request
 type LookupResultMsg struct {
-	MsgSize uint16            `order:"big"`  // total size of message
-	MsgType uint16            `order:"big"`  // GNS_LOOKUP_RESULT (501)
+	MsgHeader
 	ID      uint32            `order:"big"`  // Unique identifier for this request (for key collisions).
 	Count   uint32            `order:"big"`  // The number of records contained in response
 	Records []*ResourceRecord `size:"Count"` // GNS resource records
@@ -169,11 +161,10 @@ type LookupResultMsg struct {
 // NewGNSLookupResultMsg returns a new lookup result message
 func NewGNSLookupResultMsg(id uint32) *LookupResultMsg {
 	return &LookupResultMsg{
-		MsgSize: 12, // Empty result (no records)
-		MsgType: GNS_LOOKUP_RESULT,
-		ID:      id,
-		Count:   0,
-		Records: make([]*ResourceRecord, 0),
+		MsgHeader: MsgHeader{12, enums.MSG_GNS_LOOKUP_RESULT},
+		ID:        id,
+		Count:     0,
+		Records:   make([]*ResourceRecord, 0),
 	}
 }
 
@@ -195,6 +186,6 @@ func (m *LookupResultMsg) String() string {
 }
 
 // Header returns the message header in a separate instance.
-func (m *LookupResultMsg) Header() *Header {
-	return &Header{m.MsgSize, m.MsgType}
+func (m *LookupResultMsg) Header() *MsgHeader {
+	return &MsgHeader{m.MsgSize, m.MsgType}
 }

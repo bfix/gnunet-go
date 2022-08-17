@@ -20,95 +20,96 @@ package message
 
 import (
 	"fmt"
+	"gnunet/enums"
 )
 
 // NewEmptyMessage creates a new empty message object for the given type.
-func NewEmptyMessage(msgType uint16) (Message, error) {
+func NewEmptyMessage(msgType enums.MsgType) (Message, error) {
 	switch msgType {
 	//------------------------------------------------------------------
 	// Transport
 	//------------------------------------------------------------------
-	case TRANSPORT_TCP_WELCOME:
+	case enums.MSG_TRANSPORT_TCP_WELCOME:
 		return NewTransportTCPWelcomeMsg(nil), nil
-	case HELLO:
+	case enums.MSG_HELLO:
 		return NewHelloMsg(nil), nil
-	case TRANSPORT_SESSION_QUOTA:
+	case enums.MSG_TRANSPORT_SESSION_QUOTA:
 		return NewSessionQuotaMsg(0), nil
-	case TRANSPORT_SESSION_SYN:
+	case enums.MSG_TRANSPORT_SESSION_SYN:
 		return NewSessionSynMsg(), nil
-	case TRANSPORT_SESSION_SYN_ACK:
+	case enums.MSG_TRANSPORT_SESSION_SYN_ACK:
 		return NewSessionSynAckMsg(), nil
-	case TRANSPORT_SESSION_ACK:
+	case enums.MSG_TRANSPORT_SESSION_ACK:
 		return new(SessionAckMsg), nil
-	case TRANSPORT_PING:
+	case enums.MSG_TRANSPORT_PING:
 		return NewTransportPingMsg(nil, nil), nil
-	case TRANSPORT_PONG:
+	case enums.MSG_TRANSPORT_PONG:
 		return NewTransportPongMsg(0, nil), nil
-	case TRANSPORT_SESSION_KEEPALIVE:
+	case enums.MSG_TRANSPORT_SESSION_KEEPALIVE:
 		return NewSessionKeepAliveMsg(), nil
 
 	//------------------------------------------------------------------
 	// Core
 	//------------------------------------------------------------------
-	case CORE_EPHEMERAL_KEY:
+	case enums.MSG_CORE_EPHEMERAL_KEY:
 		return NewEphemeralKeyMsg(), nil
 
 	//------------------------------------------------------------------
 	// DHT
 	//------------------------------------------------------------------
-	case DHT_CLIENT_PUT:
+	case enums.MSG_DHT_CLIENT_PUT:
 		return NewDHTClientPutMsg(nil, 0, nil), nil
-	case DHT_CLIENT_GET:
+	case enums.MSG_DHT_CLIENT_GET:
 		return NewDHTClientGetMsg(nil), nil
-	case DHT_CLIENT_GET_STOP:
+	case enums.MSG_DHT_CLIENT_GET_STOP:
 		return NewDHTClientGetStopMsg(nil), nil
-	case DHT_CLIENT_RESULT:
+	case enums.MSG_DHT_CLIENT_RESULT:
 		return NewDHTClientResultMsg(nil), nil
-	case DHT_CLIENT_GET_RESULTS_KNOWN:
+	case enums.MSG_DHT_CLIENT_GET_RESULTS_KNOWN:
 		return NewDHTClientGetResultsKnownMsg(nil), nil
 
 	//------------------------------------------------------------------
 	// DHT-P2P
 	//------------------------------------------------------------------
-	case DHT_P2P_HELLO:
+	case enums.MSG_DHT_P2P_HELLO:
 		return NewDHTP2PHelloMsg(), nil
-	case DHT_P2P_GET:
+	case enums.MSG_DHT_P2P_GET:
 		return NewDHTP2PGetMsg(), nil
-	case DHT_P2P_PUT:
+	case enums.MSG_DHT_P2P_PUT:
 		return NewDHTP2PPutMsg(), nil
-	case DHT_P2P_RESULT:
+	case enums.MSG_DHT_P2P_RESULT:
 		return NewDHTP2PResultMsg(), nil
 
 	//------------------------------------------------------------------
 	// GNS
 	//------------------------------------------------------------------
-	case GNS_LOOKUP:
+	case enums.MSG_GNS_LOOKUP:
 		return NewGNSLookupMsg(), nil
-	case GNS_LOOKUP_RESULT:
+	case enums.MSG_GNS_LOOKUP_RESULT:
 		return NewGNSLookupResultMsg(0), nil
 
 	//------------------------------------------------------------------
 	// Namecache
 	//------------------------------------------------------------------
-	case NAMECACHE_LOOKUP_BLOCK:
+	case enums.MSG_NAMECACHE_LOOKUP_BLOCK:
 		return NewNamecacheLookupMsg(nil), nil
-	case NAMECACHE_LOOKUP_BLOCK_RESPONSE:
+	case enums.MSG_NAMECACHE_LOOKUP_BLOCK_RESPONSE:
 		return NewNamecacheLookupResultMsg(), nil
-	case NAMECACHE_BLOCK_CACHE:
+	case enums.MSG_NAMECACHE_BLOCK_CACHE:
 		return NewNamecacheCacheMsg(nil), nil
-	case NAMECACHE_BLOCK_CACHE_RESPONSE:
+	case enums.MSG_NAMECACHE_BLOCK_CACHE_RESPONSE:
 		return NewNamecacheCacheResponseMsg(), nil
 
 	//------------------------------------------------------------------
 	// Revocation
 	//------------------------------------------------------------------
-	case REVOCATION_QUERY:
+	case enums.MSG_REVOCATION_QUERY:
 		return NewRevocationQueryMsg(nil), nil
-	case REVOCATION_QUERY_RESPONSE:
+	case enums.MSG_REVOCATION_QUERY_RESPONSE:
 		return NewRevocationQueryResponseMsg(true), nil
-	case REVOCATION_REVOKE:
+	case enums.MSG_REVOCATION_REVOKE:
 		return NewRevocationRevokeMsg(nil), nil
-	case REVOCATION_REVOKE_RESPONSE:
+	case enums.MSG_REVOCATION_REVOKE_RESPONSE:
 		return NewRevocationRevokeResponseMsg(false), nil
 	}
 	return nil, fmt.Errorf("unknown message type %d", msgType)

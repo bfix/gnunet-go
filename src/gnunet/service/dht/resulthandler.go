@@ -57,7 +57,7 @@ const (
 type ResultHandler struct {
 	id        int                 // task identifier
 	key       *crypto.HashCode    // GET query key
-	btype     uint32              // content type of the payload
+	btype     enums.BlockType     // content type of the payload
 	flags     uint16              // processing flags
 	resFilter blocks.ResultFilter // result filter
 	xQuery    []byte              // extended query

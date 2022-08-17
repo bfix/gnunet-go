@@ -157,7 +157,7 @@ func (s *Service) HandleMessage(ctx context.Context, sender *util.PeerID, msg me
 		//----------------------------------------------------------
 		// UNKNOWN message type received
 		//----------------------------------------------------------
-		logger.Printf(logger.ERROR, "[revocation%s] Unhandled message of type (%d)\n", label, msg.Header().MsgType)
+		logger.Printf(logger.ERROR, "[revocation%s] Unhandled message of type (%s)\n", label, msg.Type())
 		return false
 	}
 	return true

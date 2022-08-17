@@ -22,6 +22,7 @@ import (
 	"fmt"
 
 	"gnunet/crypto"
+	"gnunet/enums"
 	"gnunet/util"
 )
 
@@ -31,8 +32,7 @@ import (
 
 // RevocationQueryMsg is a request message to check if a key is revoked
 type RevocationQueryMsg struct {
-	MsgSize  uint16          `order:"big"` // total size of message
-	MsgType  uint16          `order:"big"` // REVOCATION_QUERY (636)
+	MsgHeader
 	Reserved uint32          `order:"big"` // Reserved for future use
 	Zone     *crypto.ZoneKey // Zone that is to be checked for revocation
 }
@@ -40,10 +40,9 @@ type RevocationQueryMsg struct {
 // NewRevocationQueryMsg creates a new message for a given zone.
 func NewRevocationQueryMsg(zkey *crypto.ZoneKey) *RevocationQueryMsg {
 	return &RevocationQueryMsg{
-		MsgSize:  40,
-		MsgType:  REVOCATION_QUERY,
-		Reserved: 0,
-		Zone:     zkey,
+		MsgHeader: MsgHeader{40, enums.MSG_REVOCATION_QUERY},
+		Reserved:  0,
+		Zone:      zkey,
 	}
 }
 
@@ -52,20 +51,14 @@ func (m *RevocationQueryMsg) String() string {
 	return fmt.Sprintf("RevocationQueryMsg{zone=%s}", m.Zone.ID())
 }
 
-// Header returns the message header in a separate instance.
-func (m *RevocationQueryMsg) Header() *Header {
-	return &Header{m.MsgSize, m.MsgType}
-}
-
 //----------------------------------------------------------------------
 // REVOCATION_QUERY_RESPONSE
 //----------------------------------------------------------------------
 
 // RevocationQueryResponseMsg is a response message for revocation checks.
 type RevocationQueryResponseMsg struct {
-	MsgSize uint16 `order:"big"` // total size of message
-	MsgType uint16 `order:"big"` // REVOCATION_QUERY_RESPONSE (637)
-	Valid   uint32 `order:"big"` // revoked(0), valid(1)
+	MsgHeader
+	Valid uint32 `order:"big"` // revoked(0), valid(1)
 }
 
 // NewRevocationQueryResponseMsg creates a new response for a query.
@@ -75,9 +68,8 @@ func NewRevocationQueryResponseMsg(revoked bool) *RevocationQueryResponseMsg {
 		valid = 0
 	}
 	return &RevocationQueryResponseMsg{
-		MsgSize: 8,
-		MsgType: REVOCATION_QUERY_RESPONSE,
-		Valid:   uint32(valid),
+		MsgHeader: MsgHeader{8, enums.MSG_REVOCATION_QUERY_RESPONSE},
+		Valid:     uint32(valid),
 	}
 }
 
@@ -86,19 +78,13 @@ func (m *RevocationQueryResponseMsg) String() string {
 	return fmt.Sprintf("RevocationQueryResponseMsg{valid=%d}", m.Valid)
 }
 
-// Header returns the message header in a separate instance.
-func (m *RevocationQueryResponseMsg) Header() *Header {
-	return &Header{m.MsgSize, m.MsgType}
-}
-
 //----------------------------------------------------------------------
 // REVOCATION_REVOKE
 //----------------------------------------------------------------------
 
 // RevocationRevokeMsg is a request to revoke a given key with PoW data
 type RevocationRevokeMsg struct {
-	MsgSize    uint16                `order:"big"`           // total size of message
-	MsgType    uint16                `order:"big"`           // REVOCATION_REVOKE (638)
+	MsgHeader
 	Timestamp  util.AbsoluteTime     ``                      // Timestamp of revocation creation
 	TTL        util.RelativeTime     ``                      // TTL of revocation
 	PoWs       []uint64              `size:"32" order:"big"` // (Sorted) list of PoW values
@@ -108,8 +94,7 @@ type RevocationRevokeMsg struct {
 // NewRevocationRevokeMsg creates a new message for a given zone.
 func NewRevocationRevokeMsg(zsig *crypto.ZoneSignature) *RevocationRevokeMsg {
 	return &RevocationRevokeMsg{
-		MsgSize:    364,
-		MsgType:    REVOCATION_REVOKE,
+		MsgHeader:  MsgHeader{364, enums.MSG_REVOCATION_REVOKE},
 		Timestamp:  util.AbsoluteTimeNow(),
 		TTL:        util.RelativeTime{},
 		PoWs:       make([]uint64, 32),
@@ -119,12 +104,8 @@ func NewRevocationRevokeMsg(zsig *crypto.ZoneSignature) *RevocationRevokeMsg {
 
 // String returns a human-readable representation of the message.
 func (m *RevocationRevokeMsg) String() string {
-	return fmt.Sprintf("RevocationRevokeMsg{zone=%s}", m.ZoneKeySig.ID())
-}
-
-// Header returns the message header in a separate instance.
-func (m *RevocationRevokeMsg) Header() *Header {
-	return &Header{m.MsgSize, m.MsgType}
+	return fmt.Sprintf("RevocationRevokeMsg{zone=%s,expire=%s}",
+		m.ZoneKeySig.ID(), m.Timestamp.AddRelative(m.TTL))
 }
 
 //----------------------------------------------------------------------
@@ -133,8 +114,7 @@ func (m *RevocationRevokeMsg) Header() *Header {
 
 // RevocationRevokeResponseMsg is a response message for a revocation request
 type RevocationRevokeResponseMsg struct {
-	MsgSize uint16 `order:"big"` // total size of message
-	MsgType uint16 `order:"big"` // REVOCATION_REVOKE_RESPONSE (639)
+	MsgHeader
 	Success uint32 `order:"big"` // Revoke successful? (0=no, 1=yes)
 }
 
@@ -145,18 +125,12 @@ func NewRevocationRevokeResponseMsg(success bool) *RevocationRevokeResponseMsg {
 		status = 1
 	}
 	return &RevocationRevokeResponseMsg{
-		MsgSize: 8,
-		MsgType: REVOCATION_QUERY_RESPONSE,
-		Success: uint32(status),
+		MsgHeader: MsgHeader{8, enums.MSG_REVOCATION_QUERY_RESPONSE},
+		Success:   uint32(status),
 	}
 }
 
 // String returns a human-readable representation of the message.
 func (m *RevocationRevokeResponseMsg) String() string {
 	return fmt.Sprintf("RevocationRevokeResponseMsg{success=%v}", m.Success == 1)
-}
-
-// Header returns the message header in a separate instance.
-func (m *RevocationRevokeResponseMsg) Header() *Header {
-	return &Header{m.MsgSize, m.MsgType}
 }

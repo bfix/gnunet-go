@@ -178,7 +178,7 @@ func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *message.Reco
 				expires := time.Now().Add(time.Duration(record.Header().Ttl) * time.Second)
 				rr.Expire = util.NewAbsoluteTime(expires)
 				rr.Flags = 0
-				rr.Type = uint32(record.Header().Rrtype)
+				rr.RType = uint32(record.Header().Rrtype)
 				rr.Size = uint32(record.Header().Rdlength)
 				rr.Data = make([]byte, rr.Size)
 
@@ -230,7 +230,7 @@ func (m *Module) ResolveDNS(
 			// traverse resource records for 'A' and 'AAAA' records.
 		rec_loop:
 			for _, rec := range set.Records {
-				switch enums.GNSType(rec.Type) {
+				switch enums.GNSType(rec.RType) {
 				case enums.GNS_TYPE_DNS_AAAA:
 					addr = net.IP(rec.Data)
 					// we prefer IPv6

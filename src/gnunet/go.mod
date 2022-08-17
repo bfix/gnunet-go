@@ -24,4 +24,4 @@ require (
 	golang.org/x/tools v0.1.11 // indirect
 )
 
-//replace github.com/bfix/gospel v1.2.18 => ../gospel
+replace github.com/bfix/gospel v1.2.18 => ../gospel

@@ -113,10 +113,10 @@ func NewModule(ctx context.Context, c *core.Core) (m *Module) {
 // Filter returns the event filter for the service
 func (m *Module) Filter() *core.EventFilter {
 	f := core.NewEventFilter()
-	f.AddMsgType(message.GNS_LOOKUP)
-	f.AddMsgType(message.GNS_LOOKUP_RESULT)
-	f.AddMsgType(message.GNS_REVERSE_LOOKUP)
-	f.AddMsgType(message.GNS_REVERSE_LOOKUP_RESULT)
+	f.AddMsgType(enums.MSG_GNS_LOOKUP)
+	f.AddMsgType(enums.MSG_GNS_LOOKUP_RESULT)
+	f.AddMsgType(enums.MSG_GNS_REVERSE_LOOKUP)
+	f.AddMsgType(enums.MSG_GNS_REVERSE_LOOKUP_RESULT)
 	return f
 }
 
@@ -340,7 +340,7 @@ func (m *Module) ResolveRelative(
 	set = message.NewRecordSet()
 	for _, rec := range records {
 		// is this the record type we are looking for?
-		if kind.HasType(enums.GNSType(rec.Type)) {
+		if kind.HasType(enums.GNSType(rec.RType)) {
 			// add it to the result
 			if rec = hdlrs.FinalizeRecord(rec); rec != nil {
 				set.AddRecord(rec)
@@ -363,7 +363,7 @@ func (m *Module) ResolveRelative(
 	// asking for explicitly.
 	if set.Count > 0 {
 		for _, rec := range records {
-			if !kind.HasType(enums.GNSType(rec.Type)) && (int(rec.Flags)&enums.GNS_FLAG_SUPPL) != 0 {
+			if !kind.HasType(enums.GNSType(rec.RType)) && (int(rec.Flags)&enums.GNS_FLAG_SUPPL) != 0 {
 				set.AddRecord(rec)
 			}
 		}
@@ -474,7 +474,7 @@ func (m *Module) newLEHORecord(name string, expires util.AbsoluteTime) *message.
 	rr := new(message.ResourceRecord)
 	rr.Expire = expires
 	rr.Flags = uint32(enums.GNS_FLAG_SUPPL)
-	rr.Type = uint32(enums.GNS_TYPE_LEHO)
+	rr.RType = uint32(enums.GNS_TYPE_LEHO)
 	rr.Size = uint32(len(name) + 1)
 	rr.Data = make([]byte, rr.Size)
 	copy(rr.Data, []byte(name))

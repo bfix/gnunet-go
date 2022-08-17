@@ -23,7 +23,7 @@ import (
 	"gnunet/config"
 	"gnunet/core"
 	"gnunet/crypto"
-	"gnunet/message"
+	"gnunet/enums"
 	"gnunet/service"
 	"gnunet/service/store"
 	"gnunet/util"
@@ -85,10 +85,10 @@ func NewModule(ctx context.Context, c *core.Core) (m *Module) {
 // Filter returns the event filter for the service
 func (m *Module) Filter() *core.EventFilter {
 	f := core.NewEventFilter()
-	f.AddMsgType(message.REVOCATION_QUERY)
-	f.AddMsgType(message.REVOCATION_QUERY_RESPONSE)
-	f.AddMsgType(message.REVOCATION_REVOKE)
-	f.AddMsgType(message.REVOCATION_REVOKE_RESPONSE)
+	f.AddMsgType(enums.MSG_REVOCATION_QUERY)
+	f.AddMsgType(enums.MSG_REVOCATION_QUERY_RESPONSE)
+	f.AddMsgType(enums.MSG_REVOCATION_REVOKE)
+	f.AddMsgType(enums.MSG_REVOCATION_REVOKE_RESPONSE)
 	return f
 }
 

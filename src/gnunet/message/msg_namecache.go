@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"gnunet/crypto"
+	"gnunet/enums"
 	"gnunet/service/dht/blocks"
 	"gnunet/util"
 )
@@ -32,10 +33,9 @@ import (
 
 // NamecacheLookupMsg is request message for lookups in local namecache
 type NamecacheLookupMsg struct {
-	MsgSize uint16           `order:"big"` // total size of message
-	MsgType uint16           `order:"big"` // NAMECACHE_LOOKUP_BLOCK (431)
-	ID      uint32           `order:"big"` // Request Id
-	Query   *crypto.HashCode // Query data
+	MsgHeader
+	ID    uint32           `order:"big"` // Request Id
+	Query *crypto.HashCode // Query data
 }
 
 // NewNamecacheLookupMsg creates a new default message.
@@ -44,10 +44,9 @@ func NewNamecacheLookupMsg(query *crypto.HashCode) *NamecacheLookupMsg {
 		query = crypto.NewHashCode(nil)
 	}
 	return &NamecacheLookupMsg{
-		MsgSize: 72,
-		MsgType: NAMECACHE_LOOKUP_BLOCK,
-		ID:      0,
-		Query:   query,
+		MsgHeader: MsgHeader{72, enums.MSG_NAMECACHE_LOOKUP_BLOCK},
+		ID:        0,
+		Query:     query,
 	}
 }
 
@@ -57,19 +56,13 @@ func (m *NamecacheLookupMsg) String() string {
 		m.ID, hex.EncodeToString(m.Query.Data))
 }
 
-// Header returns the message header in a separate instance.
-func (m *NamecacheLookupMsg) Header() *Header {
-	return &Header{m.MsgSize, m.MsgType}
-}
-
 //----------------------------------------------------------------------
 // NAMECACHE_LOOKUP_BLOCK_RESPONSE
 //----------------------------------------------------------------------
 
 // NamecacheLookupResultMsg is the response message for namecache lookups.
 type NamecacheLookupResultMsg struct {
-	MsgSize       uint16                `order:"big"` // total size of message
-	MsgType       uint16                `order:"big"` // NAMECACHE_LOOKUP_BLOCK_RESPONSE (432)
+	MsgHeader
 	ID            uint32                `order:"big"` // Request Id
 	Expire        util.AbsoluteTime     ``            // Expiration time
 	DerivedKeySig *crypto.ZoneSignature ``            // Derived public key
@@ -79,8 +72,7 @@ type NamecacheLookupResultMsg struct {
 // NewNamecacheLookupResultMsg creates a new default message.
 func NewNamecacheLookupResultMsg() *NamecacheLookupResultMsg {
 	return &NamecacheLookupResultMsg{
-		MsgSize:       112,
-		MsgType:       NAMECACHE_LOOKUP_BLOCK_RESPONSE,
+		MsgHeader:     MsgHeader{112, enums.MSG_NAMECACHE_LOOKUP_BLOCK_RESPONSE},
 		ID:            0,
 		Expire:        *new(util.AbsoluteTime),
 		DerivedKeySig: nil,
@@ -94,19 +86,13 @@ func (m *NamecacheLookupResultMsg) String() string {
 		m.ID, m.Expire)
 }
 
-// Header returns the message header in a separate instance.
-func (m *NamecacheLookupResultMsg) Header() *Header {
-	return &Header{m.MsgSize, m.MsgType}
-}
-
 //----------------------------------------------------------------------
 // NAMECACHE_CACHE_BLOCK
 //----------------------------------------------------------------------
 
 // NamecacheCacheMsg is the request message to put a name into the local cache.
 type NamecacheCacheMsg struct {
-	MsgSize       uint16                `order:"big"` // total size of message
-	MsgType       uint16                `order:"big"` // NAMECACHE_CACHE_BLOCK (433)
+	MsgHeader
 	ID            uint32                `order:"big"` // Request Id
 	Expire        util.AbsoluteTime     ``            // Expiration time
 	DerivedKeySig *crypto.ZoneSignature ``            // Derived public key and signature
@@ -116,8 +102,7 @@ type NamecacheCacheMsg struct {
 // NewNamecacheCacheMsg creates a new default message.
 func NewNamecacheCacheMsg(block *blocks.GNSBlock) *NamecacheCacheMsg {
 	msg := &NamecacheCacheMsg{
-		MsgSize:       108,
-		MsgType:       NAMECACHE_BLOCK_CACHE,
+		MsgHeader:     MsgHeader{108, enums.MSG_NAMECACHE_BLOCK_CACHE},
 		ID:            0,
 		Expire:        *new(util.AbsoluteTime),
 		DerivedKeySig: nil,
@@ -140,30 +125,23 @@ func (m *NamecacheCacheMsg) String() string {
 		m.ID, m.Expire)
 }
 
-// Header returns the message header in a separate instance.
-func (m *NamecacheCacheMsg) Header() *Header {
-	return &Header{m.MsgSize, m.MsgType}
-}
-
 //----------------------------------------------------------------------
 // NAMECACHE_BLOCK_CACHE_RESPONSE
 //----------------------------------------------------------------------
 
 // NamecacheCacheResponseMsg is the response message for a put request
 type NamecacheCacheResponseMsg struct {
-	MsgSize uint16 `order:"big"` // total size of message
-	MsgType uint16 `order:"big"` // NAMECACHE_LOOKUP_BLOCK_RESPONSE (432)
-	ID      uint32 `order:"big"` // Request Id
-	Result  int32  `order:"big"` // Result code
+	MsgHeader
+	ID     uint32 `order:"big"` // Request Id
+	Result int32  `order:"big"` // Result code
 }
 
 // NewNamecacheCacheResponseMsg creates a new default message.
 func NewNamecacheCacheResponseMsg() *NamecacheCacheResponseMsg {
 	return &NamecacheCacheResponseMsg{
-		MsgSize: 12,
-		MsgType: NAMECACHE_BLOCK_CACHE_RESPONSE,
-		ID:      0,
-		Result:  0,
+		MsgHeader: MsgHeader{12, enums.MSG_NAMECACHE_BLOCK_CACHE_RESPONSE},
+		ID:        0,
+		Result:    0,
 	}
 }
 
@@ -171,9 +149,4 @@ func NewNamecacheCacheResponseMsg() *NamecacheCacheResponseMsg {
 func (m *NamecacheCacheResponseMsg) String() string {
 	return fmt.Sprintf("NamecacheCacheResponseMsg{id=%d,result=%d}",
 		m.ID, m.Result)
-}
-
-// Header returns the message header in a separate instance.
-func (m *NamecacheCacheResponseMsg) Header() *Header {
-	return &Header{m.MsgSize, m.MsgType}
 }

@@ -47,9 +47,8 @@ import (
 
 // DHTP2PGetMsg wire layout
 type DHTP2PGetMsg struct {
-	MsgSize    uint16             `order:"big"`   // total size of message
-	MsgType    uint16             `order:"big"`   // DHT_P2P_GET (147)
-	BType      uint32             `order:"big"`   // content type of the payload
+	MsgHeader
+	BType      enums.BlockType    `order:"big"`   // content type of the payload
 	Flags      uint16             `order:"big"`   // processing flags
 	HopCount   uint16             `order:"big"`   // number of hops so far
 	ReplLevel  uint16             `order:"big"`   // Replication level
@@ -63,9 +62,8 @@ type DHTP2PGetMsg struct {
 // NewDHTP2PGetMsg creates an empty DHT-P2P-Get message
 func NewDHTP2PGetMsg() *DHTP2PGetMsg {
 	return &DHTP2PGetMsg{
-		MsgSize:    208,                     // message size without ResFiter and XQuery
-		MsgType:    DHT_P2P_GET,             // DHT_P2P_GET (147)
-		BType:      0,                       // no block type defined
+		MsgHeader:  MsgHeader{208, enums.MSG_DHT_P2P_GET},
+		BType:      enums.BLOCK_TYPE_ANY,    // no block type defined
 		Flags:      0,                       // no flags defined
 		HopCount:   0,                       // no hops
 		ReplLevel:  0,                       // no replication level defined
@@ -80,12 +78,7 @@ func NewDHTP2PGetMsg() *DHTP2PGetMsg {
 // String returns a human-readable representation of the message.
 func (m *DHTP2PGetMsg) String() string {
 	return fmt.Sprintf("DHTP2PGetMsg{btype=%s,hops=%d,flags=%s}",
-		enums.BlockType(m.BType).String(), m.HopCount, dhtFlags(m.Flags))
-}
-
-// Header returns the message header in a separate instance.
-func (m *DHTP2PGetMsg) Header() *Header {
-	return &Header{m.MsgSize, m.MsgType}
+		m.BType, m.HopCount, dhtFlags(m.Flags))
 }
 
 // Update message (forwarding)
@@ -93,8 +86,7 @@ func (m *DHTP2PGetMsg) Update(pf *blocks.PeerFilter, rf blocks.ResultFilter, hop
 	buf := rf.Bytes()
 	ns := uint16(len(buf))
 	return &DHTP2PGetMsg{
-		MsgSize:    m.MsgSize - m.RfSize + ns,
-		MsgType:    DHT_P2P_GET,
+		MsgHeader:  MsgHeader{m.MsgSize - m.RfSize + ns, enums.MSG_DHT_P2P_GET},
 		BType:      m.BType,
 		Flags:      m.Flags,
 		HopCount:   hop,
@@ -114,9 +106,8 @@ func (m *DHTP2PGetMsg) Update(pf *blocks.PeerFilter, rf blocks.ResultFilter, hop
 
 // DHTP2PPutMsg wire layout
 type DHTP2PPutMsg struct {
-	MsgSize     uint16              `order:"big"`    // total size of message
-	MsgType     uint16              `order:"big"`    // DHT_P2P_PUT (146)
-	BType       uint32              `order:"big"`    // block type
+	MsgHeader
+	BType       enums.BlockType     `order:"big"`    // block type
 	Flags       uint16              `order:"big"`    // processing flags
 	HopCount    uint16              `order:"big"`    // message hops
 	ReplLvl     uint16              `order:"big"`    // replication level
@@ -133,9 +124,8 @@ type DHTP2PPutMsg struct {
 // NewDHTP2PPutMsg creates an empty new DHTP2PPutMsg
 func NewDHTP2PPutMsg() *DHTP2PPutMsg {
 	return &DHTP2PPutMsg{
-		MsgSize:     218,                      // total size without path and block data
-		MsgType:     DHT_P2P_PUT,              // DHT_P2P_PUT (146)
-		BType:       0,                        // block type
+		MsgHeader:   MsgHeader{218, enums.MSG_DHT_P2P_PUT},
+		BType:       enums.BLOCK_TYPE_ANY,     // block type
 		Flags:       0,                        // processing flags
 		HopCount:    0,                        // message hops
 		ReplLvl:     0,                        // replication level
@@ -271,12 +261,7 @@ func (m *DHTP2PPutMsg) SetPath(p *path.Path) {
 // String returns a human-readable representation of the message.
 func (m *DHTP2PPutMsg) String() string {
 	return fmt.Sprintf("DHTP2PPutMsg{btype=%s,hops=%d,flags=%s}",
-		enums.BlockType(m.BType).String(), m.HopCount, dhtFlags(m.Flags))
-}
-
-// Header returns the message header in a separate instance.
-func (m *DHTP2PPutMsg) Header() *Header {
-	return &Header{m.MsgSize, m.MsgType}
+		m.BType, m.HopCount, dhtFlags(m.Flags))
 }
 
 //----------------------------------------------------------------------
@@ -286,9 +271,8 @@ func (m *DHTP2PPutMsg) Header() *Header {
 
 // DHTP2PResultMsg wire layout
 type DHTP2PResultMsg struct {
-	MsgSize     uint16              `order:"big"`      // total size of message
-	MsgType     uint16              `order:"big"`      // DHT_P2P_RESULT (148)
-	BType       uint32              `order:"big"`      // Block type of result
+	MsgHeader
+	BType       enums.BlockType     `order:"big"`      // Block type of result
 	Flags       uint32              `order:"big"`      // Message flags
 	PutPathL    uint16              `order:"big"`      // size of PUTPATH field
 	GetPathL    uint16              `order:"big"`      // size of GETPATH field
@@ -303,15 +287,14 @@ type DHTP2PResultMsg struct {
 // NewDHTP2PResultMsg creates a new empty DHTP2PResultMsg
 func NewDHTP2PResultMsg() *DHTP2PResultMsg {
 	return &DHTP2PResultMsg{
-		MsgSize:     88,                           // size of empty message
-		MsgType:     DHT_P2P_RESULT,               // DHT_P2P_RESULT (148)
-		BType:       uint32(enums.BLOCK_TYPE_ANY), // type of returned block
-		TruncOrigin: nil,                          // no truncated origin
-		PutPathL:    0,                            // empty putpath
-		GetPathL:    0,                            // empty getpath
-		PathList:    nil,                          // empty path list (put+get)
-		LastSig:     nil,                          // no recorded route
-		Block:       nil,                          // empty block
+		MsgHeader:   MsgHeader{88, enums.MSG_DHT_P2P_RESULT},
+		BType:       enums.BLOCK_TYPE_ANY, // type of returned block
+		TruncOrigin: nil,                  // no truncated origin
+		PutPathL:    0,                    // empty putpath
+		GetPathL:    0,                    // empty getpath
+		PathList:    nil,                  // empty path list (put+get)
+		LastSig:     nil,                  // no recorded route
+		Block:       nil,                  // empty block
 	}
 }
 
@@ -434,8 +417,7 @@ func (m *DHTP2PResultMsg) SetPath(p *path.Path) {
 func (m *DHTP2PResultMsg) Update(pth *path.Path) *DHTP2PResultMsg {
 	// clone old message
 	msg := &DHTP2PResultMsg{
-		MsgSize:     m.MsgSize,
-		MsgType:     m.MsgType,
+		MsgHeader:   MsgHeader{m.MsgSize, m.MsgType},
 		BType:       m.BType,
 		Flags:       m.Flags,
 		PutPathL:    m.PutPathL,
@@ -457,12 +439,7 @@ func (m *DHTP2PResultMsg) Update(pth *path.Path) *DHTP2PResultMsg {
 // String returns a human-readable representation of the message.
 func (m *DHTP2PResultMsg) String() string {
 	return fmt.Sprintf("DHTP2PResultMsg{btype=%s,putl=%d,getl=%d,flags=%s}",
-		enums.BlockType(m.BType).String(), m.PutPathL, m.GetPathL, dhtFlags(uint16(m.Flags)))
-}
-
-// Header returns the message header in a separate instance.
-func (m *DHTP2PResultMsg) Header() *Header {
-	return &Header{m.MsgSize, m.MsgType}
+		m.BType, m.PutPathL, m.GetPathL, dhtFlags(uint16(m.Flags)))
 }
 
 //----------------------------------------------------------------------
@@ -475,8 +452,7 @@ func (m *DHTP2PResultMsg) Header() *Header {
 
 // DHTP2PHelloMsg is a message send by peers to announce their presence
 type DHTP2PHelloMsg struct {
-	MsgSize   uint16              `order:"big"` // total size of message
-	MsgType   uint16              `order:"big"` // DHT_P2P_HELLO (157)
+	MsgHeader
 	Reserved  uint16              `order:"big"` // Reserved for further use
 	NumAddr   uint16              `order:"big"` // Number of addresses in list
 	Signature *util.PeerSignature ``            // Signature
@@ -489,8 +465,7 @@ func NewDHTP2PHelloMsg() *DHTP2PHelloMsg {
 	// return empty HelloMessage
 	exp := time.Now().Add(HelloAddressExpiration)
 	return &DHTP2PHelloMsg{
-		MsgSize:   80,                         // size without 'AddrList'
-		MsgType:   DHT_P2P_HELLO,              // DHT_P2P_HELLO (157)
+		MsgHeader: MsgHeader{80, enums.MSG_DHT_P2P_HELLO},
 		Reserved:  0,                          // not used here
 		NumAddr:   0,                          // start with empty address list
 		Signature: util.NewPeerSignature(nil), // signature
@@ -545,11 +520,6 @@ func (m *DHTP2PHelloMsg) SetAddresses(list []*util.Address) {
 // String returns a human-readable representation of the message.
 func (m *DHTP2PHelloMsg) String() string {
 	return fmt.Sprintf("DHTP2PHelloMsg{expire:%s,addrs=[%d]}", m.Expire, m.NumAddr)
-}
-
-// Header returns the message header in a separate instance.
-func (m *DHTP2PHelloMsg) Header() *Header {
-	return &Header{m.MsgSize, m.MsgType}
 }
 
 // Verify the message signature

@@ -298,7 +298,7 @@ func NewTestNode(ctx context.Context, t *testing.T, cfg *config.NodeConfig) (nod
 				case EV_DISCONNECT:
 					t.Logf("[%d] <<< Peer %s diconnected", node.id, ev.Peer)
 				case EV_MESSAGE:
-					t.Logf("[%d] <<< Msg from %s of type %d", node.id, ev.Peer, ev.Msg.Header().MsgType)
+					t.Logf("[%d] <<< Msg from %s of type %s", node.id, ev.Peer, ev.Msg.Type())
 					t.Logf("[%d] <<<    --> %s", node.id, ev.Msg.String())
 					wrt := new(bytes.Buffer)
 					if err := transport.WriteMessageDirect(wrt, ev.Msg); err == nil {

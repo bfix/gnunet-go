@@ -92,7 +92,7 @@ func ReadMessage(ctx context.Context, rdr io.ReadCloser, buf []byte) (msg messag
 	if err = get(0, 4); err != nil {
 		return
 	}
-	var mh *message.Header
+	var mh *message.MsgHeader
 	if mh, err = message.GetMsgHeader(buf[:4]); err != nil {
 		return
 	}

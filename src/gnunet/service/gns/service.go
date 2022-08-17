@@ -136,7 +136,7 @@ func (s *Service) HandleMessage(ctx context.Context, sender *util.PeerID, msg me
 				logger.Printf(logger.DBG, "[gns%s] Lookup request finished.\n", label)
 			}()
 
-			kind := NewRRTypeList(enums.GNSType(m.Type))
+			kind := NewRRTypeList(enums.GNSType(m.RType))
 			recset, err := s.Resolve(ctx, label, m.Zone, kind, int(m.Options), 0)
 			if err != nil {
 				logger.Printf(logger.ERROR, "[gns%s] Failed to lookup block: %s\n", label, err.Error())
@@ -159,7 +159,7 @@ func (s *Service) HandleMessage(ctx context.Context, sender *util.PeerID, msg me
 					logger.Printf(logger.DBG, "[gns%s] Record #%d: %v\n", label, i, rec)
 
 					// is this the record type we are looking for?
-					if rec.Type == m.Type || enums.GNSType(m.Type) == enums.GNS_TYPE_ANY {
+					if rec.RType == m.RType || enums.GNSType(m.RType) == enums.GNS_TYPE_ANY {
 						// add it to the response message
 						if err := resp.AddRecord(rec); err != nil {
 							logger.Printf(logger.ERROR, "[gns%s] failed: %sv", label, err.Error())
@@ -173,7 +173,7 @@ func (s *Service) HandleMessage(ctx context.Context, sender *util.PeerID, msg me
 		//----------------------------------------------------------
 		// UNKNOWN message type received
 		//----------------------------------------------------------
-		logger.Printf(logger.ERROR, "[gns%s] Unhandled message of type (%d)\n", label, msg.Header().MsgType)
+		logger.Printf(logger.ERROR, "[gns%s] Unhandled message of type (%s)\n", label, msg.Type())
 		return false
 	}
 	return true
@@ -292,7 +292,7 @@ func (s *Service) LookupNamecache(ctx context.Context, query *blocks.GNSQuery) (
 			break
 		}
 	default:
-		logger.Printf(logger.ERROR, "[gns] Got invalid response type (%d)\n", m.Header().MsgType)
+		logger.Printf(logger.ERROR, "[gns] Got invalid response type (%s)\n", m.Type())
 		err = ErrInvalidResponseType
 	}
 	return
@@ -328,7 +328,7 @@ func (s *Service) StoreNamecache(ctx context.Context, query *blocks.GNSQuery, bl
 		}
 		return fmt.Errorf("failed with rc=%d", m.Result)
 	default:
-		logger.Printf(logger.ERROR, "[gns] Got invalid response type (%d)\n", m.Header().MsgType)
+		logger.Printf(logger.ERROR, "[gns] Got invalid response type (%s)\n", m.Type())
 		err = ErrInvalidResponseType
 	}
 	return
@@ -375,7 +375,7 @@ func (s *Service) LookupDHT(ctx context.Context, query blocks.Query) (block bloc
 	reqGet := message.NewDHTClientGetMsg(query.Key())
 	reqGet.ID = uint64(util.NextID())
 	reqGet.ReplLevel = uint32(enums.GNS_REPLICATION_LEVEL)
-	reqGet.Type = uint32(enums.BLOCK_TYPE_GNS_NAMERECORD)
+	reqGet.BType = enums.BLOCK_TYPE_GNS_NAMERECORD
 	reqGet.Options = uint32(enums.DHT_RO_DEMULTIPLEX_EVERYWHERE)
 
 	if err = interact(reqGet, true); err != nil {
@@ -413,7 +413,7 @@ func (s *Service) LookupDHT(ctx context.Context, query blocks.Query) (block bloc
 			break
 		}
 		// check if result is of requested type
-		if enums.BlockType(m.Type) != enums.BLOCK_TYPE_GNS_NAMERECORD {
+		if enums.BlockType(m.BType) != enums.BLOCK_TYPE_GNS_NAMERECORD {
 			logger.Println(logger.ERROR, "[gns] DHT response has wrong type")
 			break
 		}

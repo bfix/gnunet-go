@@ -81,6 +81,13 @@ func (t AbsoluteTime) Add(d time.Duration) AbsoluteTime {
 	}
 }
 
+// Add a relative time to an absolute time yielding a new absolute time.
+func (t AbsoluteTime) AddRelative(d RelativeTime) AbsoluteTime {
+	return AbsoluteTime{
+		Val: t.Val + d.Val,
+	}
+}
+
 // Elapsed time since 't'. Return 0 if 't' is in the future.
 func (t AbsoluteTime) Elapsed() RelativeTime {
 	dt, elapsed := t.Diff(AbsoluteTimeNow())

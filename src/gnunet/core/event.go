@@ -20,6 +20,7 @@ package core
 
 import (
 	"fmt"
+	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/transport"
 	"gnunet/util"
@@ -42,14 +43,14 @@ const (
 // can be filtered by message type also.
 type EventFilter struct {
 	evTypes  map[int]bool
-	msgTypes map[uint16]bool
+	msgTypes map[enums.MsgType]bool
 }
 
 // NewEventFilter creates a new empty filter instance.
 func NewEventFilter() *EventFilter {
 	return &EventFilter{
 		evTypes:  make(map[int]bool),
-		msgTypes: make(map[uint16]bool),
+		msgTypes: make(map[enums.MsgType]bool),
 	}
 }
 
@@ -59,7 +60,7 @@ func (f *EventFilter) AddEvent(ev int) {
 }
 
 // AddMsgType adds a message type to filter
-func (f *EventFilter) AddMsgType(mt uint16) {
+func (f *EventFilter) AddMsgType(mt enums.MsgType) {
 	f.evTypes[EV_MESSAGE] = true
 	f.msgTypes[mt] = true
 }
@@ -76,7 +77,7 @@ func (f *EventFilter) CheckEvent(ev int) bool {
 
 // CheckMsgType returns true if a message type is matched
 // by the filter or the filter is empty.
-func (f *EventFilter) CheckMsgType(mt uint16) bool {
+func (f *EventFilter) CheckMsgType(mt enums.MsgType) bool {
 	if len(f.msgTypes) == 0 {
 		return true
 	}
@@ -103,7 +104,7 @@ func (e *Event) String() string {
 	}
 	s += fmt.Sprintf("id=%d,peer=%s", e.ID, e.Peer)
 	if e.Msg != nil {
-		s += fmt.Sprintf(",msg=%d", e.Msg.Header().MsgType)
+		s += fmt.Sprintf(",msg=%s", e.Msg.Type())
 	}
 	return s + "}"
 }

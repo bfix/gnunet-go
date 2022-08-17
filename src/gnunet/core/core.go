@@ -360,7 +360,7 @@ func (c *Core) dispatch(ev *Event) {
 	for _, l := range c.listeners {
 		if l.filter.CheckEvent(ev.ID) {
 			if ev.ID == EV_MESSAGE {
-				mt := ev.Msg.Header().MsgType
+				mt := ev.Msg.Type()
 				if mt != 0 && !l.filter.CheckMsgType(mt) {
 					// skip event
 					return

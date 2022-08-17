@@ -43,8 +43,7 @@ type EphKeyBlock struct {
 // EphemeralKeyMsg announces a new transient key for a peer. The key is signed
 // by the issuing peer.
 type EphemeralKeyMsg struct {
-	MsgSize      uint16              `order:"big"` // total size of message
-	MsgType      uint16              `order:"big"` // CORE_EPHEMERAL_KEY (88)
+	MsgHeader
 	SenderStatus uint32              `order:"big"` // enum PeerStateMachine
 	Signature    *util.PeerSignature ``            // EdDSA signature
 	SignedBlock  *EphKeyBlock
@@ -53,8 +52,7 @@ type EphemeralKeyMsg struct {
 // NewEphemeralKeyMsg creates an empty message for key announcement.
 func NewEphemeralKeyMsg() *EphemeralKeyMsg {
 	return &EphemeralKeyMsg{
-		MsgSize:      160,
-		MsgType:      CORE_EPHEMERAL_KEY,
+		MsgHeader:    MsgHeader{160, enums.MSG_CORE_EPHEMERAL_KEY},
 		SenderStatus: 1,
 		Signature:    util.NewPeerSignature(nil),
 		SignedBlock: &EphKeyBlock{
@@ -77,11 +75,6 @@ func (m *EphemeralKeyMsg) String() string {
 		util.EncodeBinaryToString(m.SignedBlock.EphemeralKey.Data),
 		m.SignedBlock.CreateTime, m.SignedBlock.ExpireTime,
 		m.SenderStatus)
-}
-
-// Header returns the message header in a separate instance.
-func (m *EphemeralKeyMsg) Header() *Header {
-	return &Header{m.MsgSize, m.MsgType}
 }
 
 // Public extracts the public key of an announcing peer.

@@ -22,6 +22,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"gnunet/enums"
 	"gnunet/util"
 	"io"
 	"time"
@@ -140,8 +141,7 @@ func (a *HelloAddress) Bytes() []byte {
 
 // HelloMsg is a message send by peers to announce their presence
 type HelloMsg struct {
-	MsgSize     uint16       `order:"big"` // total size of message
-	MsgType     uint16       `order:"big"` // HELLO (17)
+	MsgHeader
 	FriendsOnly uint32       `order:"big"` // Do not gossip this HELLO message
 	Peer        *util.PeerID ``            // peer identifier for addresses
 	AddrList    []byte       `size:"*"`    // List of end-point addresses (HelloAddress)
@@ -155,8 +155,7 @@ func NewHelloMsg(peer *util.PeerID) *HelloMsg {
 	}
 	// return empty HelloMessage
 	return &HelloMsg{
-		MsgSize:     40,              // size without 'AddrList'
-		MsgType:     HELLO,           // HELLO (17)
+		MsgHeader:   MsgHeader{40, enums.MSG_HELLO},
 		FriendsOnly: 0,               // not used here
 		Peer:        peer,            // associated peer
 		AddrList:    make([]byte, 0), // list of addresses
@@ -193,9 +192,4 @@ func (m *HelloMsg) SetAddresses(list []*HelloAddress) {
 		m.MsgSize += uint16(n)
 	}
 	m.AddrList = wrt.Bytes()
-}
-
-// Header returns the message header in a separate instance.
-func (m *HelloMsg) Header() *Header {
-	return &Header{m.MsgSize, m.MsgType}
 }
