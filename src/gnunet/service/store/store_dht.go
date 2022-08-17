@@ -166,6 +166,11 @@ func (s *DHTStore) Put(query blocks.Query, entry *DHTEntry) (err error) {
 	btype := query.Type()
 	expire := entry.Blk.Expire()
 	blkSize := len(entry.Blk.Bytes())
+	pl := 0
+	if entry.Path != nil {
+		pl = int(entry.Path.NumList)
+	}
+	logger.Printf(logger.INFO, "[dht-store] storing %d bytes under key %s (path: %d)", blkSize, util.Shorten(query.String(), 20), pl)
 
 	// write entry to file for storage
 	if err = s.writeEntry(query.Key().Data, entry); err != nil {
