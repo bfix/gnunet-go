@@ -136,24 +136,21 @@ func NewRoutingTable(ref *PeerAddress, cfg *config.RoutingConfig) *RoutingTable 
 // Returns true if the entry was added, false otherwise.
 func (rt *RoutingTable) Add(p *PeerAddress, label string) bool {
 	k := p.String()
-	logger.Printf(logger.DBG, "[%s] Add(%s)", label, util.Shorten(k, 20))
 
 	// check if peer is already known
 	if px, ok := rt.list.Get(k, 0); ok {
-		logger.Printf(logger.DBG, "[%s] --> already known", label)
 		px.lastSeen = util.AbsoluteTimeNow()
 		return false
 	}
 	// compute distance (bucket index) and insert address.
 	_, idx := p.Distance(rt.ref)
 	if rt.buckets[idx].Add(p) {
-		logger.Printf(logger.DBG, "[%s] --> entry added", label)
 		p.lastUsed = util.AbsoluteTimeNow()
 		rt.list.Put(k, p, 0)
+		logger.Printf(logger.DBG, "[%s] %s added to routing table", label, util.Shorten(k, 20))
 		return true
 	}
 	// Full bucket: we did not add the address to the routing table.
-	logger.Printf(logger.DBG, "[%s] --> bucket[%d] full -- discarded", label, idx)
 	return false
 }
 
