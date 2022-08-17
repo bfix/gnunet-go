@@ -60,10 +60,10 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		//--------------------------------------------------------------
 		// DHT-P2P GET
 		//--------------------------------------------------------------
-		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-GET message", label)
+		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-GET message for type %s", label, msg.BType)
 
 		// assemble query and initialize (cache) results
-		query := blocks.NewGenericQuery(msg.Query, enums.BlockType(msg.BType), msg.Flags)
+		query := blocks.NewGenericQuery(msg.Query, msg.BType, msg.Flags)
 		var results []*store.DHTResult
 
 		//--------------------------------------------------------------
@@ -108,10 +108,16 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		//----------------------------------------------------------
 		// check if we need to respond (and how) (9.4.3.3)
 		addr := NewQueryAddress(query.Key())
-		closest := m.rtable.IsClosestPeer(nil, addr, msg.PeerFilter, 0)
 		demux := int(msg.Flags)&enums.DHT_RO_DEMULTIPLEX_EVERYWHERE != 0
 		approx := int(msg.Flags)&enums.DHT_RO_FIND_APPROXIMATE != 0
-
+		closest := false
+		// only check for closest node if we are not looking for our own HELLO
+		if msg.Flags&enums.DHT_RO_DISCOVERY == 0 {
+			closest = m.rtable.IsClosestPeer(nil, addr, msg.PeerFilter, 0)
+		} else {
+			// remove discovery flag
+			msg.Flags &^= enums.DHT_RO_DISCOVERY
+		}
 		// enforced actions
 		doResult, doForward := getActions(closest, demux, approx)
 		logger.Printf(logger.DBG, "[%s] GET message: closest=%v, demux=%v, approx=%v --> result=%v, forward=%v",
@@ -174,9 +180,6 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 					pf.Add(p.Peer)
 					// create open get-forward result handler
 					rh := NewResultHandler(msg, rf, back)
-					if rh.Key().String()[:8] == "00000000" {
-						panic("@@@")
-					}
 					logger.Printf(logger.INFO, "[%s] DHT-P2P-GET task #%d (%s) started",
 						label, rh.ID(), util.Shorten(rh.Key().String(), 20))
 					m.reshdlrs.Add(rh)
@@ -194,12 +197,11 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		//----------------------------------------------------------
 		// DHT-P2P PUT
 		//----------------------------------------------------------
-		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-PUT message", label)
+		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-PUT message for type %s", label, msg.BType)
 
 		// assemble query and entry
-		btype := enums.BlockType(msg.BType)
-		query := blocks.NewGenericQuery(msg.Key, btype, msg.Flags)
-		blk, err := blocks.NewBlock(btype, msg.Expire, msg.Block)
+		query := blocks.NewGenericQuery(msg.Key, msg.BType, msg.Flags)
+		blk, err := blocks.NewBlock(msg.BType, msg.Expire, msg.Block)
 		if err != nil {
 			logger.Printf(logger.ERROR, "[%s] DHT-P2P-PUT message block problem: %s", label, err.Error())
 			return false
@@ -212,10 +214,10 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		//--------------------------------------------------------------
 		// check if request is expired (9.3.2.1)
 		if msg.Expire.Expired() {
-			logger.Printf(logger.WARN, "[%s] DHT-P2P-PUT message expired (%s)", label, msg.Expire.String())
+			logger.Printf(logger.WARN, "[%s] DHT-P2P-PUT message expired (%s)", label, msg.Expire)
 			return false
 		}
-		blockHdlr, ok := blocks.BlockHandlers[btype]
+		blockHdlr, ok := blocks.BlockHandlers[msg.BType]
 		if ok { // (9.3.2.2)
 			// reconstruct block instance
 			if block, err := blockHdlr.ParseBlock(msg.Block); err == nil {
@@ -233,7 +235,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 				}
 			}
 		} else {
-			logger.Printf(logger.INFO, "[%s] No validator defined for block type %s", label, btype.String())
+			logger.Printf(logger.INFO, "[%s] No validator defined for block type %s", label, msg.BType)
 			blockHdlr = nil
 		}
 		// clone peer filter
@@ -271,7 +273,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		//--------------------------------------------------------------
 		// if the put is for a HELLO block, add the sender to the
 		// routing table (9.3.2.9)
-		if btype == enums.BLOCK_TYPE_DHT_HELLO {
+		if msg.BType == enums.BLOCK_TYPE_DHT_HELLO {
 			// get addresses from HELLO block
 			hello, err := blocks.ParseHelloBlockFromBytes(msg.Block)
 			if err != nil {
@@ -333,8 +335,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		//----------------------------------------------------------
 		// DHT-P2P RESULT
 		//----------------------------------------------------------
-		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-RESULT message for type %s",
-			label, enums.BlockType(msg.BType).String())
+		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-RESULT message for type %s", label, msg.BType)
 
 		//--------------------------------------------------------------
 		// check if request is expired (9.5.2.1)
@@ -394,7 +395,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		}
 		// message forwarding to responder
 		key := msg.Query.String()
-		logger.Printf(logger.DBG, "[%s] DHT-P2P-RESULT key = %s", label, key)
+		logger.Printf(logger.DBG, "[%s] DHT-P2P-RESULT key = %s", label, util.Shorten(key, 20))
 		handled := false
 		if list, ok := m.reshdlrs.Get(key); ok {
 			for _, rh := range list {

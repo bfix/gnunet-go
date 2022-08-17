@@ -140,7 +140,7 @@ func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Mod
 	// run periodic tasks (8.2. peer discovery)
 	ticker := time.NewTicker(5 * time.Minute)
 	key := crypto.Hash(m.core.PeerID().Bytes())
-	flags := uint16(enums.DHT_RO_FIND_APPROXIMATE | enums.DHT_RO_DEMULTIPLEX_EVERYWHERE)
+	flags := uint16(enums.DHT_RO_FIND_APPROXIMATE | enums.DHT_RO_DEMULTIPLEX_EVERYWHERE | enums.DHT_RO_DISCOVERY)
 	var resCh <-chan blocks.Block
 	go func() {
 		for {
