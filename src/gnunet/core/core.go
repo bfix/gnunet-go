@@ -265,7 +265,8 @@ func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addrs []*util.Addre
 			continue
 		}
 		// learn address
-		logger.Printf(logger.INFO, "[core] Learning %s for %s (expires %s)", addr.URI(), peer, addr.Expire)
+		logger.Printf(logger.INFO, "[core] Learning %s for %s (expires %s)",
+			addr.URI(), util.Shorten(peer.String(), 20), addr.Expire)
 		newPeer = (c.peers.Add(peer, addr) == 1) || newPeer
 	}
 	return
@@ -355,7 +356,6 @@ func (c *Core) Unregister(name string) *Listener {
 
 // internal: dispatch event to listeners
 func (c *Core) dispatch(ev *Event) {
-	logger.Printf(logger.DBG, "[core] Dispatching %v...", ev)
 	// dispatch event to listeners
 	for _, l := range c.listeners {
 		if l.filter.CheckEvent(ev.ID) {
