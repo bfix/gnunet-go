@@ -25,7 +25,6 @@ import (
 	"gnunet/util"
 
 	"github.com/bfix/gospel/data"
-	"github.com/bfix/gospel/logger"
 )
 
 //----------------------------------------------------------------------
@@ -222,10 +221,6 @@ func NewBlock(btype enums.BlockType, expires util.AbsoluteTime, blk []byte) (b B
 		return NewGenericBlock(btype, expires, blk), nil
 	}
 	b = fac()
-	if err = data.Unmarshal(b, blk); err == nil {
-		if b.Expire().Compare(expires) != 0 {
-			logger.Printf(logger.WARN, "[newblock] expire mismatch")
-		}
-	}
+	err = data.Unmarshal(b, blk)
 	return
 }
