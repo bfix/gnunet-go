@@ -114,11 +114,7 @@ func (t AbsoluteTime) Diff(t2 AbsoluteTime) (dt RelativeTime, elapsed bool) {
 
 // Expired returns true if the timestamp is in the past.
 func (t AbsoluteTime) Expired() bool {
-	// check for "never"
-	if t.Val == math.MaxUint64 {
-		return false
-	}
-	return t.Val < uint64(time.Now().Unix())
+	return t.Compare(AbsoluteTimeNow()) < 0
 }
 
 // Compare two times (-1 = (t < t2), 0 = (t == t2), 1 = (t > t2)

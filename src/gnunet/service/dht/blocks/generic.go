@@ -140,7 +140,7 @@ func (q *GenericQuery) Decrypt(b Block) error {
 
 // String returns the human-readable representation of a block
 func (q *GenericQuery) String() string {
-	return fmt.Sprintf("GenericQuery{btype=%s,key=%s}", q.btype, util.Shorten(q.Key().String(), 20))
+	return fmt.Sprintf("GenericQuery{btype=%s,key=%s}", q.btype, q.Key().Short())
 }
 
 // NewGenericQuery creates a simple Query from hash code.
