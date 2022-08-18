@@ -83,5 +83,9 @@
     },
     "rpc": {
         "endpoint": "tcp:127.0.0.1:80"
+    },
+    "logging": {
+        "level": 4,
+        "file": "/tmp/gnunet-go/run.log"
     }
 }

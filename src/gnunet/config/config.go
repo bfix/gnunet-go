@@ -134,6 +134,16 @@ type RevocationConfig struct {
 }
 
 //----------------------------------------------------------------------
+// Logging configuration
+//----------------------------------------------------------------------
+
+// LoggingConfig defines the loglevel and logfile location
+type LoggingConfig struct {
+	Level int    `json:"level"`
+	File  string `json:"file"`
+}
+
+//----------------------------------------------------------------------
 // Combined configuration
 //----------------------------------------------------------------------
 
@@ -150,6 +160,7 @@ type Config struct {
 	GNS        *GNSConfig        `json:"gns"`
 	Namecache  *NamecacheConfig  `json:"namecache"`
 	Revocation *RevocationConfig `json:"revocation"`
+	Logging    *LoggingConfig    `json:"logging"`
 }
 
 var (
