@@ -37,7 +37,7 @@ go test ./...
 
 The binaries are stored in `${GOPATH}/bin`.
 
-## Source code
+# Source code
 
 All source code is written for Go v1.18+.
 
@@ -45,7 +45,7 @@ All source code is written for Go v1.18+.
 the source code, make sure you run `go mod tidy` in the `src/gnunet` folder
 to install all dependencies.
 
-### `./src/gnunet`
+## `./src/gnunet`
 
 The folder `src/gnunet` contains a Go implementation of GNUnet: It is WIP
 and only provides a very limited coverage of GNUnet. The goal is to have
@@ -53,12 +53,12 @@ a complete, functionally equivalent implementation of the GNUnet protocol
 in Go. Currently only some aspects of Transport, GNS, Revocation, Namecache
 and DHT are implemented.
 
-Use `./build.sh` to build the executables (services and utilities, see
+Use `./build.sh withgen` to build the executables (services and utilities, see
 below). The resulting programs are stored in `${GOPATH}/bin`.
 
 To run the unit tests, use `./test.sh`. 
 
-#### `./src/gnunet/enums`
+## `./src/gnunet/enums`
 
 Changes in GANA definitions for block types, GNS record types and signature
 purpose values can be imported by copying the recfiles (GNU recutils) from
@@ -71,21 +71,21 @@ GANA into this folder:
 After updating the recfiles, you need to run `go generate ./...` to generate
 the new source files.
 
-### `./src/gnunet/cmd`
+## `./src/gnunet/cmd`
 
-#### `gnunet-service-dht-test-go`: Implementation of the DHT core service (testbed).
+### `gnunet-service-dht-test-go`: Implementation of the DHT core service (testbed).
 
-#### `gnunet-service-gns-go`: Implementation of the GNS core service.
+### `gnunet-service-gns-go`: Implementation of the GNS core service.
 
 Stand-alone GNS service that could be used with other GNUnet utilities and
 services.
 
-#### `gnunet-service-revocation-go`: Implementation of the GNS revocation service.
+### `gnunet-service-revocation-go`: Implementation of the GNS revocation service.
 
 Stand-alone Revocation service that could be used with other GNUnet utilities
 and services.
 
-#### `revoke-zonekey`: Implementation of a stand-alone program to calculate revocations.
+### `revoke-zonekey`: Implementation of a stand-alone program to calculate revocations.
 
 This program creates a zone key revocation block. Depending on the parameters
 the calculation can take days or even weeks. The program can be interrupted
@@ -109,9 +109,9 @@ The default difficulty will create a revocation valid for ~2 years.
 
 * **`-v`**: verbose output
 
-#### `peer_mockup`: test message exchange on the lowest level (transport).
+### `peer_mockup`: test message exchange on the lowest level (transport).
 
-#### `vanityid`: Compute GNUnet vanity peer id for a given regexp pattern.
+### `vanityid`: Compute GNUnet vanity peer id for a given regexp pattern.
 
 N.B.: Key generation is slow at the moment, so be patient! To generate a single
 matching key some 1,000,000 keys need to be generated for a four letter prefix;
@@ -141,7 +141,203 @@ For `gnunet-go` configuration files you need to paste the result of
 `echo "<hex.seed>" | xxd -r -p | base64` into the `PrivateSeed` field in the
 `NodeConfig` section.
 
-## Using gnunet-go in your own projects
+# Testing `gnunet-go`
+
+To test the current `gnunet-go` implementation in a local GNUnet environment,
+you should follow the detailed instructions below.
+
+**N.B.**: Testing requires an up-to-date GNUnet build from source. You can
+either use your local machine (please follow the GNUnet documentation for
+setup) or you can simply use a Docker image like
+[gnunet-docker](https://github.com/bfix/gnunet-docker) for this.
+
+## Testing `R5N DHT`
+
+`gnunet-go` implements the DHT protocol specified in
+[lsd0004](https://lsd.gnunet.org/lsd0004/) and uses a custom (unencrypted)
+transport protocol not supported by the standard GNUnet. Luckily there is a
+testbed in GNUnet that allows to run the new protocol over UDP/IP.
+
+### Starting the DHTU testbed
+
+Make sure you stopped (or have not started) all GNUnet services; the testbed
+will take care of everything required.
+
+Change into `./src/dht` in the `gnunet`-Repository and start any number of
+DHTU nodes for testing:
+
+```bash
+./dhtu_testbed_deploy.sh 10
+```
+
+will start ten DHTU nodes. Nodes will listen to all available network
+addresses on port 10000+ (one node, one port).
+
+Log and configuration files can be found in `/tmp/deployment/`; they are
+named by index (starting at 0).
+
+### Running the `gnunet-go` node in the testbed
+
+#### Setting up the configuration file
+
+Copy the example `gnunet-config.json` to `dhtu-config.json` and modify the
+`network` and `local` sections to our local setup. In this example
+`172.17.0.5` is the network address for GNUnet DHTU nodes and `172.17.0.1`
+is the network address for `gnunet-go`:
+
+```json
+{
+    "network": {
+        "bootstrap": [
+            "ip+udp://127.17.0.5:10000"
+        ],
+        "numPeers": 10
+    },
+    "local": {
+        "privateSeed": "YGoe6XFH3XdvFRl+agx9gIzPTvxA229WFdkazEMdcOs=",
+        "endpoints": [
+            {
+                "id": "r5n",
+                "network": "ip+udp",
+                "address": "172.17.0.1",
+                "port": 2086,
+                "ttl": 86400
+            }
+        ]
+    }
+    :
+}
+```
+
+The above configuration will expect a network of 10 nodes and has a single
+bootstrap node (the first DHTU node in the testbed). `gnunet-go` will listen
+on port 2086.
+
+#### Running the `gnunet-go`node
+
+Run the following commands to start the `gnunet-go` node:
+
+```bash
+rm -rf /tmp/gnunet-system-runtime
+mkdir -p /tmp/gnunet-system-runtime
+${GOPATH}/bin/gnunet-service-dht-go -c dhtu-config.json 2>&1 | tee run.log
+```
+
+## Testing `GNS`
+
+You need to have (all) GNUnet services up and running.
+
+### Setting up the configuration file
+
+Copy the example `gnunet-config.json` to `gns-config.json` and modify the
+`network` and `local` sections:
+
+```json
+{
+    "network": {
+        "bootstrap": [],
+        "numPeers": 10
+    },
+    "local": {
+        "privateSeed": "YGoe6XFH3XdvFRl+agx9gIzPTvxA229WFdkazEMdcOs=",
+        "endpoints": []
+    },
+    :
+}
+```
+
+### Preparing and running the tests
+
+For test purposes you need to start the `gnunet-go` DNS service, generate
+zones and resource records for testing and run the actual test cases.
+You can use the follwing script to do it all in one go:
+
+```bash
+#!/bin/bash
+
+GNS_SOCK=/tmp/gnunet-system-runtime/gnunet-service-gns-go.sock
+[ -e ${GNS_SOCK} ] && sudo rm -f ${GNS_SOCK}
+sudo -u gnunet ../bin/gnunet-service-gns-go -L 5 &
+GOGNS=$!
+
+function get_pkey() {
+    gnunet-identity -d -e $1 | sed 's/.* - //'
+}
+
+CERT=$(openssl x509 -in <(openssl s_client -connect gnunet.org:443 </dev/null 2>/dev/null) -outform der \
+    | od -t x1 -A n \
+    | tr "\n" " " \
+    | sed "s/ //g")
+VPN="ZH7W4PR933913VA45AH45GH9QNQVP3TEM89J18549Q6RNDV75A4G secret"
+
+
+for x in zone9 private; do
+    gnunet-identity -D $x
+done
+
+  gnunet-identity -C zone9
+  gnunet-identity -C private
+
+  gnunet-namestore -a -z zone9   -n "@"  -t NICK    -V "zone9"                  -e never
+  gnunet-namestore -a -z zone9   -n web  -t A       -V 131.159.74.67            -e never
+  gnunet-namestore -a -z zone9   -n web  -t BOX     -V "6 443 52 3 0 0 ${CERT}" -e never
+  gnunet-namestore -a -z zone9   -n gn   -t CNAME   -V gnunet.org               -e never
+  gnunet-namestore -a -z zone9   -n sec  -t VPN     -V "6 ${VPN}"               -e never
+  gnunet-namestore -a -z zone9   -n prv  -t PKEY    -V "$(get_pkey private)"    -e never
+# gnunet-namestore -a -z zone9   -n prv  -t A       -V "14.15.16.17"            -e never
+  gnunet-namestore -a -z zone9   -n old  -t LEHO    -V "old.gnunet.org"         -e never
+  gnunet-namestore -a -z zone9   -n old  -t A       -V 5.6.7.8                  -e never
+# gnunet-namestore -a -z zone9   -n old  -t A       -V 10.11.12.13              -e never
+# gnunet-namestore -a -z zone9   -n old  -t TXT     -V "Old version"            -e never
+
+  gnunet-namestore -a -z private -n "@"  -t NICK    -V "nexus9"                 -e never
+  gnunet-namestore -a -z private -n name -t TXT     -V "GNUnet test"            -e never
+  gnunet-namestore -d -z private -n host
+  gnunet-namestore -a -z private -n host -t GNS2DNS -V "gnunet.org@8.8.8.8"     -e never
+# gnunet-namestore -a -z private -n host -t A       -V 1.2.3.4                  -e never
+
+function test_gns() {
+    echo "========================"
+    echo -n "Testing '$2' for type '$1': "
+    gnunet-gns -t $1 -u $2 > plain.out
+    gnunet-gns -c gns-go.conf -t $1 -u $2 > go.out
+    rc=$(diff plain.out go.out)
+    if [ -z "$rc" ]; then
+        echo "O.K."
+    else
+        echo "FAILED!"
+        echo "---------------- GNS-C"
+        cat plain.out
+        echo "---------------- GNS-Go"
+        cat go.out
+    fi
+}
+
+# (1)
+test_gns any  web.zone9
+# (2)
+test_gns any  _443._tcp.web.zone9
+# (3)
+test_gns nick zone9
+# (4)
+test_gns any  gn.zone9
+# (5)
+test_gns any  sec.zone9
+# (6)
+test_gns pkey prv.zone9
+# (7)
+test_gns nick prv.zone9
+# (8)
+test_gns any  name.prv.zone9
+# (9)
+test_gns any  host.prv.zone9
+# (10)
+test_gns a  host.prv.zone9
+
+kill ${GOGNS}
+```
+
+# Using gnunet-go in your own projects
 
 `gnunet-go` is not a standard Go module for direct use (via go.mod) in other
 packages, but designed as a stand-alone application. The rationale behind was
