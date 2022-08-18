@@ -33,6 +33,7 @@ import (
 	"gnunet/service"
 	"gnunet/service/dht"
 	"gnunet/service/dht/blocks"
+	"gnunet/transport"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/logger"
@@ -44,6 +45,8 @@ func main() {
 		// flush last messages
 		logger.Flush()
 	}()
+	// intro
+	logger.SetLogLevel(logger.DBG)
 	logger.Println(logger.INFO, "[dht] Starting service...")
 
 	var (
@@ -58,7 +61,7 @@ func main() {
 	flag.StringVar(&cfgFile, "c", "gnunet-config.json", "GNUnet configuration file")
 	flag.StringVar(&socket, "s", "", "GNS service socket")
 	flag.StringVar(&param, "p", "", "socket parameters (<key>=<value>,...)")
-	flag.IntVar(&logLevel, "L", logger.DBG, "DHT log level (default: DBG)")
+	flag.IntVar(&logLevel, "L", logger.INFO, "DHT log level (default: INFO)")
 	flag.StringVar(&rpcEndp, "R", "", "JSON-RPC endpoint (default: none)")
 	flag.Parse()
 
@@ -69,6 +72,9 @@ func main() {
 	}
 
 	// apply configuration
+	if config.Cfg.Logging.Level > 0 {
+		logLevel = config.Cfg.Logging.Level
+	}
 	logger.SetLogLevel(logLevel)
 	if len(socket) == 0 {
 		socket = config.Cfg.DHT.Service.Socket
@@ -155,11 +161,12 @@ func main() {
 	}
 	// send HELLO to all bootstrap addresses
 	for _, addr := range bsList {
-		if err := dhtSrv.SendHello(ctx, addr); err != nil {
-			logger.Printf(logger.ERROR, "[dht] send HELLO failed: %s", err.Error())
+		if err := dhtSrv.SendHello(ctx, addr, "bootstrap"); err != nil {
+			if err != transport.ErrEndpMaybeSent {
+				logger.Printf(logger.ERROR, "[bootstrap] send HELLO failed: %s", err.Error())
+			}
 		}
 	}
-
 	// handle OS signals
 	sigCh := make(chan os.Signal, 5)
 	signal.Notify(sigCh)

@@ -41,6 +41,9 @@ var (
 	ErrCoreNotSent    = errors.New("message not sent")
 )
 
+// CtxKey is a value-context key
+type CtxKey string
+
 //----------------------------------------------------------------------
 // EndpointRef is a reference to an endpoint instance managed by core.
 type EndpointRef struct {
@@ -84,7 +87,7 @@ func NewCore(ctx context.Context, node *config.NodeConfig) (c *Core, err error) 
 	if peer, err = NewLocalPeer(node); err != nil {
 		return
 	}
-	logger.Printf(logger.DBG, "[core] Local node is %s", peer.GetID().String())
+	logger.Printf(logger.INFO, "[core] Local node is %s", peer.GetID().Short())
 
 	// create new core instance
 	incoming := make(chan *transport.Message)
@@ -165,8 +168,7 @@ func (c *Core) pump(ctx context.Context) {
 		select {
 		// get (next) message from transport
 		case tm := <-c.incoming:
-			logger.Printf(logger.DBG, "[core] Message received from %s:", tm.Peer)
-			logger.Printf(logger.DBG, "[core]  -> %s", tm.Msg.String())
+			logger.Printf(logger.DBG, "[core] Message received from %s: %s", tm.Peer.Short(), tm.Msg)
 
 			// check if peer is already connected (has an entry in PeerAddrist)
 			_, connected := c.connected.Get(tm.Peer.String(), 0)
@@ -217,6 +219,14 @@ func (c *Core) Shutdown() {
 // Send is a function that allows the local peer to send a protocol
 // message to a remote peer.
 func (c *Core) Send(ctx context.Context, peer *util.PeerID, msg message.Message) (err error) {
+	// assemble log label
+	label := "core"
+	if v := ctx.Value(CtxKey("label")); v != nil {
+		if s, ok := v.(string); ok && len(s) > 0 {
+			label = s
+		}
+	}
+
 	// TODO: select best endpoint protocol for transport; now fixed to IP+UDP
 	netw := "ip+udp"
 
@@ -224,12 +234,12 @@ func (c *Core) Send(ctx context.Context, peer *util.PeerID, msg message.Message)
 	aList := c.peers.Get(peer, netw)
 	maybe := false // message may be sent...
 	for _, addr := range aList {
-		logger.Printf(logger.INFO, "[core] Trying to send to %s", addr.URI())
+		logger.Printf(logger.INFO, "[%s] Trying to send to %s", label, addr.URI())
 		// send message to address
 		if err = c.SendToAddr(ctx, addr, msg); err != nil {
 			// if it is possible that the message was not sent, try next address
 			if err != transport.ErrEndpMaybeSent {
-				logger.Printf(logger.WARN, "[core] Failed to send to %s: %s", addr.URI(), err.Error())
+				logger.Printf(logger.WARN, "[%s] Failed to send to %s: %s", label, addr.URI(), err.Error())
 			} else {
 				maybe = true
 			}
@@ -239,7 +249,6 @@ func (c *Core) Send(ctx context.Context, peer *util.PeerID, msg message.Message)
 		return
 	}
 	if maybe {
-		logger.Printf(logger.WARN, "[core] %s", transport.ErrEndpMaybeSent.Error())
 		err = nil
 	} else {
 		err = ErrCoreNotSent
@@ -256,7 +265,9 @@ func (c *Core) SendToAddr(ctx context.Context, addr *util.Address, msg message.M
 }
 
 // Learn (new) addresses for peer
-func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addrs []*util.Address) (newPeer bool) {
+func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addrs []*util.Address, label string) (newPeer bool) {
+	logger.Printf(logger.DBG, "[%s] Learning %v for %s", label, addrs, peer.Short())
+
 	// learn all addresses for peer
 	newPeer = false
 	for _, addr := range addrs {
@@ -265,8 +276,8 @@ func (c *Core) Learn(ctx context.Context, peer *util.PeerID, addrs []*util.Addre
 			continue
 		}
 		// learn address
-		logger.Printf(logger.INFO, "[core] Learning %s for %s (expires %s)",
-			addr.URI(), util.Shorten(peer.String(), 20), addr.Expire)
+		logger.Printf(logger.INFO, "[%s] Learning %s for %s (expires %s)",
+			label, addr.URI(), peer.Short(), addr.Expire)
 		newPeer = (c.peers.Add(peer, addr) == 1) || newPeer
 	}
 	return

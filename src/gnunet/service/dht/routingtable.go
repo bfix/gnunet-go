@@ -147,7 +147,8 @@ func (rt *RoutingTable) Add(p *PeerAddress, label string) bool {
 	if rt.buckets[idx].Add(p) {
 		p.lastUsed = util.AbsoluteTimeNow()
 		rt.list.Put(k, p, 0)
-		logger.Printf(logger.DBG, "[%s] %s added to routing table", label, util.Shorten(k, 20))
+		logger.Printf(logger.INFO, "[%s] %s added to routing table",
+			label, p.Peer.Short())
 		return true
 	}
 	// Full bucket: we did not add the address to the routing table.
@@ -175,38 +176,37 @@ func (rt *RoutingTable) Check(p *PeerAddress) int {
 
 // Remove peer address from routing table.
 // Returns true if the entry was removed, false otherwise.
-func (rt *RoutingTable) Remove(p *PeerAddress, pid int) bool {
-	k := p.String()
-	logger.Printf(logger.DBG, "[RT] Remove(%s)", k)
-
+func (rt *RoutingTable) Remove(p *PeerAddress, label string, pid int) bool {
 	// compute distance (bucket index) and remove entry from bucket
 	rc := false
 	_, idx := p.Distance(rt.ref)
 	if rt.buckets[idx].Remove(p) {
-		logger.Println(logger.DBG, "[RT] --> entry removed from bucket and internal lists")
+		logger.Printf(logger.DBG, "[%s] %s removed from RT (bucket and internal lists)", label, p.Peer.Short())
 		rc = true
 	} else {
 		// remove from internal list
-		logger.Println(logger.DBG, "[RT] --> entry removed from internal lists only")
+		logger.Printf(logger.DBG, "[%s] %s removed from RT (internal lists only)", label, p.Peer.Short())
 	}
-	rt.list.Delete(k, 0)
+	rt.list.Delete(p.String(), 0)
 	// delete from HELLO cache
 	rt.helloCache.Delete(p.Peer.String(), pid)
 	return rc
 }
 
 // Contains checks if a peer is available in the routing table
-func (rt *RoutingTable) Contains(p *PeerAddress) bool {
+func (rt *RoutingTable) Contains(p *PeerAddress, label string) bool {
 	k := p.String()
 
 	// check for peer in internal list
 	px, ok := rt.list.Get(k, 0)
 	if !ok {
-		logger.Printf(logger.WARN, "[RT] %s NOT found in current list:", util.Shorten(k, 20))
+		logger.Printf(logger.WARN, "[%s] %s NOT found in RT", label, p.Peer.Short())
+		var list []string
 		_ = rt.list.ProcessRange(func(key string, val *PeerAddress, _ int) error {
-			logger.Printf(logger.DBG, "[RT]    * %s", util.Shorten(val.String(), 20))
+			list = append(list, val.Peer.Short())
 			return nil
 		}, true)
+		logger.Printf(logger.DBG, "[%s] RT=%v", list)
 	} else {
 		//logger.Println(logger.DBG, "[RT] --> found in current list")
 		px.lastSeen = util.AbsoluteTimeNow()
@@ -336,18 +336,18 @@ func (rt *RoutingTable) ComputeOutDegree(repl, hop uint16) int {
 func (rt *RoutingTable) heartbeat(ctx context.Context) {
 
 	// check for dead or expired peers
-	logger.Println(logger.DBG, "[dht] RT heartbeat...")
+	logger.Println(logger.DBG, "[dht-rt-hb] RT heartbeat...")
 	timeout := util.NewRelativeTime(time.Duration(rt.cfg.PeerTTL) * time.Second)
 	if err := rt.list.ProcessRange(func(k string, p *PeerAddress, pid int) error {
 		// check if we can/need to drop a peer
 		drop := timeout.Compare(p.lastSeen.Elapsed()) < 0
 		if drop || timeout.Compare(p.lastUsed.Elapsed()) < 0 {
-			logger.Printf(logger.DBG, "[RT] removing %v: %v, %v", p, p.lastSeen.Elapsed(), p.lastUsed.Elapsed())
-			rt.Remove(p, pid)
+			logger.Printf(logger.DBG, "[dht-rt-hb] removing %v: %v, %v", p, p.lastSeen.Elapsed(), p.lastUsed.Elapsed())
+			rt.Remove(p, "dht-rt-hb", pid)
 		}
 		return nil
 	}, false); err != nil {
-		logger.Println(logger.ERROR, "[dht] RT heartbeat failed: "+err.Error())
+		logger.Println(logger.ERROR, "[dht-rt-hb] RT heartbeat failed: "+err.Error())
 	}
 
 	// drop expired entries from the HELLO cache
@@ -365,7 +365,7 @@ func (rt *RoutingTable) heartbeat(ctx context.Context) {
 //----------------------------------------------------------------------
 
 // LookupHello returns blocks from the HELLO cache for given query.
-func (rt *RoutingTable) LookupHello(addr *PeerAddress, rf blocks.ResultFilter, approx bool) (results []*store.DHTResult) {
+func (rt *RoutingTable) LookupHello(addr *PeerAddress, rf blocks.ResultFilter, approx bool, label string) (results []*store.DHTResult) {
 	// iterate over cached HELLOs to find matches;
 	// approximate search is limited by distance (max. diff for bucket index is 16)
 	_ = rt.helloCache.ProcessRange(func(key string, hb *blocks.HelloBlock, _ int) error {
@@ -386,7 +386,7 @@ func (rt *RoutingTable) LookupHello(addr *PeerAddress, rf blocks.ResultFilter, a
 				results = append(results, result)
 			}
 		} else {
-			logger.Printf(logger.DBG, "[RT] GET-HELLO: cache block is filtered")
+			logger.Printf(logger.DBG, "[%s] LookupHello: cached HELLO block is filtered")
 		}
 		return nil
 	}, true)

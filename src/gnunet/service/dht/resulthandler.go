@@ -164,7 +164,7 @@ func (t *ResultHandler) Handle(ctx context.Context, msg *message.DHTP2PResultMsg
 		}
 		// build updated PUT message
 		msg = msg.Update(pp)
-		tgt = rcv.String()
+		tgt = rcv.Short()
 	}
 	// send result message back to originator (result forwarding).
 	logger.Printf(logger.INFO, "[dht-task-%d] sending result back %s", t.id, tgt)
@@ -207,23 +207,23 @@ func (t *ResultHandlerList) Add(hdlr *ResultHandler) bool {
 			switch h.Compare(hdlr) {
 			case RHC_SAME:
 				// already in list; no need to add again
-				logger.Println(logger.DBG, "[rhl] SAME")
+				logger.Println(logger.DBG, "[rhl] resultfilter compare: SAME")
 				return false
 			case RHC_MERGE:
 				// merge the two result handlers
 				oldMod := modified
 				modified = h.Merge(hdlr) || modified
-				logger.Printf(logger.DBG, "[rhl] MERGE (%v -- %v)", oldMod, modified)
+				logger.Printf(logger.DBG, "[rhl] resultfilter compare: MERGE (%v -- %v)", oldMod, modified)
 				break loop
 			case RHC_REPLACE:
 				// replace the old handler with the new one
-				logger.Printf(logger.DBG, "[rhl] REPLACE #%d with #%d", list[i].id, hdlr.id)
+				logger.Printf(logger.DBG, "[rhl] resultfilter compare: REPLACE #%d with #%d", list[i].id, hdlr.id)
 				list[i] = hdlr
 				modified = true
 				break loop
 			case RHC_DIFFER:
 				// try next
-				logger.Println(logger.DBG, "[rhl] DIFFER")
+				logger.Println(logger.DBG, "[rhl] resultfilter compare: DIFFER")
 			}
 		}
 	}

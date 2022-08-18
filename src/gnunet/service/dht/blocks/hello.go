@@ -74,9 +74,13 @@ func InitHelloBlock(peer *util.PeerID, addrs []*util.Address, ttl time.Duration)
 	hb := new(HelloBlock)
 	hb.PeerID = peer
 	// limit expiration to second precision (HELLO-URL compatibility)
-	hb.Expire_ = util.NewAbsoluteTimeEpoch(uint64(time.Now().Add(ttl).Unix()))
+	hb.SetExpire(ttl)
 	hb.SetAddresses(addrs)
 	return hb
+}
+
+func (h *HelloBlock) SetExpire(ttl time.Duration) {
+	h.Expire_ = util.NewAbsoluteTimeEpoch(uint64(time.Now().Add(ttl).Unix()))
 }
 
 // SetAddresses adds a bulk of addresses for this HELLO block.
@@ -92,6 +96,9 @@ func (h *HelloBlock) SetAddresses(a []*util.Address) {
 
 // Addresses returns the list of addresses
 func (h *HelloBlock) Addresses() []*util.Address {
+	if h.addrs == nil {
+		h.finalize()
+	}
 	return util.Clone(h.addrs)
 }
 
@@ -308,7 +315,7 @@ func (h *HelloBlock) SignedData() []byte {
 	err := binary.Write(buf, binary.BigEndian, size)
 	if err == nil {
 		if err = binary.Write(buf, binary.BigEndian, purpose); err == nil {
-			if err = binary.Write(buf, binary.BigEndian, h.Expire_ /*.Epoch()*1000000*/); err == nil {
+			if err = binary.Write(buf, binary.BigEndian, h.Expire_); err == nil {
 				if n, err = buf.Write(hAddr[:]); err == nil {
 					if n != len(hAddr[:]) {
 						err = errors.New("signed data size mismatch")

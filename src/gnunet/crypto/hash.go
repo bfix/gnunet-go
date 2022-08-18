@@ -53,6 +53,11 @@ func (hc *HashCode) String() string {
 	return hex.EncodeToString(hc.Data)
 }
 
+// Short returns a short key representation
+func (hc *HashCode) Short() string {
+	return util.Shorten(hc.String(), 20)
+}
+
 // NewHashCode creates a new (initialized) hash value
 func NewHashCode(data []byte) *HashCode {
 	hc := new(HashCode)

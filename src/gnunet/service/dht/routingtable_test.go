@@ -101,7 +101,7 @@ func TestRT(t *testing.T) {
 		t.Logf("[%6d] %s %s\n", e, task.addr, msg)
 	}
 	disconnected := func(task *Entry, e int64, msg string) {
-		rt.Remove(task.addr, 0)
+		rt.Remove(task.addr, "test", 0)
 		task.online = false
 		task.last = e
 		t.Logf("[%6d] %s %s\n", e, task.addr, msg)

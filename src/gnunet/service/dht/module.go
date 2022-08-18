@@ -21,7 +21,7 @@ package dht
 import (
 	"context"
 	"encoding/hex"
-	"errors"
+	"fmt"
 	"gnunet/config"
 	"gnunet/core"
 	"gnunet/crypto"
@@ -149,7 +149,7 @@ func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Mod
 			case <-ticker.C:
 				// query DHT for our own HELLO block
 				query := blocks.NewGenericQuery(key, enums.BLOCK_TYPE_DHT_URL_HELLO, flags)
-				logger.Printf(logger.DBG, "[dht] peer discovery: %s", query.String())
+				logger.Printf(logger.DBG, "[dht-discovery] own HELLO key %s", query.Key().Short())
 				resCh = m.Get(ctx, query)
 
 			// handle peer discover results
@@ -159,16 +159,18 @@ func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Mod
 				if btype == enums.BLOCK_TYPE_DHT_URL_HELLO {
 					hb, ok := res.(*blocks.HelloBlock)
 					if !ok {
-						logger.Println(logger.WARN, "[dht] peer discovery received invalid block data")
-						logger.Printf(logger.DBG, "[dht] -> %s", hex.EncodeToString(res.Bytes()))
+						logger.Println(logger.WARN, "[dht-discovery] received invalid block data")
+						logger.Printf(logger.DBG, "[dht-discovery] -> %s", hex.EncodeToString(res.Bytes()))
 					} else {
 						// cache HELLO block
 						m.rtable.CacheHello(hb)
 						// add sender to routing table
-						m.rtable.Add(NewPeerAddress(hb.PeerID), "dht")
+						m.rtable.Add(NewPeerAddress(hb.PeerID), "dht-discovery")
+						// learn addresses
+						m.core.Learn(ctx, hb.PeerID, hb.Addresses(), "dht-discovery")
 					}
 				} else {
-					logger.Printf(logger.WARN, "[dht] peer discovery received invalid block type %s", btype)
+					logger.Printf(logger.WARN, "[dht-discovery] received invalid block type %s", btype)
 				}
 
 			// termination
@@ -303,27 +305,28 @@ func (m *Module) event(ctx context.Context, ev *core.Event) {
 	// New peer connected:
 	case core.EV_CONNECT:
 		// Add peer to routing table
-		logger.Printf(logger.INFO, "[dht-event] Peer %s connected", ev.Peer)
+		logger.Printf(logger.INFO, "[dht-event] Peer %s connected", ev.Peer.Short())
 		m.rtable.Add(NewPeerAddress(ev.Peer), "dht-event")
 
 	// Peer disconnected:
 	case core.EV_DISCONNECT:
 		// Remove peer from routing table
-		logger.Printf(logger.INFO, "[dht-event] Peer %s disconnected", ev.Peer)
-		m.rtable.Remove(NewPeerAddress(ev.Peer), 0)
+		logger.Printf(logger.INFO, "[dht-event] Peer %s disconnected", ev.Peer.Short())
+		m.rtable.Remove(NewPeerAddress(ev.Peer), "dht-event", 0)
 
 	// Message received.
 	case core.EV_MESSAGE:
-		logger.Printf(logger.INFO, "[dht-event] Message received: %s", ev.Msg.String())
-
+		// generate tracking label
+		label := fmt.Sprintf("dht-msg-%d", util.NextID())
+		tctx := context.WithValue(ctx, core.CtxKey("label"), label)
 		// check if peer is in routing table (connected peer)
-		if !m.rtable.Contains(NewPeerAddress(ev.Peer)) {
-			logger.Printf(logger.WARN, "[dht-event] message %d from unregistered peer -- discarded", ev.Msg.Type())
+		if !m.rtable.Contains(NewPeerAddress(ev.Peer), label) {
+			logger.Printf(logger.WARN, "[%s] message %d from unregistered peer -- discarded", label, ev.Msg.Type())
 			return
 		}
 		// process message
-		if !m.HandleMessage(ctx, ev.Peer, ev.Msg, ev.Resp) {
-			logger.Println(logger.WARN, "[dht-event] Message NOT handled!")
+		if !m.HandleMessage(tctx, ev.Peer, ev.Msg, ev.Resp) {
+			logger.Printf(logger.WARN, "[%s] %s message NOT handled", label, ev.Msg.Type())
 		}
 	}
 }
@@ -343,19 +346,19 @@ func (m *Module) heartbeat(ctx context.Context) {
 //----------------------------------------------------------------------
 
 // Send the currently active HELLO to given network address
-func (m *Module) SendHello(ctx context.Context, addr *util.Address) (err error) {
+func (m *Module) SendHello(ctx context.Context, addr *util.Address, label string) (err error) {
 	// get (buffered) HELLO
 	var msg *message.DHTP2PHelloMsg
-	if msg, err = m.getHello(); err != nil {
+	if msg, err = m.getHello(label); err != nil {
 		return
 	}
-	logger.Printf(logger.INFO, "[core] Sending own HELLO to %s", addr.URI())
+	logger.Printf(logger.INFO, "[%s] Sending own HELLO to %s", label, addr.URI())
 	return m.core.SendToAddr(ctx, addr, msg)
 }
 
 // get the recent HELLO if it is defined and not expired;
 // create a new HELLO otherwise.
-func (m *Module) getHello() (msg *message.DHTP2PHelloMsg, err error) {
+func (m *Module) getHello(label string) (msg *message.DHTP2PHelloMsg, err error) {
 	if m.lastHello == nil || m.lastHello.Expire.Expired() {
 		// assemble new (signed) HELLO block
 		var addrList []*util.Address
@@ -379,7 +382,6 @@ func (m *Module) getHello() (msg *message.DHTP2PHelloMsg, err error) {
 		if err = m.core.Sign(msg); err != nil {
 			return
 		}
-
 		// save for later use
 		m.lastHello = msg
 
@@ -387,12 +389,12 @@ func (m *Module) getHello() (msg *message.DHTP2PHelloMsg, err error) {
 		var ok bool
 		if ok, err = msg.Verify(m.core.PeerID()); !ok || err != nil {
 			if !ok {
-				err = errors.New("failed to verify own HELLO")
+				err = fmt.Errorf("[%s] failed to verify own HELLO", label)
 			}
 			logger.Println(logger.ERROR, err.Error())
 			return
 		}
-		logger.Println(logger.DBG, "[dht] new own HELLO created")
+		logger.Printf(logger.INFO, "[%s] new own HELLO created (expires %s)", label, msg.Expire)
 		return
 	}
 	// we have a valid HELLO for re-use.

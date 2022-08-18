@@ -31,7 +31,7 @@ import (
 func (m *Module) lookupHelloCache(label string, addr *PeerAddress, rf blocks.ResultFilter, approx bool) (results []*store.DHTResult) {
 	logger.Printf(logger.DBG, "[%s] GET message for HELLO: check cache", label)
 	// find best cached HELLO
-	return m.rtable.LookupHello(addr, rf, approx)
+	return m.rtable.LookupHello(addr, rf, approx, label)
 }
 
 // getLocalStorage tries to find the requested block in local storage

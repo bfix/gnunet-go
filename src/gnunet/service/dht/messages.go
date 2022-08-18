@@ -20,6 +20,7 @@ package dht
 
 import (
 	"context"
+	"gnunet/core"
 	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/message"
@@ -42,12 +43,11 @@ import (
 func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn message.Message, back transport.Responder) bool {
 	// assemble log label
 	label := "dht"
-	if v := ctx.Value("label"); v != nil {
+	if v := ctx.Value(core.CtxKey("label")); v != nil {
 		if s, ok := v.(string); ok && len(s) > 0 {
-			label = "dht-" + s
+			label = s
 		}
 	}
-	logger.Printf(logger.INFO, "[%s] message received from %s", label, sender)
 	local := m.core.PeerID()
 
 	// process message
@@ -60,7 +60,8 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		//--------------------------------------------------------------
 		// DHT-P2P GET
 		//--------------------------------------------------------------
-		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-GET message for type %s", label, msg.BType)
+		logger.Printf(logger.INFO, "[%s] DHT-P2P-GET from %s (type %s, flags=%s)",
+			label, sender.Short(), msg.BType, message.DHTFlags(msg.Flags))
 
 		// assemble query and initialize (cache) results
 		query := blocks.NewGenericQuery(msg.Query, msg.BType, msg.Flags)
@@ -73,7 +74,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		if ok {
 			// validate block query
 			if !blockHdlr.ValidateBlockQuery(msg.Query, msg.XQuery) {
-				logger.Printf(logger.WARN, "[%s] DHT-P2P-GET invalid query -- discarded", label)
+				logger.Printf(logger.WARN, "[%s] invalid query -- discarded", label)
 				return false
 			}
 		} else {
@@ -120,7 +121,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		}
 		// enforced actions
 		doResult, doForward := getActions(closest, demux, approx)
-		logger.Printf(logger.DBG, "[%s] GET message: closest=%v, demux=%v, approx=%v --> result=%v, forward=%v",
+		logger.Printf(logger.DBG, "[%s] Actions: closest=%v, demux=%v, approx=%v --> result=%v, forward=%v",
 			label, closest, demux, approx, doResult, doForward)
 
 		//------------------------------------------------------
@@ -143,7 +144,11 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 					results = append(results, lclResults...)
 				}
 			}
-			// if we have results, send them as response
+			// if we have results, send them as response on the back channel
+			rcv := "locally"
+			if back.Receiver() != nil {
+				rcv = back.Receiver().Short()
+			}
 			for _, result := range results {
 				var pth *path.Path
 				// check if record the route
@@ -155,9 +160,9 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 					pth.Add(pe)
 				}
 
-				logger.Printf(logger.INFO, "[%s] sending DHT result message to caller", label)
+				logger.Printf(logger.INFO, "[%s] sending result message to %s", label, rcv)
 				if err := m.sendResult(ctx, query, result.Entry.Blk, pth, back); err != nil {
-					logger.Printf(logger.ERROR, "[%s] Failed to send DHT result message: %s", label, err.Error())
+					logger.Printf(logger.ERROR, "[%s] Failed to send result message: %s", label, err.Error())
 				}
 			}
 		}
@@ -173,22 +178,22 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			for n := 0; n < numForward; n++ {
 				if p := m.rtable.SelectClosestPeer(addr, pf, 0); p != nil {
 					// forward message to peer
-					logger.Printf(logger.INFO, "[%s] forward DHT get message to %s", label, util.Shorten(p.Peer.String(), 20))
+					logger.Printf(logger.INFO, "[%s] forward GET message to %s", label, p.Peer.Short())
 					if err := m.core.Send(ctx, p.Peer, msgOut); err != nil {
-						logger.Printf(logger.ERROR, "[%s] Failed to forward DHT get message: %s", label, err.Error())
+						logger.Printf(logger.ERROR, "[%s] Failed to forward GET message: %s", label, err.Error())
 					}
 					pf.Add(p.Peer)
 					// create open get-forward result handler
 					rh := NewResultHandler(msg, rf, back)
-					logger.Printf(logger.INFO, "[%s] DHT-P2P-GET task #%d (%s) started",
-						label, rh.ID(), util.Shorten(rh.Key().String(), 20))
+					logger.Printf(logger.INFO, "[%s] result handler task #%d (key %s) started",
+						label, rh.ID(), rh.Key().Short())
 					m.reshdlrs.Add(rh)
 				} else {
 					break
 				}
 			}
 		}
-		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-GET message done", label)
+		logger.Printf(logger.INFO, "[%s] DHT-P2P-GET done", label)
 
 	//==================================================================
 	// DHT-P2P-PUT
@@ -197,13 +202,14 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		//----------------------------------------------------------
 		// DHT-P2P PUT
 		//----------------------------------------------------------
-		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-PUT message for type %s", label, msg.BType)
+		logger.Printf(logger.INFO, "[%s] DHT-P2P-PUT from %s (type %s, flags=%s)",
+			label, sender.Short(), msg.BType, message.DHTFlags(msg.Flags))
 
 		// assemble query and entry
 		query := blocks.NewGenericQuery(msg.Key, msg.BType, msg.Flags)
 		blk, err := blocks.NewBlock(msg.BType, msg.Expire, msg.Block)
 		if err != nil {
-			logger.Printf(logger.ERROR, "[%s] DHT-P2P-PUT message block problem: %s", label, err.Error())
+			logger.Printf(logger.ERROR, "[%s] message block problem: %s", label, err.Error())
 			return false
 		}
 		entry := &store.DHTEntry{
@@ -214,7 +220,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		//--------------------------------------------------------------
 		// check if request is expired (9.3.2.1)
 		if msg.Expire.Expired() {
-			logger.Printf(logger.WARN, "[%s] DHT-P2P-PUT message expired (%s)", label, msg.Expire)
+			logger.Printf(logger.WARN, "[%s] PUT message expired (%s) -- ignored", label, msg.Expire)
 			return false
 		}
 		blockHdlr, ok := blocks.BlockHandlers[msg.BType]
@@ -224,13 +230,13 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 
 				// validate block key (9.3.2.3)
 				if !blockHdlr.ValidateBlockKey(block, msg.Key) {
-					logger.Printf(logger.WARN, "[%s] DHT-P2P-PUT invalid key -- discarded", label)
+					logger.Printf(logger.WARN, "[%s] PUT invalid key -- discarded", label)
 					return false
 				}
 
 				// validate block payload (9.3.2.4)
 				if !blockHdlr.ValidateBlockStoreRequest(block) {
-					logger.Printf(logger.WARN, "[%s] DHT-P2P-PUT invalid payload -- discarded", label)
+					logger.Printf(logger.WARN, "[%s] PUT invalid payload -- discarded", label)
 					return false
 				}
 			}
@@ -247,7 +253,8 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		closest := m.rtable.IsClosestPeer(nil, addr, msg.PeerFilter, 0)
 		demux := int(msg.Flags)&enums.DHT_RO_DEMULTIPLEX_EVERYWHERE != 0
 		doStore, doForward := putActions(closest, demux)
-		logger.Printf(logger.DBG, "[%s] PUT message: closest=%v, demux=%v", label, closest, demux)
+		logger.Printf(logger.DBG, "[%s] Actions: closest=%v, demux=%v => doStore=%v, doForward=%v",
+			label, closest, demux, doStore, doForward)
 
 		//--------------------------------------------------------------
 		// check if sender is in peer filter (9.3.2.5)
@@ -315,9 +322,9 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 					msgOut := msg.Update(pp, pf, msg.HopCount+1)
 
 					// forward message to peer
-					logger.Printf(logger.INFO, "[%s] forward DHT put message to %s", label, p.Peer.String())
+					logger.Printf(logger.INFO, "[%s] forward PUT message to %s", label, p.Peer.Short())
 					if err := m.core.Send(ctx, p.Peer, msgOut); err != nil {
-						logger.Printf(logger.ERROR, "[%s] Failed to forward DHT put message: %s", label, err.Error())
+						logger.Printf(logger.ERROR, "[%s] Failed to forward PUT message: %s", label, err.Error())
 					}
 					// add forward node to filter
 					pf.Add(p.Peer)
@@ -326,7 +333,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 				}
 			}
 		}
-		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-PUT message done", label)
+		logger.Printf(logger.INFO, "[%s] DHT-P2P-PUT done", label)
 
 	//==================================================================
 	// DHT-P2P-RESULT
@@ -335,12 +342,13 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		//----------------------------------------------------------
 		// DHT-P2P RESULT
 		//----------------------------------------------------------
-		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-RESULT message for type %s", label, msg.BType)
+		logger.Printf(logger.INFO, "[%s] DHT-P2P-RESULT from %s (type %s, flags=%s)",
+			label, sender.Short(), msg.BType, message.DHTFlags(msg.Flags))
 
 		//--------------------------------------------------------------
 		// check if request is expired (9.5.2.1)
 		if msg.Expire.Expired() {
-			logger.Printf(logger.WARN, "[%s] DHT-P2P-RESULT message expired (%s)",
+			logger.Printf(logger.WARN, "[%s] message expired (%s) -- ignoring",
 				label, msg.Expire.String())
 			return false
 		}
@@ -353,7 +361,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			if block, err := blockHdlr.ParseBlock(msg.Block); err == nil {
 				// validate block (9.5.2.2)
 				if !blockHdlr.ValidateBlockStoreRequest(block) {
-					logger.Printf(logger.WARN, "[%s] DHT-P2P-RESULT invalid block -- discarded", label)
+					logger.Printf(logger.WARN, "[%s] RESULT invalid block -- discarded", label)
 					return false
 				}
 				// Compute block key (9.5.2.4)
@@ -394,19 +402,19 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			}
 		}
 		// message forwarding to responder
-		key := msg.Query.String()
-		logger.Printf(logger.DBG, "[%s] DHT-P2P-RESULT key = %s", label, util.Shorten(key, 20))
+		logger.Printf(logger.DBG, "[%s] result key = %s", label, msg.Query.Short())
 		handled := false
+		key := msg.Query.String()
 		if list, ok := m.reshdlrs.Get(key); ok {
 			for _, rh := range list {
-				logger.Printf(logger.DBG, "[%s] Task #%d for DHT-P2P-RESULT found", label, rh.ID())
+				logger.Printf(logger.DBG, "[%s] Result handler task #%d found", label, rh.ID())
 
 				//--------------------------------------------------------------
 				// check task list for handler (9.5.2.6)
 				if rh.Flags()&enums.DHT_RO_FIND_APPROXIMATE == 0 && blkKey != nil && !blkKey.Equal(rh.Key()) {
 					// (9.5.2.6.a) derived key mismatch
 					logger.Printf(logger.ERROR, "[%s] derived block key / query key mismatch:", label)
-					logger.Printf(logger.ERROR, "[%s]   --> %s != %s", label, blkKey.String(), rh.Key().String())
+					logger.Printf(logger.ERROR, "[%s]   --> %s != %s", label, blkKey, rh.Key())
 					return false
 				}
 				// (9.5.2.6.b+c) check block against query
@@ -423,9 +431,10 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			}
 		}
 		if !handled {
-			logger.Printf(logger.WARN, "[%s] DHT-P2P-RESULT not processed (no handler)", label)
+			logger.Printf(logger.WARN, "[%s] RESULT not processed (no handler)", label)
+		} else {
+			logger.Printf(logger.INFO, "[%s] DHT-P2P-RESULT done", label)
 		}
-		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-RESULT message done", label)
 		return handled
 
 	//==================================================================
@@ -435,11 +444,11 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		//----------------------------------------------------------
 		// DHT-P2P HELLO
 		//----------------------------------------------------------
-		logger.Printf(logger.INFO, "[%s] Handling DHT-P2P-HELLO message", label)
+		logger.Printf(logger.INFO, "[%s] DHT-P2P-HELLO from %s", label, sender.Short())
 
 		// verify integrity of message
 		if ok, err := msg.Verify(sender); !ok || err != nil {
-			logger.Printf(logger.WARN, "[%s] Received invalid DHT_P2P_HELLO message", label)
+			logger.Printf(logger.WARN, "[%s] Received invalid HELLO message", label)
 			if err != nil {
 				logger.Printf(logger.ERROR, "[%s] --> %s", label, err.Error())
 			}
@@ -448,16 +457,16 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		// keep peer addresses in core for transports
 		aList, err := msg.Addresses()
 		if err != nil {
-			logger.Printf(logger.ERROR, "[%s] Failed to parse addresses from DHT_P2P_HELLO message", label)
+			logger.Printf(logger.ERROR, "[%s] Failed to parse addresses from HELLO message", label)
 			return false
 		}
-		if newPeer := m.core.Learn(ctx, sender, aList); newPeer {
+		if newPeer := m.core.Learn(ctx, sender, aList, label); newPeer {
 			// we added a previously unknown peer: send a HELLO
 			var msgOut *message.DHTP2PHelloMsg
-			if msgOut, err = m.getHello(); err != nil {
+			if msgOut, err = m.getHello(label); err != nil {
 				return false
 			}
-			logger.Printf(logger.INFO, "[%s] Sending own HELLO to %s", label, sender)
+			logger.Printf(logger.INFO, "[%s] Sending own HELLO to %s", label, sender.Short())
 			err = m.core.Send(ctx, sender, msgOut)
 			// no error if the message might have been sent
 			if err != nil && err != transport.ErrEndpMaybeSent {
@@ -490,31 +499,31 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		//----------------------------------------------------------
 		// DHT PUT
 		//----------------------------------------------------------
-		logger.Printf(logger.INFO, "[%s] Handling DHTClientPut message", label)
+		logger.Printf(logger.INFO, "[%s] Ignoring DHTClientPut message", label)
 
 	case *message.DHTClientGetMsg:
 		//----------------------------------------------------------
 		// DHT GET
 		//----------------------------------------------------------
-		logger.Printf(logger.INFO, "[%s] Handling DHTClientGet message", label)
+		logger.Printf(logger.INFO, "[%s] Ignoring DHTClientGet message", label)
 
 	case *message.DHTClientGetResultsKnownMsg:
 		//----------------------------------------------------------
 		// DHT GET-RESULTS-KNOWN
 		//----------------------------------------------------------
-		logger.Printf(logger.INFO, "[%s] Handling DHTClientGetResultsKnown message", label)
+		logger.Printf(logger.INFO, "[%s] Ignoring DHTClientGetResultsKnown message", label)
 
 	case *message.DHTClientGetStopMsg:
 		//----------------------------------------------------------
 		// DHT GET-STOP
 		//----------------------------------------------------------
-		logger.Printf(logger.INFO, "[%s] Handling DHTClientGetStop message", label)
+		logger.Printf(logger.INFO, "[%s] Ignoring DHTClientGetStop message", label)
 
 	case *message.DHTClientResultMsg:
 		//----------------------------------------------------------
 		// DHT RESULT
 		//----------------------------------------------------------
-		logger.Printf(logger.INFO, "[%s] Handling DHTClientResult message", label)
+		logger.Printf(logger.INFO, "[%s] Ignoring DHTClientResult message", label)
 
 	default:
 		//----------------------------------------------------------
@@ -535,7 +544,7 @@ func (m *Module) sendResult(ctx context.Context, query blocks.Query, blk blocks.
 	// assemble result message
 	out := message.NewDHTP2PResultMsg()
 	out.BType = query.Type()
-	out.Flags = uint32(query.Flags())
+	out.Flags = query.Flags()
 	out.Expire = blk.Expire()
 	out.Query = query.Key()
 	out.Block = blk.Bytes()

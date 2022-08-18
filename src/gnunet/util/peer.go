@@ -93,6 +93,11 @@ func (p *PeerID) String() string {
 	return EncodeBinaryToString(p.Data)
 }
 
+// SHort returns a shortened peer id for display
+func (p *PeerID) Short() string {
+	return p.String()[:8]
+}
+
 // Bytes returns the binary representation of a peer identifier.
 func (p *PeerID) Bytes() []byte {
 	return Clone(p.Data)

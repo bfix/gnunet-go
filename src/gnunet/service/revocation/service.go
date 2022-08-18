@@ -75,7 +75,7 @@ func (s *Service) ServeClient(ctx context.Context, id int, mc *service.Connectio
 		logger.Printf(logger.INFO, "[revocation:%d:%d] Received request: %v\n", id, reqID, msg)
 
 		// handle message
-		valueCtx := context.WithValue(ctx, service.CtxKey("label"), fmt.Sprintf(":%d:%d", id, reqID))
+		valueCtx := context.WithValue(ctx, core.CtxKey("label"), fmt.Sprintf(":%d:%d", id, reqID))
 		s.HandleMessage(valueCtx, nil, msg, mc)
 	}
 	// close client connection

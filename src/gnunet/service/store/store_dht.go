@@ -170,7 +170,8 @@ func (s *DHTStore) Put(query blocks.Query, entry *DHTEntry) (err error) {
 	if entry.Path != nil {
 		pl = int(entry.Path.NumList)
 	}
-	logger.Printf(logger.INFO, "[dht-store] storing %d bytes under key %s (path: %d)", blkSize, util.Shorten(query.String(), 20), pl)
+	logger.Printf(logger.INFO, "[dht-store] storing %d bytes under key %s (path: %d)",
+		blkSize, query.Key().Short(), pl)
 
 	// write entry to file for storage
 	if err = s.writeEntry(query.Key().Data, entry); err != nil {

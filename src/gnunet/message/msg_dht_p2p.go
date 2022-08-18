@@ -78,7 +78,7 @@ func NewDHTP2PGetMsg() *DHTP2PGetMsg {
 // String returns a human-readable representation of the message.
 func (m *DHTP2PGetMsg) String() string {
 	return fmt.Sprintf("DHTP2PGetMsg{btype=%s,hops=%d,flags=%s}",
-		m.BType, m.HopCount, dhtFlags(m.Flags))
+		m.BType, m.HopCount, DHTFlags(m.Flags))
 }
 
 // Update message (forwarding)
@@ -261,7 +261,7 @@ func (m *DHTP2PPutMsg) SetPath(p *path.Path) {
 // String returns a human-readable representation of the message.
 func (m *DHTP2PPutMsg) String() string {
 	return fmt.Sprintf("DHTP2PPutMsg{btype=%s,hops=%d,flags=%s}",
-		m.BType, m.HopCount, dhtFlags(m.Flags))
+		m.BType, m.HopCount, DHTFlags(m.Flags))
 }
 
 //----------------------------------------------------------------------
@@ -273,7 +273,8 @@ func (m *DHTP2PPutMsg) String() string {
 type DHTP2PResultMsg struct {
 	MsgHeader
 	BType       enums.BlockType     `order:"big"`      // Block type of result
-	Flags       uint32              `order:"big"`      // Message flags
+	Flags       uint16              `order:"big"`      // Message flags
+	Reserved    uint16              `order:"big"`      // Reserved
 	PutPathL    uint16              `order:"big"`      // size of PUTPATH field
 	GetPathL    uint16              `order:"big"`      // size of GETPATH field
 	Expire      util.AbsoluteTime   ``                 // expiration date
@@ -439,7 +440,7 @@ func (m *DHTP2PResultMsg) Update(pth *path.Path) *DHTP2PResultMsg {
 // String returns a human-readable representation of the message.
 func (m *DHTP2PResultMsg) String() string {
 	return fmt.Sprintf("DHTP2PResultMsg{btype=%s,putl=%d,getl=%d,flags=%s}",
-		m.BType, m.PutPathL, m.GetPathL, dhtFlags(uint16(m.Flags)))
+		m.BType, m.PutPathL, m.GetPathL, DHTFlags(uint16(m.Flags)))
 }
 
 //----------------------------------------------------------------------
@@ -462,14 +463,16 @@ type DHTP2PHelloMsg struct {
 
 // NewHelloMsgDHT creates an empty DHT_P2P_HELLO message.
 func NewDHTP2PHelloMsg() *DHTP2PHelloMsg {
-	// return empty HelloMessage
-	exp := time.Now().Add(HelloAddressExpiration)
+	// return empty HelloMessage with set expire date
+	t := util.NewAbsoluteTime(time.Now().Add(HelloAddressExpiration))
+	exp := util.NewAbsoluteTimeEpoch(t.Epoch())
+
 	return &DHTP2PHelloMsg{
 		MsgHeader: MsgHeader{80, enums.MSG_DHT_P2P_HELLO},
 		Reserved:  0,                          // not used here
 		NumAddr:   0,                          // start with empty address list
 		Signature: util.NewPeerSignature(nil), // signature
-		Expire:    util.NewAbsoluteTime(exp),  // default expiration
+		Expire:    exp,                        // default expiration
 		AddrList:  make([]byte, 0),            // list of addresses
 	}
 }
@@ -501,7 +504,8 @@ func (m *DHTP2PHelloMsg) Addresses() (list []*util.Address, err error) {
 // SetAddresses adds addresses to the HELLO message.
 func (m *DHTP2PHelloMsg) SetAddresses(list []*util.Address) {
 	// write addresses as blob and track earliest expiration
-	exp := util.NewAbsoluteTime(time.Now().Add(HelloAddressExpiration))
+	t := util.NewAbsoluteTime(time.Now().Add(HelloAddressExpiration))
+	exp := util.NewAbsoluteTimeEpoch(t.Epoch())
 	wrt := new(bytes.Buffer)
 	for _, addr := range list {
 		// check if address expires before current expire
@@ -553,7 +557,7 @@ func (m *DHTP2PHelloMsg) SignedData() []byte {
 	err := binary.Write(buf, binary.BigEndian, size)
 	if err == nil {
 		if err = binary.Write(buf, binary.BigEndian, purpose); err == nil {
-			if err = binary.Write(buf, binary.BigEndian, m.Expire.Epoch()*1000000); err == nil {
+			if err = binary.Write(buf, binary.BigEndian, m.Expire); err == nil {
 				if n, err = buf.Write(hAddr[:]); err == nil {
 					if n != len(hAddr[:]) {
 						err = errors.New("write failed")
@@ -573,7 +577,7 @@ func (m *DHTP2PHelloMsg) SignedData() []byte {
 //----------------------------------------------------------------------
 
 // get human-readable flags
-func dhtFlags(flags uint16) string {
+func DHTFlags(flags uint16) string {
 	var list []string
 	if flags&enums.DHT_RO_DEMULTIPLEX_EVERYWHERE != 0 {
 		list = append(list, "DEMUX")
