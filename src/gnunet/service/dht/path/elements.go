@@ -59,7 +59,7 @@ func (e *Entry) String() string {
 
 //----------------------------------------------------------------------
 // shared path element data across types
-type elementData struct {
+type _ElementData struct {
 	Expire          util.AbsoluteTime // expiration date
 	BlockHash       *crypto.HashCode  // block hash
 	PeerPredecessor *util.PeerID      // predecessor peer
@@ -67,10 +67,10 @@ type elementData struct {
 }
 
 // helper type for signature creation/verification
-type elementSignedData struct {
-	Size    uint16       `order:"big"` // size of signed data
-	Purpose uint16       `order:"big"` // signature purpose (SIG_DHT_HOP)
-	Elem    *elementData ``            // path element data
+type _ElementSignedData struct {
+	Size    uint16           `order:"big"` // size of signed data
+	Purpose enums.SigPurpose `order:"big"` // signature purpose (SIG_DHT_HOP)
+	Elem    *_ElementData    ``            // path element data
 }
 
 //----------------------------------------------------------------------
@@ -86,20 +86,25 @@ type elementSignedData struct {
 //     if !pe.Verify(peerId) { ... }
 //
 type Element struct {
-	elementData
+	_ElementData
 	Entry
 }
 
 // SignedData gets the data to be signed by peer ('Signable' interface)
 func (pe *Element) SignedData() []byte {
-	sd := &elementSignedData{
-		Size:    80,
-		Purpose: uint16(enums.SIG_DHT_HOP),
-		Elem:    &(pe.elementData),
+	sd := &_ElementSignedData{
+		Size:    140,
+		Purpose: enums.SIG_DHT_HOP,
+		Elem:    &(pe._ElementData),
 	}
 	buf, err := data.Marshal(sd)
 	if err != nil {
 		logger.Println(logger.ERROR, "can't serialize path element for signature")
+		return nil
+	}
+	if len(buf) != int(sd.Size) {
+		logger.Printf(logger.ERROR, "size mismatch for serialized path element -- %d -> %d", sd.Size, len(buf))
+		sd.Size = uint16(len(buf))
 		return nil
 	}
 	return buf
