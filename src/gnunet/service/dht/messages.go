@@ -74,7 +74,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		if ok {
 			// validate block query
 			if !blockHdlr.ValidateBlockQuery(msg.Query, msg.XQuery) {
-				logger.Printf(logger.WARN, "[%s] invalid query -- discarded", label)
+				logger.Printf(logger.WARN, "[%s] invalid query -- message discarded", label)
 				return false
 			}
 		} else {
@@ -92,7 +92,8 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			if blockHdlr != nil {
 				rf = blockHdlr.ParseResultFilter(msg.ResFilter)
 			} else {
-				logger.Printf(logger.WARN, "[%s] unknown result filter implementation -- skipped", label)
+				logger.Printf(logger.WARN, "[%s] unknown result filter implementation -- message discarded", label)
+				return false
 			}
 		} else {
 			// ... or create a new one
@@ -145,7 +146,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 				}
 			}
 			// if we have results, send them as response on the back channel
-			rcv := "locally"
+			rcv := "local caller"
 			if back.Receiver() != nil {
 				rcv = back.Receiver().Short()
 			}
