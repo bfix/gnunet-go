@@ -178,20 +178,20 @@ func (m *DHTP2PPutMsg) Update(p *path.Path, pf *blocks.PeerFilter, hop uint16) *
 func (m *DHTP2PPutMsg) Path(sender *util.PeerID) *path.Path {
 	// create a "real" path list from message data
 	pth := path.NewPath(crypto.Hash(m.Block), m.Expire)
+	pth.Flags = m.Flags
 
 	// return empty path if recording is switched off
-	if m.Flags&enums.DHT_RO_RECORD_ROUTE == 0 {
+	if pth.Flags&enums.DHT_RO_RECORD_ROUTE == 0 {
 		return pth
 	}
 
 	// handle truncate origin
-	if m.Flags&enums.DHT_RO_TRUNCATED == 1 {
+	if pth.Flags&enums.DHT_RO_TRUNCATED == 1 {
 		if m.TruncOrigin == nil {
 			logger.Printf(logger.WARN, "[path] truncated but no origin - flag reset")
-			m.Flags &^= enums.DHT_RO_TRUNCATED
+			pth.Flags &^= enums.DHT_RO_TRUNCATED
 		} else {
 			pth.TruncOrigin = m.TruncOrigin
-			pth.Flags |= path.PathTruncated
 		}
 	}
 
@@ -204,7 +204,6 @@ func (m *DHTP2PPutMsg) Path(sender *util.PeerID) *path.Path {
 		logger.Printf(logger.WARN, "[path]  - last hop signature missing - path reset")
 		return path.NewPath(crypto.Hash(m.Block), m.Expire)
 	}
-	pth.Flags |= path.PathLastHop
 	pth.LastSig = m.LastSig
 	pth.LastHop = sender
 	return pth
@@ -323,21 +322,22 @@ func (m *DHTP2PResultMsg) NumPath(field string) uint {
 func (m *DHTP2PResultMsg) Path(sender *util.PeerID) *path.Path {
 	// create a "real" path list from message data
 	pth := path.NewPath(crypto.Hash(m.Block), m.Expire)
+	pth.Flags = m.Flags
 
 	// return empty path if recording is switched off
-	if m.Flags&enums.DHT_RO_RECORD_ROUTE == 0 {
+	if pth.Flags&enums.DHT_RO_RECORD_ROUTE == 0 {
 		return pth
 	}
 	// handle truncate origin
-	if m.Flags&enums.DHT_RO_TRUNCATED == 1 {
-		if m.TruncOrigin == nil {
+	if pth.Flags&enums.DHT_RO_TRUNCATED == 1 {
+		if pth.TruncOrigin == nil {
 			logger.Printf(logger.WARN, "[path] truncated but no origin - flag reset")
-			m.Flags &^= enums.DHT_RO_TRUNCATED
+			pth.Flags &^= enums.DHT_RO_TRUNCATED
 		} else {
 			pth.TruncOrigin = m.TruncOrigin
-			pth.Flags |= path.PathTruncated
 		}
 	}
+
 	// copy path elements
 	pth.List = util.Clone(m.PathList)
 	pth.NumList = uint16(len(pth.List))
@@ -358,7 +358,6 @@ func (m *DHTP2PResultMsg) Path(sender *util.PeerID) *path.Path {
 		logger.Printf(logger.WARN, "[path]  - last hop signature missing - path reset")
 		return path.NewPath(crypto.Hash(m.Block), m.Expire)
 	}
-	pth.Flags |= path.PathLastHop
 	pth.LastSig = m.LastSig
 	pth.LastHop = sender
 	return pth
