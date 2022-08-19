@@ -23,6 +23,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"gnunet/crypto"
+	"gnunet/enums"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/data"
@@ -33,17 +34,11 @@ import (
 // Path handling
 //----------------------------------------------------------------------
 
-// path flags
-const (
-	PathTruncated = 1
-	PathLastHop   = 2
-)
-
 // Path is the complete list of verified hops a message travelled.
 // It also keeps the associated block hash and expiration time of
 // the request for signature verification purposes.
 type Path struct {
-	Flags       uint32              `order:"big"`    // flags
+	Flags       uint16              `order:"big"`    // flags
 	BlkHash     *crypto.HashCode    ``               // block hash value
 	Expire      util.AbsoluteTime   ``               // expiration time
 	TruncOrigin *util.PeerID        `opt:"(IsUsed)"` // truncated origin (optional)
@@ -58,9 +53,9 @@ type Path struct {
 func (p *Path) IsUsed(field string) bool {
 	switch field {
 	case "TruncOrigin":
-		return p.Flags&PathTruncated != 0
+		return p.Flags&enums.DHT_RO_TRUNCATED != 0
 	case "LastSig", "LastHop":
-		return p.Flags&PathLastHop != 0
+		return p.Flags&enums.DHT_RO_RECORD_ROUTE != 0
 	}
 	return false
 }
@@ -128,7 +123,7 @@ func (p *Path) Clone() *Path {
 // NewElement creates a new path element from data
 func (p *Path) NewElement(pred, signer, succ *util.PeerID) *Element {
 	return &Element{
-		elementData: elementData{
+		_ElementData: _ElementData{
 			Expire:          p.Expire,
 			BlockHash:       p.BlkHash,
 			PeerPredecessor: pred,
@@ -155,7 +150,7 @@ func (p *Path) Add(elem *Element) {
 	// update last hop signature
 	p.LastSig = elem.Signature
 	p.LastHop = elem.Signer
-	p.Flags |= PathLastHop
+	p.Flags |= enums.DHT_RO_RECORD_ROUTE
 }
 
 // Verify path: process list entries from right to left (decreasing index).
@@ -181,6 +176,7 @@ func (p *Path) Verify(local *util.PeerID) {
 		pe := p.NewElement(pred, p.LastHop, local)
 		ok, err := pe.Verify(p.LastSig)
 		if err != nil || !ok {
+			logger.Println(logger.WARN, "[path] Dropping path (invalid last signature)")
 			// remove last hop signature and truncated origin; reset flags
 			p.LastSig = nil
 			p.LastHop = nil
@@ -188,56 +184,55 @@ func (p *Path) Verify(local *util.PeerID) {
 			p.Flags = 0
 		}
 		return
-	} else {
-		// yes: process list of path elements
-		signer := p.LastHop
-		sig := p.LastSig
-		succ := local
-		num := len(p.List)
-		var pred *util.PeerID
-		for i := num - 1; i >= 0; i-- {
-			if i == -1 {
-				if p.TruncOrigin != nil {
-					pred = p.TruncOrigin
-				} else {
-					pred = util.NewPeerID(nil)
-				}
+	}
+	// yes: process list of path elements
+	signer := p.LastHop
+	sig := p.LastSig
+	succ := local
+	num := len(p.List)
+	var pred *util.PeerID
+	for i := num - 1; i >= 0; i-- {
+		if i == -1 {
+			if p.TruncOrigin != nil {
+				pred = p.TruncOrigin
 			} else {
-				pred = p.List[i].Signer
+				pred = util.NewPeerID(nil)
 			}
-			pe := p.NewElement(pred, signer, succ)
-			ok, err := pe.Verify(sig)
-			if err != nil || !ok {
-				// we need to truncate:
-				logger.Printf(logger.WARN, "[path] Truncating path (invalid signature at hop %d)", i)
+		} else {
+			pred = p.List[i].Signer
+		}
+		pe := p.NewElement(pred, signer, succ)
+		ok, err := pe.Verify(sig)
+		if err != nil || !ok {
+			// we need to truncate:
+			logger.Printf(logger.WARN, "[path] Truncating path (invalid signature at hop %d)", i)
 
-				// are we at the end of the list?
-				if i == num-1 {
-					// yes: the last hop signature failed -> reset path
-					p.LastSig = nil
-					p.LastHop = nil
-					p.TruncOrigin = nil
-					p.Flags = 0
-					p.List = make([]*Entry, 0)
-					return
-				}
-				// trim list
-				p.Flags |= PathTruncated
-				p.TruncOrigin = signer
-				size := num - 2 - i
-				list := make([]*Entry, size)
-				if size > 0 {
-					copy(list, p.List[i+2:])
-				}
-				p.List = list
+			// are we at the end of the list?
+			if i == num-1 {
+				// yes: the last hop signature failed -> reset path
+				p.LastSig = nil
+				p.LastHop = nil
+				p.TruncOrigin = nil
+				p.Flags = 0
+				p.List = make([]*Entry, 0)
 				return
 			}
-			// check next path element
-			succ = signer
-			signer = pred
-			if i != -1 {
-				sig = p.List[i].Signature
+			// trim list
+			p.Flags |= enums.DHT_RO_TRUNCATED
+			p.TruncOrigin = signer
+			size := num - 2 - i
+			list := make([]*Entry, size)
+			if size > 0 {
+				copy(list, p.List[i+2:])
 			}
+			p.List = list
+			return
+		}
+		// check next path element
+		succ = signer
+		signer = pred
+		if i != -1 {
+			sig = p.List[i].Signature
 		}
 	}
 }
