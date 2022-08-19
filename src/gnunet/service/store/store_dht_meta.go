@@ -70,8 +70,8 @@ type FileMetaDB struct {
 // database is "access.db".
 func OpenMetaDB(path string) (db *FileMetaDB, err error) {
 	// connect to database
-	dbFile := path + "/acccess.db"
-	if _, err = os.Stat(path + "/acccess.db"); err != nil {
+	dbFile := path + "/access.db"
+	if _, err = os.Stat(path + "/access.db"); err != nil {
 		var file *os.File
 		if file, err = os.Create(dbFile); err != nil {
 			return
