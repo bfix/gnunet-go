@@ -225,9 +225,25 @@ ${GOPATH}/bin/gnunet-service-dht-go -c dhtu-config.json 2>&1 | tee run.log
 
 ## Testing `GNS`
 
-You need to have (all) GNUnet services up and running.
+**N.B.**: The GNS service is currently not up-to-date. To test it, you need to
+check out version v0.1.23 (the latest tested version) and a matching GNUnet
+version as well (latest as of May 2020) to be on a safe side. You also need to
+have (all) GNUnet services up and running.
 
-### Setting up the configuration file
+### Setting up a modified configuration for GNUnet
+
+You need to tell the GNUnet client which GNS service to use (either the default
+or the `gnunet-go` version) by modifying the GNS service socket. Copy your
+configuration file to `gns-go.comf` and modify the `[gns]` sectiom:
+
+```
+UNIXPATH = $GNUNET_RUNTIME_DIR/gnunet-service-gns-go.sock
+```
+
+This will ensure that clients (and other services) talk to the `gnunet-go`
+GNS service.
+
+### Setting up the configuration file (gnunet-go)
 
 Copy the example `gnunet-config.json` to `gns-config.json` and modify the
 `network` and `local` sections:
