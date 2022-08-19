@@ -169,6 +169,10 @@ func (s *DHTStore) Put(query blocks.Query, entry *DHTEntry) (err error) {
 	pl := 0
 	if entry.Path != nil {
 		pl = int(entry.Path.NumList)
+		// count partial entry
+		if entry.Path.LastSig != nil && entry.Path.LastHop != nil {
+			pl++
+		}
 	}
 	logger.Printf(logger.INFO, "[dht-store] storing %d bytes under key %s (path: %d)",
 		blkSize, query.Key().Short(), pl)
@@ -276,7 +280,7 @@ func (s *DHTStore) GetApprox(label string, query blocks.Query, rf blocks.ResultF
 
 //----------------------------------------------------------------------
 
-type entryLayout struct {
+type _EntryLayout struct {
 	SizeBlk uint16 `order:"big"`    // size of block data
 	SizePth uint16 `order:"big"`    // size of path data
 	Block   []byte `size:"SizeBlk"` // block data
@@ -300,7 +304,7 @@ func (s *DHTStore) readEntry(md *FileMetadata) (entry *DHTEntry, err error) {
 	size := int(fi.Size())
 
 	// read data
-	val := new(entryLayout)
+	val := new(_EntryLayout)
 	if err = data.UnmarshalStream(file, val, size); err != nil {
 		return
 	}
@@ -329,7 +333,7 @@ func (s *DHTStore) writeEntry(key []byte, entry *DHTEntry) (err error) {
 	defer file.Close()
 
 	// assemble and write entry
-	val := new(entryLayout)
+	val := new(_EntryLayout)
 	val.Block = entry.Blk.Bytes()
 	val.SizeBlk = uint16(len(val.Block))
 	if entry.Path != nil {
