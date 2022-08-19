@@ -368,7 +368,7 @@ func (m *Module) getHello(label string) (msg *message.DHTP2PHelloMsg, err error)
 		// assemble HELLO data
 		hb := new(blocks.HelloBlock)
 		hb.PeerID = m.core.PeerID()
-		hb.Expire_ = util.NewAbsoluteTime(time.Now().Add(message.HelloAddressExpiration))
+		hb.SetExpire(message.HelloAddressExpiration)
 		hb.SetAddresses(addrList)
 
 		// sign HELLO block
