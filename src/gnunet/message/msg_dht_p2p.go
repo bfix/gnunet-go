@@ -273,8 +273,8 @@ func (m *DHTP2PPutMsg) String() string {
 type DHTP2PResultMsg struct {
 	MsgHeader
 	BType       enums.BlockType     `order:"big"`      // Block type of result
-	Flags       uint16              `order:"big"`      // Message flags
 	Reserved    uint16              `order:"big"`      // Reserved
+	Flags       uint16              `order:"big"`      // Message flags
 	PutPathL    uint16              `order:"big"`      // size of PUTPATH field
 	GetPathL    uint16              `order:"big"`      // size of GETPATH field
 	Expire      util.AbsoluteTime   ``                 // expiration date
