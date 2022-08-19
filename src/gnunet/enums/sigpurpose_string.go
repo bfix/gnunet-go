@@ -58,7 +58,7 @@ var (
 
 func (i SigPurpose) String() string {
 	switch {
-	case 0 <= i && i <= 7:
+	case i <= 7:
 		return _SigPurpose_name_0[_SigPurpose_index_0[i]:_SigPurpose_index_0[i+1]]
 	case 11 <= i && i <= 18:
 		i -= 11
