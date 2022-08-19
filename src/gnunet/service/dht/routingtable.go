@@ -206,7 +206,7 @@ func (rt *RoutingTable) Contains(p *PeerAddress, label string) bool {
 			list = append(list, val.Peer.Short())
 			return nil
 		}, true)
-		logger.Printf(logger.DBG, "[%s] RT=%v", list)
+		logger.Printf(logger.DBG, "[%s] RT=%v", label, list)
 	} else {
 		//logger.Println(logger.DBG, "[RT] --> found in current list")
 		px.lastSeen = util.AbsoluteTimeNow()
@@ -386,7 +386,7 @@ func (rt *RoutingTable) LookupHello(addr *PeerAddress, rf blocks.ResultFilter, a
 				results = append(results, result)
 			}
 		} else {
-			logger.Printf(logger.DBG, "[%s] LookupHello: cached HELLO block is filtered")
+			logger.Println(logger.DBG, "[%s] LookupHello: cached HELLO block is filtered")
 		}
 		return nil
 	}, true)

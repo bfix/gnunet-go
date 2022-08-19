@@ -69,7 +69,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 
 		//--------------------------------------------------------------
 		// validate query (based on block type requested)  (9.4.3.1)
-		btype := enums.BlockType(msg.BType)
+		btype := msg.BType
 		blockHdlr, ok := blocks.BlockHandlers[btype]
 		if ok {
 			// validate block query
@@ -354,7 +354,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			return false
 		}
 		//--------------------------------------------------------------
-		btype := enums.BlockType(msg.BType)
+		btype := msg.BType
 		var blkKey *crypto.HashCode
 		blockHdlr, ok := blocks.BlockHandlers[btype]
 		if ok {

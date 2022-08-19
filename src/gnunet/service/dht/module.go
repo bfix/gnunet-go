@@ -72,7 +72,7 @@ func (lr *LocalBlockResponder) Send(ctx context.Context, msg message.Message) er
 	case *message.DHTP2PResultMsg:
 		// deliver incoming blocks
 		go func() {
-			blk, err := blocks.NewBlock(enums.BlockType(res.BType), res.Expire, res.Block)
+			blk, err := blocks.NewBlock(res.BType, res.Expire, res.Block)
 			if err == nil {
 				lr.ch <- blk
 			} else {
@@ -80,7 +80,7 @@ func (lr *LocalBlockResponder) Send(ctx context.Context, msg message.Message) er
 			}
 		}()
 	default:
-		logger.Printf(logger.WARN, "[local] %d not a DHT-RESULT -- skipped", "")
+		logger.Printf(logger.WARN, "[local] %d not a DHT-RESULT -- skipped", msg.Type())
 	}
 	return nil
 }

@@ -413,7 +413,7 @@ func (s *Service) LookupDHT(ctx context.Context, query blocks.Query) (block bloc
 			break
 		}
 		// check if result is of requested type
-		if enums.BlockType(m.BType) != enums.BLOCK_TYPE_GNS_NAMERECORD {
+		if m.BType != enums.BLOCK_TYPE_GNS_NAMERECORD {
 			logger.Println(logger.ERROR, "[gns] DHT response has wrong type")
 			break
 		}

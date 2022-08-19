@@ -135,7 +135,7 @@ func (t *ResultHandler) Merge(a *ResultHandler) bool {
 
 // Proceed return true if the message is to be processed in derived implementations
 func (t *ResultHandler) Proceed(ctx context.Context, msg *message.DHTP2PResultMsg) bool {
-	blk, err := blocks.NewBlock(enums.BlockType(msg.BType), msg.Expire, msg.Block)
+	blk, err := blocks.NewBlock(msg.BType, msg.Expire, msg.Block)
 	if err == nil && !t.resFilter.Contains(blk) {
 		t.resFilter.Add(blk)
 		return true

@@ -439,7 +439,7 @@ func (m *DHTP2PResultMsg) Update(pth *path.Path) *DHTP2PResultMsg {
 // String returns a human-readable representation of the message.
 func (m *DHTP2PResultMsg) String() string {
 	return fmt.Sprintf("DHTP2PResultMsg{btype=%s,putl=%d,getl=%d,flags=%s}",
-		m.BType, m.PutPathL, m.GetPathL, DHTFlags(uint16(m.Flags)))
+		m.BType, m.PutPathL, m.GetPathL, DHTFlags(m.Flags))
 }
 
 //----------------------------------------------------------------------

@@ -97,7 +97,7 @@ func (h *HelloBlock) SetAddresses(a []*util.Address) {
 // Addresses returns the list of addresses
 func (h *HelloBlock) Addresses() []*util.Address {
 	if h.addrs == nil {
-		h.finalize()
+		_ = h.finalize()
 	}
 	return util.Clone(h.addrs)
 }
