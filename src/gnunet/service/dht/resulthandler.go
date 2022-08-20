@@ -45,6 +45,7 @@ import (
 //======================================================================
 
 // Compare return values
+//
 //nolint:stylecheck // allow non-camel-case in constants
 const (
 	RHC_SAME    = blocks.CMP_SAME   // the two result handlers are the same

@@ -108,7 +108,6 @@ func Shorten(s string, n int) string {
 	return s[:p+k] + "..." + s[l-p:]
 }
 
-//----------------------------------------------------------------------
 // Dump instance
 func Dump(obj any, format string) string {
 	switch format {

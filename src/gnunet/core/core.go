@@ -33,7 +33,7 @@ import (
 	"github.com/bfix/gospel/logger"
 )
 
-//----------------------------------------------------------------------
+// ----------------------------------------------------------------------
 // Core-related error codes
 var (
 	ErrCoreNoUpnpDyn  = errors.New("no dynamic port with UPnP")
@@ -44,7 +44,7 @@ var (
 // CtxKey is a value-context key
 type CtxKey string
 
-//----------------------------------------------------------------------
+// ----------------------------------------------------------------------
 // EndpointRef is a reference to an endpoint instance managed by core.
 type EndpointRef struct {
 	id     string             // endpoint identifier in configuration
@@ -53,7 +53,7 @@ type EndpointRef struct {
 	upnpID string             // UPNP identifier (empty if unused)
 }
 
-//----------------------------------------------------------------------
+// ----------------------------------------------------------------------
 // Core service
 type Core struct {
 	// local peer instance

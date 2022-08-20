@@ -331,7 +331,7 @@ func (m *Module) event(ctx context.Context, ev *core.Event) {
 	}
 }
 
-//----------------------------------------------------------------------
+// ----------------------------------------------------------------------
 // Heartbeat handler for periodic tasks
 func (m *Module) heartbeat(ctx context.Context) {
 	// run heartbeat for routing table

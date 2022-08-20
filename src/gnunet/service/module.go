@@ -24,7 +24,7 @@ import (
 	"time"
 )
 
-//----------------------------------------------------------------------
+// ----------------------------------------------------------------------
 // Module is an interface for GNUnet service modules (workers).
 //
 // Modules can call other GNUnet services; these services can be used by
@@ -34,29 +34,28 @@ import (
 // calls to m.Export() and m.Import() to link the modules together (see
 // example):
 //
-//    // create module instances
-//    gnsMod = gns.NewModule(ctx, core)
-//    dhtMod = dht.NewModule(ctx, core)
-//    ncMod = namecache.NewModule(ctx, core)
-//    revMod = revocation.NewModule(ctx, core)
+//	// create module instances
+//	gnsMod = gns.NewModule(ctx, core)
+//	dhtMod = dht.NewModule(ctx, core)
+//	ncMod = namecache.NewModule(ctx, core)
+//	revMod = revocation.NewModule(ctx, core)
 //
-//    // export module functions
-//    fcn := make(map[string]any)
-//    gnsMod.Export(fcn)
-//    dhtMod.Export(fcn)
-//    ncMod.Export(fcn)
-//    revMod.Export(fcn)
+//	// export module functions
+//	fcn := make(map[string]any)
+//	gnsMod.Export(fcn)
+//	dhtMod.Export(fcn)
+//	ncMod.Export(fcn)
+//	revMod.Export(fcn)
 //
-//    // import (link) module functions
-//    gnsMod.Import(fcn)
-//    dhtMod.Import(fcn)
-//    ncMod.Import(fcn)
-//    revMod.Import(fcn)
+//	// import (link) module functions
+//	gnsMod.Import(fcn)
+//	dhtMod.Import(fcn)
+//	ncMod.Import(fcn)
+//	revMod.Import(fcn)
 //
 // Exported and imported module function are identified by name defined in the
 // Export() function. Import() functions that access functions in other modules
 // need to use the same name for linking.
-//
 type Module interface {
 	// Export functions by name
 	Export(map[string]any)

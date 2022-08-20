@@ -20,6 +20,7 @@
 package enums
 
 // MsgType for GNUnet message type identifiers
+//
 //go:generate stringer -type=MsgType
 type MsgType uint16
 

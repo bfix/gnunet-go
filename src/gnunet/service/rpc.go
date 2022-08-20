@@ -54,10 +54,11 @@ func RunRPCServer(ctx context.Context, endpoint string) (srvRPC *JRPCServer, err
 
 	// instantiate a server and run it
 	srv := &http.Server{
-		Handler:      router,
-		Addr:         endpoint,
-		WriteTimeout: 15 * time.Second,
-		ReadTimeout:  15 * time.Second,
+		Handler:           router,
+		Addr:              endpoint,
+		WriteTimeout:      5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 	// start listening
 	go func() {

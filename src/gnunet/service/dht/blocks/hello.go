@@ -103,7 +103,7 @@ func (h *HelloBlock) Addresses() []*util.Address {
 }
 
 // ParseHelloBlockFromURL parses a HELLO URL of the following form:
-//     gnunet://hello/<PeerID>/<signature>/<expire>?<addrs>
+// gnunet://hello/<PeerID>/<signature>/<expire>?<addrs>
 // The addresses are encoded.
 func ParseHelloBlockFromURL(u string, checkExpiry bool) (h *HelloBlock, err error) {
 	// check and trim prefix

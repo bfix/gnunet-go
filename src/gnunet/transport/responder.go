@@ -25,7 +25,7 @@ import (
 	"gnunet/util"
 )
 
-//----------------------------------------------------------------------
+// ----------------------------------------------------------------------
 // Responder is a back-channel for messages generated during
 // message processing. The Connection type is a responder
 // and used as such in ServeClient().
@@ -38,7 +38,7 @@ type Responder interface {
 	Receiver() *util.PeerID
 }
 
-//----------------------------------------------------------------------
+// ----------------------------------------------------------------------
 // TransportResponder is used as a responder in message handling for
 // messages received from Transport. It is used by Endpoint instances
 // to define custom responders for messages received.

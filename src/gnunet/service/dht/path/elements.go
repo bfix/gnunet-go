@@ -36,6 +36,7 @@ var (
 )
 
 //----------------------------------------------------------------------
+
 // Entry is an element of the path list
 type Entry struct {
 	Signature *util.PeerSignature // path element signature
@@ -57,7 +58,7 @@ func (e *Entry) String() string {
 	return fmt.Sprintf("(%s,%s)", e.Signer.String(), s)
 }
 
-//----------------------------------------------------------------------
+// ----------------------------------------------------------------------
 // shared path element data across types
 type _ElementData struct {
 	Expire          util.AbsoluteTime // expiration date
@@ -73,18 +74,19 @@ type _ElementSignedData struct {
 	Elem    *_ElementData    ``            // path element data
 }
 
-//----------------------------------------------------------------------
+// ----------------------------------------------------------------------
 // Element is the full-fledged data assembly for a path element in
 // PUT/GET pathes. It is assembled programatically (on generation[1] and
 // verification[2]) and not transferred in messages directly.
 //
 // [1] spe = &Element{...}
-//     core.Sign(spe)
-//     msg.putpath[i] = spe.Wire()
+//
+//	core.Sign(spe)
+//	msg.putpath[i] = spe.Wire()
 //
 // [2] pe = &Element{...,Signature: wire.sig}
-//     if !pe.Verify(peerId) { ... }
 //
+//	if !pe.Verify(peerId) { ... }
 type Element struct {
 	_ElementData
 	Entry

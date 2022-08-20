@@ -132,11 +132,11 @@ func (p *dbPool) remove(key string) error {
 // argument defines the SQL database type. Other arguments depend on the value
 // of this first argument.
 // The following SQL types are implemented:
-// * 'sqlite3': SQLite3-compatible database; the second argument specifies the
-//              file that holds the data (e.g. "sqlite3+/home/user/store.db")
-// * 'mysql':   A MySQL-compatible database; the second argument specifies the
-//              information required to log into the database (e.g.
-//              "[user[:passwd]@][proto[(addr)]]/dbname[?param1=value1&...]").
+//   - 'sqlite3': SQLite3-compatible database; the second argument specifies the
+//     file that holds the data (e.g. "sqlite3+/home/user/store.db")
+//   - 'mysql':   A MySQL-compatible database; the second argument specifies the
+//     information required to log into the database (e.g.
+//     "[user[:passwd]@][proto[(addr)]]/dbname[?param1=value1&...]").
 func (p *dbPool) Connect(spec string) (db *DBConn, err error) {
 	err = p.insts.Process(func(pid int) error {
 		// check if we have a connection to this database.

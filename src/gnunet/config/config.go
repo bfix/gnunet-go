@@ -22,7 +22,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"gnunet/util"
-	"io/ioutil"
+	"os"
 	"reflect"
 	"regexp"
 	"strings"
@@ -172,7 +172,7 @@ var (
 // the Config data structure.
 func ParseConfig(fileName string) (err error) {
 	// parse configuration file
-	file, err := ioutil.ReadFile(fileName)
+	file, err := os.ReadFile(fileName)
 	if err != nil {
 		return
 	}

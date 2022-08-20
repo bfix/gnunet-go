@@ -136,16 +136,17 @@ func (r *RevData) size() int {
 // process run stand-alone from other GNUnet services:
 //
 // (1) Generate the desired PoWs for the public zone key:
-//     This process can be started, stopped and resumed, so the long
-//     calculation time (usually days or even weeks) can be interrupted if
-//     desired. For security reasons you should only pass the "-z" argument to
-//     this step but not the "-k" argument (private key) as it is not required
-//     to calculate the PoWs.
 //
+//	This process can be started, stopped and resumed, so the long
+//	calculation time (usually days or even weeks) can be interrupted if
+//	desired. For security reasons you should only pass the "-z" argument to
+//	this step but not the "-k" argument (private key) as it is not required
+//	to calculate the PoWs.
 //
 // (2) A fully generated PoW set can be signed with the private key to create
-//     the final revocation data to be send out. This requires to pass the "-k"
-//     and "-z" argument.
+//
+//	the final revocation data to be send out. This requires to pass the "-k"
+//	and "-z" argument.
 //
 // The two steps can be run (sequentially) on separate machines; step one requires
 // computing power nd memory and step two requires a trusted environment.

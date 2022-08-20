@@ -56,7 +56,7 @@ type KVStore interface {
 	Close() error
 }
 
-//------------------------------------------------------------
+// ------------------------------------------------------------
 // NewKVStore creates a new storage handler with given spec
 // for use with key/value string pairs.
 func NewKVStore(spec util.ParameterSet) (KVStore, error) {

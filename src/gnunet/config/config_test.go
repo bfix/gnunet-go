@@ -20,7 +20,7 @@ package config
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/bfix/gospel/logger"
@@ -30,7 +30,7 @@ func TestConfigRead(t *testing.T) {
 	logger.SetLogLevel(logger.WARN)
 
 	// read configuration file
-	data, err := ioutil.ReadFile("./gnunet-config.json")
+	data, err := os.ReadFile("./gnunet-config.json")
 	if err != nil {
 		t.Fatal(err)
 	}
