@@ -280,7 +280,7 @@ func (rt *RoutingTable) SelectRandomPeer(pf *blocks.PeerFilter, pid int) (p *Pee
 // SelectPeer selects a neighbor depending on the number of hops parameter.
 // If hops < NSE this function MUST return SelectRandomPeer() and
 // SelectClosestpeer() otherwise.
-func (rt *RoutingTable) SelectPeer(p *PeerAddress, hops int, bf *blocks.PeerFilter, pid int) *PeerAddress {
+func (rt *RoutingTable) SelectPeer(p *PeerAddress, hops uint16, bf *blocks.PeerFilter, pid int) *PeerAddress {
 	if float64(hops) < rt.l2nse {
 		return rt.SelectRandomPeer(bf, pid)
 	}

@@ -177,7 +177,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			// forward to number of peers
 			numForward := m.rtable.ComputeOutDegree(msg.ReplLevel, msg.HopCount)
 			for n := 0; n < numForward; n++ {
-				if p := m.rtable.SelectClosestPeer(addr, pf, 0); p != nil {
+				if p := m.rtable.SelectPeer(addr, msg.HopCount, pf, 0); p != nil {
 					// forward message to peer
 					logger.Printf(logger.INFO, "[%s] forward GET message to %s", label, p.Peer.Short())
 					if err := m.core.Send(ctx, p.Peer, msgOut); err != nil {
@@ -310,7 +310,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			// forward to computed number of peers
 			numForward := m.rtable.ComputeOutDegree(msg.ReplLvl, msg.HopCount)
 			for n := 0; n < numForward; n++ {
-				if p := m.rtable.SelectClosestPeer(addr, pf, 0); p != nil {
+				if p := m.rtable.SelectPeer(addr, msg.HopCount, pf, 0); p != nil {
 					// check if route is recorded (9.3.2.6)
 					var pp *path.Path
 					if msg.Flags&enums.DHT_RO_RECORD_ROUTE != 0 {
