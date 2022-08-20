@@ -26,7 +26,6 @@ import (
 	"gnunet/service/dht/path"
 	"gnunet/util"
 	"os"
-	"strings"
 
 	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
@@ -168,22 +167,8 @@ func (s *DHTStore) Put(query blocks.Query, entry *DHTEntry) (err error) {
 	expire := entry.Blk.Expire()
 	blkSize := len(entry.Blk.Bytes())
 
-	// handle path
-	var popt []string
-	if entry.Path != nil {
-		if entry.Path.TruncOrigin != nil {
-			popt = append(popt, entry.Path.TruncOrigin.Short())
-		}
-		for _, e := range entry.Path.List {
-			popt = append(popt, e.Signer.Short())
-		}
-		// count partial entry
-		if entry.Path.LastHop != nil {
-			popt = append(popt, entry.Path.LastHop.Short())
-		}
-	}
-	logger.Printf(logger.INFO, "[dht-store] storing %d bytes @ %s (path <%s>)",
-		blkSize, query.Key().Short(), strings.Join(popt, ","))
+	logger.Printf(logger.INFO, "[dht-store] storing %d bytes @ %s (path %s)",
+		blkSize, query.Key().Short(), entry.Path)
 
 	// write entry to file for storage
 	if err = s.writeEntry(query.Key().Data, entry); err != nil {

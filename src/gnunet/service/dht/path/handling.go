@@ -19,12 +19,10 @@
 package path
 
 import (
-	"bytes"
-	"encoding/hex"
-	"fmt"
 	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/util"
+	"strings"
 
 	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
@@ -237,25 +235,26 @@ func (p *Path) Verify(local *util.PeerID) {
 	}
 }
 
-// String returs a uman-readbale representation
+// String returns a human-readable representation
 func (p *Path) String() string {
-	buf := new(bytes.Buffer)
-	s := "0"
-	if p.TruncOrigin != nil {
-		s = p.TruncOrigin.String()
+	var hops []string
+	if p != nil {
+		if p.TruncOrigin != nil {
+			hops = append(hops, p.TruncOrigin.Short())
+		}
+		for _, e := range p.List {
+			hops = append(hops, e.Signer.Short())
+		}
+		if p.LastHop != nil {
+			hops = append(hops, p.LastHop.Short())
+		}
 	}
-	buf.WriteString(fmt.Sprintf("{to=%s, (%d)[", s, len(p.List)))
-	for _, e := range p.List {
-		buf.WriteString(e.String())
+	// trim to sensible length for display
+	if num := len(hops); num > 8 {
+		trim := make([]string, 9)
+		copy(trim[:4], hops[:4])
+		trim[4] = "..."
+		copy(trim[5:], hops[num-5:])
 	}
-	s = "0"
-	if p.LastSig != nil {
-		s = hex.EncodeToString(p.LastSig.Bytes())
-	}
-	num := len(s)
-	if num > 16 {
-		s = s[:8] + ".." + s[num-8:]
-	}
-	buf.WriteString(fmt.Sprintf("], ls=%s}", s))
-	return buf.String()
+	return "[" + strings.Join(hops, "-") + "]"
 }
