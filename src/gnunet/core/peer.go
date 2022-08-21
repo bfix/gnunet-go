@@ -103,7 +103,7 @@ func (p *Peer) HelloData(ttl time.Duration, a []*util.Address) (h *blocks.HelloB
 	// assemble HELLO data
 	h = new(blocks.HelloBlock)
 	h.PeerID = p.GetID()
-	h.Expire_ = util.NewAbsoluteTime(time.Now().Add(ttl))
+	h.SetExpire(ttl)
 	h.SetAddresses(a)
 
 	// sign data
