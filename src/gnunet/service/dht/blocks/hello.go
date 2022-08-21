@@ -21,7 +21,6 @@ package blocks
 import (
 	"bytes"
 	"crypto/sha512"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"gnunet/crypto"
@@ -302,32 +301,36 @@ func (h *HelloBlock) SetSignature(sig *util.PeerSignature) error {
 	return nil
 }
 
+// _SignedData is the structured data to be signed
+type _SignedData struct {
+	Purpose  *crypto.SignaturePurpose // signature purpose
+	Expire   util.AbsoluteTime        // expiration time
+	AddrHash *crypto.HashCode         // address hash
+}
+
 // SignedData assembles a data block for sign and verify operations.
 func (h *HelloBlock) SignedData() []byte {
-	// hash address block
-	hAddr := sha512.Sum512(h.AddrBin)
-	var size uint32 = 80
-	purpose := uint32(enums.SIG_HELLO)
-
 	// assemble signed data
-	buf := new(bytes.Buffer)
-	var n int
-	err := binary.Write(buf, binary.BigEndian, size)
-	if err == nil {
-		if err = binary.Write(buf, binary.BigEndian, purpose); err == nil {
-			if err = binary.Write(buf, binary.BigEndian, h.Expire_); err == nil {
-				if n, err = buf.Write(hAddr[:]); err == nil {
-					if n != len(hAddr[:]) {
-						err = errors.New("signed data size mismatch")
-					}
-				}
-			}
-		}
+	sd := &_SignedData{
+		Purpose: &crypto.SignaturePurpose{
+			Size:    80,
+			Purpose: enums.SIG_HELLO,
+		},
+		Expire:   h.Expire_,
+		AddrHash: crypto.Hash(h.AddrBin),
 	}
+	// generate binary representation
+	buf, err := data.Marshal(sd)
 	if err != nil {
-		logger.Printf(logger.ERROR, "[HelloBlock.SignedData] failed: %s", err.Error())
+		logger.Println(logger.ERROR, "can't serialize HELLO for signature")
+		return nil
 	}
-	return buf.Bytes()
+	if len(buf) != int(sd.Purpose.Size) {
+		logger.Printf(logger.ERROR, "size mismatch for serialized HELLO -- %d -> %d", sd.Purpose.Size, len(buf))
+		sd.Purpose.Size = uint32(len(buf))
+		return nil
+	}
+	return buf
 }
 
 //----------------------------------------------------------------------
