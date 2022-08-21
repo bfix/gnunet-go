@@ -18,12 +18,15 @@
 
 package crypto
 
-import "gnunet/util"
+import (
+	"gnunet/enums"
+	"gnunet/util"
+)
 
 // SignaturePurpose is the GNUnet data structure used as header for signed data.
 type SignaturePurpose struct {
-	Size    uint32 `order:"big"` // How many bytes are signed?
-	Purpose uint32 `order:"big"` // Signature purpose
+	Size    uint32           `order:"big"` // How many bytes are signed?
+	Purpose enums.SigPurpose `order:"big"` // Signature purpose
 }
 
 // Signable interface for objects that can get signed by peer

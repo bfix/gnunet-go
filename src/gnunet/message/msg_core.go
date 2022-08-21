@@ -58,7 +58,7 @@ func NewEphemeralKeyMsg() *EphemeralKeyMsg {
 		SignedBlock: &EphKeyBlock{
 			Purpose: &crypto.SignaturePurpose{
 				Size:    88,
-				Purpose: uint32(enums.SIG_SET_ECC_KEY),
+				Purpose: enums.SIG_SET_ECC_KEY,
 			},
 			CreateTime:   util.AbsoluteTimeNow(),
 			ExpireTime:   util.NewRelativeTime(12 * time.Hour),

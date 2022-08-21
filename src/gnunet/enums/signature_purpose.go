@@ -3,7 +3,7 @@
 //nolint:stylecheck // allow non-camel-case for constants
 package enums
 
-type SigPurpose uint16
+type SigPurpose uint32
 
 // Signature purpose values
 const (

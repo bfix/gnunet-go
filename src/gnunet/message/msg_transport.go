@@ -134,7 +134,7 @@ func NewSignedAddress(a *util.Address) *SignedAddress {
 	addr := &SignedAddress{
 		Purpose: &crypto.SignaturePurpose{
 			Size:    uint32(alen + 20),
-			Purpose: uint32(enums.SIG_TRANSPORT_PONG_OWN),
+			Purpose: enums.SIG_TRANSPORT_PONG_OWN,
 		},
 		ExpireOn: util.AbsoluteTimeNow().Add(12 * time.Hour),
 		AddrSize: uint32(alen),

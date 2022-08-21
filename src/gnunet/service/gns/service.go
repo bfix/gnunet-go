@@ -278,7 +278,7 @@ func (s *Service) LookupNamecache(ctx context.Context, query *blocks.GNSQuery) (
 		block.DerivedKeySig = m.DerivedKeySig
 		sb := new(blocks.SignedGNSBlockData)
 		sb.Purpose = new(crypto.SignaturePurpose)
-		sb.Purpose.Purpose = uint32(enums.SIG_GNS_RECORD_SIGN)
+		sb.Purpose.Purpose = enums.SIG_GNS_RECORD_SIGN
 		sb.Purpose.Size = uint32(16 + len(m.EncData))
 		sb.Expire = m.Expire
 		sb.Data = m.EncData
