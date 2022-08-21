@@ -27,8 +27,8 @@ import (
 func TestElementDebug(t *testing.T) {
 	var (
 		signedData = "" +
-			"008C" +
-			"0006" +
+			"00000090" +
+			"00000006" +
 			"0005e6983d33f911" +
 			"f3236acc2be7812a988617c647fc27fcfbd0dacc3d960aa29a5f9bf0b9b9131f" +
 			"cdd31cfa45de2cbd9510665e7f2b1ccafefd445511c62729c0798dd1b0675f19" +
@@ -63,9 +63,9 @@ func TestElementDebug(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !ok {
-		t.Log("Verify NOT OK:")
 		t.Logf("Pred: %s", pred.Short())
 		t.Logf("Sign: %s", curr.Short())
 		t.Logf("Succ: %s", succ.Short())
+		t.Error("Verify NOT OK:")
 	}
 }
