@@ -20,7 +20,6 @@ package blocks
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/hex"
 	"gnunet/util"
 	"strings"
@@ -28,7 +27,6 @@ import (
 	"time"
 
 	"github.com/bfix/gospel/crypto/ed25519"
-	"github.com/bfix/gospel/data"
 )
 
 var (
@@ -120,45 +118,5 @@ func TestHelloBytes(t *testing.T) {
 		t.Log(hex.EncodeToString(tblk.Bytes()))
 		t.Log(hex.EncodeToString(block.Bytes()))
 		t.Fatal("Bytes readback failed")
-	}
-}
-
-func TestHelloDebug(t *testing.T) {
-	blkData := "QKObXJUbnnghRh9McDDjHaB9IIL6MhhEiQHc8VfO3QMABeZZJJhsA" +
-		"GlwK3VkcDovLzEyNy4wLjAuMToxMDAwMQBpcCt1ZHA6Ly8xNzIuMT" +
-		"cuMC40OjEwMDAxAGlwK3VkcDovL1s6OmZmZmY6MTcyLjE3LjAuNF06MTAwMDEA"
-	buf, err := base64.RawStdEncoding.DecodeString(blkData)
-	if err != nil {
-		t.Fatal(err)
-	}
-	hb, err := ParseHelloBlockFromBytes(buf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ok, err := hb.Verify()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !ok {
-		// trace problem
-		t.Log("Block: " + hex.EncodeToString(buf))
-		t.Log("PeerID: " + hb.PeerID.String())
-		t.Log("  ->  " + hex.EncodeToString(hb.PeerID.Bytes()))
-		t.Logf("Expire: %d", hb.Expire_.Val)
-		t.Logf("  -> " + hb.Expire_.String())
-		var exp util.AbsoluteTime
-		if err = data.Unmarshal(&exp, buf[32:40]); err != nil {
-			t.Fatal(err)
-		}
-		t.Logf("  -> " + exp.String())
-		t.Log("AddrBin: " + hex.EncodeToString(hb.AddrBin))
-		sd := hb.SignedData()
-		t.Log("SignedData: " + hex.EncodeToString(sd))
-		t.Log("Addresses:")
-		for _, addr := range hb.Addresses() {
-			t.Logf("* " + addr.URI())
-		}
-		t.Log("Signature: " + hex.EncodeToString(hb.Signature.Bytes()))
-		t.Fatal("debug HELLO verify failed")
 	}
 }
