@@ -342,7 +342,7 @@ func (rt *RoutingTable) heartbeat(ctx context.Context) {
 		// check if we can/need to drop a peer
 		drop := timeout.Compare(p.lastSeen.Elapsed()) < 0
 		if drop || timeout.Compare(p.lastUsed.Elapsed()) < 0 {
-			logger.Printf(logger.DBG, "[dht-rt-hb] removing %v: %v, %v", p, p.lastSeen.Elapsed(), p.lastUsed.Elapsed())
+			logger.Printf(logger.DBG, "[dht-rt-hb] removing %s: lastSeen %s, lastUsed %v", p.Peer.Short(), p.lastSeen.Elapsed(), p.lastUsed.Elapsed())
 			rt.Remove(p, "dht-rt-hb", pid)
 		}
 		return nil
