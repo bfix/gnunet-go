@@ -95,6 +95,9 @@ func (p *PeerID) String() string {
 
 // SHort returns a shortened peer id for display
 func (p *PeerID) Short() string {
+	if p == nil {
+		return "local"
+	}
 	return p.String()[:8]
 }
 
