@@ -409,7 +409,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		key := msg.Query.String()
 		if list, ok := m.reshdlrs.Get(key); ok {
 			for _, rh := range list {
-				logger.Printf(logger.DBG, "[%s] Result handler task #%d found", label, rh.ID())
+				logger.Printf(logger.DBG, "[%s] Result handler task #%d found (receiver %s)", label, rh.ID(), rh.Receiver().Short())
 
 				//--------------------------------------------------------------
 				// check task list for handler (9.5.2.6)
