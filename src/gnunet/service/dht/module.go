@@ -161,7 +161,7 @@ func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Mod
 					if !ok {
 						logger.Println(logger.WARN, "[dht-discovery] received invalid block data")
 						logger.Printf(logger.DBG, "[dht-discovery] -> %s", hex.EncodeToString(res.Bytes()))
-					} else {
+					} else if !hb.PeerID.Equal(m.core.PeerID()) {
 						// cache HELLO block
 						m.rtable.CacheHello(hb)
 						// add sender to routing table
