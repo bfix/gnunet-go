@@ -93,6 +93,11 @@ func (t *ResultHandler) Key() *crypto.HashCode {
 	return t.key
 }
 
+// Receiver returns the destination peer
+func (t *ResultHandler) Receiver() *util.PeerID {
+	return t.resp.Receiver()
+}
+
 // Flags returns the query flags
 func (t *ResultHandler) Flags() uint16 {
 	return t.flags
@@ -213,7 +218,7 @@ func (t *ResultHandlerList) Add(hdlr *ResultHandler) bool {
 			case RHC_MERGE:
 				// merge the two result handlers
 				oldMod := modified
-				modified = h.Merge(hdlr) || modified
+				modified = h.Merge(hdlr)
 				logger.Printf(logger.DBG, "[rhl] resultfilter compare: MERGE (%v -- %v)", oldMod, modified)
 				break loop
 			case RHC_REPLACE:
