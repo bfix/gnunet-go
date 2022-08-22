@@ -86,7 +86,7 @@ func (addr *PeerAddress) Equal(p *PeerAddress) bool {
 // bucket index (smaller index = less distant).
 func (addr *PeerAddress) Distance(p *PeerAddress) (*math.Int, int) {
 	r := util.Distance(addr.Key.Data, p.Key.Data)
-	return r, 512 - r.BitLen()
+	return r, 511 - r.BitLen()
 }
 
 //======================================================================
