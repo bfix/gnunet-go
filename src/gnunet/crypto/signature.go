@@ -29,11 +29,16 @@ type SignaturePurpose struct {
 	Purpose enums.SigPurpose `order:"big"` // Signature purpose
 }
 
-// Signable interface for objects that can get signed by peer
+// Signable interface for objects that can get signed by a Signer
 type Signable interface {
 	// SignedData returns the byte array to be signed
 	SignedData() []byte
 
 	// SetSignature returns the signature to the signable object
 	SetSignature(*util.PeerSignature) error
+}
+
+// Signer instance for creating signatures
+type Signer interface {
+	Sign(Signable) error
 }
