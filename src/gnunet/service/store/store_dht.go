@@ -233,6 +233,8 @@ func (s *DHTStore) Get(label string, query blocks.Query, rf blocks.ResultFilter)
 			logger.Printf(logger.ERROR, "[%s] can't flag DHT entry as used: %s", label, err)
 			continue
 		}
+		logger.Printf(logger.INFO, "[dht-store] retrieving %d bytes @ %s (path %s)",
+			len(entry.Blk.Bytes()), query.Key().Short(), entry.Path)
 	}
 	return
 }
