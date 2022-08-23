@@ -63,7 +63,7 @@ func TestDHTFilesStore(t *testing.T) {
 	// allocate keys
 	keys := make([]blocks.Query, 0, fsNumBlocks)
 	// create result filter
-	rf := blocks.NewGenericResultFilter()
+	rf := blocks.NewGenericResultFilter(128, 236742)
 
 	// First round: save blocks
 	btype := enums.BLOCK_TYPE_TEST

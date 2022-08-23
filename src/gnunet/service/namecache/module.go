@@ -26,6 +26,7 @@ import (
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
 	"gnunet/service/store"
+	"gnunet/util"
 )
 
 //======================================================================
@@ -71,7 +72,7 @@ func (m *Module) Import(fcm map[string]any) {
 // Get entry from the cache if available.
 func (m *Module) Get(ctx context.Context, query *blocks.GNSQuery) (block *blocks.GNSBlock, err error) {
 	var e []*store.DHTEntry
-	rf := blocks.NewGenericResultFilter()
+	rf := blocks.NewGenericResultFilter(128, util.RndUInt32())
 	if e, err = m.cache.Get("namecache", query, rf); err != nil {
 		return
 	}

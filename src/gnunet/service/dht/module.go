@@ -56,7 +56,7 @@ type LocalBlockResponder struct {
 func NewLocalBlockResponder() *LocalBlockResponder {
 	return &LocalBlockResponder{
 		ch: make(chan blocks.Block),
-		rf: blocks.NewGenericResultFilter(),
+		rf: blocks.NewGenericResultFilter(128, util.RndUInt32()),
 	}
 }
 
@@ -77,6 +77,10 @@ func (lr *LocalBlockResponder) Send(ctx context.Context, msg message.Message) er
 				lr.ch <- blk
 			} else {
 				logger.Println(logger.WARN, "[local] DHT-RESULT block problem: "+err.Error())
+				// DEBUG:
+				logger.Printf(logger.DBG, "[local] btype=%s, expire=%s", res.BType, res.Expire)
+				logger.Printf(logger.DBG, "[local] block=%s", hex.EncodeToString(res.Block))
+				panic("@@@")
 			}
 		}()
 	default:
