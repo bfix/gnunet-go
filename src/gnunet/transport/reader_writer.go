@@ -20,7 +20,6 @@ package transport
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"gnunet/message"
 	"io"
@@ -42,10 +41,13 @@ func WriteMessage(ctx context.Context, wrt io.WriteCloser, msg message.Message) 
 		return
 	}
 	/*
-		// debug for outgoing messages
-		if msg.Type() == enums.MSG_DHT_P2P_HELLO {
-			logger.Printf(logger.DBG, "[rw_msg] msg=%s", hex.EncodeToString(buf))
-			logger.Printf(logger.DBG, "[rw_msg] msg=%s", util.Dump(msg, "json"))
+		// DEBUG outgoing messages
+		if msg.Type() == enums.MSG_DHT_P2P_RESULT {
+			tmsg, _ := msg.(*message.DHTP2PResultMsg)
+			if tmsg.BType == enums.BLOCK_TYPE_TEST {
+				logger.Printf(logger.DBG, "[rw_msg] msg=%s", hex.EncodeToString(buf))
+				logger.Printf(logger.DBG, "[rw_msg] msg=%s", util.Dump(msg, "json"))
+			}
 		}
 	*/
 	// check message header size and packet size
@@ -54,7 +56,7 @@ func WriteMessage(ctx context.Context, wrt io.WriteCloser, msg message.Message) 
 		return
 	}
 	if len(buf) != int(mh.MsgSize) {
-		return errors.New("WriteMessage: message size mismatch")
+		return fmt.Errorf("WriteMessage: message size mismatch (%d != %d)", len(buf), mh.MsgSize)
 	}
 	// perform write operation
 	var n int
@@ -116,7 +118,7 @@ func ReadMessage(ctx context.Context, rdr io.ReadCloser, buf []byte) (msg messag
 	}
 	err = data.Unmarshal(msg, buf[:mh.MsgSize])
 	/*
-		// debug for incoming messages
+		// DEBUG incoming messages
 		if mh.MsgType == enums.MSG_DHT_P2P_RESULT {
 			logger.Printf(logger.DBG, "[rw_msg] msg=%s", hex.EncodeToString(buf[:mh.MsgSize]))
 			logger.Printf(logger.DBG, "[rw_msg] msg=%s", util.Dump(msg, "json"))
