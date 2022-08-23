@@ -65,11 +65,12 @@ type ResultHandler struct {
 	started   util.AbsoluteTime   // Timestamp of session start
 	active    bool                // is the task active?
 	resp      transport.Responder // back-channel to deliver result
+	signer    crypto.Signer       // signing instance
 }
 
 // NewResultHandler creates an instance from a DHT-GET message and a
 // result filter instance.
-func NewResultHandler(msg *message.DHTP2PGetMsg, rf blocks.ResultFilter, back transport.Responder) *ResultHandler {
+func NewResultHandler(msg *message.DHTP2PGetMsg, rf blocks.ResultFilter, back transport.Responder, signer crypto.Signer) *ResultHandler {
 	return &ResultHandler{
 		id:        util.NextID(),
 		key:       msg.Query.Clone(),
@@ -80,6 +81,7 @@ func NewResultHandler(msg *message.DHTP2PGetMsg, rf blocks.ResultFilter, back tr
 		started:   util.AbsoluteTimeNow(),
 		active:    true,
 		resp:      back,
+		signer:    signer,
 	}
 }
 
@@ -171,7 +173,11 @@ func (t *ResultHandler) Handle(ctx context.Context, msg *message.DHTP2PResultMsg
 			pp = pth.Clone()
 			// yes: add path element
 			pe := pp.NewElement(sender, local, rcv)
-			pp.Add(pe)
+			if err := t.signer.Sign(pe); err == nil {
+				logger.Printf(logger.ERROR, "[dht-task-%d] failed to sign path element: %s", t.id, err.Error())
+			} else {
+				pp.Add(pe)
+			}
 		}
 		// build updated PUT message
 		msg = msg.Update(pp)
