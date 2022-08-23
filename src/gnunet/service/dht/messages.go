@@ -160,7 +160,11 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 					pth = result.Entry.Path.Clone()
 					pth.SplitPos = pth.NumList
 					pe := pth.NewElement(pth.LastHop, local, back.Receiver())
-					pth.Add(pe)
+					if err := m.core.Sign(pe); err != nil {
+						logger.Printf(logger.ERROR, "[%s] failed to sign path element: %s", label, err.Error())
+					} else {
+						pth.Add(pe)
+					}
 				}
 
 				logger.Printf(logger.INFO, "[%s] sending result message to %s", label, rcv)
@@ -187,7 +191,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 					}
 					pf.Add(p.Peer)
 					// create open get-forward result handler
-					rh := NewResultHandler(msg, rf, back)
+					rh := NewResultHandler(msg, rf, back, m.core)
 					logger.Printf(logger.INFO, "[%s] result handler task #%d (key %s) started",
 						label, rh.ID(), rh.Key().Short())
 					m.reshdlrs.Add(rh)
@@ -319,7 +323,11 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 						// yes: add path element
 						pp = entry.Path.Clone()
 						pe := pp.NewElement(sender, local, p.Peer)
-						pp.Add(pe)
+						if err := m.core.Sign(pe); err != nil {
+							logger.Printf(logger.ERROR, "[%s] failed to sign path element: %s", label, err.Error())
+						} else {
+							pp.Add(pe)
+						}
 					}
 					// build updated PUT message
 					msgOut := msg.Update(pp, pf, msg.HopCount+1)
@@ -564,7 +572,12 @@ func (m *Module) sendResult(ctx context.Context, query blocks.Query, blk blocks.
 	out.Block = blk.Bytes()
 	out.MsgSize += uint16(len(out.Block))
 	out.SetPath(pth)
-
+	/*
+		// DEBUG
+		if out.BType == enums.BLOCK_TYPE_TEST {
+			logger.Printf(logger.DBG, "result message = %s", util.Dump(out, "json"))
+		}
+	*/
 	// send message
 	return back.Send(ctx, out)
 }
