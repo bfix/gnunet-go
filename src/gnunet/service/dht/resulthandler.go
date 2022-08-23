@@ -98,6 +98,11 @@ func (t *ResultHandler) Receiver() *util.PeerID {
 	return t.resp.Receiver()
 }
 
+// Type returns the requested block type
+func (t *ResultHandler) Type() enums.BlockType {
+	return t.btype
+}
+
 // Flags returns the query flags
 func (t *ResultHandler) Flags() uint16 {
 	return t.flags
