@@ -90,9 +90,11 @@ func (p *Path) Size() uint {
 	if p.TruncOrigin != nil {
 		size += p.TruncOrigin.Size()
 	}
-	size += uint(p.NumList) * p.List[0].Size()
+	if p.NumList > 0 {
+		size += uint(p.NumList) * p.List[0].Size()
+	}
 	if p.LastSig != nil {
-		size += p.LastSig.Size() + p.LastHop.Size()
+		size += p.LastSig.Size()
 	}
 	return size
 }
