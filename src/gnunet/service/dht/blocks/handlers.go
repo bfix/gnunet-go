@@ -84,4 +84,5 @@ func init() {
 
 	// add validation functions
 	BlockHandlers[enums.BLOCK_TYPE_DHT_URL_HELLO] = new(HelloBlockHandler)
+	BlockHandlers[enums.BLOCK_TYPE_TEST] = new(TestBlockHandler)
 }
