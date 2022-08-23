@@ -250,7 +250,7 @@ func (s *DHTStore) GetApprox(label string, query blocks.Query, rf blocks.ResultF
 		}
 		// check distance (max. 16 bucktes off)
 		dist := util.Distance(md.key.Data, query.Key().Data)
-		if (511 - dist.BitLen()) > 16 {
+		if (512 - dist.BitLen()) > 16 {
 			return
 		}
 		// read entry from storage
