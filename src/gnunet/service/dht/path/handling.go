@@ -43,7 +43,7 @@ type Path struct {
 	NumList     uint16              `order:"big"`    // number of list entries
 	SplitPos    uint16              `order:"big"`    // optional split position
 	List        []*Entry            `size:"NumList"` // list of path entries
-	LastSig     *util.PeerSignature `opt:"(Isused)"` // last hop signature
+	LastSig     *util.PeerSignature `opt:"(IsUsed)"` // last hop signature
 	LastHop     *util.PeerID        `opt:"(IsUsed)"` // last hop peer id
 }
 
@@ -99,7 +99,10 @@ func (p *Path) Size() uint {
 
 // Bytes returns a binary representation
 func (p *Path) Bytes() []byte {
-	buf, _ := data.Marshal(p)
+	buf, err := data.Marshal(p)
+	if err != nil {
+		logger.Println(logger.WARN, "[path] failed serialization: "+err.Error())
+	}
 	return buf
 }
 
