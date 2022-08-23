@@ -125,81 +125,87 @@ type ResultFilter interface {
 }
 
 //----------------------------------------------------------------------
-// Generic result filter:
-// Filter duplicate blocks (identical hash value over content)
+// Generic result filter
 //----------------------------------------------------------------------
 
-// GenericResultFilter is a dummy result filter with no state.
+// GenericResultFilter is the default resultfilter implementation for
+// DHT blocks. It is used by the two predefined block types (BLOCK_TYPE_TEST
+// and BLOCK_TYPE_DHT_URL_HELLO) and can serve custom blocks as well if
+// no custom result filter is required.
 type GenericResultFilter struct {
 	bf *BloomFilter
 }
 
-// NewGenericResultFilter creates a new empty result bloom filter
-func NewGenericResultFilter() *GenericResultFilter {
-	return &GenericResultFilter{
-		bf: NewBloomFilter(128),
+// NewGenericResultFilter initializes an empty result filter
+func NewGenericResultFilter(filterSize int, mutator uint32) *GenericResultFilter {
+	// HELLO result filters are BloomFilters with a mutator
+	rf := new(GenericResultFilter)
+	rf.bf = NewBloomFilter(filterSize)
+	rf.bf.SetMutator(mutator)
+	return rf
+}
+
+// NewGenericResultFilterFromBytes creates a new result filter from a binary
+// representation: 'data' is the concatenaion 'mutator|bloomfilter'.
+// If 'withMutator' is false, no mutator is used.
+func NewGenericResultFilterFromBytes(data []byte) *GenericResultFilter {
+	//logger.Printf(logger.DBG, "[filter] FromBytes = %d:%s (mutator: %v)",len(data), hex.EncodeToString(data), withMutator)
+
+	// handle mutator input
+	mSize := 4
+	rf := new(GenericResultFilter)
+	rf.bf = &BloomFilter{
+		Bits: util.Clone(data[mSize:]),
+	}
+	if mSize > 0 {
+		rf.bf.SetMutator(data[:mSize])
+	}
+	return rf
+}
+
+// Add a HELLO block to th result filter
+func (rf *GenericResultFilter) Add(b Block) {
+	if hb, ok := b.(*HelloBlock); ok {
+		hAddr := sha512.Sum512(hb.AddrBin)
+		rf.bf.Add(hAddr[:])
 	}
 }
 
-// Add a block to the result filter.
-func (rf *GenericResultFilter) Add(b Block) {
-	bh := crypto.Hash(b.Bytes())
-	rf.bf.Add(bh.Data)
-}
-
-// Contains returns true if a block is filtered
+// Contains checks if a block is contained in the result filter
 func (rf *GenericResultFilter) Contains(b Block) bool {
-	bh := crypto.Hash(b.Bytes())
-	return rf.bf.Contains(bh.Data)
+	if hb, ok := b.(*HelloBlock); ok {
+		hAddr := sha512.Sum512(hb.AddrBin)
+		return rf.bf.Contains(hAddr[:])
+	}
+	return false
 }
 
-// ContainsHash returns true if a block hash is filtered
+// ContainsHash checks if a block hash is contained in the result filter
 func (rf *GenericResultFilter) ContainsHash(bh *crypto.HashCode) bool {
 	return rf.bf.Contains(bh.Data)
 }
 
-// Bytes returns the binary representation of a result filter
-func (rf *GenericResultFilter) Bytes() (buf []byte) {
+// Bytes returns a binary representation of a HELLO result filter
+func (rf *GenericResultFilter) Bytes() []byte {
 	return rf.bf.Bytes()
 }
 
-// Merge two result filters
-func (rf *GenericResultFilter) Merge(t ResultFilter) bool {
-	// check for correct type
-	trf, ok := t.(*GenericResultFilter)
-	if !ok {
-		return false
-	}
-	// check for identical mutator (if any)
-	if !bytes.Equal(rf.bf.mInput, trf.bf.mInput) {
-		return false
-	}
-	// check for same size
-	if len(rf.bf.Bits) != len(trf.bf.Bits) {
-		return false
-	}
-	// merge bloomfilters
-	for i := range rf.bf.Bits {
-		rf.bf.Bits[i] ^= trf.bf.Bits[i]
-	}
-	return true
-}
-
-// Compare two result filters
+// Compare two HELLO result filters
 func (rf *GenericResultFilter) Compare(t ResultFilter) int {
 	trf, ok := t.(*GenericResultFilter)
 	if !ok {
 		return CMP_DIFFER
 	}
-	// check for identical mutator (if any)
-	if !bytes.Equal(rf.bf.mInput, trf.bf.mInput) {
-		return CMP_DIFFER
+	return rf.bf.Compare(trf.bf)
+}
+
+// Merge two HELLO result filters
+func (rf *GenericResultFilter) Merge(t ResultFilter) bool {
+	trf, ok := t.(*GenericResultFilter)
+	if !ok {
+		return false
 	}
-	// check for identical bits
-	if bytes.Equal(rf.bf.Bits, trf.bf.Bits) {
-		return CMP_SAME
-	}
-	return CMP_MERGE
+	return rf.bf.Merge(trf.bf)
 }
 
 //======================================================================

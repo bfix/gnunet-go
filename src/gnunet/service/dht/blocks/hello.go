@@ -20,7 +20,6 @@ package blocks
 
 import (
 	"bytes"
-	"crypto/sha512"
 	"errors"
 	"fmt"
 	"gnunet/crypto"
@@ -405,12 +404,12 @@ func (bh *HelloBlockHandler) ValidateBlockStoreRequest(b Block) bool {
 // MUTATOR value which MAY be used to deterministically re-randomize
 // probabilistic data structures.
 func (bh *HelloBlockHandler) SetupResultFilter(filterSize int, mutator uint32) ResultFilter {
-	return NewHelloResultFilter(filterSize, mutator)
+	return NewGenericResultFilter(filterSize, mutator)
 }
 
 // ParseResultFilter from binary data
 func (bh *HelloBlockHandler) ParseResultFilter(data []byte) ResultFilter {
-	return NewHelloResultFilterFromBytes(data)
+	return NewGenericResultFilterFromBytes(data)
 }
 
 // FilterResult is used to filter results against specific queries. This
@@ -431,85 +430,4 @@ func (bh *HelloBlockHandler) FilterResult(b Block, key *crypto.HashCode, rf Resu
 	}
 	rf.Add(b)
 	return RF_LAST
-}
-
-//----------------------------------------------------------------------
-// HELLO result filter
-//----------------------------------------------------------------------
-
-// HelloResultFilter is a result  filter implementation for HELLO blocks
-type HelloResultFilter struct {
-	bf *BloomFilter
-}
-
-// NewHelloResultFilter initializes an empty resut filter
-func NewHelloResultFilter(filterSize int, mutator uint32) *HelloResultFilter {
-	// HELLO result filters are BloomFilters with a mutator
-	rf := new(HelloResultFilter)
-	rf.bf = NewBloomFilter(filterSize)
-	rf.bf.SetMutator(mutator)
-	return rf
-}
-
-// NewHelloResultFilterFromBytes creates a new result filter from a binary
-// representation: 'data' is the concatenaion 'mutator|bloomfilter'.
-// If 'withMutator' is false, no mutator is used.
-func NewHelloResultFilterFromBytes(data []byte) *HelloResultFilter {
-	//logger.Printf(logger.DBG, "[filter] FromBytes = %d:%s (mutator: %v)",len(data), hex.EncodeToString(data), withMutator)
-
-	// handle mutator input
-	mSize := 4
-	rf := new(HelloResultFilter)
-	rf.bf = &BloomFilter{
-		Bits: util.Clone(data[mSize:]),
-	}
-	if mSize > 0 {
-		rf.bf.SetMutator(data[:mSize])
-	}
-	return rf
-}
-
-// Add a HELLO block to th result filter
-func (rf *HelloResultFilter) Add(b Block) {
-	if hb, ok := b.(*HelloBlock); ok {
-		hAddr := sha512.Sum512(hb.AddrBin)
-		rf.bf.Add(hAddr[:])
-	}
-}
-
-// Contains checks if a block is contained in the result filter
-func (rf *HelloResultFilter) Contains(b Block) bool {
-	if hb, ok := b.(*HelloBlock); ok {
-		hAddr := sha512.Sum512(hb.AddrBin)
-		return rf.bf.Contains(hAddr[:])
-	}
-	return false
-}
-
-// ContainsHash checks if a block hash is contained in the result filter
-func (rf *HelloResultFilter) ContainsHash(bh *crypto.HashCode) bool {
-	return rf.bf.Contains(bh.Data)
-}
-
-// Bytes returns a binary representation of a HELLO result filter
-func (rf *HelloResultFilter) Bytes() []byte {
-	return rf.bf.Bytes()
-}
-
-// Compare two HELLO result filters
-func (rf *HelloResultFilter) Compare(t ResultFilter) int {
-	trf, ok := t.(*HelloResultFilter)
-	if !ok {
-		return CMP_DIFFER
-	}
-	return rf.bf.Compare(trf.bf)
-}
-
-// Merge two HELLO result filters
-func (rf *HelloResultFilter) Merge(t ResultFilter) bool {
-	trf, ok := t.(*HelloResultFilter)
-	if !ok {
-		return false
-	}
-	return rf.bf.Merge(trf.bf)
 }
