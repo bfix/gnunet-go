@@ -98,11 +98,12 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 			}
 		} else {
 			// ... or create a new one
+			mut := util.RndUInt32()
 			if blockHdlr != nil {
-				rf = blockHdlr.SetupResultFilter(128, util.RndUInt32())
+				rf = blockHdlr.SetupResultFilter(128, mut)
 			} else {
 				logger.Printf(logger.WARN, "[%s] using default result filter", label)
-				rf = blocks.NewGenericResultFilter()
+				rf = blocks.NewGenericResultFilter(128, mut)
 			}
 		}
 		// clone peer filter
@@ -410,6 +411,17 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		if list, ok := m.reshdlrs.Get(key); ok {
 			for _, rh := range list {
 				logger.Printf(logger.DBG, "[%s] Result handler task #%d found (receiver %s)", label, rh.ID(), rh.Receiver().Short())
+
+				// check if the handler can really handle the result
+				if rh.Type() != btype {
+					// this is another block type, we don't handle it
+					logger.Printf(logger.DBG, "[%s] Result handler not suitable (%s != %s) -- skipped", label, rh.Type(), btype)
+					continue
+				}
+				if rh.Flags()&enums.DHT_RO_FIND_APPROXIMATE != msg.Flags&enums.DHT_RO_FIND_APPROXIMATE {
+					logger.Println(logger.DBG, "[%s] Result handler asked for match, got approx -- skipped")
+					continue
+				}
 
 				//--------------------------------------------------------------
 				// check task list for handler (9.5.2.6)
