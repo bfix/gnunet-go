@@ -367,29 +367,29 @@ func (rt *RoutingTable) heartbeat(ctx context.Context) {
 // LookupHello returns blocks from the HELLO cache for given query.
 func (rt *RoutingTable) LookupHello(addr *PeerAddress, rf blocks.ResultFilter, approx bool, label string) (results []*store.DHTResult) {
 	// iterate over cached HELLOs to find matches;
-	// approximate search is limited by distance (max. diff for bucket index is 16)
+	// approximate search is guided by distance
+	list := store.NewSortedDHTResults(10)
 	_ = rt.helloCache.ProcessRange(func(key string, hb *blocks.HelloBlock, _ int) error {
 		// check if block is excluded by result filter
-		var result *store.DHTResult
 		if !rf.Contains(hb) {
 			// no: possible result, compute distance
 			p := NewPeerAddress(hb.PeerID)
-			dist, idx := addr.Distance(p)
-			result = &store.DHTResult{
-				Entry: &store.DHTEntry{
-					Blk: hb,
-				},
-				Dist: dist,
-			}
-			// check if we need to add result
-			if (approx && idx < 16) || idx == 0 {
-				results = append(results, result)
+			dist, _ := addr.Distance(p)
+			if pos := list.Accepts(dist); pos != -1 {
+				result := &store.DHTResult{
+					Entry: &store.DHTEntry{
+						Blk: hb,
+					},
+					Dist: dist,
+				}
+				list.Add(result, pos)
 			}
 		} else {
 			logger.Println(logger.DBG, "[%s] LookupHello: cached HELLO block is filtered")
 		}
 		return nil
 	}, true)
+	results = list.GetResults()
 	return
 }
 
