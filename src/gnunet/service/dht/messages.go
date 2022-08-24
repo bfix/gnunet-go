@@ -132,7 +132,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		if btype == enums.BLOCK_TYPE_DHT_URL_HELLO {
 			// try to find results in HELLO cache
 			results = m.lookupHelloCache(label, addr, rf, approx)
-			// DEBUG
+			// DEBUG:
 			for i, res := range results {
 				logger.Printf(logger.DBG, "[%s] cache #%d = %s", label, i, res)
 			}
@@ -147,12 +147,29 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 				// get results from local storage
 				lclResults, err := m.getLocalStorage(label, query, rf)
 				if err == nil {
-					// DEBUG
+					// DEBUG:
 					for i, res := range lclResults {
 						logger.Printf(logger.DBG, "[%s] local #%d = %s", label, i, res)
 					}
-					// append local results
-					results = append(results, lclResults...)
+					// create total result list
+					if len(results) == 0 {
+						results = lclResults
+					} else if len(results)+len(lclResults) <= 10 {
+						// handle few results directly
+						results = append(results, lclResults...)
+					} else {
+						// compile a new sorted list from results.
+						list := store.NewSortedDHTResults(10)
+						for pos, res := range results {
+							list.Add(res, pos)
+						}
+						for _, res := range lclResults {
+							if pos := list.Accepts(res.Dist); pos != -1 {
+								list.Add(res, pos)
+							}
+						}
+						results = list.GetResults()
+					}
 				}
 			}
 			// if we have results, send them as response on the back channel
@@ -583,7 +600,7 @@ func (m *Module) sendResult(ctx context.Context, query blocks.Query, blk blocks.
 	out.MsgSize += uint16(len(out.Block))
 	out.SetPath(pth)
 	/*
-		// DEBUG
+		// DEBUG:
 		if out.BType == enums.BLOCK_TYPE_TEST {
 			logger.Printf(logger.DBG, "result message = %s", util.Dump(out, "json"))
 		}
