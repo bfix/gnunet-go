@@ -389,7 +389,7 @@ func (m *Module) getHello(label string) (msg *message.DHTP2PHelloMsg, err error)
 		// save for later use
 		m.lastHello = msg
 
-		// DEBUG
+		// DEBUG:
 		var ok bool
 		if ok, err = msg.Verify(m.core.PeerID()); !ok || err != nil {
 			if !ok {

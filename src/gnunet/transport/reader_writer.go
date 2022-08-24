@@ -41,7 +41,7 @@ func WriteMessage(ctx context.Context, wrt io.WriteCloser, msg message.Message) 
 		return
 	}
 	/*
-		// DEBUG outgoing messages
+		// DEBUG: outgoing messages
 		if msg.Type() == enums.MSG_DHT_P2P_RESULT {
 			tmsg, _ := msg.(*message.DHTP2PResultMsg)
 			if tmsg.BType == enums.BLOCK_TYPE_TEST {
@@ -118,7 +118,7 @@ func ReadMessage(ctx context.Context, rdr io.ReadCloser, buf []byte) (msg messag
 	}
 	err = data.Unmarshal(msg, buf[:mh.MsgSize])
 	/*
-		// DEBUG incoming messages
+		// DEBUG: incoming messages
 		if mh.MsgType == enums.MSG_DHT_P2P_RESULT {
 			logger.Printf(logger.DBG, "[rw_msg] msg=%s", hex.EncodeToString(buf[:mh.MsgSize]))
 			logger.Printf(logger.DBG, "[rw_msg] msg=%s", util.Dump(msg, "json"))
