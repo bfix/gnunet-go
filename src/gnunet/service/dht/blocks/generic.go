@@ -80,6 +80,10 @@ type Block interface {
 
 	// String returns the human-readable representation of a block
 	String() string
+
+	// Prepare a block to be of given type and expiration. Block types
+	// decide if and which information to change/set in the block instance.
+	Prepare(enums.BlockType, util.AbsoluteTime)
 }
 
 // Unwrap (raw) block to a specific block type
@@ -173,6 +177,12 @@ func NewGenericBlock(btype enums.BlockType, expire util.AbsoluteTime, blk []byte
 	}
 }
 
+// Prepare a block to be of given type and expiration.
+func (b *GenericBlock) Prepare(btype enums.BlockType, expire util.AbsoluteTime) {
+	b.BType = btype
+	b.Expire_ = expire
+}
+
 // Bytes returns the DHT block data (unstructured without type and
 // expiration information.
 func (b *GenericBlock) Bytes() []byte {
@@ -216,12 +226,14 @@ var (
 )
 
 // NewGenericBlock creates a Block from binary data.
-func NewBlock(btype enums.BlockType, expires util.AbsoluteTime, blk []byte) (b Block, err error) {
-	fac, ok := blkFactory[btype]
-	if !ok {
-		return NewGenericBlock(btype, expires, blk), nil
+func NewBlock(btype enums.BlockType, expire util.AbsoluteTime, blk []byte) (b Block, err error) {
+	if fac, ok := blkFactory[btype]; ok {
+		b = fac()
+		if err = data.Unmarshal(b, blk); err == nil {
+			b.Prepare(btype, expire)
+		}
+	} else {
+		b, err = NewGenericBlock(btype, expire, blk), nil
 	}
-	b = fac()
-	err = data.Unmarshal(b, blk)
 	return
 }

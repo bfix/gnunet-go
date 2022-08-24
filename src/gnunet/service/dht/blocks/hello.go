@@ -191,6 +191,10 @@ func ParseHelloBlockFromBytes(buf []byte) (h *HelloBlock, err error) {
 	return
 }
 
+// Prepare a block to be of given type and expiration.
+// Not required for HELLO blocks
+func (h *HelloBlock) Prepare(enums.BlockType, util.AbsoluteTime) {}
+
 // finalize block data (generate dependent fields)
 func (h *HelloBlock) finalize() (err error) {
 	if h.addrs == nil {
@@ -198,15 +202,19 @@ func (h *HelloBlock) finalize() (err error) {
 		pos := 0
 		h.addrs = make([]*util.Address, 0)
 		for {
+			// reconstruct address string
 			var as string
 			as, pos = util.ReadCString(h.AddrBin, pos)
 			if pos == -1 {
 				break
 			}
+			// convert to target address type
 			var addr *util.Address
 			if addr, err = util.ParseAddress(as); err != nil {
 				return
 			}
+			addr.Expire = h.Expire_
+			// append to list
 			h.addrs = append(h.addrs, addr)
 		}
 	} else if h.AddrBin == nil {

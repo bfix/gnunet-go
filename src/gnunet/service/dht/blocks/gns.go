@@ -177,6 +177,10 @@ func NewGNSBlock() Block {
 	}
 }
 
+// Prepare a block to be of given type and expiration.
+// Not required for GNS blocks
+func (b *GNSBlock) Prepare(enums.BlockType, util.AbsoluteTime) {}
+
 // Verify the integrity of the block data from a signature.
 // Only the cryptographic signature is verified; the formal correctness of
 // the association between the block and a GNS label in a GNS zone can't

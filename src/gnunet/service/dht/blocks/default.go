@@ -34,12 +34,22 @@ import (
 // with appropriate internal logic. TestBlocks are just a pile of bits that
 // never expire...
 type TestBlock struct {
-	Data []byte `size:"*"`
+	expire util.AbsoluteTime ``         // expiry (transient!)
+	Data   []byte            `size:"*"` // block data
 }
 
 // NewTestBlock creates a new empty test block
 func NewTestBlock() Block {
-	return new(TestBlock)
+	return &TestBlock{
+		expire: util.AbsoluteTimeNever(),
+		Data:   nil,
+	}
+}
+
+// Prepare a block to be of given type and expiration.
+// Use expiration date for test block.
+func (t *TestBlock) Prepare(_ enums.BlockType, expire util.AbsoluteTime) {
+	t.expire = expire
 }
 
 // Return the block type
@@ -54,7 +64,7 @@ func (t *TestBlock) Bytes() []byte {
 
 // Expire returns the block expiration
 func (t *TestBlock) Expire() util.AbsoluteTime {
-	return util.AbsoluteTimeNever()
+	return t.expire
 }
 
 // String returns the human-readable representation of a block
