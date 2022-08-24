@@ -67,35 +67,57 @@ func (r *DHTResult) String() string {
 	return fmt.Sprintf("DHTResult{%s,dist=%d}", r.Entry, 512-r.Dist.BitLen())
 }
 
-//------------------------------------------------------------
+//----------------------------------------------------------------------
+// Sorted DHT result list
+//----------------------------------------------------------------------
 
-// DHTResultSet is a list of results
-type DHTResultSet struct {
-	list []*DHTResult // list of DHT results
-	pos  int          // iterator position
+// SortedDHTResults is a length-limit result list which only adds entries
+// if they are "better" than another listed entry. "better" means "less
+// distant" from the search key
+type SortedDHTResults struct {
+	list []*DHTResult
 }
 
-// NewDHTResultSet allocates a new result set.
-func NewDHTResultSet() *DHTResultSet {
-	return &DHTResultSet{
-		list: make([]*DHTResult, 0),
-		pos:  0,
+// NewSortedDHTResults creates a new sorted result list
+func NewSortedDHTResults(n int) *SortedDHTResults {
+	return &SortedDHTResults{
+		list: make([]*DHTResult, n),
 	}
 }
 
-// Add result to set
-func (rs *DHTResultSet) Add(r *DHTResult) {
-	rs.list = append(rs.list, r)
+// Accepts checks if given distance would be inserted into the list
+// at pos. If pos < 0 the distance is rejected.
+func (rl *SortedDHTResults) Accepts(dist *math.Int) int {
+	for pos, entry := range rl.list {
+		if entry == nil || entry.Dist.Cmp(dist) > 0 {
+			return pos
+		}
+	}
+	return -1
 }
 
-// Next result from set (iterator)
-func (rs *DHTResultSet) Next() (result *DHTResult) {
-	if rs.pos == len(rs.list) {
-		return nil
+// Add result at given position with sanity check
+func (rl *SortedDHTResults) Add(res *DHTResult, pos int) {
+	// check index
+	if pos < 0 || pos > len(rl.list)-1 {
+		return
 	}
-	result = rs.list[rs.pos]
-	rs.pos++
-	return
+	// check entry
+	entry := rl.list[pos]
+	if entry == nil || entry.Dist.Cmp(res.Dist) > 0 {
+		rl.list[pos] = res
+	}
+}
+
+// GetResults returns the final result list
+func (rl *SortedDHTResults) GetResults() []*DHTResult {
+	out := make([]*DHTResult, 0)
+	for _, res := range rl.list {
+		if res != nil {
+			out = append(out, res)
+		}
+	}
+	return out
 }
 
 //------------------------------------------------------------
@@ -254,13 +276,15 @@ func (s *DHTStore) Get(label string, query blocks.Query, rf blocks.ResultFilter)
 	return
 }
 
-// GetApprox returns the best-matching value with given key from storage
-// that is not excluded
+// GetApprox returns the best-matching values with given key from storage
+// that are not excluded
 func (s *DHTStore) GetApprox(label string, query blocks.Query, rf blocks.ResultFilter) (results []*DHTResult, err error) {
 	btype := query.Type()
 
+	// List of possible results (size limited)
+	list := NewSortedDHTResults(10)
+
 	// iterate over all keys; process each metadata instance
-	// (append to results if appropriate)
 	process := func(md *FileMetadata) {
 		// filter by block type
 		if btype != enums.BLOCK_TYPE_ANY && btype != md.btype {
@@ -272,26 +296,27 @@ func (s *DHTStore) GetApprox(label string, query blocks.Query, rf blocks.ResultF
 			// filtered out...
 			return
 		}
-		// check distance (max. 16 bucktes off)
+		// check distance in result list
 		dist := util.Distance(md.key.Data, query.Key().Data)
-		if (512 - dist.BitLen()) > 16 {
-			return
+		if pos := list.Accepts(dist); pos != -1 {
+
+			// read entry from storage
+			var entry *DHTEntry
+			if entry, err = s.readEntry(md); err != nil {
+				logger.Printf(logger.ERROR, "[%s] failed to retrieve block for %s", label, md.key.String())
+				return
+			}
+			// add to result list
+			result := &DHTResult{
+				Entry: entry,
+				Dist:  dist,
+			}
+			list.Add(result, pos)
 		}
-		// read entry from storage
-		var entry *DHTEntry
-		if entry, err = s.readEntry(md); err != nil {
-			logger.Printf(logger.ERROR, "[%s] failed to retrieve block for %s", label, md.key.String())
-			return
-		}
-		// add to result list
-		result := &DHTResult{
-			Entry: entry,
-			Dist:  dist,
-		}
-		results = append(results, result)
 	}
 	// traverse mestadata database
 	err = s.meta.Traverse(process)
+	results = list.GetResults()
 	return
 }
 
