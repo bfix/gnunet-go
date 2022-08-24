@@ -184,9 +184,9 @@ func (b *GenericBlock) Type() enums.BlockType {
 	return b.BType
 }
 
-// Expire returns the block expiration (never for custom blocks)
+// Expire returns the block expiration
 func (b *GenericBlock) Expire() util.AbsoluteTime {
-	return util.AbsoluteTimeNever()
+	return b.Expire_
 }
 
 // Verify the integrity of a block (optional). Override in custom query
@@ -199,7 +199,7 @@ func (b *GenericBlock) Verify() (bool, error) {
 
 // String returns the human-readable representation of a block
 func (b *GenericBlock) String() string {
-	return fmt.Sprintf("Block{type=%s,expire=%s,data=[%d]", b.BType, b.Expire_, len(b.Data))
+	return fmt.Sprintf("Block{type=%s,expire=%s,data=[%d]}", b.BType, b.Expire_, len(b.Data))
 }
 
 //----------------------------------------------------------------------
@@ -211,6 +211,7 @@ var (
 	blkFactory = map[enums.BlockType]func() Block{
 		enums.BLOCK_TYPE_GNS_NAMERECORD: NewGNSBlock,
 		enums.BLOCK_TYPE_DHT_URL_HELLO:  NewHelloBlock,
+		enums.BLOCK_TYPE_TEST:           NewTestBlock,
 	}
 )
 
