@@ -244,7 +244,7 @@ func (h *HelloBlock) Expire() util.AbsoluteTime {
 // String returns the human-readable representation of a block
 func (h *HelloBlock) String() string {
 	return fmt.Sprintf("HelloBlock{peer=%s,expires=%s,addrs=[%d]}",
-		h.PeerID, h.Expire_, len(h.Addresses()))
+		h.PeerID.Short(), h.Expire_, len(h.Addresses()))
 }
 
 // URL returns the HELLO URL for the data.
