@@ -434,11 +434,12 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 					logger.Printf(logger.DBG, "[%s] Result handler not suitable (%s != %s) -- skipped", label, rh.Type(), btype)
 					continue
 				}
-				if rh.Flags()&enums.DHT_RO_FIND_APPROXIMATE != msg.Flags&enums.DHT_RO_FIND_APPROXIMATE {
-					logger.Printf(logger.DBG, "[%s] Result handler asked for match, got approx -- ignored", label)
-					//continue
-				}
-
+				/*
+					if rh.Flags()&enums.DHT_RO_FIND_APPROXIMATE != msg.Flags&enums.DHT_RO_FIND_APPROXIMATE {
+						logger.Printf(logger.DBG, "[%s] Result handler asked for match, got approx -- ignored", label)
+						continue
+					}
+				*/
 				//--------------------------------------------------------------
 				// check task list for handler (9.5.2.6)
 				if rh.Flags()&enums.DHT_RO_FIND_APPROXIMATE == 0 && blkKey != nil && !blkKey.Equal(rh.Key()) {
