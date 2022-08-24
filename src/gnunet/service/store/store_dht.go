@@ -22,6 +22,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"gnunet/crypto"
+	"gnunet/enums"
 	"gnunet/service/dht/blocks"
 	"gnunet/service/dht/path"
 	"gnunet/util"
@@ -46,6 +47,11 @@ type DHTEntry struct {
 	Path *path.Path   // associated put path
 }
 
+// String returns a human-readable representation
+func (e *DHTEntry) String() string {
+	return fmt.Sprintf("DHTEntry{%s,path=%s}", e.Blk, e.Path)
+}
+
 //------------------------------------------------------------
 // DHT result is a single DHT result
 //------------------------------------------------------------
@@ -56,13 +62,20 @@ type DHTResult struct {
 	Dist  *math.Int // distance of entry to query key
 }
 
+// String returns a human-readable representation
+func (r *DHTResult) String() string {
+	return fmt.Sprintf("DHTResult{%s,dist=%d}", r.Entry, 512-r.Dist.BitLen())
+}
+
 //------------------------------------------------------------
 
+// DHTResultSet is a list of results
 type DHTResultSet struct {
 	list []*DHTResult // list of DHT results
 	pos  int          // iterator position
 }
 
+// NewDHTResultSet allocates a new result set.
 func NewDHTResultSet() *DHTResultSet {
 	return &DHTResultSet{
 		list: make([]*DHTResult, 0),
@@ -70,10 +83,12 @@ func NewDHTResultSet() *DHTResultSet {
 	}
 }
 
+// Add result to set
 func (rs *DHTResultSet) Add(r *DHTResult) {
 	rs.list = append(rs.list, r)
 }
 
+// Next result from set (iterator)
 func (rs *DHTResultSet) Next() (result *DHTResult) {
 	if rs.pos == len(rs.list) {
 		return nil
@@ -167,8 +182,8 @@ func (s *DHTStore) Put(query blocks.Query, entry *DHTEntry) (err error) {
 	expire := entry.Blk.Expire()
 	blkSize := len(entry.Blk.Bytes())
 
-	logger.Printf(logger.INFO, "[dht-store] storing %d bytes @ %s (path %s)",
-		blkSize, query.Key().Short(), entry.Path)
+	logger.Printf(logger.INFO, "[dht-store] storing %d bytes @ %s (path %s), expires %s",
+		blkSize, query.Key().Short(), entry.Path, expire)
 
 	// write entry to file for storage
 	if err = s.writeEntry(query.Key().Data, entry); err != nil {
@@ -242,9 +257,16 @@ func (s *DHTStore) Get(label string, query blocks.Query, rf blocks.ResultFilter)
 // GetApprox returns the best-matching value with given key from storage
 // that is not excluded
 func (s *DHTStore) GetApprox(label string, query blocks.Query, rf blocks.ResultFilter) (results []*DHTResult, err error) {
+	btype := query.Type()
+
 	// iterate over all keys; process each metadata instance
 	// (append to results if appropriate)
 	process := func(md *FileMetadata) {
+		// filter by block type
+		if btype != enums.BLOCK_TYPE_ANY && btype != md.btype {
+			// block type not matching
+			return
+		}
 		// check for filtered block.
 		if rf.ContainsHash(md.bhash) {
 			// filtered out...
