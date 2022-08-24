@@ -31,9 +31,15 @@ import (
 
 // TestBlock (BLOCK_TYPE_TEST) is a block for testing the DHT with non-HELLO
 // blocks. Applications using the DHT are encouraged to define custom blocks
-// with appropriate internal logic. TestBlocks are just a pile of bits...
+// with appropriate internal logic. TestBlocks are just a pile of bits that
+// never expire...
 type TestBlock struct {
 	Data []byte `size:"*"`
+}
+
+// NewTestBlock creates a new empty test block
+func NewTestBlock() Block {
+	return new(TestBlock)
 }
 
 // Return the block type
