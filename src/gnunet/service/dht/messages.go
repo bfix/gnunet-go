@@ -132,6 +132,10 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		if btype == enums.BLOCK_TYPE_DHT_URL_HELLO {
 			// try to find results in HELLO cache
 			results = m.lookupHelloCache(label, addr, rf, approx)
+			// DEBUG
+			for i, res := range results {
+				logger.Printf(logger.DBG, "[%s] cache #%d = %s", label, i, res)
+			}
 		}
 
 		//--------------------------------------------------------------
@@ -143,6 +147,10 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 				// get results from local storage
 				lclResults, err := m.getLocalStorage(label, query, rf)
 				if err == nil {
+					// DEBUG
+					for i, res := range lclResults {
+						logger.Printf(logger.DBG, "[%s] local #%d = %s", label, i, res)
+					}
 					// append local results
 					results = append(results, lclResults...)
 				}
@@ -427,8 +435,8 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 					continue
 				}
 				if rh.Flags()&enums.DHT_RO_FIND_APPROXIMATE != msg.Flags&enums.DHT_RO_FIND_APPROXIMATE {
-					logger.Println(logger.DBG, "[%s] Result handler asked for match, got approx -- skipped")
-					continue
+					logger.Printf(logger.DBG, "[%s] Result handler asked for match, got approx -- ignored", label)
+					//continue
 				}
 
 				//--------------------------------------------------------------
@@ -505,6 +513,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		}
 		// we need to cache a new(er) HELLO
 		if isNew {
+			logger.Printf(logger.INFO, "[%s] caching HELLO from %s", label, sender.Short())
 			m.rtable.CacheHello(&blocks.HelloBlock{
 				PeerID:    sender,
 				Signature: msg.Signature,
