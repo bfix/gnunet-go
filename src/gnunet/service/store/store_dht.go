@@ -64,7 +64,7 @@ type DHTResult struct {
 
 // String returns a human-readable representation
 func (r *DHTResult) String() string {
-	return fmt.Sprintf("DHTResult{%s,dist=%d}", r.Entry, 512-r.Dist.BitLen())
+	return fmt.Sprintf("DHTResult{%s,dist=%d}", r.Entry, r.Dist.BitLen())
 }
 
 //----------------------------------------------------------------------
