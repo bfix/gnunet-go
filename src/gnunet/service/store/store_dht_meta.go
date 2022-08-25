@@ -100,7 +100,7 @@ func (db *FileMetaDB) Store(md *FileMetadata) (err error) {
 	sql := "replace into meta(qkey,btype,bhash,size,stored,expires,lastUsed,usedCount) values(?,?,?,?,?,?,?,?)"
 	_, err = db.conn.Exec(sql,
 		md.key.Data, md.btype, md.bhash.Data, md.size, md.stored.Epoch(),
-		md.expires.Epoch(), md.lastUsed.Epoch(), md.usedCount)
+		md.expires.Val, md.lastUsed.Epoch(), md.usedCount)
 	return
 }
 
@@ -123,8 +123,8 @@ func (db *FileMetaDB) Get(query blocks.Query) (mds []*FileMetadata, err error) {
 		md := NewFileMetadata()
 		md.key = query.Key()
 		md.btype = btype
-		var st, exp, lu uint64
-		if err = rows.Scan(&md.size, &md.bhash.Data, &st, &exp, &lu, &md.usedCount); err != nil {
+		var st, lu uint64
+		if err = rows.Scan(&md.size, &md.bhash.Data, &st, &md.expires.Val, &lu, &md.usedCount); err != nil {
 			if err == sql.ErrNoRows {
 				md = nil
 				err = nil
@@ -132,7 +132,6 @@ func (db *FileMetaDB) Get(query blocks.Query) (mds []*FileMetadata, err error) {
 			return
 		}
 		md.stored.Val = st * 1000000
-		md.expires.Val = exp * 1000000
 		md.lastUsed.Val = lu * 1000000
 		mds = append(mds, md)
 	}
@@ -172,12 +171,11 @@ func (db *FileMetaDB) Obsolete(n int) (removable []*FileMetadata, err error) {
 	}
 	var md *FileMetadata
 	for rows.Next() {
-		var st, exp, lu uint64
-		if err = rows.Scan(&md.key, &md.btype, &md.size, &st, &exp, &lu, &md.usedCount); err != nil {
+		var st, lu uint64
+		if err = rows.Scan(&md.key, &md.btype, &md.size, &st, &md.expires.Val, &lu, &md.usedCount); err != nil {
 			return
 		}
 		md.stored.Val = st * 1000000
-		md.expires.Val = exp * 1000000
 		md.lastUsed.Val = lu * 1000000
 		removable = append(removable, md)
 	}
@@ -193,13 +191,12 @@ func (db *FileMetaDB) Traverse(f func(*FileMetadata)) error {
 	}
 	md := NewFileMetadata()
 	for rows.Next() {
-		var st, exp, lu uint64
-		err = rows.Scan(&md.key.Data, &md.btype, &md.bhash.Data, &md.size, &st, &exp, &lu, &md.usedCount)
+		var st, lu uint64
+		err = rows.Scan(&md.key.Data, &md.btype, &md.bhash.Data, &md.size, &st, &md.expires.Val, &lu, &md.usedCount)
 		if err != nil {
 			return err
 		}
 		md.stored.Val = st * 1000000
-		md.expires.Val = exp * 1000000
 		md.lastUsed.Val = lu * 1000000
 		// call process function
 		f(md)
