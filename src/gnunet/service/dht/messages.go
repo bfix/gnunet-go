@@ -602,6 +602,7 @@ func (m *Module) sendResult(ctx context.Context, query blocks.Query, blk blocks.
 	/*
 		// DEBUG:
 		if out.BType == enums.BLOCK_TYPE_TEST {
+			logger.Printf(logger.DBG, "result message = %s", util.Dump(out, "hex"))
 			logger.Printf(logger.DBG, "result message = %s", util.Dump(out, "json"))
 		}
 	*/
