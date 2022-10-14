@@ -95,6 +95,11 @@ type GNSConfig struct {
 	MaxDepth  int            `json:"maxDepth"`  // maximum recursion depth in resolution
 }
 
+// ZoneMasterConfig contains parameters for the GNS ZoneMaster process
+type ZoneMasterConfig struct {
+	Storage util.ParameterSet `json:"storage"` // persistence mechanism for zone data
+}
+
 //----------------------------------------------------------------------
 // DHT configuration
 //----------------------------------------------------------------------
@@ -159,6 +164,7 @@ type Config struct {
 	DHT        *DHTConfig        `json:"dht"`
 	GNS        *GNSConfig        `json:"gns"`
 	Namecache  *NamecacheConfig  `json:"namecache"`
+	ZoneMaster *ZoneMasterConfig `json:"zonemaster"`
 	Revocation *RevocationConfig `json:"revocation"`
 	Logging    *LoggingConfig    `json:"logging"`
 }

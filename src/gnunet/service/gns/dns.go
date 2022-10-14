@@ -178,7 +178,7 @@ func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *message.Reco
 				expires := time.Now().Add(time.Duration(record.Header().Ttl) * time.Second)
 				rr.Expire = util.NewAbsoluteTime(expires)
 				rr.Flags = 0
-				rr.RType = uint32(record.Header().Rrtype)
+				rr.RType = enums.GNSType(record.Header().Rrtype)
 				rr.Size = uint32(record.Header().Rdlength)
 				rr.Data = make([]byte, rr.Size)
 

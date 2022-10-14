@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"strings"
 
+	"gnunet/enums"
 	"gnunet/message"
 
 	"github.com/bfix/gospel/data"
@@ -31,10 +32,10 @@ import (
 
 // Box is an encapsulated RR for special names
 type Box struct {
-	Proto uint16 `order:"big"` // Protcol identifier
-	Svc   uint16 `order:"big"` // Service identifier
-	Type  uint32 `order:"big"` // Type of embedded RR
-	RR    []byte `size:"*"`    // embedded RR
+	Proto uint16        `order:"big"` // Protcol identifier
+	Svc   uint16        `order:"big"` // Service identifier
+	Type  enums.GNSType `order:"big"` // Type of embedded RR
+	RR    []byte        `size:"*"`    // embedded RR
 
 	// transient attributes (not serialized)
 	key string                  // map key for box instance

@@ -364,7 +364,7 @@ func (m *Module) ResolveRelative(
 	// asking for explicitly.
 	if set.Count > 0 {
 		for _, rec := range records {
-			if !kind.HasType(enums.GNSType(rec.RType)) && (int(rec.Flags)&enums.GNS_FLAG_SUPPL) != 0 {
+			if !kind.HasType(enums.GNSType(rec.RType)) && (rec.Flags&enums.GNS_FLAG_SUPPL) != 0 {
 				set.AddRecord(rec)
 			}
 		}
@@ -474,8 +474,8 @@ func (m *Module) Lookup(
 func (m *Module) newLEHORecord(name string, expires util.AbsoluteTime) *message.ResourceRecord {
 	rr := new(message.ResourceRecord)
 	rr.Expire = expires
-	rr.Flags = uint32(enums.GNS_FLAG_SUPPL)
-	rr.RType = uint32(enums.GNS_TYPE_LEHO)
+	rr.Flags = enums.GNS_FLAG_SUPPL
+	rr.RType = enums.GNS_TYPE_LEHO
 	rr.Size = uint32(len(name) + 1)
 	rr.Data = make([]byte, rr.Size)
 	copy(rr.Data, []byte(name))

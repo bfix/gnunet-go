@@ -39,7 +39,7 @@ type LookupMsg struct {
 	Zone     *crypto.ZoneKey ``            // Zone that is to be used for lookup
 	Options  uint16          `order:"big"` // Local options for where to look for results
 	Reserved uint16          `order:"big"` // Always 0
-	RType    uint32          `order:"big"` // the type of record to look up
+	RType    enums.GNSType   `order:"big"` // the type of record to look up
 	Name     []byte          `size:"*"`    // zero-terminated name to look up
 }
 
@@ -51,7 +51,7 @@ func NewGNSLookupMsg() *LookupMsg {
 		Zone:      nil,
 		Options:   uint16(enums.GNS_LO_DEFAULT),
 		Reserved:  0,
-		RType:     uint32(enums.GNS_TYPE_ANY),
+		RType:     enums.GNS_TYPE_ANY,
 		Name:      nil,
 	}
 }
@@ -139,15 +139,15 @@ func (rs *RecordSet) Expire() util.AbsoluteTime {
 type ResourceRecord struct {
 	Expire util.AbsoluteTime // Expiration time for the record
 	Size   uint32            `order:"big"` // Number of bytes in 'Data'
-	RType  uint32            `order:"big"` // Type of the GNS/DNS record
-	Flags  uint32            `order:"big"` // Flags for the record
+	RType  enums.GNSType     `order:"big"` // Type of the GNS/DNS record
+	Flags  enums.GNSFlag     `order:"big"` // Flags for the record
 	Data   []byte            `size:"Size"` // Record data
 }
 
 // String returns a human-readable representation of the message.
 func (r *ResourceRecord) String() string {
 	return fmt.Sprintf("GNSResourceRecord{type=%s,expire=%s,flags=%d,size=%d}",
-		enums.GNSType(r.RType).String(), r.Expire, r.Flags, r.Size)
+		r.RType.String(), r.Expire, r.Flags, r.Size)
 }
 
 // LookupResultMsg is a response message for a GNS name lookup request

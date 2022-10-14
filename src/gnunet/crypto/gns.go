@@ -147,8 +147,7 @@ type ZoneSigImpl interface {
 
 //nolint:stylecheck // allow non-camel-case in constants
 var (
-	ZONE_PKEY  = uint32(enums.GNS_TYPE_PKEY)
-	ZONE_EDKEY = uint32(enums.GNS_TYPE_EDKEY)
+	ZONE_EDKEY = enums.GNS_TYPE_EDKEY
 )
 
 var (
@@ -176,7 +175,7 @@ type ZoneImplementation struct {
 
 // keep a mapping of available implementations
 var (
-	zoneImpl = make(map[uint32]*ZoneImplementation)
+	zoneImpl = make(map[enums.GNSType]*ZoneImplementation)
 )
 
 // Error codes
@@ -187,7 +186,7 @@ var (
 
 // GetImplementation return the factory for a given zone type.
 // If zje zone type is unregistered, nil is returned.
-func GetImplementation(ztype uint32) *ZoneImplementation {
+func GetImplementation(ztype enums.GNSType) *ZoneImplementation {
 	if impl, ok := zoneImpl[ztype]; ok {
 		return impl
 	}
@@ -210,7 +209,7 @@ type ZonePrivate struct {
 }
 
 // NewZonePrivate returns a new initialized ZonePrivate instance
-func NewZonePrivate(ztype uint32, d []byte) (zp *ZonePrivate, err error) {
+func NewZonePrivate(ztype enums.GNSType, d []byte) (zp *ZonePrivate, err error) {
 	// get factory for given zone type
 	impl, ok := zoneImpl[ztype]
 	if !ok {
@@ -286,8 +285,8 @@ func (zp *ZonePrivate) Public() *ZoneKey {
 
 // ZoneKey represents the possible types of zone keys (PKEY, EDKEY,...)
 type ZoneKey struct {
-	Type    uint32 `json:"type" order:"big"`
-	KeyData []byte `json:"key" size:"(KeySize)"`
+	Type    enums.GNSType `json:"type" order:"big"`
+	KeyData []byte        `json:"key" size:"(KeySize)"`
 
 	impl ZoneKeyImpl // reference to implementation
 }

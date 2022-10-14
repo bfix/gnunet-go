@@ -21,11 +21,12 @@
     },
     "environ": {
         "TMP": "/tmp",
-        "RT_SYS": "${TMP}/gnunet-system-runtime"
+        "RT_SYS": "${TMP}/gnunet-system-runtime",
+        "VAR_LIB": "/var/lib/gnunet"
     },
     "dht": {
         "service": {
-            "socket": "${RT_SYS}/gnunet-service-dht.sock",
+            "socket": "${RT_SYS}/gnunet-service-dht-go.sock",
             "params": {
                 "perm": "0770"
             }
@@ -54,7 +55,7 @@
     },
     "namecache": {
         "service": {
-            "socket": "${RT_SYS}/gnunet-service-namecache.sock",
+            "socket": "${RT_SYS}/gnunet-service-namecache-go.sock",
             "params": {
                 "perm": "0770"
             }
@@ -79,6 +80,12 @@
             "addr": "localhost:6397",
             "passwd": "",
             "id": 15
+        }
+    },
+    "zonemaster": {
+        "storage": {
+            "mode": "sqlite3",
+            "file": "${VAR_LIB}/gns/zonemaster.sqlite3"
         }
     },
     "rpc": {

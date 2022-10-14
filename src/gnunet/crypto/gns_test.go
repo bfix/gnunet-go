@@ -23,6 +23,7 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/hex"
+	"gnunet/enums"
 	"gnunet/util"
 	"testing"
 	"time"
@@ -249,7 +250,7 @@ func TestDeriveH(t *testing.T) {
 	)
 
 	// create private key from scalar
-	prv, err := NewZonePrivate(ZONE_PKEY, D)
+	prv, err := NewZonePrivate(enums.GNS_TYPE_PKEY, D)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -60,7 +60,7 @@ func TestRevocationRFC(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	prv, err := crypto.NewZonePrivate(crypto.ZONE_PKEY, d)
+	prv, err := crypto.NewZonePrivate(enums.GNS_TYPE_PKEY, d)
 	if err != nil {
 		t.Fatal(err)
 	}

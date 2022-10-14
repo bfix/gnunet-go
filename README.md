@@ -213,13 +213,16 @@ The above configuration will expect a network of 10 nodes and has a single
 bootstrap node (the first DHTU node in the testbed). `gnunet-go` will listen
 on port 2086.
 
+Check the configuration for path definitions (especially `/var/libg/gnunet/...`)
+and make sure the folders exist and have R/W permissions for the user running
+the test.
+
 #### Running the `gnunet-go`node
 
 Run the following commands to start the `gnunet-go` node:
 
 ```bash
-rm -rf /tmp/gnunet-system-runtime
-mkdir -p /tmp/gnunet-system-runtime
+rm -f /tmp/gnunet-system-runtime/*-go.sock
 ${GOPATH}/bin/gnunet-service-dht-go -c dhtu-config.json 2>&1 | tee run.log
 ```
 
@@ -389,9 +392,9 @@ func main() {
 * edit `go.mod` and add at end of file:
 
 ```bash
-require gnunet v0.1.27
+require gnunet v0.1.34
 
-replace gnunet v0.1.27 => /home/user/gnunet-go/src/gnunet
+replace gnunet v0.1.34 => /home/user/gnunet-go/src/gnunet
 ```
 
 * run `go mod tidy`

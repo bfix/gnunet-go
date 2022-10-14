@@ -19,12 +19,14 @@
 //nolint:stylecheck // allow non-camel-case for constants
 package enums
 
+type GNSFlag uint32
+
 const (
 	// GNS record flags
-	GNS_FLAG_PRIVATE = 2  // Record is not shared on the DHT
-	GNS_FLAG_SUPPL   = 4  // Supplemental records (e.g. NICK) in a block
-	GNS_FLAG_EXPREL  = 8  // Expire time in record is in relative time.
-	GNS_FLAG_SHADOW  = 16 // Record is ignored if non-expired records of same type exist in block
+	GNS_FLAG_PRIVATE GNSFlag = 2  // Record is not shared on the DHT
+	GNS_FLAG_SUPPL   GNSFlag = 4  // Supplemental records (e.g. NICK) in a block
+	GNS_FLAG_EXPREL  GNSFlag = 8  // Expire time in record is in relative time.
+	GNS_FLAG_SHADOW  GNSFlag = 16 // Record is ignored if non-expired records of same type exist in block
 
 	// GNS_LocalOptions
 	GNS_LO_DEFAULT      = 0 // Defaults, look in cache, then in DHT.

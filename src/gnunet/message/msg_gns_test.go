@@ -69,7 +69,7 @@ func TestRecordsetPKEY(t *testing.T) {
 						Val: uint64(26147096139323793),
 					},
 					Size:  36,
-					RType: crypto.ZONE_PKEY,
+					RType: enums.GNS_TYPE_PKEY,
 					Flags: 2,
 					Data: []byte{
 						0x00, 0x01, 0x00, 0x00,
@@ -134,7 +134,7 @@ func TestRecordsetPKEY(t *testing.T) {
 	)
 
 	// check zone key pair
-	prv, err := crypto.NewZonePrivate(crypto.ZONE_PKEY, D)
+	prv, err := crypto.NewZonePrivate(enums.GNS_TYPE_PKEY, D)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -229,7 +229,7 @@ func TestRecordsetEDKEY(t *testing.T) {
 						Val: uint64(49556645701000000),
 					},
 					Size:  36,
-					RType: uint32(enums.GNS_TYPE_NICK),
+					RType: enums.GNS_TYPE_NICK,
 					Flags: 2,
 					Data: []byte{
 						0x4d, 0x79, 0x20, 0x4e, 0x69, 0x63, 0x6b, 0x00,

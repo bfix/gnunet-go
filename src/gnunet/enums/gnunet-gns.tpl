@@ -3,7 +3,7 @@
 //nolint:stylecheck // allow non-camel-case for constants
 package enums
 
-type GNSType int
+type GNSType uint32
 
 // GNS constants
 const (

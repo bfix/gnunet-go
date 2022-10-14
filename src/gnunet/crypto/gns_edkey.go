@@ -22,6 +22,7 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"errors"
+	"gnunet/enums"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/crypto/ed25519"
@@ -57,7 +58,7 @@ func init() {
 
 // EDKEYPublicImpl implements the public key scheme.
 type EDKEYPublicImpl struct {
-	ztype uint32
+	ztype enums.GNSType
 	pub   *ed25519.PublicKey
 }
 

@@ -119,7 +119,7 @@ func NewBlockHandlerList(records []*message.ResourceRecord, labels []string) (*B
 	shadows := make([]*message.ResourceRecord, 0)
 	for _, rec := range records {
 		// filter out shadow records...
-		if (int(rec.Flags) & enums.GNS_FLAG_SHADOW) != 0 {
+		if (rec.Flags & enums.GNS_FLAG_SHADOW) != 0 {
 			shadows = append(shadows, rec)
 		}
 	}
@@ -128,7 +128,7 @@ func NewBlockHandlerList(records []*message.ResourceRecord, labels []string) (*B
 	active := make([]*message.ResourceRecord, 0)
 	for _, rec := range records {
 		// don't process shadow records again
-		if (int(rec.Flags) & enums.GNS_FLAG_SHADOW) != 0 {
+		if (rec.Flags & enums.GNS_FLAG_SHADOW) != 0 {
 			continue
 		}
 		// check for expired record
@@ -137,7 +137,7 @@ func NewBlockHandlerList(records []*message.ResourceRecord, labels []string) (*B
 			for _, shadow := range shadows {
 				if shadow.RType == rec.RType && !shadow.Expire.Expired() {
 					// deliver un-expired shadow record instead.
-					shadow.Flags &^= uint32(enums.GNS_FLAG_SHADOW)
+					shadow.Flags &^= enums.GNS_FLAG_SHADOW
 					active = append(active, shadow)
 				}
 			}
@@ -149,7 +149,7 @@ func NewBlockHandlerList(records []*message.ResourceRecord, labels []string) (*B
 	// Third pass: Traverse active list and build list of handler instances.
 	for _, rec := range active {
 		// update counter map for non-supplemental records
-		if (int(rec.Flags) & enums.GNS_FLAG_SUPPL) != 0 {
+		if (rec.Flags & enums.GNS_FLAG_SUPPL) != 0 {
 			logger.Printf(logger.DBG, "[gns] handler_list: skip %v\n", rec)
 			continue
 		}
@@ -216,7 +216,7 @@ func (hl *BlockHandlerList) FinalizeRecord(rec *message.ResourceRecord) *message
 
 // ZoneKeyHandler implementing the BlockHandler interface
 type ZoneKeyHandler struct {
-	ztype uint32                  // zone type
+	ztype enums.GNSType           // zone type
 	zkey  *crypto.ZoneKey         // Zone key
 	rec   *message.ResourceRecord // associated recource record
 }

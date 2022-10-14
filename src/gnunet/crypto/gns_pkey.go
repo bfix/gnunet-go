@@ -23,6 +23,7 @@ import (
 	"crypto/cipher"
 	"crypto/sha256"
 	"crypto/sha512"
+	"gnunet/enums"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/crypto/ed25519"
@@ -41,7 +42,7 @@ import (
 
 // register our implementation
 func init() {
-	zoneImpl[ZONE_PKEY] = &ZoneImplementation{
+	zoneImpl[enums.GNS_TYPE_PKEY] = &ZoneImplementation{
 		NewPrivate:    func() ZonePrivateImpl { return &PKEYPrivateImpl{} },
 		PrivateSize:   32,
 		NewPublic:     func() ZoneKeyImpl { return &PKEYPublicImpl{} },
@@ -57,14 +58,14 @@ func init() {
 
 // PKEYPublicImpl implements the public key scheme.
 type PKEYPublicImpl struct {
-	ztype uint32
+	ztype enums.GNSType
 	pub   *ed25519.PublicKey
 }
 
 // Init instance from binary data. The data represents a big integer
 // (in big-endian notation) for the private scalar d.
 func (pk *PKEYPublicImpl) Init(data []byte) error {
-	pk.ztype = ZONE_PKEY
+	pk.ztype = enums.GNS_TYPE_PKEY
 	pk.pub = ed25519.NewPublicKeyFromBytes(data)
 	return nil
 }
@@ -171,7 +172,7 @@ type PKEYPrivateImpl struct {
 func (pk *PKEYPrivateImpl) Init(data []byte) error {
 	d := math.NewIntFromBytes(data)
 	pk.prv = ed25519.NewPrivateKeyFromD(d)
-	pk.ztype = ZONE_PKEY
+	pk.ztype = enums.GNS_TYPE_PKEY
 	pk.pub = pk.prv.Public()
 	return nil
 }
