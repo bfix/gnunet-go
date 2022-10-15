@@ -280,7 +280,7 @@ func (db *ZoneDB) SetLabel(l *Label) error {
 // ("where" clause)
 func (db *ZoneDB) GetLabels(filter string, args ...any) (list []*Label, err error) {
 	// assemble querey
-	stmt := "select id,zid,name,created,modified from records"
+	stmt := "select id,zid,name,created,modified from labels"
 	if len(filter) > 0 {
 		stmt += " where " + fmt.Sprintf(filter, args...)
 	}
@@ -370,6 +370,108 @@ func (db *ZoneDB) GetRecords(filter string, args ...any) (list []*Record, err er
 		rec.Size = uint32(len(rec.Data))
 		// append to result list
 		list = append(list, rec)
+	}
+	return
+}
+
+//----------------------------------------------------------------------
+// Retrieve database content as a nested struct
+//----------------------------------------------------------------------
+
+// LabelGroup is a nested label entry (with records)
+type LabelGroup struct {
+	Label   *Label
+	Records []*Record
+}
+
+// ZoneGroup is a nested zone entry (with labels)
+type ZoneGroup struct {
+	Zone   *Zone
+	Labels []*LabelGroup
+}
+
+// GetContent returns the database content as a nested list of zones, labels
+// and records. Since the use-case for the ZoneManager is the management of
+// local zones, the number of entries is limited.
+func (db *ZoneDB) GetContent() (zg []*ZoneGroup, err error) {
+	// get all zones
+	var zones []*Zone
+	if zones, err = db.GetZones(""); err != nil {
+		return
+	}
+	for _, z := range zones {
+		// create group instance for zone
+		zGroup := &ZoneGroup{
+			Zone:   z,
+			Labels: make([]*LabelGroup, 0),
+		}
+		zg = append(zg, zGroup)
+
+		// get all labels for zone
+		var labels []*Label
+		if labels, err = db.GetLabels("zid=%d", z.ID); err != nil {
+			return
+		}
+		for _, l := range labels {
+			// create group instance for label
+			lGroup := &LabelGroup{
+				Label:   l,
+				Records: make([]*Record, 0),
+			}
+			// link to zone group
+			zGroup.Labels = append(zGroup.Labels, lGroup)
+
+			// get all records for label
+			lGroup.Records, err = db.GetRecords("lid=%d", l.ID)
+		}
+	}
+	return
+}
+
+//----------------------------------------------------------------------
+// Retrieve list of used names (Zone,Label) or RR types (Record)
+//----------------------------------------------------------------------
+
+// GetNames returns a list of used names (table "zones" and "labels")
+func (db *ZoneDB) GetNames(tbl string) (names []string, err error) {
+	// select all zone names
+	stmt := fmt.Sprintf("select name from %s", tbl)
+	var rows *sql.Rows
+	if rows, err = db.conn.Query(stmt); err != nil {
+		return
+	}
+	// process zones
+	defer rows.Close()
+	var name string
+	for rows.Next() {
+		if err = rows.Scan(&name); err != nil {
+			// terminate on error; return list so far
+			return
+		}
+		// append to result list
+		names = append(names, name)
+	}
+	return
+}
+
+// GetRRTypes returns a list record types stored under a label
+func (db *ZoneDB) GetRRTypes(lid string) (rrtypes []enums.GNSType, err error) {
+	// select all record types under label
+	stmt := fmt.Sprintf("select rrtype from records where lid=%s", lid)
+	var rows *sql.Rows
+	if rows, err = db.conn.Query(stmt); err != nil {
+		return
+	}
+	// process records
+	defer rows.Close()
+	var rrtype enums.GNSType
+	for rows.Next() {
+		if err = rows.Scan(&rrtype); err != nil {
+			// terminate on error; return list so far
+			return
+		}
+		// append to result list
+		rrtypes = append(rrtypes, rrtype)
 	}
 	return
 }
