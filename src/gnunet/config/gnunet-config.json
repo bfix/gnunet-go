@@ -34,7 +34,7 @@
         "storage": {
             "mode": "file",
             "cache": false,
-            "path": "/var/lib/gnunet/dht/store",
+            "path": "${VAR_LIB}/dht/store",
             "maxGB": 10
         },
         "routing": {
@@ -63,7 +63,7 @@
         "storage": {
             "mode": "file",
             "cache": true,
-            "path": "/var/lib/gnunet/namecache",
+            "path": "${VAR_LIB}/namecache",
             "num": 1000,
             "expire": 43200
         }
@@ -83,16 +83,18 @@
         }
     },
     "zonemaster": {
+        "period": 300,
         "storage": {
             "mode": "sqlite3",
             "file": "${VAR_LIB}/gns/zonemaster.sqlite3"
-        }
+        },
+        "gui": "127.0.0.1:8100"
     },
     "rpc": {
         "endpoint": "tcp:127.0.0.1:80"
     },
     "logging": {
         "level": 4,
-        "file": "/tmp/gnunet-go/run.log"
+        "file": "${TMP}/gnunet-go/run.log"
     }
 }
