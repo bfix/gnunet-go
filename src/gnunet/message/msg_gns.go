@@ -25,6 +25,7 @@ import (
 	"gnunet/enums"
 	"gnunet/util"
 
+	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
 )
 
@@ -132,6 +133,15 @@ func (rs *RecordSet) Expire() util.AbsoluteTime {
 		}
 	}
 	return expires
+}
+
+// Bytes returns the binary representation
+func (rs *RecordSet) Bytes() []byte {
+	buf, err := data.Marshal(rs)
+	if err != nil {
+		return nil
+	}
+	return buf
 }
 
 // ResourceRecord is the GNUnet-specific representation of resource
