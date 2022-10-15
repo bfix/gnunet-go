@@ -25,10 +25,18 @@ create table zones (
     zdata    blob
 );
 
-create table records (
+
+create table labels (
     id       integer primary key autoincrement,
     zid      integer references zones(id),
-	name     text, 
+	name     text,
+    created  integer,
+    modified integer
+);
+
+create table records (
+    id       integer primary key autoincrement,
+    lid      integer references labels(id),
     expire   integer,
     created  integer,
     modified integer,

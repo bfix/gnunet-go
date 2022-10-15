@@ -59,12 +59,31 @@ func NewZone(name string, sk *crypto.ZonePrivate) *Zone {
 
 //----------------------------------------------------------------------
 
+type Label struct {
+	ID       int64             // database id of label
+	Zone     int64             // database ID of parent zone
+	Name     string            // label name
+	Created  util.AbsoluteTime // date of creation
+	Modified util.AbsoluteTime // date of last modification
+}
+
+func NewLabel(label string) *Label {
+	lbl := new(Label)
+	lbl.ID = 0
+	lbl.Zone = 0
+	lbl.Name = label
+	lbl.Created = util.AbsoluteTimeNow()
+	lbl.Modified = util.AbsoluteTimeNow()
+	return lbl
+}
+
+//----------------------------------------------------------------------
+
 // Record for GNS resource in a zone (generic). It is the responsibility
 // of the caller to provide valid resource data in binary form.
 type Record struct {
 	ID       int64             // database id of record
-	Zone     int64             // database ID of parent zone
-	Name     string            // record name
+	Label    int64             // database ID of parent label
 	Created  util.AbsoluteTime // date of creation
 	Modified util.AbsoluteTime // date of last modification
 
@@ -75,7 +94,8 @@ type Record struct {
 // automatically added to the database.
 func NewRecord(expire util.AbsoluteTime, rtype enums.GNSType, flags enums.GNSFlag, data []byte) *Record {
 	rec := new(Record)
-	rec.Zone = 0
+	rec.ID = 0
+	rec.Label = 0
 	rec.Expire = expire
 	rec.RType = rtype
 	rec.Flags = flags
@@ -168,9 +188,9 @@ func (db *ZoneDB) SetZone(z *Zone) error {
 		}
 		return err
 	}
-	// remove zone from database: also move all dependent resource
-	// records into "trash bin" (parent zone reference is nil)
-	if _, err := db.conn.Exec("update records set zid=null where zid=?", z.ID); err != nil {
+	// remove zone from database: also move all dependent labels to "trash bin"
+	// (parent zone reference is nil)
+	if _, err := db.conn.Exec("update labels set zid=null where zid=?", z.ID); err != nil {
 		return err
 	}
 	_, err := db.conn.Exec("delete from zones where id=?", z.ID)
@@ -212,7 +232,80 @@ func (db *ZoneDB) GetZones(filter string, args ...any) (list []*Zone, err error)
 }
 
 //----------------------------------------------------------------------
-// Record handling handling
+// Label handling
+//----------------------------------------------------------------------
+
+// SetLabel inserts, updates or deletes a zone label in the database.
+// The function does not change timestamps which are in the
+// responsibility of the caller.
+//   - insert: Label.ID is nil (0)
+//   - update: Label.Name is set (eventually modified)
+//   - remove: otherwise
+func (db *ZoneDB) SetLabel(l *Label) error {
+	// check for label insert
+	if l.ID == 0 {
+		stmt := "insert into labels(zid,name,created,modified) values(?,?,?,?)"
+		result, err := db.conn.Exec(stmt, l.Zone, l.Name, l.Created.Val, l.Modified.Val)
+		if err != nil {
+			return err
+		}
+		l.ID, err = result.LastInsertId()
+		return err
+	}
+	// check for label update
+	if len(l.Name) > 0 {
+		stmt := "update labels set zid=?,name=?,created=?,modified=? where id=?"
+		result, err := db.conn.Exec(stmt, l.Zone, l.Name, l.Created.Val, l.Modified.Val, l.ID)
+		if err != nil {
+			return err
+		}
+		var num int64
+		if num, err = result.RowsAffected(); err == nil {
+			if num != 1 {
+				err = errors.New("update label failed")
+			}
+		}
+		return err
+	}
+	// remove label from database; move dependent records to trash bin
+	// (label id set to nil)
+	if _, err := db.conn.Exec("update records set lid=null where lid=?", l.ID); err != nil {
+		return err
+	}
+	_, err := db.conn.Exec("delete from labels where id=?", l.ID)
+	return err
+}
+
+// GetLabels retrieves record instances from database matching a filter
+// ("where" clause)
+func (db *ZoneDB) GetLabels(filter string, args ...any) (list []*Label, err error) {
+	// assemble querey
+	stmt := "select id,zid,name,created,modified from records"
+	if len(filter) > 0 {
+		stmt += " where " + fmt.Sprintf(filter, args...)
+	}
+	// select labels
+	var rows *sql.Rows
+	if rows, err = db.conn.Query(stmt); err != nil {
+		return
+	}
+	// process labels
+	defer rows.Close()
+	for rows.Next() {
+		// assemble label from database row
+		lbl := new(Label)
+		if err = rows.Scan(&lbl.ID, &lbl.Zone, &lbl.Name, &lbl.Created.Val, &lbl.Modified.Val); err != nil {
+			// terminate on error; return list so far
+			return
+		}
+		// append to result list
+		list = append(list, lbl)
+	}
+	return
+}
+
+//----------------------------------------------------------------------
+// Record handling
 //----------------------------------------------------------------------
 
 // SetRecord inserts, updates or deletes a record in the database.
@@ -224,8 +317,8 @@ func (db *ZoneDB) GetZones(filter string, args ...any) (list []*Zone, err error)
 func (db *ZoneDB) SetRecord(r *Record) error {
 	// check for record insert
 	if r.ID == 0 {
-		stmt := "insert into records(zid,name,expire,created,modified,flags,rtype,rdata) values(?,?,?,?,?,?,?,?)"
-		result, err := db.conn.Exec(stmt, r.Zone, r.Name, r.Expire.Val, r.Created.Val, r.Modified.Val, r.Flags, r.RType, r.Data)
+		stmt := "insert into records(lid,expire,created,modified,flags,rtype,rdata) values(?,?,?,?,?,?,?)"
+		result, err := db.conn.Exec(stmt, r.Label, r.Expire.Val, r.Created.Val, r.Modified.Val, r.Flags, r.RType, r.Data)
 		if err != nil {
 			return err
 		}
@@ -233,9 +326,9 @@ func (db *ZoneDB) SetRecord(r *Record) error {
 		return err
 	}
 	// check for record update
-	if r.Zone != 0 {
-		stmt := "update records set zid=?,name=?,expire=?,created=?,modified=?,flags=?,rtype=?,rdata=? where id=?"
-		result, err := db.conn.Exec(stmt, r.Zone, r.Name, r.Expire.Val, r.Created.Val, r.Modified.Val, r.Flags, r.RType, r.Data, r.ID)
+	if r.Label != 0 {
+		stmt := "update records set lid=?,expire=?,created=?,modified=?,flags=?,rtype=?,rdata=? where id=?"
+		result, err := db.conn.Exec(stmt, r.Label, r.Expire.Val, r.Created.Val, r.Modified.Val, r.Flags, r.RType, r.Data, r.ID)
 		if err != nil {
 			return err
 		}
@@ -256,7 +349,7 @@ func (db *ZoneDB) SetRecord(r *Record) error {
 // ("where" clause)
 func (db *ZoneDB) GetRecords(filter string, args ...any) (list []*Record, err error) {
 	// assemble querey
-	stmt := "select id,zid,expire,created,modified,flags,rtype,rdata from records"
+	stmt := "select id,lid,expire,created,modified,flags,rtype,rdata from records"
 	if len(filter) > 0 {
 		stmt += " where " + fmt.Sprintf(filter, args...)
 	}
@@ -265,12 +358,12 @@ func (db *ZoneDB) GetRecords(filter string, args ...any) (list []*Record, err er
 	if rows, err = db.conn.Query(stmt); err != nil {
 		return
 	}
-	// process zones
+	// process records
 	defer rows.Close()
 	for rows.Next() {
-		// assemble zone from database row
+		// assemble record from database row
 		rec := new(Record)
-		if err = rows.Scan(&rec.ID, &rec.Zone, &rec.Expire.Val, &rec.Created.Val, &rec.Modified.Val, &rec.Flags, &rec.RType, &rec.Data); err != nil {
+		if err = rows.Scan(&rec.ID, &rec.Label, &rec.Expire.Val, &rec.Created.Val, &rec.Modified.Val, &rec.Flags, &rec.RType, &rec.Data); err != nil {
 			// terminate on error; return list so far
 			return
 		}

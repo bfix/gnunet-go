@@ -28,12 +28,16 @@ import (
 )
 
 func TestZoneMaster(t *testing.T) {
+
+	//------------------------------------------------------------------
 	// create database
 	zdb, err := OpenZoneDB("/tmp/zonemaster.db")
 	if err != nil {
 		t.Fatal(err)
 	}
-	// create zone
+
+	//------------------------------------------------------------------
+	// create zone and add zone to database
 	seed := make([]byte, 32)
 	if _, err = rand.Read(seed); err != nil {
 		t.Fatal(err)
@@ -42,17 +46,28 @@ func TestZoneMaster(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	zone := NewZone("zone1", zp)
-	// add zone to database
+	zone := NewZone("foo", zp)
 	if err = zdb.SetZone(zone); err != nil {
 		t.Fatal(err)
 	}
-	// add record to zone and database
+
+	//------------------------------------------------------------------
+	// create label and add to zone and database
+	label := NewLabel("bar")
+	label.Zone = zone.ID
+	if err = zdb.SetLabel(label); err != nil {
+		t.Fatal(err)
+	}
+
+	//------------------------------------------------------------------
+	// add record to label and database
 	rec := NewRecord(util.AbsoluteTimeNever().Add(time.Hour), enums.GNS_TYPE_DNS_TXT, 0, []byte("test entry"))
-	rec.Zone = zone.ID
+	rec.Label = label.ID
 	if err = zdb.SetRecord(rec); err != nil {
 		t.Fatal(err)
 	}
+
+	//------------------------------------------------------------------
 	// search record in database
 	recs, err := zdb.GetRecords("rtype=%d", enums.GNS_TYPE_DNS_TXT)
 	if err != nil {
@@ -61,12 +76,16 @@ func TestZoneMaster(t *testing.T) {
 	if len(recs) != 1 {
 		t.Fatalf("record: got %d records, expected 1", len(recs))
 	}
+
+	//------------------------------------------------------------------
 	// rename zone
 	zone.Name = "MyZone"
 	zone.Modified = util.AbsoluteTimeNow()
 	if err = zdb.SetZone(zone); err != nil {
 		t.Fatal(err)
 	}
+
+	//------------------------------------------------------------------
 	// search zone in database
 	zones, err := zdb.GetZones("name like 'My%%'")
 	if err != nil {
@@ -75,6 +94,8 @@ func TestZoneMaster(t *testing.T) {
 	if len(zones) != 1 {
 		t.Fatalf("zone: got %d records, expected 1", len(zones))
 	}
+
+	//------------------------------------------------------------------
 	// close database
 	if err = zdb.Close(); err != nil {
 		t.Fatal(err)
