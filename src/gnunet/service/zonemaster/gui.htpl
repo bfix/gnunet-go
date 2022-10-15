@@ -1,0 +1,339 @@
+{{define "main"}}
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+        <style>
+            * {
+                box-sizing: border-box;
+            }
+            body {
+                margin: 2em 10em 2em 10em;
+            }
+            div.row::after {
+                content: "";
+                clear: both;
+                display: table;
+            }
+            div.cell {
+                display: inline;
+                float: left;
+            }
+            div.box {
+                border: 2px solid black;
+                margin: 0.5em;
+                padding: 0.5em;
+            }
+            div.heading {
+                color: white;
+                background-color: orange;
+                font-size: 200%;
+                font-weight: bold;
+                padding: 0.3em;
+                margin: 1em 0 1em 0;
+            }
+            button.icon {
+                border: none;
+                color: black;
+                background-color: white;
+                padding: 0 0;
+                text-align: center;
+                text-decoration: none;
+                display: inline-block;
+                font-size: 100%;
+                margin: 4px 2px;
+                cursor: pointer;
+            }
+            .label {
+                text-align: right;
+                vertical-align: top;
+                font-weight: bold;
+            }            
+            .title {
+                font-size: 120%;
+                font-weight: bold;
+                margin-bottom: 0.5em;
+            }
+            .large {
+                font-size: 200%;
+                font-weight: bold;
+            }
+            .small {
+                font-size: 75%;
+            }
+            .blue {
+                color: blue !important;
+            }
+            .red {
+                color: red !important;
+            }
+            .headline {
+                color: white;
+                padding: 0.3em;
+            }
+            .status-0 {
+                background-color: green;
+            }
+            .status-1 {
+                background-color: orange;
+            }
+            .status-2 {
+                background-color: red;
+            }
+            .spacer-right {
+                margin-right: 2em;
+            }
+            .changed {
+                background-color: #fee;
+            }
+            table.rowed {
+                border-collapse: separate;
+            }
+            table.rowed > tbody > tr {
+                border: solid;
+                border-width: 1px 0;
+                border-color: #ccc;
+            }
+            tr.row:nth-child(even) {
+                background: #eef;
+            }
+            tr.row:nth-child(odd) {
+                background: #ccf;
+            }
+            tr.header {
+                background: #eee;
+                color: black;
+                font-weight: bold;
+            }
+            td {
+                padding: 0.5em;
+            }
+            th {
+                padding: 0.5em;
+                text-align: center;
+            }
+            label[for=toggle] {
+                cursor: pointer;
+                border: 1px solid black;
+                border-radius: 0.2em;
+                background-color: #eeeeee;
+                padding: 0.1em;
+            }
+            #toggle {
+                display: none;
+            }
+            #toggle:not(:checked) ~ #toggled {
+                display: none;
+            }
+            ul, #dashboard {
+                list-style-type: none;
+            }
+            #dashboard {
+                margin: 0;
+                padding: 0;
+            }
+            li {
+                margin: 0.5em;
+            }
+            .caret {
+                cursor: pointer;
+                user-select: none;
+            }
+            .caret::before {
+                content: "\25B6";
+                color: black;
+                display: inline-block;
+                margin-right: 6px;
+            }
+            .caret-down::before {
+                transform: rotate(90deg);
+            }
+            .nested {
+                display: none;
+            }
+            .active {
+                display: block;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>GNUnet Zone Master</h1>
+        <hr/>
+        {{.}}
+        <script>
+            function notify(msg) {
+                if ('Notification' in window) {
+                    if (Notification.permission !== 'denied') {
+                        Notification.requestPermission(function (permission) {
+                            if (permission === 'granted') {
+                                var note = new Notification('GNUnet Zone Master', {
+                                    body: msg,
+                                    actions: []
+                                });
+                            }
+                        });
+                    }
+                }
+            }
+        </script>
+    </body>
+</html>
+{{end}}
+
+{{define "dashboard"}}
+<div>
+    <ul id="dashboard">
+        {{range $zi, $zone := .}}
+        <li>
+            {{$z := $zone.Zone}}
+            <span class="caret">
+                <b>{{$z.Name}}</b> [{{keytype $z.Key.Type}}]
+                <a href="/edit/zone/{{$z.ID}}" title="Edit zone"><button class="icon blue">&#9998;</button></a>
+                <a href="/del/zone/{{$z.ID}}" title="Remove zone"><button class="icon red">&#10006;</button></a>
+                (Created: {{date $z.Created}}, Modified: {{date $z.Modified}})
+            </span>
+            <ul class="nested">
+                {{range $li, $label := $zone.Labels}}
+                <li>
+                    {{$l := $label.Label}}
+                    <span class="caret">
+                        <b>{{$l.Name}}</b>
+                        <a href="/edit/label/{{$l.ID}}" title="Edit label"><button class="icon blue">&#9998;</button></a>
+                        <a href="/del/label/{{$l.ID}}" title="Remove label"><button class="icon red">&#10006;"</button></a>
+                        (Created: {{date $l.Created}}, Modified: {{date $l.Modified}})
+                    </span>
+                    <ul class="nested">
+                        <li>
+                            <table class="rowed">
+                                <tr class="header">
+                                    <th>Type</th>
+                                    <th>Value</th>
+                                    <th>Flags</th>
+                                    <th>Expires</th>
+                                    <th>Created</th>
+                                    <th>Modified</th>
+                                    <th>Actions</th>
+                                </tr>
+                                {{range $ri, $rec := $label.Records}}
+                                    <tr>
+                                        <td>{{rrtype $rec}}</td>
+                                        <td>{{rrdata $rec}}</td>
+                                        <td>{{rrflags $rec}}</td>
+                                        <td>{{date $rec.Expire}}</td>
+                                        <td>{{date $rec.Created}}</td>
+                                        <td>{{date $rec.Modified}}</td>
+                                        <td>
+                                            <a href="/edit/rec/{{$rec.ID}}" title="Edit record"><button class="icon blue">&#9998;</button></a>
+                                            <a href="/del/rec/{{$rec.ID}}" title="Remove record"><button class="icon red">&#10006;</button></a>
+                                        </td>
+                                    </tr>
+                                {{end}}
+                            </table>
+                        </li>
+                        <li>
+                            <a href="/new/rec/{{$l.ID}}" title="Add new record..."><button class="icon blue">&#10010;</button></a>
+                        </li>
+                    </ul>
+                </li>
+                {{end}}
+                <li>
+                    <a href="/new/label/{{$z.ID}}" title="Add new label..."><button class="icon blue">&#10010;</button></a>
+                </li>
+            </ul>
+        </li>
+        {{end}}
+        <li>
+            <a href="/new/zone/0" title="Add new zone..."><button class="icon blue">&#10010;</button></a>
+        </li>
+    </ul>
+</div>
+<script>
+    var toggler = document.getElementsByClassName("caret");
+    var i;
+    for (i = 0; i < toggler.length; i++) {
+        toggler[i].addEventListener("click", function() {
+            this.parentElement.querySelector(".nested").classList.toggle("active");
+            this.classList.toggle("caret-down");
+        });
+    }
+</script>
+{{end}}
+
+{{define "new_zone"}}
+<div>
+    <h3>Creating a new GNS zone:</h3>
+    <form action="/action/new/zone/0" method="post" onsubmit="return(validate());">
+        <table>
+            <tr>
+                <td align="right"><b>Zone name:</b></td>
+                <td><input type="text" id="name" name="name"></td>
+            </tr>
+            <tr>
+                <td align="right" valign="top"><b>Key type:</b></td>
+                <td>
+                    <input type="radio" id="pkey" name="keytype" value="PKEY" checked="checked">&nbsp;PKEY (Ed25519+EcDSA)<br>
+                    <input type="radio" id="edkey" name="keytype" value="EDKEY">&nbsp;EDKEY (EdDSA)
+                </td>
+            </tr>
+        </table>
+        <button id="submit">Add zone</button>
+    </form>
+</div>
+<script>
+    const names = [
+        {{range $i, $n := .Names}}
+        '{{$n}}',
+        {{end}}
+    ];
+    function validate() {
+        const name = document.getElementById("name").value;
+        if (!name) {
+            alert("Empty zone name not allowed");
+            return false;
+        }
+        for (var i = 0; i < names.length; i++) {
+            if (names[i] == name) {
+                alert("Zone name already used");
+                return false;
+            }
+        }
+        return(true);
+    }
+</script>
+{{end}}
+
+{{define "new_label"}}
+<div>
+    <h3>Creating a new GNS zone label:</h3>
+    <form action="/action/new/label/{{.Ref}}" onsubmit="return(validate());">
+        <table>
+            <tr>
+                <td align="right">Name:</td>
+                <td><input type="text" id="name" name="name"></td>
+            </tr>
+        </table>
+        <button id="submit">Add label</button>
+    </form>
+</div>
+<script>
+    const names = [
+        {{range $i, $n := .Names}}
+        '{{$n}}',
+        {{end}}
+    ];
+    function validate() {
+        const name = document.getElementById("name").value;
+        if (!name) {
+            alert("Empty labels not allowed");
+            return false;
+        }
+        for (var i = 0; i < names.length; i++) {
+            if (names[i] == name) {
+                alert("Label already used");
+                return false;
+            }
+        }
+        return(true);
+    }
+</script>
+{{end}}
