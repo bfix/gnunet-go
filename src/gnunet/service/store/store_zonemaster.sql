@@ -18,7 +18,7 @@
 
 create table zones (
     id       integer primary key autoincrement,
-    name     text,
+    name     text unique,
     created  integer,
     modified integer,
 	ztype    integer,
@@ -31,7 +31,8 @@ create table labels (
     zid      integer references zones(id),
 	name     text,
     created  integer,
-    modified integer
+    modified integer,
+    unique (zid,name)
 );
 
 create table records (
