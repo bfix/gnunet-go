@@ -97,7 +97,9 @@ type GNSConfig struct {
 
 // ZoneMasterConfig contains parameters for the GNS ZoneMaster process
 type ZoneMasterConfig struct {
+	Period  int               `json:"period"`  // cycle period
 	Storage util.ParameterSet `json:"storage"` // persistence mechanism for zone data
+	GUI     string            `json:"gui"`     // listen address for HTTP GUI
 }
 
 //----------------------------------------------------------------------
@@ -206,14 +208,19 @@ var (
 // substString is a helper function to substitute environment variables
 // with actual values.
 func substString(s string, env map[string]string) string {
-	matches := rx.FindAllStringSubmatch(s, -1)
-	for _, m := range matches {
-		if len(m[1]) != 0 {
-			subst, ok := env[m[1]]
-			if !ok {
-				continue
+	changed := true
+	for changed {
+		changed = false
+		matches := rx.FindAllStringSubmatch(s, -1)
+		for _, m := range matches {
+			if len(m[1]) != 0 {
+				subst, ok := env[m[1]]
+				if !ok {
+					continue
+				}
+				s = strings.Replace(s, "${"+m[1]+"}", subst, -1)
+				changed = true
 			}
-			s = strings.Replace(s, "${"+m[1]+"}", subst, -1)
 		}
 	}
 	return s
@@ -231,14 +238,26 @@ func applySubstitutions(x interface{}, env map[string]string) {
 				case reflect.String:
 					// check for substitution
 					if s, ok := fld.Interface().(string); ok {
-						for {
-							s1 := substString(s, env)
-							if s1 == s {
-								break
+						sOut := substString(s, env)
+						if sOut != s {
+							logger.Printf(logger.DBG, "[config] %s --> %s\n", s, sOut)
+							fld.SetString(sOut)
+						}
+					}
+
+				case reflect.Map:
+					// substitute values
+					if s, ok := fld.Interface().(util.ParameterSet); ok {
+						for k, v := range s {
+							v1, ok := v.(string)
+							if !ok {
+								continue
 							}
-							logger.Printf(logger.DBG, "[config] %s --> %s\n", s, s1)
-							fld.SetString(s1)
-							s = s1
+							sOut := substString(v1, env)
+							if sOut != v1 {
+								logger.Printf(logger.DBG, "[config] %s --> %s\n", v1, sOut)
+								s[k] = sOut
+							}
 						}
 					}
 
