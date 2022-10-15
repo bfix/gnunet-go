@@ -167,8 +167,12 @@ func NewGNSBlock() Block {
 	return &GNSBlock{
 		DerivedKeySig: nil,
 		Body: &SignedGNSBlockData{
-			Purpose: new(crypto.SignaturePurpose),
-			Data:    nil,
+			Purpose: &crypto.SignaturePurpose{
+				Size:    16,
+				Purpose: enums.SIG_GNS_RECORD_SIGN,
+			},
+			Expire: util.AbsoluteTimeNever(),
+			Data:   nil,
 		},
 		checked:   false,
 		verified:  false,
@@ -180,6 +184,23 @@ func NewGNSBlock() Block {
 // Prepare a block to be of given type and expiration.
 // Not required for GNS blocks
 func (b *GNSBlock) Prepare(enums.BlockType, util.AbsoluteTime) {}
+
+// SetData sets the data for the GNS block
+func (b *GNSBlock) SetData(data []byte) {
+	b.Body.Data = data
+	b.Body.Purpose.Size = uint32(len(data) + 16)
+}
+
+// Sign the block with a derived private key
+func (b *GNSBlock) Sign(sk *crypto.ZonePrivate) error {
+	// get signed data
+	buf, err := data.Marshal(b.Body)
+	if err == nil {
+		// generate signature
+		b.DerivedKeySig, err = sk.Sign(buf)
+	}
+	return err
+}
 
 // Verify the integrity of the block data from a signature.
 // Only the cryptographic signature is verified; the formal correctness of
