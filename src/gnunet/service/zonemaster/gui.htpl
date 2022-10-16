@@ -674,102 +674,52 @@
                 <td>
                     <input type="text" name="box_svc" size="16" list="services" required>
                     <datalist id="services">
-                        <option value='20 (tcp/ftp-data)'>
-                        <option value='88 (tcp/kerberos)'>
-                        <option value='88 (udp/kerberos)'>
-                        <option value='102 (tcp/iso-tsap)'>
-                        <option value='104 (tcp/acr-nema)'>
-                        <option value='106 (tcp/poppassd)'>
-                        <option value='137 (udp/netbios-ns)'>
-                        <option value='138 (udp/netbios-dgm)'>
-                        <option value='139 (tcp/netbios-ssn)'>
-                        <option value='162 (snmp-trap)'>
-                        <option value='163 (cmip-man)'>
-                        <option value='164 (cmip-agent)'>
-                        <option value='319 (udp/ptp-event)'>
-                        <option value='320 (udp/ptp-general)'>
-                        <option value='369 (rpc2portmap)'>
-                        <option value='370 (codaauth2)'>
-                        <option value='371 (udp/clearcase)'>
-                        <option value='445 (tcp/microsoft-ds)'>
-                        <option value='465 (tcp/submissions)'>
-                        <option value='623 (udp/asf-rmcp)'>
-                        <option value='546 (udp/dhcpv6-client)'>
-                        <option value='547 (udp/dhcpv6-server)'>
-                        <option value='548 (tcp/afpovertcp)'>
-                        <option value='587 (tcp/submission)'>
-                        <option value='749 (tcp/kerberos-adm)'>
+                        <option value='20 (ftp-data/tcp)'>
+                        <option value='21 (ftp/tcp)'>
+                        <option value='22 (ssh/tcp)'>
+                        <option value='23 (telnet/tcp)'>
+                        <option value='25 (smtp/tcp)'>
+                        <option value='53 (domain)'>
+                        <option value='67 (bootps/udp)'>
+                        <option value='68 (bootpc/udp)'>
+                        <option value='69 (tftp/udp)'>
+                        <option value='70 (gopher/tcp)'>
+                        <option value='79 (finger/tcp)'>
+                        <option value='80 (http/tcp)'>
+                        <option value='88 (kerberos)'>
+                        <option value='110 (pop3/tcp)'>
+                        <option value='123 (ntp/udp)'>
+                        <option value='143 (imap2/tcp)'>
+                        <option value='161 (snmp)'>
+                        <option value='389 (ldap)'>
+                        <option value='443 (https)'>
+                        <option value='500 (isakmp/udp)'>
+                        <option value='513 (login/tcp)'>
+                        <option value='513 (who/udp)'>
+                        <option value='514 (shell/tcp)'>
+                        <option value='514 (syslog/udp)'>
+                        <option value='515 (printer/tcp)'>
+                        <option value='540 (uucp/tcp)'>
+                        <option value='554 (rtsp)'>
+                        <option value='636 (ldaps)'>
                         <option value='750 (kerberos4)'>
-                        <option value='751 (kerberos-master)'>
-                        <option value='752 (udp/passwd-server)'>
-                        <option value='754 (tcp/krb-prop)'>
-                        <option value='775 (tcp/moira-db)'>
-                        <option value='777 (tcp/moira-update)'>
-                        <option value='779 (udp/moira-ureg)'>
-                        <option value='853 (tcp/domain-s)'>
-                        <option value='853 (udp/domain-s)'>
-                        <option value='871 (tcp/supfilesrv)'>
-                        <option value='989 (tcp/ftps-data)'>
-                        <option value='1099 (tcp/rmiregistry)'>
-                        <option value='1127 (tcp/supfiledbg)'>
-                        <option value='1352 (tcp/lotusnote)'>
-                        <option value='1433 (tcp/ms-sql-s)'>
-                        <option value='1434 (udp/ms-sql-m)'>
-                        <option value='1524 (tcp/ingreslock)'>
-                        <option value='1645 (datametrics)'>
-                        <option value='1646 (sa-msg-port)'>
-                        <option value='1677 (tcp/groupwise)'>
-                        <option value='1813 (radius-acct)'>
-                        <option value='2000 (tcp/cisco-sccp)'>
-                        <option value='2101 (tcp/rtcm-sc104)'>
-                        <option value='2102 (udp/zephyr-srv)'>
-                        <option value='2103 (udp/zephyr-clt)'>
-                        <option value='2104 (udp/zephyr-hm)'>
-                        <option value='2119 (tcp/gsigatekeeper)'>
-                        <option value='2401 (tcp/cvspserver)'>
-                        <option value='2431 (venus-se)'>
-                        <option value='2433 (codasrv-se)'>
-                        <option value='2600 (tcp/zebrasrv)'>
-                        <option value='2792 (tcp/f5-globalsite)'>
-                        <option value='3260 (tcp/iscsi-target)'>
-                        <option value='3389 (tcp/ms-wbt-server)'>
-                        <option value='4353 (tcp/f5-iquery)'>
-                        <option value='4500 (udp/ipsec-nat-t)'>
-                        <option value='4899 (tcp/radmin-port)'>
-                        <option value='5222 (tcp/xmpp-client)'>
-                        <option value='5269 (tcp/xmpp-server)'>
-                        <option value='5308 (tcp/cfengine)'>
-                        <option value='5432 (tcp/postgresql)'>
-                        <option value='6346 (gnutella-svc)'>
-                        <option value='6347 (gnutella-rtr)'>
-                        <option value='6444 (tcp/sge-qmaster)'>
-                        <option value='6445 (tcp/sge-execd)'>
-                        <option value='6446 (tcp/mysql-proxy)'>
-                        <option value='6514 (tcp/syslog-tls)'>
-                        <option value='6566 (tcp/sane-port)'>
-                        <option value='7000 (udp/afs3-fileserver)'>
-                        <option value='7001 (udp/afs3-callback)'>
-                        <option value='7002 (udp/afs3-prserver)'>
-                        <option value='7003 (udp/afs3-vlserver)'>
-                        <option value='7004 (udp/afs3-kaserver)'>
-                        <option value='7005 (udp/afs3-volser)'>
-                        <option value='7007 (udp/afs3-bos)'>
-                        <option value='7008 (udp/afs3-update)'>
-                        <option value='7009 (udp/afs3-rmtsys)'>
-                        <option value='7100 (tcp/font-service)'>
-                        <option value='8080 (tcp/http-alt)'>
-                        <option value='8021 (tcp/zope-ftp)'>
-                        <option value='8990 (tcp/clc-build-daemon)'>
-                        <option value='9101 (tcp/bacula-dir)'>
-                        <option value='9102 (tcp/bacula-fd)'>
-                        <option value='9103 (tcp/bacula-sd)'>
-                        <option value='10050 (tcp/zabbix-agent)'>
-                        <option value='10051 (tcp/zabbix-trapper)'>
-                        <option value='10082 (tcp/amandaidx)'>
-                        <option value='10083 (tcp/amidxtape)'>
-                        <option value='17001 (udp/sgi-cmsd)'>
-                        <option value='17002 (udp/sgi-crsd)'>
-                        <option value='57000 (tcp/dircproxy)'>
+                        <option value='873 (rsync/tcp)'>
+                        <option value='989 (ftps-data/tcp)'>
+                        <option value='990 (ftps/tcp)'>
+                        <option value='992 (telnets/tcp)'>
+                        <option value='993 (imaps/tcp)'>
+                        <option value='995 (pop3s/tcp)'>
+                        <option value='1194 (openvpn)'>
+                        <option value='1649 (kermit/tcp)'>
+                        <option value='1812 (radius)'>
+                        <option value='2086 (gnunet)'>
+                        <option value='3306 (mysql/tcp)'>
+                        <option value='5060 (sip)'>
+                        <option value='5061 (sip-tls)'>
+                        <option value='6000 (x11/tcp)'>
+                        <option value='6379 (redis/tcp)'>
+                        <option value='9418 (git/tcp)'>
+                        <option value='10000 (webmin/tcp)'>
                     </datalist>
                 </td>
             </tr>
@@ -937,4 +887,13 @@
             return(valid);
         }
     </script>
+{{end}}
+
+{{define "debug"}}
+    <h1>Debug</h1>
+    <ul>
+    {{range $k,$v := .}}
+        <li><b>{{$k}}</b> = {{$v}}</li>
+    {{end}}
+    </ul>
 {{end}}
