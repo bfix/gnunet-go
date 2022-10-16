@@ -454,24 +454,30 @@ func (db *ZoneDB) GetNames(tbl string) (names []string, err error) {
 	return
 }
 
+// RRData contains the type and flags of a resource record
+type RRData struct {
+	Type  enums.GNSType
+	Flags enums.GNSFlag
+}
+
 // GetRRTypes returns a list record types stored under a label
-func (db *ZoneDB) GetRRTypes(lid string) (rrtypes []enums.GNSType, err error) {
+func (db *ZoneDB) GetRRTypes(lid int64) (rrtypes []*RRData, err error) {
 	// select all record types under label
-	stmt := fmt.Sprintf("select rrtype from records where lid=%s", lid)
+	stmt := fmt.Sprintf("select rtype,flags from records where lid=%d", lid)
 	var rows *sql.Rows
 	if rows, err = db.conn.Query(stmt); err != nil {
 		return
 	}
 	// process records
 	defer rows.Close()
-	var rrtype enums.GNSType
 	for rows.Next() {
-		if err = rows.Scan(&rrtype); err != nil {
+		e := new(RRData)
+		if err = rows.Scan(&e.Type, &e.Flags); err != nil {
 			// terminate on error; return list so far
 			return
 		}
 		// append to result list
-		rrtypes = append(rrtypes, rrtype)
+		rrtypes = append(rrtypes, e)
 	}
 	return
 }
