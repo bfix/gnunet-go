@@ -43,19 +43,18 @@ import (
 var (
 	// list of managed RR types
 	rrtypes = []enums.GNSType{
-		enums.GNS_TYPE_PKEY,
-		enums.GNS_TYPE_EDKEY,
-		enums.GNS_TYPE_LEHO,
-		enums.GNS_TYPE_VPN,
-		enums.GNS_TYPE_GNS2DNS,
-		enums.GNS_TYPE_PHONE,
-		enums.GNS_TYPE_DNS_A,
-		enums.GNS_TYPE_DNS_CNAME,
-		enums.GNS_TYPE_DNS_MX,
-		enums.GNS_TYPE_DNS_TXT,
-		enums.GNS_TYPE_DNS_AAAA,
-		enums.GNS_TYPE_DNS_SRV,
-		enums.GNS_TYPE_DNS_TLSA,
+		enums.GNS_TYPE_PKEY,      // PKEY zone delegation
+		enums.GNS_TYPE_EDKEY,     // EDKEY zone delegation
+		enums.GNS_TYPE_REDIRECT,  // GNS delegation by name
+		enums.GNS_TYPE_GNS2DNS,   // DNS delegation by name
+		enums.GNS_TYPE_NICK,      // Nick name
+		enums.GNS_TYPE_LEHO,      // Legacy hostname
+		enums.GNS_TYPE_BOX,       // Boxed resource record
+		enums.GNS_TYPE_DNS_A,     // IPv4 address
+		enums.GNS_TYPE_DNS_AAAA,  // IPv6 address
+		enums.GNS_TYPE_DNS_CNAME, // CNAME in DNS
+		enums.GNS_TYPE_DNS_MX,    // Mailbox
+		enums.GNS_TYPE_DNS_TXT,   // DNS TXT
 	}
 )
 
@@ -93,18 +92,18 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 			}
 			return "???"
 		},
-		"rrtype": func(r *store.Record) string {
-			return strings.Replace(r.RType.String(), "GNS_TYPE_", "", -1)
+		"rrtype": func(t enums.GNSType) string {
+			return strings.Replace(t.String(), "GNS_TYPE_", "", -1)
 		},
-		"rrflags": func(r *store.Record) string {
+		"rrflags": func(f enums.GNSFlag) string {
 			flags := make([]string, 0)
-			if r.Flags&enums.GNS_FLAG_PRIVATE != 0 {
+			if f&enums.GNS_FLAG_PRIVATE != 0 {
 				flags = append(flags, "Private")
 			}
-			if r.Flags&enums.GNS_FLAG_SHADOW != 0 {
+			if f&enums.GNS_FLAG_SHADOW != 0 {
 				flags = append(flags, "Shadow")
 			}
-			if r.Flags&enums.GNS_FLAG_SUPPL != 0 {
+			if f&enums.GNS_FLAG_SUPPL != 0 {
 				flags = append(flags, "Suppl")
 			}
 			if len(flags) == 0 {
@@ -112,8 +111,8 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 			}
 			return strings.Join(flags, ",")
 		},
-		"rrdata": func(r *store.Record) string {
-			return string(r.Data)
+		"rrdata": func(buf []byte) string {
+			return string(buf)
 		},
 	})
 	if _, err := tpl.ParseFS(fsys, "gui.htpl"); err != nil {
@@ -151,6 +150,7 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 // action dispatcher
 func (zm *ZoneMaster) action(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
+	mode := vars["mode"]
 	id, err := strconv.ParseInt(vars["id"], 10, 64)
 	if err != nil {
 		_, _ = io.WriteString(w, "ERROR: "+err.Error())
@@ -158,11 +158,11 @@ func (zm *ZoneMaster) action(w http.ResponseWriter, r *http.Request) {
 	}
 	switch vars["cmd"] {
 	case "new":
-		err = zm.actionNew(w, r, vars["mode"], id)
+		err = zm.actionNew(w, r, mode, id)
 	case "upd":
-		err = zm.actionUpd(w, r, vars["mode"], id)
+		err = zm.actionUpd(w, r, mode, id)
 	case "del":
-		err = zm.actionDel(w, r, vars["mode"], id)
+		err = zm.actionDel(w, r, mode, id)
 	}
 	if err != nil {
 		_, _ = io.WriteString(w, "ERROR: "+err.Error())
@@ -233,17 +233,22 @@ func (zm *ZoneMaster) dashboard(w http.ResponseWriter, r *http.Request) {
 
 // ----------------------------------------------------------------------
 
-type NewData struct {
-	Ref     int64           // database id of reference object
+type NewEditData struct {
+	// shared attributes
+	Ref    int64  // database id of reference object
+	Action string // "Add" or "Edit" action
+
+	// "new" attributes
 	Names   []string        // list of names in use (ZONE,LABEL)
-	RRtypes []enums.GNSType // list of allowed record types (REC)
+	RRtypes []*store.RRData // list of allowed record types (REC)
 }
 
 func (zm *ZoneMaster) new(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	var dialog string
 	var err error
-	data := new(NewData)
+	data := new(NewEditData)
+	data.Action = "Add"
 	switch vars["mode"] {
 	case "zone":
 		dialog = "new_zone"
@@ -253,27 +258,36 @@ func (zm *ZoneMaster) new(w http.ResponseWriter, r *http.Request) {
 		}
 	case "label":
 		dialog = "new_label"
+		// get reference id
 		id, err := strconv.ParseInt(vars["id"], 10, 64)
 		if err != nil {
 			_, _ = io.WriteString(w, "ERROR: "+err.Error())
 			return
 		}
+		// get
 		stmt := fmt.Sprintf("labels where zid=%d", id)
 		if data.Names, err = zm.zdb.GetNames(stmt); err != nil {
 			_, _ = io.WriteString(w, "ERROR: "+err.Error())
 			return
 		}
 		data.Ref = id
-	case "record":
+	case "rr":
 		dialog = "new_record"
+		// get reference id
+		id, err := strconv.ParseInt(vars["id"], 10, 64)
+		if err != nil {
+			_, _ = io.WriteString(w, "ERROR: "+err.Error())
+			return
+		}
 		// get all rrtypes used under given label
-		rrs, err := zm.zdb.GetRRTypes(vars["id"])
+		rrs, err := zm.zdb.GetRRTypes(id)
 		if err != nil {
 			_, _ = io.WriteString(w, "ERROR: "+err.Error())
 			return
 		}
 		// compile a list of acceptable types for new records
 		data.RRtypes = compatibleRR(rrs)
+		data.Ref = id
 	default:
 		zm.dashboard(w, r)
 		return
@@ -326,6 +340,12 @@ func renderPage(w io.Writer, data interface{}, page string) {
 
 // Create a list of compatible record types from list of
 // existing record types.
-func compatibleRR(list []enums.GNSType) []enums.GNSType {
-	return rrtypes
+func compatibleRR(in []*store.RRData) (out []*store.RRData) {
+	for _, t := range rrtypes {
+		out = append(out, &store.RRData{
+			Type:  t,
+			Flags: 0,
+		})
+	}
+	return
 }

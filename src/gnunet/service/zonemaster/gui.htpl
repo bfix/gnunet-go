@@ -24,6 +24,10 @@
                 margin: 0.5em;
                 padding: 0.5em;
             }
+            div.block {
+                margin: 0.5em;
+                padding: 0.5em;
+            }
             div.heading {
                 color: white;
                 background-color: orange;
@@ -154,6 +158,87 @@
             .active {
                 display: block;
             }
+            .tabset > input[type="radio"] {
+                position: absolute;
+                left: -200vw;
+            }
+            .tabset .tab-panel {
+                display: none;
+            }
+            .tabset > input:first-child:checked ~ .tab-panels > .tab-panel:first-child,
+            .tabset > input:nth-child(3):checked ~ .tab-panels > .tab-panel:nth-child(2),
+            .tabset > input:nth-child(5):checked ~ .tab-panels > .tab-panel:nth-child(3),
+            .tabset > input:nth-child(7):checked ~ .tab-panels > .tab-panel:nth-child(4),
+            .tabset > input:nth-child(9):checked ~ .tab-panels > .tab-panel:nth-child(5),
+            .tabset > input:nth-child(11):checked ~ .tab-panels > .tab-panel:nth-child(6),
+            .tabset > input:nth-child(13):checked ~ .tab-panels > .tab-panel:nth-child(7),
+            .tabset > input:nth-child(15):checked ~ .tab-panels > .tab-panel:nth-child(8),
+            .tabset > input:nth-child(17):checked ~ .tab-panels > .tab-panel:nth-child(9),
+            .tabset > input:nth-child(19):checked ~ .tab-panels > .tab-panel:nth-child(10),
+            .tabset > input:nth-child(21):checked ~ .tab-panels > .tab-panel:nth-child(11),
+            .tabset > input:nth-child(23):checked ~ .tab-panels > .tab-panel:nth-child(12),
+            .tabset > input:nth-child(25):checked ~ .tab-panels > .tab-panel:nth-child(13),
+            .tabset > input:nth-child(27):checked ~ .tab-panels > .tab-panel:nth-child(14),
+            .tabset > input:nth-child(29):checked ~ .tab-panels > .tab-panel:nth-child(15),
+            .tabset > input:nth-child(31):checked ~ .tab-panels > .tab-panel:nth-child(16),
+            .tabset > input:nth-child(33):checked ~ .tab-panels > .tab-panel:nth-child(17),
+            .tabset > input:nth-child(35):checked ~ .tab-panels > .tab-panel:nth-child(18),
+            .tabset > input:nth-child(37):checked ~ .tab-panels > .tab-panel:nth-child(19),
+            .tabset > input:nth-child(39):checked ~ .tab-panels > .tab-panel:nth-child(20) {
+                display: block;
+            }
+            .tabset > label {
+                position: relative;
+                display: inline-block;
+                padding: 15px 15px 25px;
+                border: 1px solid transparent;
+                border-bottom: 0;
+                cursor: pointer;
+                font-weight: 600;
+            }
+            .tabset > label::after {
+                content: "";
+                position: absolute;
+                left: 15px;
+                bottom: 10px;
+                width: 22px;
+                height: 4px;
+                background: #8d8d8d;
+            }
+            .tabset > label:hover {
+                color: #f90;
+            }
+            .tabset > input:focus + label {
+                color: #06c;
+            }
+            .tabset > label:hover::after {
+                background: #f90;
+            }
+            .tabset > input:focus + label::after,
+            .tabset > input:checked + label::after {
+                background: #06c;
+            }
+            .tabset > input:checked + label {
+                border-color: #ccc;
+                border-bottom: 1px solid #fff;
+                margin-bottom: -1px;
+            }
+            .tab-panel {
+                padding: 30px 0;
+                border-top: 1px solid #ccc;
+            }
+            div.switch {
+                display: none;
+            }
+            input.switch:checked ~ div.switch {
+                display: block;
+            }
+            div.alternate {
+                display: block;
+            }
+            input.alternate:checked ~ div.alternate {
+                display: none;
+            }
         </style>
     </head>
     <body>
@@ -216,22 +301,22 @@
                                 </tr>
                                 {{range $ri, $rec := $label.Records}}
                                     <tr>
-                                        <td>{{rrtype $rec}}</td>
-                                        <td>{{rrdata $rec}}</td>
-                                        <td>{{rrflags $rec}}</td>
+                                        <td>{{rrtype $rec.RType}}</td>
+                                        <td>{{rrdata $rec.Data}}</td>
+                                        <td>{{rrflags $rec.Flags}}</td>
                                         <td>{{date $rec.Expire}}</td>
                                         <td>{{date $rec.Created}}</td>
                                         <td>{{date $rec.Modified}}</td>
                                         <td>
-                                            <a href="/edit/rec/{{$rec.ID}}" title="Edit record"><button class="icon blue">&#9998;</button></a>
-                                            <a href="/del/rec/{{$rec.ID}}" title="Remove record"><button class="icon red">&#10006;</button></a>
+                                            <a href="/edit/rr/{{$rec.ID}}" title="Edit record"><button class="icon blue">&#9998;</button></a>
+                                            <a href="/del/rr/{{$rec.ID}}" title="Remove record"><button class="icon red">&#10006;</button></a>
                                         </td>
                                     </tr>
                                 {{end}}
                             </table>
                         </li>
                         <li>
-                            <a href="/new/rec/{{$l.ID}}" title="Add new record..."><button class="icon blue">&#10010;</button></a>
+                            <a href="/new/rr/{{$l.ID}}" title="Add new record..."><button class="icon blue">&#10010;</button></a>
                         </li>
                     </ul>
                 </li>
@@ -262,7 +347,7 @@
 {{define "new_zone"}}
 <div>
     <h3>Creating a new GNS zone:</h3>
-    <form action="/action/new/zone/0" method="post" onsubmit="return(validate());">
+    <form action="/action/new/zone/0" method="post" onsubmit="return(zone_validate());">
         <table>
             <tr>
                 <td align="right"><b>Zone name:</b></td>
@@ -280,19 +365,19 @@
     </form>
 </div>
 <script>
-    const names = [
+    const zone_names = [
         {{range $i, $n := .Names}}
         '{{$n}}',
         {{end}}
     ];
-    function validate() {
+    function zone_validate() {
         const name = document.getElementById("name").value;
         if (!name) {
             alert("Empty zone name not allowed");
             return false;
         }
         for (var i = 0; i < names.length; i++) {
-            if (names[i] == name) {
+            if (zone_names[i] == name) {
                 alert("Zone name already used");
                 return false;
             }
@@ -305,7 +390,7 @@
 {{define "new_label"}}
 <div>
     <h3>Creating a new GNS zone label:</h3>
-    <form action="/action/new/label/{{.Ref}}" onsubmit="return(validate());">
+    <form action="/action/new/label/{{.Ref}}" onsubmit="return(label_validate());">
         <table>
             <tr>
                 <td align="right">Name:</td>
@@ -316,19 +401,19 @@
     </form>
 </div>
 <script>
-    const names = [
+    const label_names = [
         {{range $i, $n := .Names}}
         '{{$n}}',
         {{end}}
     ];
-    function validate() {
+    function label_validate() {
         const name = document.getElementById("name").value;
         if (!name) {
             alert("Empty labels not allowed");
             return false;
         }
         for (var i = 0; i < names.length; i++) {
-            if (names[i] == name) {
+            if (label_names[i] == name) {
                 alert("Label already used");
                 return false;
             }
@@ -336,4 +421,520 @@
         return(true);
     }
 </script>
+{{end}}
+
+{{define "new_record"}}
+{{$data := .}}
+<div>
+    <h3>Creating a new GNS resource record:</h3>
+    <div class="tabset">
+        {{range $i, $type := .RRtypes}}
+        <input type="radio" name="tabset" id="tab{{$i}}" aria-controls="tab{{$i}}" {{if eq $i 0}}checked{{end}}>
+        <label for="tab{{$i}}">{{rrtype $type.Type}}</label>
+        {{end}}
+        <div class="tab-panels">
+            {{range $i, $type := .RRtypes}}
+            <section id="tab{{$i}}" class="tab-panel">
+                {{$t := rrtype $type.Type}}
+                {{$mode := "Add"}}
+                {{if eq $t "PKEY"}}{{template "PKEY" $data}}{{end}}
+                {{if eq $t "EDKEY"}}{{template "EDKEY" $data}}{{end}}
+                {{if eq $t "NICK"}}{{template "NICK" $data}}{{end}}
+                {{if eq $t "LEHO"}}{{template "LEHO" $data}}{{end}}
+                {{if eq $t "REDIRECT"}}{{template "REDIRECT" $data}}{{end}}
+                {{if eq $t "GNS2DNS"}}{{template "GNS2DNS" $data}}{{end}}
+                {{if eq $t "BOX"}}{{template "BOX" $data}}{{end}}
+                {{if eq $t "DNS_CNAME"}}{{template "DNS_CNAME" $data}}{{end}}
+                {{if eq $t "DNS_A"}}{{template "DNS_A" $data}}{{end}}
+                {{if eq $t "DNS_AAAA"}}{{template "DNS_AAAA" $data}}{{end}}
+                {{if eq $t "DNS_MX"}}{{template "DNS_MX" $data}}{{end}}
+                {{if eq $t "DNS_TXT"}}{{template "DNS_TXT" $data}}{{end}}
+            </section>
+            {{end}}
+        </div>
+    </div>
+</div>
+{{end}}
+
+{{define "RRCommon"}}
+    <tr>
+        <td align="right" valign="top"><b>Expires:</b></td>
+        <td>
+            Never <input type="checkbox" class="alternate" name="{{.}}_never">
+            <div class="alternate">
+                At given date and time:
+                <input type="datetime-local" id="{{.}}_expires" name="{{.}}_expires" required>
+            </div>
+        </td>
+    </tr>
+    <tr>
+        <td align="right" valign="top"><b>Flags:</b></td>
+        <td>
+            <input type="checkbox" name="{{.}}_private"> Private<br>
+            <input type="checkbox" name="{{.}}_shadow"> Shadow<br>
+            <input type="checkbox" name="{{.}}_suppl"> Supplemental<br>
+        </td>
+    </tr>
+    <script>
+        var dt = document.getElementById("{{.}}_expires");
+        if (!dt.value) {
+            var exp = new Date(new Date().getTime() + 31536000000);
+            dt.value = exp.toISOString().slice(0, 16);
+        }
+    </script>
+{{end}}
+
+{{define "PKEY"}}
+    <h3>PKEY delegation</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="PKEY">
+        <table>
+            <tr><td/>
+                <td>
+                    Enter the public zone key (type
+                    <a href="https://lsd.gnunet.org/lsd0001/#name-pkey" target="_blank">PKEY</a>
+                    ) in
+                    <a href="https://lsd.gnunet.org/lsd0001/#name-base32gns" target="_blank">Base32GNS</a>
+                    encoding:
+                </td>
+            </tr>
+            <tr>
+                <td align="right"><b>Key:</b></td>
+                <td>
+                    <input type="text" name="pkey"
+                        maxlength="58" minlength="58" size="58"
+                        pattern="[0-9A-HJKMNP-TV-Z]{58}"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            {{template "RRCommon" "pkey"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "EDKEY"}}
+    <h3>EDKEY delegation</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="EDKEY">
+        <table>
+            <tr><td/>
+                <td>
+                    Enter the public zone key (type
+                    <a href="https://lsd.gnunet.org/lsd0001/#name-edkey" target="_blank">EDKEY</a>
+                    ) in
+                    <a href="https://lsd.gnunet.org/lsd0001/#name-base32gns" target="_blank">Base32GNS</a>
+                    encoding:
+                </td>
+            </tr>
+            <tr>
+                <td align="right"><b>Key:</b></td>
+                <td>
+                    <input type="text" name="edkey"
+                        maxlength="58" minlength="58" size="58"
+                        pattern="[0-9A-HJKMNP-TV-Z]{58}"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            {{template "RRCommon" "edkey"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "REDIRECT"}}
+    <h3>REDIRECT (GNS delegation)</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="EDKEY">
+        <table>
+            <tr><td/>
+                <td>
+                    Enter the redirected GNS name (see
+                    <a href="https://lsd.gnunet.org/lsd0001/#name-redirect" target="_blank">specification</a>
+                    ):
+                </td>
+            </tr>
+            <tr>
+                <td align="right"><b>Name:</b></td>
+                <td>
+                    <input type="text" name="redirect"
+                        maxlength="63" size="63"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            {{template "RRCommon" "redirect"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "LEHO"}}
+    <h3>LEHO (legacy hostname)</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="LEHO">
+        <table>
+            <tr>
+                <td align="right"><b>Legacy hostname:</b></td>
+                <td>
+                    <input type="text" name="leho"
+                        maxlength="63" size="63"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            {{template "RRCommon" "leho"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "NICK"}}
+    <h3>NICK</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="NICK">
+        <table>
+            <tr>
+                <td align="right"><b>Nick name:</b></td>
+                <td>
+                    <input type="text" name="leho"
+                        maxlength="63" size="63"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            {{template "RRCommon" "nick"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "GNS2DNS"}}
+    <h3>GNS2DNS delegation</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="GNS2DNS">
+        <table>
+            <tr><td/>
+                <td>
+                    Enter DNS name and server as
+                    <a href="https://lsd.gnunet.org/lsd0001/#name-gns2dns" target="_blank">specified</a>.
+                </td>
+            </tr>
+            <tr>
+                <td align="right"><b>DNS name:</b></td>
+                <td>
+                    <input type="text" name="gns2dns_name"
+                        maxlength="63" size="63"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            <tr>
+                <td align="right"><b>DNS server:</b></td>
+                <td>
+                    <input type="text" name="gns2dns_server"
+                        maxlength="63" size="63"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            {{template "RRCommon" "gns2dns"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "BOX"}}
+    <h3>BOX</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="BOX">
+        <table>
+            <tr>
+                <td align="right"><b>Host:</b></td>
+                <td>
+                    <input type="text" name="box_host"
+                        maxlength="63" size="63" required
+                    >
+                </td>
+            </tr>
+            <tr><td/>
+                <td>
+                    Enter protocol, service (port) and type of the boxed resource type as
+                    <a href="https://lsd.gnunet.org/lsd0001/#name-box" target="_blank">specified</a>:
+                </td>
+            </tr>
+            <tr>
+                <td align="right"><b>Protocol:</b></td>
+                <td>
+                    <input type="text" name="box_proto" size="16" list="protocols" required>
+                    <datalist id="protocols">
+                        <option value="6 (TCP)">
+                        <option value="17 (UDP)">
+                    </datalist>
+                </td>
+            </tr>
+            <tr>
+                <td align="right"><b>Service:</b></td>
+                <td>
+                    <input type="text" name="box_svc" size="16" list="services" required>
+                    <datalist id="services">
+                        <option value='20 (tcp/ftp-data)'>
+                        <option value='88 (tcp/kerberos)'>
+                        <option value='88 (udp/kerberos)'>
+                        <option value='102 (tcp/iso-tsap)'>
+                        <option value='104 (tcp/acr-nema)'>
+                        <option value='106 (tcp/poppassd)'>
+                        <option value='137 (udp/netbios-ns)'>
+                        <option value='138 (udp/netbios-dgm)'>
+                        <option value='139 (tcp/netbios-ssn)'>
+                        <option value='162 (snmp-trap)'>
+                        <option value='163 (cmip-man)'>
+                        <option value='164 (cmip-agent)'>
+                        <option value='319 (udp/ptp-event)'>
+                        <option value='320 (udp/ptp-general)'>
+                        <option value='369 (rpc2portmap)'>
+                        <option value='370 (codaauth2)'>
+                        <option value='371 (udp/clearcase)'>
+                        <option value='445 (tcp/microsoft-ds)'>
+                        <option value='465 (tcp/submissions)'>
+                        <option value='623 (udp/asf-rmcp)'>
+                        <option value='546 (udp/dhcpv6-client)'>
+                        <option value='547 (udp/dhcpv6-server)'>
+                        <option value='548 (tcp/afpovertcp)'>
+                        <option value='587 (tcp/submission)'>
+                        <option value='749 (tcp/kerberos-adm)'>
+                        <option value='750 (kerberos4)'>
+                        <option value='751 (kerberos-master)'>
+                        <option value='752 (udp/passwd-server)'>
+                        <option value='754 (tcp/krb-prop)'>
+                        <option value='775 (tcp/moira-db)'>
+                        <option value='777 (tcp/moira-update)'>
+                        <option value='779 (udp/moira-ureg)'>
+                        <option value='853 (tcp/domain-s)'>
+                        <option value='853 (udp/domain-s)'>
+                        <option value='871 (tcp/supfilesrv)'>
+                        <option value='989 (tcp/ftps-data)'>
+                        <option value='1099 (tcp/rmiregistry)'>
+                        <option value='1127 (tcp/supfiledbg)'>
+                        <option value='1352 (tcp/lotusnote)'>
+                        <option value='1433 (tcp/ms-sql-s)'>
+                        <option value='1434 (udp/ms-sql-m)'>
+                        <option value='1524 (tcp/ingreslock)'>
+                        <option value='1645 (datametrics)'>
+                        <option value='1646 (sa-msg-port)'>
+                        <option value='1677 (tcp/groupwise)'>
+                        <option value='1813 (radius-acct)'>
+                        <option value='2000 (tcp/cisco-sccp)'>
+                        <option value='2101 (tcp/rtcm-sc104)'>
+                        <option value='2102 (udp/zephyr-srv)'>
+                        <option value='2103 (udp/zephyr-clt)'>
+                        <option value='2104 (udp/zephyr-hm)'>
+                        <option value='2119 (tcp/gsigatekeeper)'>
+                        <option value='2401 (tcp/cvspserver)'>
+                        <option value='2431 (venus-se)'>
+                        <option value='2433 (codasrv-se)'>
+                        <option value='2600 (tcp/zebrasrv)'>
+                        <option value='2792 (tcp/f5-globalsite)'>
+                        <option value='3260 (tcp/iscsi-target)'>
+                        <option value='3389 (tcp/ms-wbt-server)'>
+                        <option value='4353 (tcp/f5-iquery)'>
+                        <option value='4500 (udp/ipsec-nat-t)'>
+                        <option value='4899 (tcp/radmin-port)'>
+                        <option value='5222 (tcp/xmpp-client)'>
+                        <option value='5269 (tcp/xmpp-server)'>
+                        <option value='5308 (tcp/cfengine)'>
+                        <option value='5432 (tcp/postgresql)'>
+                        <option value='6346 (gnutella-svc)'>
+                        <option value='6347 (gnutella-rtr)'>
+                        <option value='6444 (tcp/sge-qmaster)'>
+                        <option value='6445 (tcp/sge-execd)'>
+                        <option value='6446 (tcp/mysql-proxy)'>
+                        <option value='6514 (tcp/syslog-tls)'>
+                        <option value='6566 (tcp/sane-port)'>
+                        <option value='7000 (udp/afs3-fileserver)'>
+                        <option value='7001 (udp/afs3-callback)'>
+                        <option value='7002 (udp/afs3-prserver)'>
+                        <option value='7003 (udp/afs3-vlserver)'>
+                        <option value='7004 (udp/afs3-kaserver)'>
+                        <option value='7005 (udp/afs3-volser)'>
+                        <option value='7007 (udp/afs3-bos)'>
+                        <option value='7008 (udp/afs3-update)'>
+                        <option value='7009 (udp/afs3-rmtsys)'>
+                        <option value='7100 (tcp/font-service)'>
+                        <option value='8080 (tcp/http-alt)'>
+                        <option value='8021 (tcp/zope-ftp)'>
+                        <option value='8990 (tcp/clc-build-daemon)'>
+                        <option value='9101 (tcp/bacula-dir)'>
+                        <option value='9102 (tcp/bacula-fd)'>
+                        <option value='9103 (tcp/bacula-sd)'>
+                        <option value='10050 (tcp/zabbix-agent)'>
+                        <option value='10051 (tcp/zabbix-trapper)'>
+                        <option value='10082 (tcp/amandaidx)'>
+                        <option value='10083 (tcp/amidxtape)'>
+                        <option value='17001 (udp/sgi-cmsd)'>
+                        <option value='17002 (udp/sgi-crsd)'>
+                        <option value='57000 (tcp/dircproxy)'>
+                    </datalist>
+                </td>
+            </tr>
+            <tr>
+                <td align="right" valign="top"><b>Type:</b></td>
+                <td><input type="radio" name="box_type" value="SRV" checked> SRV (Host:Port of service)</td>
+            </tr>
+            <tr>
+                <td/><td>
+                    <input type="radio" class="switch" name="box_type" value="TLSA"> TLSA (DNSSEC)
+                    <div class="switch">
+                        <div class="block">
+                            <label for="box_tlsa_usage">Usage:</label>
+                            <select size="1" name="box_tlsa_usage">
+                                <option value="0">CA certificate</option>
+                                <option value="1">Service certificate constraint</option>
+                                <option value="2">Trust anchor assertion</option>
+                                <option value="3">Domain-issued certificate</option>
+                                <option value="255">Private use</option>
+                            </select>
+                        </div>
+                        <div class="block">
+                            <label for="box_tlsa_usage">Selector:</label>
+                            <select size="1" name="box_tlsa_selector">
+                                <option value="0">Full certificate</option>
+                                <option value="1">SubjectPublicKeyInfo</option>
+                                <option value="255">Private use</option>
+                            </select>
+                        </div>
+                        <div class="block">
+                            <label for="box_tlsa_match">Match:</label>
+                            <select size="1" name="box_tlsa_match">
+                                <option value="0">No hash</option>
+                                <option value="1">SHA-256</option>
+                                <option value="2">SHA-512</option>
+                                <option value="255">Private use</option>
+                            </select>
+                        </div>
+                        <div class="block">
+                            <label for="box_tlsa_cert">PEM-encoded certificate:</label><br>
+                            <textarea name="box_tlsa_cert" rows="10" cols="50"></textarea>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            {{template "RRCommon" "box"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "DNS_A"}}
+    <h3>DNS A (IPv4 address)</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="DNS_A">
+        <table>
+            <tr>
+                <td align="right"><b>Address:</b></td>
+                <td>
+                    <input type="text" name="dnsa"
+                        maxlength="15" size="15"
+                        pattern="[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            {{template "RRCommon" "dnsa"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "DNS_AAAA"}}
+    <h3>DNS AAAA (IPv6 address)</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="DNS_AAAA">
+        <table>
+            <tr>
+                <td align="right"><b>Address:</b></td>
+                <td>
+                    <input type="text" name="dnsaaaa"
+                        maxlength="15" size="15"
+                        pattern="(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            {{template "RRCommon" "dnsaaaa"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "DNS_CNAME"}}
+    <h3>DNS CNAME delegation</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="DNS_CNAME">
+        <table>
+            <tr>
+                <td align="right"><b>Name:</b></td>
+                <td>
+                    <input type="text" name="dnscname"
+                        maxlength="63" size="63"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            {{template "RRCommon" "dnscname"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "DNS_TXT"}}
+    <h3>DNS TXT</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="DNS_TXT">
+        <table>
+            <tr>
+                <td align="right"><b>Text:</b></td>
+                <td>
+                    <input type="text" name="dnstxt"
+                        maxlength="63" size="63"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            {{template "RRCommon" "dnstxt"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "DNS_MX"}}
+    <h3>DNS MX (Mailbox)</h3>
+    <form action="/action/new/rr/{{.Ref}}" onsubmit="return(mx_validate());">
+        <input type="hidden" name="type" value="DNS_MX">
+        <table>
+            <tr>
+                <td align="right" valign="top"><b>Mailserver list:</b></td>
+                <td>
+                    <textarea id="dnsmx" name="dnsmx" rows="5" cols="70"></textarea>
+                </td>
+            </tr>
+            {{template "RRCommon" "dnsmx"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+    <script>
+        function mx_validate() {
+            const list = document.getElementById("dnsmx").value;
+            if (!list) {
+                alert("Empty MX list not allowed");
+                return false;
+            }
+            var entries = list.split("\n");
+            var valid = true;
+            entries.forEach(function(value) {
+                let res = value.match(/([0-9]{1,}) (.*)/);
+                if (res.length != 3) {
+                    valid = false;
+                    return;
+                }
+                let prio = int(res[1]);
+                if (prio < 1 || prio > 9999) {
+                    valid = false;
+                    return;
+                }
+            });
+            return(valid);
+        }
+    </script>
 {{end}}
