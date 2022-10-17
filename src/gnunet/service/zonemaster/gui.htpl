@@ -334,13 +334,27 @@
 </div>
 <script>
     var toggler = document.getElementsByClassName("caret");
-    var i;
-    for (i = 0; i < toggler.length; i++) {
+    for (var i = 0; i < toggler.length; i++) {
         toggler[i].addEventListener("click", function() {
             this.parentElement.querySelector(".nested").classList.toggle("active");
             this.classList.toggle("caret-down");
         });
     }
+
+    for (var i = 0; i < toggler.length; i++) {
+        if (localStorage.getItem("t"+i) == "true") {
+            toggler[i].parentElement.querySelector(".nested").classList.toggle("active");
+            toggler[i].classList.toggle("caret-down");
+        }
+    }
+    document.documentElement.scrollTop = document.body.scrollTop = localStorage.getItem("top");
+
+    window.addEventListener('beforeunload', function (e) {
+        for (var i = 0; i < toggler.length; i++) {
+            localStorage.setItem("t"+i, toggler[i].classList.contains("caret-down"));
+        }
+        localStorage.setItem("top", window.pageYOffset || document.documentElement.scrollTop);
+    });
 </script>
 {{end}}
 
