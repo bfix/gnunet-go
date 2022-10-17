@@ -21,6 +21,7 @@ package util
 import (
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"github.com/bfix/gospel/data"
@@ -71,6 +72,21 @@ func GetParam[V any](params ParameterSet, key string) (i V, ok bool) {
 		}
 	}
 	return
+}
+
+// CastFromString a string to given type (only works for intrinsic type)
+func CastFromString[V any](s string) (i V, ok bool) {
+	num, err := fmt.Sscanf(s, "%v", &i)
+	ok = true
+	if err != nil || num != 1 {
+		ok = false
+	}
+	return
+}
+
+// CastToString returns a string representation (for intrinsic types)
+func CastToString(v any) string {
+	return fmt.Sprintf("%v", v)
 }
 
 //----------------------------------------------------------------------
