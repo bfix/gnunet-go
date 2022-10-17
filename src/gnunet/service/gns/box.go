@@ -42,15 +42,14 @@ type Box struct {
 	rec *message.ResourceRecord // originating RR
 }
 
-// NewBox creates a new box instance from a BOX resource record.
-func NewBox(rec *message.ResourceRecord) *Box {
+// NewBox creates a new box instance from a BOX resource record data.
+func NewBox(buf []byte) *Box {
 	b := new(Box)
-	if err := data.Unmarshal(b, rec.Data); err != nil {
+	if err := data.Unmarshal(b, buf); err != nil {
 		logger.Printf(logger.ERROR, "[gns] Can't unmarshal BOX")
 		return nil
 	}
-	b.key = hex.EncodeToString(rec.Data[:8])
-	b.rec = rec
+	b.key = hex.EncodeToString(buf[:8])
 	return b
 }
 

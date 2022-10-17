@@ -230,7 +230,7 @@ func (m *Module) ResolveDNS(
 			// traverse resource records for 'A' and 'AAAA' records.
 		rec_loop:
 			for _, rec := range set.Records {
-				switch enums.GNSType(rec.RType) {
+				switch rec.RType {
 				case enums.GNS_TYPE_DNS_AAAA:
 					addr = net.IP(rec.Data)
 					// we prefer IPv6

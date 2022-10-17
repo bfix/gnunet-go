@@ -136,7 +136,7 @@ func (s *Service) HandleMessage(ctx context.Context, sender *util.PeerID, msg me
 				logger.Printf(logger.DBG, "[gns%s] Lookup request finished.\n", label)
 			}()
 
-			kind := NewRRTypeList(enums.GNSType(m.RType))
+			kind := NewRRTypeList(m.RType)
 			recset, err := s.Resolve(ctx, label, m.Zone, kind, int(m.Options), 0)
 			if err != nil {
 				logger.Printf(logger.ERROR, "[gns%s] Failed to lookup block: %s\n", label, err.Error())
@@ -159,7 +159,7 @@ func (s *Service) HandleMessage(ctx context.Context, sender *util.PeerID, msg me
 					logger.Printf(logger.DBG, "[gns%s] Record #%d: %v\n", label, i, rec)
 
 					// is this the record type we are looking for?
-					if rec.RType == m.RType || enums.GNSType(m.RType) == enums.GNS_TYPE_ANY {
+					if rec.RType == m.RType || m.RType == enums.GNS_TYPE_ANY {
 						// add it to the response message
 						if err := resp.AddRecord(rec); err != nil {
 							logger.Printf(logger.ERROR, "[gns%s] failed: %sv", label, err.Error())

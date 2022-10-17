@@ -153,7 +153,7 @@ func NewBlockHandlerList(records []*message.ResourceRecord, labels []string) (*B
 			logger.Printf(logger.DBG, "[gns] handler_list: skip %v\n", rec)
 			continue
 		}
-		rrType := enums.GNSType(rec.RType)
+		rrType := rec.RType
 		hl.counts.Add(rrType)
 
 		// check for custom handler type
@@ -292,7 +292,7 @@ type Gns2DnsHandler struct {
 
 // NewGns2DnsHandler returns a new BlockHandler instance
 func NewGns2DnsHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, error) {
-	if enums.GNSType(rec.RType) != enums.GNS_TYPE_GNS2DNS {
+	if rec.RType != enums.GNS_TYPE_GNS2DNS {
 		return nil, ErrInvalidRecordType
 	}
 	h := &Gns2DnsHandler{
@@ -308,7 +308,7 @@ func NewGns2DnsHandler(rec *message.ResourceRecord, labels []string) (BlockHandl
 
 // AddRecord inserts a GNS2DNS record into the handler.
 func (h *Gns2DnsHandler) AddRecord(rec *message.ResourceRecord, labels []string) error {
-	if enums.GNSType(rec.RType) != enums.GNS_TYPE_GNS2DNS {
+	if rec.RType != enums.GNS_TYPE_GNS2DNS {
 		return ErrInvalidRecordType
 	}
 	logger.Printf(logger.DBG, "[gns] GNS2DNS data: %s\n", hex.EncodeToString(rec.Data))
@@ -367,7 +367,7 @@ type BoxHandler struct {
 
 // NewBoxHandler returns a new BlockHandler instance
 func NewBoxHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, error) {
-	if enums.GNSType(rec.RType) != enums.GNS_TYPE_BOX {
+	if rec.RType != enums.GNS_TYPE_BOX {
 		return nil, ErrInvalidRecordType
 	}
 	h := &BoxHandler{
@@ -381,7 +381,7 @@ func NewBoxHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, 
 
 // AddRecord inserts a BOX record into the handler.
 func (h *BoxHandler) AddRecord(rec *message.ResourceRecord, labels []string) error {
-	if enums.GNSType(rec.RType) != enums.GNS_TYPE_BOX {
+	if rec.RType != enums.GNS_TYPE_BOX {
 		return ErrInvalidRecordType
 	}
 	logger.Printf(logger.DBG, "[box-rr] for labels %v\n", labels)
@@ -395,7 +395,8 @@ func (h *BoxHandler) AddRecord(rec *message.ResourceRecord, labels []string) err
 		return nil
 	}
 	// (3) check of "svc" and "proto" match values in the BOX
-	box := NewBox(rec)
+	box := NewBox(rec.Data)
+	box.rec = rec
 	if box.Matches(labels) {
 		logger.Println(logger.DBG, "[box-rr] MATCH -- adding record")
 		h.boxes[box.key] = box
@@ -414,7 +415,7 @@ func (h *BoxHandler) Coexist(cm util.Counter[enums.GNSType]) bool {
 func (h *BoxHandler) Records(kind RRTypeList) *message.RecordSet {
 	rs := message.NewRecordSet()
 	for _, box := range h.boxes {
-		if kind.HasType(enums.GNSType(box.Type)) {
+		if kind.HasType(box.Type) {
 			// valid box found: assemble new resource record.
 			rr := new(message.ResourceRecord)
 			rr.Expire = box.rec.Expire
@@ -445,7 +446,7 @@ type LehoHandler struct {
 
 // NewLehoHandler returns a new BlockHandler instance
 func NewLehoHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, error) {
-	if enums.GNSType(rec.RType) != enums.GNS_TYPE_LEHO {
+	if rec.RType != enums.GNS_TYPE_LEHO {
 		return nil, ErrInvalidRecordType
 	}
 	h := &LehoHandler{
@@ -459,7 +460,7 @@ func NewLehoHandler(rec *message.ResourceRecord, labels []string) (BlockHandler,
 
 // AddRecord inserts a LEHO record into the handler.
 func (h *LehoHandler) AddRecord(rec *message.ResourceRecord, labels []string) error {
-	if enums.GNSType(rec.RType) != enums.GNS_TYPE_LEHO {
+	if rec.RType != enums.GNS_TYPE_LEHO {
 		return ErrInvalidRecordType
 	}
 	h.name = string(rec.Data)
@@ -500,7 +501,7 @@ type CnameHandler struct {
 
 // NewCnameHandler returns a new BlockHandler instance
 func NewCnameHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, error) {
-	if enums.GNSType(rec.RType) != enums.GNS_TYPE_DNS_CNAME {
+	if rec.RType != enums.GNS_TYPE_DNS_CNAME {
 		return nil, ErrInvalidRecordType
 	}
 	h := &CnameHandler{
@@ -514,7 +515,7 @@ func NewCnameHandler(rec *message.ResourceRecord, labels []string) (BlockHandler
 
 // AddRecord inserts a CNAME record into the handler.
 func (h *CnameHandler) AddRecord(rec *message.ResourceRecord, labels []string) error {
-	if enums.GNSType(rec.RType) != enums.GNS_TYPE_DNS_CNAME {
+	if rec.RType != enums.GNS_TYPE_DNS_CNAME {
 		return ErrInvalidRecordType
 	}
 	if h.rec != nil {
@@ -557,7 +558,7 @@ type VpnHandler struct {
 
 // NewVpnHandler returns a new BlockHandler instance
 func NewVpnHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, error) {
-	if enums.GNSType(rec.RType) != enums.GNS_TYPE_VPN {
+	if rec.RType != enums.GNS_TYPE_VPN {
 		return nil, ErrInvalidRecordType
 	}
 	h := &VpnHandler{}
@@ -569,7 +570,7 @@ func NewVpnHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, 
 
 // AddRecord inserts a VPN record into the handler.
 func (h *VpnHandler) AddRecord(rec *message.ResourceRecord, labels []string) error {
-	if enums.GNSType(rec.RType) != enums.GNS_TYPE_VPN {
+	if rec.RType != enums.GNS_TYPE_VPN {
 		return ErrInvalidRecordType
 	}
 	if h.rec != nil {
