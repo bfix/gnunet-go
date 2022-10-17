@@ -60,6 +60,11 @@ func AbsoluteTimeNever() AbsoluteTime {
 	return AbsoluteTime{math.MaxUint64}
 }
 
+// IsNever returns true if time is "never"
+func (t AbsoluteTime) IsNever() bool {
+	return t.Val == math.MaxUint64
+}
+
 // Epoch returns the seconds since Unix epoch.
 func (t AbsoluteTime) Epoch() uint64 {
 	return t.Val / 1000000
