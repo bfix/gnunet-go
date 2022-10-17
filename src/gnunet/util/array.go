@@ -19,6 +19,7 @@
 package util
 
 import (
+	"bytes"
 	"fmt"
 )
 
@@ -114,14 +115,13 @@ func CopyAlignedBlock(out, in []byte) {
 // not terminated, it is skipped.
 func StringList(b []byte) []string {
 	res := make([]string, 0)
-	str := ""
-	for _, ch := range b {
-		if ch == 0 {
+	pos := 0
+	var str string
+	for pos != -1 {
+		str, pos = ReadCString(b, pos)
+		if len(str) > 0 {
 			res = append(res, str)
-			str = ""
-			continue
 		}
-		str += string(ch)
 	}
 	return res
 }
@@ -136,4 +136,12 @@ func ReadCString(buf []byte, pos int) (string, int) {
 		}
 	}
 	return "", -1
+}
+
+// WriteCString returns the binary C-representation of a string
+func WriteCString(s string) []byte {
+	buf := new(bytes.Buffer)
+	_, _ = buf.WriteString(s)
+	_ = buf.WriteByte(0)
+	return buf.Bytes()
 }
