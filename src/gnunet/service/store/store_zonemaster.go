@@ -315,10 +315,15 @@ func (db *ZoneDB) GetLabels(filter string, args ...any) (list []*Label, err erro
 //   - update: Record.ZID is set (eventually modified)
 //   - remove: otherwise
 func (db *ZoneDB) SetRecord(r *Record) error {
+	// work around a SQLite3 bug when storing uint64 with high bit set
+	var exp *uint64
+	if !r.Expire.IsNever() {
+		*exp = r.Expire.Val
+	}
 	// check for record insert
 	if r.ID == 0 {
 		stmt := "insert into records(lid,expire,created,modified,flags,rtype,rdata) values(?,?,?,?,?,?,?)"
-		result, err := db.conn.Exec(stmt, r.Label, r.Expire.Val, r.Created.Val, r.Modified.Val, r.Flags, r.RType, r.Data)
+		result, err := db.conn.Exec(stmt, r.Label, exp, r.Created.Val, r.Modified.Val, r.Flags, r.RType, r.Data)
 		if err != nil {
 			return err
 		}
@@ -328,7 +333,7 @@ func (db *ZoneDB) SetRecord(r *Record) error {
 	// check for record update
 	if r.Label != 0 {
 		stmt := "update records set lid=?,expire=?,created=?,modified=?,flags=?,rtype=?,rdata=? where id=?"
-		result, err := db.conn.Exec(stmt, r.Label, r.Expire.Val, r.Created.Val, r.Modified.Val, r.Flags, r.RType, r.Data, r.ID)
+		result, err := db.conn.Exec(stmt, r.Label, exp, r.Created.Val, r.Modified.Val, r.Flags, r.RType, r.Data, r.ID)
 		if err != nil {
 			return err
 		}
@@ -363,11 +368,17 @@ func (db *ZoneDB) GetRecords(filter string, args ...any) (list []*Record, err er
 	for rows.Next() {
 		// assemble record from database row
 		rec := new(Record)
-		if err = rows.Scan(&rec.ID, &rec.Label, &rec.Expire.Val, &rec.Created.Val, &rec.Modified.Val, &rec.Flags, &rec.RType, &rec.Data); err != nil {
+		var exp *uint64
+		if err = rows.Scan(&rec.ID, &rec.Label, &exp, &rec.Created.Val, &rec.Modified.Val, &rec.Flags, &rec.RType, &rec.Data); err != nil {
 			// terminate on error; return list so far
 			return
 		}
 		rec.Size = uint32(len(rec.Data))
+		if exp != nil {
+			rec.Expire.Val = *exp
+		} else {
+			rec.Expire = util.AbsoluteTimeNever()
+		}
 		// append to result list
 		list = append(list, rec)
 	}
