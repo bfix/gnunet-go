@@ -40,24 +40,6 @@ import (
 	"github.com/gorilla/mux"
 )
 
-var (
-	// list of managed RR types
-	rrtypes = []enums.GNSType{
-		enums.GNS_TYPE_PKEY,      // PKEY zone delegation
-		enums.GNS_TYPE_EDKEY,     // EDKEY zone delegation
-		enums.GNS_TYPE_REDIRECT,  // GNS delegation by name
-		enums.GNS_TYPE_GNS2DNS,   // DNS delegation by name
-		enums.GNS_TYPE_NICK,      // Nick name
-		enums.GNS_TYPE_LEHO,      // Legacy hostname
-		enums.GNS_TYPE_BOX,       // Boxed resource record
-		enums.GNS_TYPE_DNS_A,     // IPv4 address
-		enums.GNS_TYPE_DNS_AAAA,  // IPv6 address
-		enums.GNS_TYPE_DNS_CNAME, // CNAME in DNS
-		enums.GNS_TYPE_DNS_MX,    // Mailbox
-		enums.GNS_TYPE_DNS_TXT,   // DNS TXT
-	}
-)
-
 //======================================================================
 // HTTP service
 //======================================================================
@@ -69,7 +51,8 @@ var (
 	tpl *template.Template // HTML templates
 )
 
-// ----------------------------------------------------------------------
+//----------------------------------------------------------------------
+
 // Start HTTP server to provide GUI
 func (zm *ZoneMaster) startGUI(ctx context.Context) {
 	logger.Println(logger.INFO, "[zonemaster] Starting HTTP GUI backend...")
@@ -78,7 +61,7 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 	tpl = template.New("gui")
 	tpl.Funcs(template.FuncMap{
 		"date": func(ts util.AbsoluteTime) string {
-			if ts.Compare(util.AbsoluteTimeNever()) == 0 {
+			if ts.IsNever() {
 				return "Never"
 			}
 			return time.UnixMicro(int64(ts.Val)).Format("02.01.06 15:04")
@@ -109,10 +92,15 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 			if len(flags) == 0 {
 				return "None"
 			}
-			return strings.Join(flags, ",")
+			return strings.Join(flags, ",<br>")
 		},
-		"rrdata": func(buf []byte) string {
-			return string(buf)
+		"rrdata": func(t enums.GNSType, buf []byte) string {
+			params := RRData2Map(t, buf)
+			list := make([]string, 0)
+			for k, v := range params {
+				list = append(list, fmt.Sprintf("<span title='%s'>%v</span>", k, v))
+			}
+			return strings.Join(list, ",<br>")
 		},
 	})
 	if _, err := tpl.ParseFS(fsys, "gui.htpl"); err != nil {
@@ -143,9 +131,9 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 	}()
 }
 
-// ----------------------------------------------------------------------
+//======================================================================
 // Handle GUI actions (add, edit and remove)
-// ----------------------------------------------------------------------
+//======================================================================
 
 // action dispatcher
 func (zm *ZoneMaster) action(w http.ResponseWriter, r *http.Request) {
@@ -168,7 +156,12 @@ func (zm *ZoneMaster) action(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, "ERROR: "+err.Error())
 		return
 	}
+	http.Redirect(w, r, "/", http.StatusMovedPermanently)
 }
+
+//----------------------------------------------------------------------
+// NEW: create zone, label or resource record
+//----------------------------------------------------------------------
 
 func (zm *ZoneMaster) actionNew(w http.ResponseWriter, r *http.Request, mode string, id int64) (err error) {
 	switch mode {
@@ -190,35 +183,74 @@ func (zm *ZoneMaster) actionNew(w http.ResponseWriter, r *http.Request, mode str
 		}
 		// add zone to database
 		zone := store.NewZone(name, zp)
-		if err = zm.zdb.SetZone(zone); err != nil {
-			return
-		}
-		// zone added
-		zm.dashboard(w, r)
+		err = zm.zdb.SetZone(zone)
 
 	case "label":
 		name := r.FormValue("name")
 		// add label to database
 		label := store.NewLabel(name)
 		label.Zone = id
-		if err = zm.zdb.SetLabel(label); err != nil {
-			return
-		}
-		// label added
-		zm.dashboard(w, r)
+		err = zm.zdb.SetLabel(label)
+
+	case "rr":
+		err = zm.newRec(w, r, id)
 	}
-	return nil
+	return
 }
+
+func (zm *ZoneMaster) newRec(w http.ResponseWriter, r *http.Request, label int64) error {
+	// get list of parameters from resource record dialog
+	_ = r.ParseForm()
+	params := make(map[string]string)
+	for key, val := range r.Form {
+		params[key] = strings.Join(val, ",")
+	}
+	// parse RR type (and set prefix for map keys)
+	t, _ := util.CastFromString[enums.GNSType](params["type"])
+	pf := dlgPrefix[t]
+
+	// parse expiration
+	exp := util.AbsoluteTimeNever()
+	if _, ok := params[pf+"never"]; !ok {
+		ts, _ := time.Parse("2006-01-02T15:04", params[pf+"expires"])
+		exp.Val = uint64(ts.UnixMicro())
+	}
+	// parse flags
+	var flags enums.GNSFlag
+	if _, ok := params[pf+"private"]; ok {
+		flags |= enums.GNS_FLAG_PRIVATE
+	}
+	if _, ok := params[pf+"shadow"]; ok {
+		flags |= enums.GNS_FLAG_SHADOW
+	}
+	if _, ok := params[pf+"suppl"]; ok {
+		flags |= enums.GNS_FLAG_SUPPL
+	}
+	// construct RR data
+	rrdata, err := Map2RRData(t, params)
+	if err != nil {
+		return err
+	}
+
+	// assemble record and store in database
+	rr := store.NewRecord(exp, t, flags, rrdata)
+	rr.Label = label
+	return zm.zdb.SetRecord(rr)
+}
+
+//----------------------------------------------------------------------
 
 func (zm *ZoneMaster) actionUpd(w http.ResponseWriter, r *http.Request, mode string, id int64) error {
 	return nil
 }
 
+//----------------------------------------------------------------------
+
 func (zm *ZoneMaster) actionDel(w http.ResponseWriter, r *http.Request, mode string, id int64) error {
 	return nil
 }
 
-// ----------------------------------------------------------------------
+//----------------------------------------------------------------------
 
 func (zm *ZoneMaster) dashboard(w http.ResponseWriter, r *http.Request) {
 	// collect information for the GUI
@@ -231,7 +263,7 @@ func (zm *ZoneMaster) dashboard(w http.ResponseWriter, r *http.Request) {
 	renderPage(w, zg, "dashboard")
 }
 
-// ----------------------------------------------------------------------
+//----------------------------------------------------------------------
 
 type NewEditData struct {
 	// shared attributes
@@ -256,6 +288,7 @@ func (zm *ZoneMaster) new(w http.ResponseWriter, r *http.Request) {
 			_, _ = io.WriteString(w, "ERROR: "+err.Error())
 			return
 		}
+
 	case "label":
 		dialog = "new_label"
 		// get reference id
@@ -271,6 +304,7 @@ func (zm *ZoneMaster) new(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		data.Ref = id
+
 	case "rr":
 		dialog = "new_record"
 		// get reference id
@@ -288,6 +322,7 @@ func (zm *ZoneMaster) new(w http.ResponseWriter, r *http.Request) {
 		// compile a list of acceptable types for new records
 		data.RRtypes = compatibleRR(rrs)
 		data.Ref = id
+
 	default:
 		zm.dashboard(w, r)
 		return
@@ -296,14 +331,14 @@ func (zm *ZoneMaster) new(w http.ResponseWriter, r *http.Request) {
 	renderPage(w, data, dialog)
 }
 
-// ----------------------------------------------------------------------
+//----------------------------------------------------------------------
 
 func (zm *ZoneMaster) edit(w http.ResponseWriter, r *http.Request) {
 	// show dialog
 	renderPage(w, nil, "new")
 }
 
-// ----------------------------------------------------------------------
+//----------------------------------------------------------------------
 
 func (zm *ZoneMaster) remove(w http.ResponseWriter, r *http.Request) {
 	// show dialog
@@ -338,14 +373,8 @@ func renderPage(w io.Writer, data interface{}, page string) {
 	}
 }
 
-// Create a list of compatible record types from list of
-// existing record types.
-func compatibleRR(in []*store.RRData) (out []*store.RRData) {
-	for _, t := range rrtypes {
-		out = append(out, &store.RRData{
-			Type:  t,
-			Flags: 0,
-		})
-	}
-	return
+type DebugData struct {
+	Params map[string]string
+	RR     string
+	Err    error
 }

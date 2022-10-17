@@ -39,7 +39,7 @@
             button.icon {
                 border: none;
                 color: black;
-                background-color: white;
+                background-color: transparent;
                 padding: 0 0;
                 text-align: center;
                 text-decoration: none;
@@ -99,13 +99,13 @@
                 border-color: #ccc;
             }
             tr.row:nth-child(even) {
-                background: #eef;
+                background: #fff;
             }
             tr.row:nth-child(odd) {
-                background: #ccf;
+                background: #eee;
             }
             tr.header {
-                background: #eee;
+                background: #eef;
                 color: black;
                 font-weight: bold;
             }
@@ -300,18 +300,18 @@
                                     <th>Actions</th>
                                 </tr>
                                 {{range $ri, $rec := $label.Records}}
-                                    <tr>
-                                        <td>{{rrtype $rec.RType}}</td>
-                                        <td>{{rrdata $rec.Data}}</td>
-                                        <td>{{rrflags $rec.Flags}}</td>
-                                        <td>{{date $rec.Expire}}</td>
-                                        <td>{{date $rec.Created}}</td>
-                                        <td>{{date $rec.Modified}}</td>
-                                        <td>
-                                            <a href="/edit/rr/{{$rec.ID}}" title="Edit record"><button class="icon blue">&#9998;</button></a>
-                                            <a href="/del/rr/{{$rec.ID}}" title="Remove record"><button class="icon red">&#10006;</button></a>
-                                        </td>
-                                    </tr>
+                                <tr class="row">
+                                    <td>{{rrtype $rec.RType}}</td>
+                                    <td>{{rrdata $rec.RType $rec.Data}}</td>
+                                    <td>{{rrflags $rec.Flags}}</td>
+                                    <td>{{date $rec.Expire}}</td>
+                                    <td>{{date $rec.Created}}</td>
+                                    <td>{{date $rec.Modified}}</td>
+                                    <td>
+                                        <a href="/edit/rr/{{$rec.ID}}" title="Edit record"><button class="icon blue">&#9998;</button></a>
+                                        <a href="/del/rr/{{$rec.ID}}" title="Remove record"><button class="icon red">&#10006;</button></a>
+                                    </td>
+                                </tr>
                                 {{end}}
                             </table>
                         </li>
@@ -487,7 +487,7 @@
 {{define "PKEY"}}
     <h3>PKEY delegation</h3>
     <form action="/action/new/rr/{{.Ref}}">
-        <input type="hidden" name="type" value="PKEY">
+        <input type="hidden" name="type" value="65536">
         <table>
             <tr><td/>
                 <td>
@@ -501,8 +501,8 @@
             <tr>
                 <td align="right"><b>Key:</b></td>
                 <td>
-                    <input type="text" name="pkey"
-                        maxlength="58" minlength="58" size="58"
+                    <input type="text" name="pkey_data"
+                        maxlength="58" minlength="58" size="64"
                         pattern="[0-9A-HJKMNP-TV-Z]{58}"
                         autofocus required
                     >
@@ -516,7 +516,7 @@
 {{define "EDKEY"}}
     <h3>EDKEY delegation</h3>
     <form action="/action/new/rr/{{.Ref}}">
-        <input type="hidden" name="type" value="EDKEY">
+        <input type="hidden" name="type" value="65556">
         <table>
             <tr><td/>
                 <td>
@@ -530,8 +530,8 @@
             <tr>
                 <td align="right"><b>Key:</b></td>
                 <td>
-                    <input type="text" name="edkey"
-                        maxlength="58" minlength="58" size="58"
+                    <input type="text" name="edkey_data"
+                        maxlength="58" minlength="58" size="64"
                         pattern="[0-9A-HJKMNP-TV-Z]{58}"
                         autofocus required
                     >
@@ -545,7 +545,7 @@
 {{define "REDIRECT"}}
     <h3>REDIRECT (GNS delegation)</h3>
     <form action="/action/new/rr/{{.Ref}}">
-        <input type="hidden" name="type" value="EDKEY">
+        <input type="hidden" name="type" value="65551">
         <table>
             <tr><td/>
                 <td>
@@ -557,7 +557,7 @@
             <tr>
                 <td align="right"><b>Name:</b></td>
                 <td>
-                    <input type="text" name="redirect"
+                    <input type="text" name="redirect_name"
                         maxlength="63" size="63"
                         autofocus required
                     >
@@ -571,12 +571,12 @@
 {{define "LEHO"}}
     <h3>LEHO (legacy hostname)</h3>
     <form action="/action/new/rr/{{.Ref}}">
-        <input type="hidden" name="type" value="LEHO">
+        <input type="hidden" name="type" value="65538">
         <table>
             <tr>
                 <td align="right"><b>Legacy hostname:</b></td>
                 <td>
-                    <input type="text" name="leho"
+                    <input type="text" name="leho_name"
                         maxlength="63" size="63"
                         autofocus required
                     >
@@ -590,12 +590,12 @@
 {{define "NICK"}}
     <h3>NICK</h3>
     <form action="/action/new/rr/{{.Ref}}">
-        <input type="hidden" name="type" value="NICK">
+        <input type="hidden" name="type" value="65537">
         <table>
             <tr>
                 <td align="right"><b>Nick name:</b></td>
                 <td>
-                    <input type="text" name="leho"
+                    <input type="text" name="nick_name"
                         maxlength="63" size="63"
                         autofocus required
                     >
@@ -609,7 +609,7 @@
 {{define "GNS2DNS"}}
     <h3>GNS2DNS delegation</h3>
     <form action="/action/new/rr/{{.Ref}}">
-        <input type="hidden" name="type" value="GNS2DNS">
+        <input type="hidden" name="type" value="65540">
         <table>
             <tr><td/>
                 <td>
@@ -643,16 +643,8 @@
 {{define "BOX"}}
     <h3>BOX</h3>
     <form action="/action/new/rr/{{.Ref}}">
-        <input type="hidden" name="type" value="BOX">
+        <input type="hidden" name="type" value="65541">
         <table>
-            <tr>
-                <td align="right"><b>Host:</b></td>
-                <td>
-                    <input type="text" name="box_host"
-                        maxlength="63" size="63" required
-                    >
-                </td>
-            </tr>
             <tr><td/>
                 <td>
                     Enter protocol, service (port) and type of the boxed resource type as
@@ -725,11 +717,20 @@
             </tr>
             <tr>
                 <td align="right" valign="top"><b>Type:</b></td>
-                <td><input type="radio" name="box_type" value="SRV" checked> SRV (Host:Port of service)</td>
+                <td>
+                    <input type="radio" class="switch" name="box_type" value="33" checked> SRV (Service description)
+                    <div class="switch">
+                        <div class="block">
+                            <label for="box_srv_host">Host:</label>
+                            <input type="text" name="box_srv_host" maxlength="63" size="63" required>
+                        </div>
+                    </div>
+                </td>
+            </tr>
             </tr>
             <tr>
                 <td/><td>
-                    <input type="radio" class="switch" name="box_type" value="TLSA"> TLSA (DNSSEC)
+                    <input type="radio" class="switch" name="box_type" value="52"> TLSA (TLS Association)
                     <div class="switch">
                         <div class="block">
                             <label for="box_tlsa_usage">Usage:</label>
@@ -742,7 +743,7 @@
                             </select>
                         </div>
                         <div class="block">
-                            <label for="box_tlsa_usage">Selector:</label>
+                            <label for="box_tlsa_selector">Selector:</label>
                             <select size="1" name="box_tlsa_selector">
                                 <option value="0">Full certificate</option>
                                 <option value="1">SubjectPublicKeyInfo</option>
@@ -759,7 +760,7 @@
                             </select>
                         </div>
                         <div class="block">
-                            <label for="box_tlsa_cert">PEM-encoded certificate:</label><br>
+                            <label for="box_tlsa_cert">Certificate information (hex):</label><br>
                             <textarea name="box_tlsa_cert" rows="10" cols="50"></textarea>
                         </div>
                     </div>
@@ -773,12 +774,12 @@
 {{define "DNS_A"}}
     <h3>DNS A (IPv4 address)</h3>
     <form action="/action/new/rr/{{.Ref}}">
-        <input type="hidden" name="type" value="DNS_A">
+        <input type="hidden" name="type" value="1">
         <table>
             <tr>
                 <td align="right"><b>Address:</b></td>
                 <td>
-                    <input type="text" name="dnsa"
+                    <input type="text" name="dnsa_addr"
                         maxlength="15" size="15"
                         pattern="[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
                         autofocus required
@@ -793,12 +794,12 @@
 {{define "DNS_AAAA"}}
     <h3>DNS AAAA (IPv6 address)</h3>
     <form action="/action/new/rr/{{.Ref}}">
-        <input type="hidden" name="type" value="DNS_AAAA">
+        <input type="hidden" name="type" value="28">
         <table>
             <tr>
                 <td align="right"><b>Address:</b></td>
                 <td>
-                    <input type="text" name="dnsaaaa"
+                    <input type="text" name="dnsaaaa_addr"
                         maxlength="15" size="15"
                         pattern="(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))"
                         autofocus required
@@ -813,12 +814,12 @@
 {{define "DNS_CNAME"}}
     <h3>DNS CNAME delegation</h3>
     <form action="/action/new/rr/{{.Ref}}">
-        <input type="hidden" name="type" value="DNS_CNAME">
+        <input type="hidden" name="type" value="5">
         <table>
             <tr>
                 <td align="right"><b>Name:</b></td>
                 <td>
-                    <input type="text" name="dnscname"
+                    <input type="text" name="dnscname_name"
                         maxlength="63" size="63"
                         autofocus required
                     >
@@ -832,12 +833,12 @@
 {{define "DNS_TXT"}}
     <h3>DNS TXT</h3>
     <form action="/action/new/rr/{{.Ref}}">
-        <input type="hidden" name="type" value="DNS_TXT">
+        <input type="hidden" name="type" value="16">
         <table>
             <tr>
                 <td align="right"><b>Text:</b></td>
                 <td>
-                    <input type="text" name="dnstxt"
+                    <input type="text" name="dnstxt_text"
                         maxlength="63" size="63"
                         autofocus required
                     >
@@ -850,50 +851,39 @@
 {{end}}
 {{define "DNS_MX"}}
     <h3>DNS MX (Mailbox)</h3>
-    <form action="/action/new/rr/{{.Ref}}" onsubmit="return(mx_validate());">
-        <input type="hidden" name="type" value="DNS_MX">
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="15">
         <table>
             <tr>
-                <td align="right" valign="top"><b>Mailserver list:</b></td>
+                <td align="right" valign="top"><b>Priority:</b></td>
+                <td><input type="number" name="dnsmx_prio" min="1" max="100" value="10"></td>
+            </tr>
+            <tr>
+                <td align="right" valign="top"><b>Mailserver:</b></td>
                 <td>
-                    <textarea id="dnsmx" name="dnsmx" rows="5" cols="70"></textarea>
+                    <input type="text" name="dnsmx_host"
+                        maxlength="63" size="63"
+                        autofocus required
+                    >
                 </td>
             </tr>
             {{template "RRCommon" "dnsmx"}}
             <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
         </table>
     </form>
-    <script>
-        function mx_validate() {
-            const list = document.getElementById("dnsmx").value;
-            if (!list) {
-                alert("Empty MX list not allowed");
-                return false;
-            }
-            var entries = list.split("\n");
-            var valid = true;
-            entries.forEach(function(value) {
-                let res = value.match(/([0-9]{1,}) (.*)/);
-                if (res.length != 3) {
-                    valid = false;
-                    return;
-                }
-                let prio = int(res[1]);
-                if (prio < 1 || prio > 9999) {
-                    valid = false;
-                    return;
-                }
-            });
-            return(valid);
-        }
-    </script>
 {{end}}
 
 {{define "debug"}}
     <h1>Debug</h1>
+    <h3>Parameters:</h3>
     <ul>
-    {{range $k,$v := .}}
+    {{range $k,$v := .Params}}
         <li><b>{{$k}}</b> = {{$v}}</li>
     {{end}}
     </ul>
+    <h3>RR data:</h3>
+    <p>{{.RR}}</p>
+    {{if .Err}}
+    <p>Error: <b>{{.Err}}</b></p>
+    {{end}}
 {{end}}
