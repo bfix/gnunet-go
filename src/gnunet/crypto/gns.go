@@ -22,7 +22,6 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"crypto/sha512"
-	"encoding/binary"
 	"errors"
 	"gnunet/enums"
 	"gnunet/util"
@@ -358,15 +357,7 @@ func (zk *ZoneKey) Verify(data []byte, zs *ZoneSignature) (ok bool, err error) {
 
 // ID returns the human-readable zone identifier.
 func (zk *ZoneKey) ID() string {
-	buf := new(bytes.Buffer)
-	err := binary.Write(buf, binary.BigEndian, zk.Type)
-	if err == nil {
-		_, err = buf.Write(zk.KeyData)
-	}
-	if err != nil {
-		logger.Printf(logger.ERROR, "[ZoneKey.ID] failed: %s", err.Error())
-	}
-	return util.EncodeBinaryToString(buf.Bytes())
+	return util.EncodeBinaryToString(zk.Bytes())
 }
 
 // Bytes returns all bytes of a zone key
