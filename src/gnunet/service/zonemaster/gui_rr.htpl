@@ -1,0 +1,416 @@
+{{define "RRCommon"}}
+<tr>
+    <td align="right" valign="top"><b>Expires:</b></td>
+    <td>
+        Never <input type="checkbox" class="alternate" name="{{.}}_never">
+        <div class="alternate">
+            At given date and time:
+            <input type="datetime-local" id="{{.}}_expires" name="{{.}}_expires" required>
+        </div>
+    </td>
+</tr>
+<tr>
+    <td align="right" valign="top"><b>Flags:</b></td>
+    <td>
+        <input type="checkbox" name="{{.}}_private"> Private<br>
+        <input type="checkbox" name="{{.}}_shadow"> Shadow<br>
+        <input type="checkbox" name="{{.}}_suppl"> Supplemental<br>
+    </td>
+</tr>
+<script>
+    var dt = document.getElementById("{{.}}_expires");
+    if (!dt.value) {
+        var exp = new Date(new Date().getTime() + 31536000000);
+        dt.value = exp.toISOString().slice(0, 16);
+    }
+</script>
+{{end}}
+
+{{define "PKEY"}}
+    <h3>PKEY delegation</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="65536">
+        <table>
+            <tr><td/>
+                <td>
+                    Enter the public zone key (type
+                    <a href="https://lsd.gnunet.org/lsd0001/#name-pkey" target="_blank">PKEY</a>
+                    ) in
+                    <a href="https://lsd.gnunet.org/lsd0001/#name-base32gns" target="_blank">Base32GNS</a>
+                    encoding:
+                </td>
+            </tr>
+            <tr>
+                <td align="right"><b>Key:</b></td>
+                <td>
+                    <input type="text" name="pkey_data"
+                        maxlength="58" minlength="58" size="64"
+                        pattern="[0-9A-HJKMNP-TV-Z]{58}"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            {{template "RRCommon" "pkey"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "EDKEY"}}
+    <h3>EDKEY delegation</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="65556">
+        <table>
+            <tr><td/>
+                <td>
+                    Enter the public zone key (type
+                    <a href="https://lsd.gnunet.org/lsd0001/#name-edkey" target="_blank">EDKEY</a>
+                    ) in
+                    <a href="https://lsd.gnunet.org/lsd0001/#name-base32gns" target="_blank">Base32GNS</a>
+                    encoding:
+                </td>
+            </tr>
+            <tr>
+                <td align="right"><b>Key:</b></td>
+                <td>
+                    <input type="text" name="edkey_data"
+                        maxlength="58" minlength="58" size="64"
+                        pattern="[0-9A-HJKMNP-TV-Z]{58}"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            {{template "RRCommon" "edkey"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "REDIRECT"}}
+    <h3>REDIRECT (GNS delegation)</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="65551">
+        <table>
+            <tr><td/>
+                <td>
+                    Enter the redirected GNS name (see
+                    <a href="https://lsd.gnunet.org/lsd0001/#name-redirect" target="_blank">specification</a>
+                    ):
+                </td>
+            </tr>
+            <tr>
+                <td align="right"><b>Name:</b></td>
+                <td>
+                    <input type="text" name="redirect_name"
+                        maxlength="63" size="63"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            {{template "RRCommon" "redirect"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "LEHO"}}
+    <h3>LEHO (legacy hostname)</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="65538">
+        <table>
+            <tr>
+                <td align="right"><b>Legacy hostname:</b></td>
+                <td>
+                    <input type="text" name="leho_name"
+                        maxlength="63" size="63"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            {{template "RRCommon" "leho"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "NICK"}}
+    <h3>NICK</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="65537">
+        <table>
+            <tr>
+                <td align="right"><b>Nick name:</b></td>
+                <td>
+                    <input type="text" name="nick_name"
+                        maxlength="63" size="63"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            {{template "RRCommon" "nick"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "GNS2DNS"}}
+    <h3>GNS2DNS delegation</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="65540">
+        <table>
+            <tr><td/>
+                <td>
+                    Enter DNS name and server as
+                    <a href="https://lsd.gnunet.org/lsd0001/#name-gns2dns" target="_blank">specified</a>.
+                </td>
+            </tr>
+            <tr>
+                <td align="right"><b>DNS name:</b></td>
+                <td>
+                    <input type="text" name="gns2dns_name"
+                        maxlength="63" size="63"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            <tr>
+                <td align="right"><b>DNS server:</b></td>
+                <td>
+                    <input type="text" name="gns2dns_server"
+                        maxlength="63" size="63"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            {{template "RRCommon" "gns2dns"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "BOX"}}
+    <h3>BOX</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="65541">
+        <table>
+            <tr><td/>
+                <td>
+                    Enter protocol, service (port) and type of the boxed resource type as
+                    <a href="https://lsd.gnunet.org/lsd0001/#name-box" target="_blank">specified</a>:
+                </td>
+            </tr>
+            <tr>
+                <td align="right"><b>Protocol:</b></td>
+                <td>
+                    <input type="text" name="box_proto" size="16" list="protocols" required>
+                    <datalist id="protocols">
+                        <option value="6 (TCP)">
+                        <option value="17 (UDP)">
+                    </datalist>
+                </td>
+            </tr>
+            <tr>
+                <td align="right"><b>Service:</b></td>
+                <td>
+                    <input type="text" name="box_svc" size="16" list="services" required>
+                    <datalist id="services">
+                        <option value='20 (ftp-data/tcp)'>
+                        <option value='21 (ftp/tcp)'>
+                        <option value='22 (ssh/tcp)'>
+                        <option value='23 (telnet/tcp)'>
+                        <option value='25 (smtp/tcp)'>
+                        <option value='53 (domain)'>
+                        <option value='67 (bootps/udp)'>
+                        <option value='68 (bootpc/udp)'>
+                        <option value='69 (tftp/udp)'>
+                        <option value='70 (gopher/tcp)'>
+                        <option value='79 (finger/tcp)'>
+                        <option value='80 (http/tcp)'>
+                        <option value='88 (kerberos)'>
+                        <option value='110 (pop3/tcp)'>
+                        <option value='123 (ntp/udp)'>
+                        <option value='143 (imap2/tcp)'>
+                        <option value='161 (snmp)'>
+                        <option value='389 (ldap)'>
+                        <option value='443 (https)'>
+                        <option value='500 (isakmp/udp)'>
+                        <option value='513 (login/tcp)'>
+                        <option value='513 (who/udp)'>
+                        <option value='514 (shell/tcp)'>
+                        <option value='514 (syslog/udp)'>
+                        <option value='515 (printer/tcp)'>
+                        <option value='540 (uucp/tcp)'>
+                        <option value='554 (rtsp)'>
+                        <option value='636 (ldaps)'>
+                        <option value='750 (kerberos4)'>
+                        <option value='873 (rsync/tcp)'>
+                        <option value='989 (ftps-data/tcp)'>
+                        <option value='990 (ftps/tcp)'>
+                        <option value='992 (telnets/tcp)'>
+                        <option value='993 (imaps/tcp)'>
+                        <option value='995 (pop3s/tcp)'>
+                        <option value='1194 (openvpn)'>
+                        <option value='1649 (kermit/tcp)'>
+                        <option value='1812 (radius)'>
+                        <option value='2086 (gnunet)'>
+                        <option value='3306 (mysql/tcp)'>
+                        <option value='5060 (sip)'>
+                        <option value='5061 (sip-tls)'>
+                        <option value='6000 (x11/tcp)'>
+                        <option value='6379 (redis/tcp)'>
+                        <option value='9418 (git/tcp)'>
+                        <option value='10000 (webmin/tcp)'>
+                    </datalist>
+                </td>
+            </tr>
+            <tr>
+                <td align="right" valign="top"><b>Type:</b></td>
+                <td>
+                    <input type="radio" class="switch" name="box_type" value="33" checked> SRV (Service description)
+                    <div class="switch">
+                        <div class="block">
+                            <label for="box_srv_host">Host:</label>
+                            <input type="text" name="box_srv_host" maxlength="63" size="63" required>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            </tr>
+            <tr>
+                <td/><td>
+                    <input type="radio" class="switch" name="box_type" value="52"> TLSA (TLS Association)
+                    <div class="switch">
+                        <div class="block">
+                            <label for="box_tlsa_usage">Usage:</label>
+                            <select size="1" name="box_tlsa_usage">
+                                <option value="0">CA certificate</option>
+                                <option value="1">Service certificate constraint</option>
+                                <option value="2">Trust anchor assertion</option>
+                                <option value="3">Domain-issued certificate</option>
+                                <option value="255">Private use</option>
+                            </select>
+                        </div>
+                        <div class="block">
+                            <label for="box_tlsa_selector">Selector:</label>
+                            <select size="1" name="box_tlsa_selector">
+                                <option value="0">Full certificate</option>
+                                <option value="1">SubjectPublicKeyInfo</option>
+                                <option value="255">Private use</option>
+                            </select>
+                        </div>
+                        <div class="block">
+                            <label for="box_tlsa_match">Match:</label>
+                            <select size="1" name="box_tlsa_match">
+                                <option value="0">No hash</option>
+                                <option value="1">SHA-256</option>
+                                <option value="2">SHA-512</option>
+                                <option value="255">Private use</option>
+                            </select>
+                        </div>
+                        <div class="block">
+                            <label for="box_tlsa_cert">Certificate information (hex):</label><br>
+                            <textarea name="box_tlsa_cert" rows="10" cols="50"></textarea>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+            {{template "RRCommon" "box"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "DNS_A"}}
+    <h3>DNS A (IPv4 address)</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="1">
+        <table>
+            <tr>
+                <td align="right"><b>Address:</b></td>
+                <td>
+                    <input type="text" name="dnsa_addr"
+                        maxlength="15" size="15"
+                        pattern="[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            {{template "RRCommon" "dnsa"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "DNS_AAAA"}}
+    <h3>DNS AAAA (IPv6 address)</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="28">
+        <table>
+            <tr>
+                <td align="right"><b>Address:</b></td>
+                <td>
+                    <input type="text" name="dnsaaaa_addr"
+                        maxlength="15" size="15"
+                        pattern="(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            {{template "RRCommon" "dnsaaaa"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "DNS_CNAME"}}
+    <h3>DNS CNAME delegation</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="5">
+        <table>
+            <tr>
+                <td align="right"><b>Name:</b></td>
+                <td>
+                    <input type="text" name="dnscname_name"
+                        maxlength="63" size="63"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            {{template "RRCommon" "dnscname"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "DNS_TXT"}}
+    <h3>DNS TXT</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="16">
+        <table>
+            <tr>
+                <td align="right"><b>Text:</b></td>
+                <td>
+                    <input type="text" name="dnstxt_text"
+                        maxlength="63" size="63"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            {{template "RRCommon" "dnstxt"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}
+{{define "DNS_MX"}}
+    <h3>DNS MX (Mailbox)</h3>
+    <form action="/action/new/rr/{{.Ref}}">
+        <input type="hidden" name="type" value="15">
+        <table>
+            <tr>
+                <td align="right" valign="top"><b>Priority:</b></td>
+                <td><input type="number" name="dnsmx_prio" min="1" max="100" value="10"></td>
+            </tr>
+            <tr>
+                <td align="right" valign="top"><b>Mailserver:</b></td>
+                <td>
+                    <input type="text" name="dnsmx_host"
+                        maxlength="63" size="63"
+                        autofocus required
+                    >
+                </td>
+            </tr>
+            {{template "RRCommon" "dnsmx"}}
+            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+        </table>
+    </form>
+{{end}}

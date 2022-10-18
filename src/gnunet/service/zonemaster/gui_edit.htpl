@@ -1,0 +1,93 @@
+{{define "edit_zone"}}
+    {{$type := index .Params "keytype"}}
+    {{$name := index .Params "name"}}
+    <div>
+        <h3>Edit a [{{$type}}] GNS zone:</h3>
+        <p><small>(Created: {{index .Params "created"}}, Last edited: {{index .Params "modified"}}</small></p>
+        <form action="/action/upd/zone/{{.Ref}}" method="post" onsubmit="return(zone_validate());">
+            <table>
+                <tr>
+                    <td align="right"><b>Zone name:</b></td>
+                    <td><input type="text" id="name" name="name" value="{{$name}}"></td>
+                </tr>
+                <tr>
+                    <td colspan="2">
+                        <p>The type of the zone key cannot be changed. It is currently set to
+                        {{if eq $type "PKEY"}}PKEY (Ed25519+EcDSA){{else}}EDKEY (EdDSA){{end}}.</p>
+                    </td>
+                </tr>
+            </table>
+            <button id="submit">Change zone name</button>
+        </form>
+        <p><a href="/"><button>Leave</button></a></p>
+    </div>
+    <script>
+        const old_zone = "{{$name}}";
+        const zone_names = [
+            {{range $i, $n := .Names}}
+                "{{$n}}",
+            {{end}}
+        ];
+        function zone_validate() {
+            const name = document.getElementById("name").value;
+            if (!name) {
+                alert("Empty zone name not allowed");
+                return false;
+            }
+            if (name == old_zone) {
+                alert("Zone name not changed");
+                return false;
+            }
+            for (var i = 0; i < names.length; i++) {
+                if (zone_names[i] == name) {
+                    alert("Zone name already in-use");
+                    return false;
+                }
+            }
+            return(true);
+        }
+    </script>
+{{end}}
+
+{{define "edit_label"}}
+    {{$name := index .Params "name"}}
+    <div>
+        <h3>Edit a GNS zone label:</h3>
+        <form action="/action/upd/label/{{.Ref}}" onsubmit="return(label_validate());">
+            <table>
+                <tr>
+                    <td align="right">Name:</td>
+                    <td><input type="text" id="name" name="name" value="{{$name}}"></td>
+                </tr>
+            </table>
+            <button id="submit">Change label name</button>
+        </form>
+        <p><a href="/"><button>Leave</button></a></p>
+    </div>
+    <script>
+        const old_label = "{{$name}}";
+        const label_names = [
+            {{range $i, $n := .Names}}
+            '{{$n}}',
+            {{end}}
+        ];
+        function label_validate() {
+            const name = document.getElementById("name").value;
+            if (!name) {
+                alert("Empty labels not allowed");
+                return false;
+            }
+            if (name == old_label) {
+                alert("Label name not changed");
+                return false;
+            }
+            for (var i = 0; i < names.length; i++) {
+                if (label_names[i] == name) {
+                    alert("Label name already in-use");
+                    return false;
+                }
+            }
+            return(true);
+        }
+    </script>
+{{end}}

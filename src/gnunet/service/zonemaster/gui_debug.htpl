@@ -1,0 +1,14 @@
+{{define "debug"}}
+    <h1>Debug</h1>
+    <h3>Parameters:</h3>
+    <ul>
+    {{range $k,$v := .}}
+        <li><b>{{$k}}</b> = {{$v}}</li>
+    {{end}}
+    </ul>
+    <h3>RR data:</h3>
+    <p>{{.RR}}</p>
+    {{if .Err}}
+    <p>Error: <b>{{.Err}}</b></p>
+    {{end}}
+{{end}}

@@ -23,19 +23,21 @@ import (
 	"context"
 	"crypto/rand"
 	"embed"
+	"errors"
 	"fmt"
 	"gnunet/crypto"
 	"gnunet/enums"
+	"gnunet/service/gns/rr"
 	"gnunet/service/store"
 	"gnunet/util"
 	"io"
 	"net"
 	"net/http"
-	"strconv"
 	"strings"
 	"text/template"
 	"time"
 
+	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
 	"github.com/gorilla/mux"
 )
@@ -44,11 +46,13 @@ import (
 // HTTP service
 //======================================================================
 
-//go:embed gui.htpl
+//go:embed *.htpl
 var fsys embed.FS
 
 var (
-	tpl *template.Template // HTML templates
+	tpl      *template.Template   // HTML templates
+	timeHTML = "2006-01-02T15:04" // time format (defined by HTML, don't change!)
+	timeGUI  = "02.01.06 15:04"   // time format for GUI
 )
 
 //----------------------------------------------------------------------
@@ -61,19 +65,10 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 	tpl = template.New("gui")
 	tpl.Funcs(template.FuncMap{
 		"date": func(ts util.AbsoluteTime) string {
-			if ts.IsNever() {
-				return "Never"
-			}
-			return time.UnixMicro(int64(ts.Val)).Format("02.01.06 15:04")
+			return guiTime(ts)
 		},
 		"keytype": func(t enums.GNSType) string {
-			switch t {
-			case enums.GNS_TYPE_PKEY:
-				return "PKEY"
-			case enums.GNS_TYPE_EDKEY:
-				return "EDKEY"
-			}
-			return "???"
+			return guiKeyType(t)
 		},
 		"rrtype": func(t enums.GNSType) string {
 			return strings.Replace(t.String(), "GNS_TYPE_", "", -1)
@@ -103,7 +98,7 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 			return strings.Join(list, ",<br>")
 		},
 	})
-	if _, err := tpl.ParseFS(fsys, "gui.htpl"); err != nil {
+	if _, err := tpl.ParseFS(fsys, "*.htpl"); err != nil {
 		logger.Println(logger.ERROR, "[zonemaster] GUI templates failed: "+err.Error())
 		return
 	}
@@ -131,6 +126,20 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 	}()
 }
 
+//----------------------------------------------------------------------
+
+// dashboard is the main entry point for the GUI
+func (zm *ZoneMaster) dashboard(w http.ResponseWriter, r *http.Request) {
+	// collect information for the GUI
+	zg, err := zm.zdb.GetContent()
+	if err != nil {
+		_, _ = io.WriteString(w, "ERROR: "+err.Error())
+		return
+	}
+	// show dashboard
+	renderPage(w, zg, "dashboard")
+}
+
 //======================================================================
 // Handle GUI actions (add, edit and remove)
 //======================================================================
@@ -139,23 +148,25 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 func (zm *ZoneMaster) action(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	mode := vars["mode"]
-	id, err := strconv.ParseInt(vars["id"], 10, 64)
+	id, ok := util.CastFromString[int64](vars["id"])
+	var err error
+	if ok {
+		switch vars["cmd"] {
+		case "new":
+			err = zm.actionNew(w, r, mode, id)
+		case "upd":
+			err = zm.actionUpd(w, r, mode, id)
+		case "del":
+			err = zm.actionDel(w, r, mode, id)
+		}
+	} else {
+		err = errors.New("action: missing object id")
+	}
 	if err != nil {
 		_, _ = io.WriteString(w, "ERROR: "+err.Error())
 		return
 	}
-	switch vars["cmd"] {
-	case "new":
-		err = zm.actionNew(w, r, mode, id)
-	case "upd":
-		err = zm.actionUpd(w, r, mode, id)
-	case "del":
-		err = zm.actionDel(w, r, mode, id)
-	}
-	if err != nil {
-		_, _ = io.WriteString(w, "ERROR: "+err.Error())
-		return
-	}
+	// redirect back to dashboard
 	http.Redirect(w, r, "/", http.StatusMovedPermanently)
 }
 
@@ -165,6 +176,8 @@ func (zm *ZoneMaster) action(w http.ResponseWriter, r *http.Request) {
 
 func (zm *ZoneMaster) actionNew(w http.ResponseWriter, r *http.Request, mode string, id int64) (err error) {
 	switch mode {
+
+	// new zone
 	case "zone":
 		name := r.FormValue("name")
 		// create private key
@@ -185,6 +198,7 @@ func (zm *ZoneMaster) actionNew(w http.ResponseWriter, r *http.Request, mode str
 		zone := store.NewZone(name, zp)
 		err = zm.zdb.SetZone(zone)
 
+	// new label
 	case "label":
 		name := r.FormValue("name")
 		// add label to database
@@ -192,12 +206,16 @@ func (zm *ZoneMaster) actionNew(w http.ResponseWriter, r *http.Request, mode str
 		label.Zone = id
 		err = zm.zdb.SetLabel(label)
 
+	// new resource record
 	case "rr":
 		err = zm.newRec(w, r, id)
 	}
 	return
 }
 
+//----------------------------------------------------------------------
+
+// create new resource record from dialog data
 func (zm *ZoneMaster) newRec(w http.ResponseWriter, r *http.Request, label int64) error {
 	// get list of parameters from resource record dialog
 	_ = r.ParseForm()
@@ -206,13 +224,16 @@ func (zm *ZoneMaster) newRec(w http.ResponseWriter, r *http.Request, label int64
 		params[key] = strings.Join(val, ",")
 	}
 	// parse RR type (and set prefix for map keys)
-	t, _ := util.CastFromString[enums.GNSType](params["type"])
+	t, ok := util.CastFromString[enums.GNSType](params["type"])
+	if !ok {
+		return errors.New("new: missing resource record type")
+	}
 	pf := dlgPrefix[t]
 
 	// parse expiration
 	exp := util.AbsoluteTimeNever()
 	if _, ok := params[pf+"never"]; !ok {
-		ts, _ := time.Parse("2006-01-02T15:04", params[pf+"expires"])
+		ts, _ := time.Parse(timeHTML, params[pf+"expires"])
 		exp.Val = uint64(ts.UnixMicro())
 	}
 	// parse flags
@@ -228,16 +249,17 @@ func (zm *ZoneMaster) newRec(w http.ResponseWriter, r *http.Request, label int64
 	}
 	// construct RR data
 	rrdata, err := Map2RRData(t, params)
-	if err != nil {
-		return err
+	if err == nil {
+		// assemble record and store in database
+		rr := store.NewRecord(exp, t, flags, rrdata)
+		rr.Label = label
+		err = zm.zdb.SetRecord(rr)
 	}
-
-	// assemble record and store in database
-	rr := store.NewRecord(exp, t, flags, rrdata)
-	rr.Label = label
-	return zm.zdb.SetRecord(rr)
+	return err
 }
 
+//----------------------------------------------------------------------
+// UPD: update zone, label or resource record
 //----------------------------------------------------------------------
 
 func (zm *ZoneMaster) actionUpd(w http.ResponseWriter, r *http.Request, mode string, id int64) error {
@@ -245,99 +267,216 @@ func (zm *ZoneMaster) actionUpd(w http.ResponseWriter, r *http.Request, mode str
 }
 
 //----------------------------------------------------------------------
+// NEW: create zone, label or resource record
+//----------------------------------------------------------------------
 
 func (zm *ZoneMaster) actionDel(w http.ResponseWriter, r *http.Request, mode string, id int64) error {
 	return nil
 }
 
 //----------------------------------------------------------------------
-
-func (zm *ZoneMaster) dashboard(w http.ResponseWriter, r *http.Request) {
-	// collect information for the GUI
-	zg, err := zm.zdb.GetContent()
-	if err != nil {
-		_, _ = io.WriteString(w, "ERROR: "+err.Error())
-		return
-	}
-	// show dashboard
-	renderPage(w, zg, "dashboard")
-}
-
+// Create new zone. label or resource record
 //----------------------------------------------------------------------
 
 type NewEditData struct {
-	// shared attributes
-	Ref    int64  // database id of reference object
-	Action string // "Add" or "Edit" action
+	// shared attributes (new/edit)
+	Ref    int64    // database id of reference object
+	Action string   // "Add" or "Edit" action
+	Names  []string // list of names in use (ZONE,LABEL)
 
 	// "new" attributes
-	Names   []string        // list of names in use (ZONE,LABEL)
-	RRtypes []*store.RRData // list of allowed record types (REC)
+	RRtypes []*enums.GNSSpec // list of allowed record types (REC)
+
+	// "edit" attributes
+	Params map[string]string // list of current values
 }
 
 func (zm *ZoneMaster) new(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	var dialog string
 	var err error
 	data := new(NewEditData)
 	data.Action = "Add"
 	switch vars["mode"] {
+
+	// new zone dialog
 	case "zone":
-		dialog = "new_zone"
 		if data.Names, err = zm.zdb.GetNames("zones"); err != nil {
-			_, _ = io.WriteString(w, "ERROR: "+err.Error())
-			return
+			break
 		}
+		renderPage(w, data, "new_zone")
+		return
 
+	// new label dialog
 	case "label":
-		dialog = "new_label"
 		// get reference id
-		id, err := strconv.ParseInt(vars["id"], 10, 64)
-		if err != nil {
-			_, _ = io.WriteString(w, "ERROR: "+err.Error())
-			return
+		id, ok := util.CastFromString[int64](vars["id"])
+		if !ok {
+			err = errors.New("new label: missing zone id")
+			break
 		}
-		// get
+		// get all existing label names for zone
 		stmt := fmt.Sprintf("labels where zid=%d", id)
-		if data.Names, err = zm.zdb.GetNames(stmt); err != nil {
-			_, _ = io.WriteString(w, "ERROR: "+err.Error())
+		if data.Names, err = zm.zdb.GetNames(stmt); err == nil {
+			data.Ref = id
+			renderPage(w, data, "new_label")
 			return
 		}
-		data.Ref = id
 
+	// new resource record dialog
 	case "rr":
-		dialog = "new_record"
 		// get reference id
-		id, err := strconv.ParseInt(vars["id"], 10, 64)
-		if err != nil {
-			_, _ = io.WriteString(w, "ERROR: "+err.Error())
-			return
+		id, ok := util.CastFromString[int64](vars["id"])
+		if !ok {
+			err = errors.New("new record: missing label id")
+			break
 		}
 		// get all rrtypes used under given label
-		rrs, err := zm.zdb.GetRRTypes(id)
-		if err != nil {
-			_, _ = io.WriteString(w, "ERROR: "+err.Error())
+		var rrs []*enums.GNSSpec
+		var label string
+		if rrs, label, err = zm.zdb.GetRRTypes(id); err == nil {
+			// compile a list of acceptable types for new records
+			data.RRtypes = compatibleRR(rrs, label)
+			data.Ref = id
+			renderPage(w, data, "new_record")
 			return
 		}
-		// compile a list of acceptable types for new records
-		data.RRtypes = compatibleRR(rrs)
-		data.Ref = id
-
-	default:
-		zm.dashboard(w, r)
+	}
+	// handle error
+	if err != nil {
+		_, _ = io.WriteString(w, "ERROR: "+err.Error())
 		return
 	}
-	// show dialog
-	renderPage(w, data, dialog)
+	// redirect back to dashboard
+	http.Redirect(w, r, "/", http.StatusMovedPermanently)
+}
+
+//----------------------------------------------------------------------
+// Edit zone. label or resource record
+//----------------------------------------------------------------------
+
+func (zm *ZoneMaster) edit(w http.ResponseWriter, r *http.Request) {
+	// get database id of edited object
+	vars := mux.Vars(r)
+	var err error
+	id, ok := util.CastFromString[int64](vars["id"])
+	if !ok {
+		err = errors.New("missing edit id")
+	} else {
+		// create edit data instance
+		data := new(NewEditData)
+		data.Ref = id
+		data.Action = "Edit"
+		data.Params = make(map[string]string)
+
+		switch vars["mode"] {
+
+		// edit zone name (type can't be changed)
+		case "zone":
+			// get all existing zone names (including the edited one!)
+			if data.Names, err = zm.zdb.GetNames("zones"); err != nil {
+				break
+			}
+			// get edited zone
+			var zone *store.Zone
+			if zone, err = zm.zdb.GetZone(id); err != nil {
+				break
+			}
+			// set edit attributes
+			data.Params["name"] = zone.Name
+			data.Params["keytype"] = guiKeyType(zone.Key.Type)
+			data.Params["created"] = guiTime(zone.Created)
+			data.Params["modified"] = guiTime(zone.Modified)
+
+			// show dialog
+			renderPage(w, data, "edit_zone")
+			return
+
+		// edit label name
+		case "label":
+			// get existing label names (including the edited label!)
+			stmt := fmt.Sprintf("labels where zid=%d", id)
+			if data.Names, err = zm.zdb.GetNames(stmt); err != nil {
+				break
+			}
+			// get edited label
+			var label *store.Label
+			if label, err = zm.zdb.GetLabel(id); err != nil {
+				return
+			}
+			// set edit parameters
+			data.Params["name"] = label.Name
+			data.Params["created"] = guiTime(label.Created)
+			data.Params["modified"] = guiTime(label.Modified)
+
+			// show dialog
+			renderPage(w, data, "edit_label")
+			return
+
+		// edit resource record
+		case "rr":
+			if err = zm.editRec(w, r, id); err == nil {
+				return
+			}
+		}
+	}
+	// handle error
+	if err != nil {
+		_, _ = io.WriteString(w, "ERROR: "+err.Error())
+		return
+	}
+	// redirect back to dashboard
+	http.Redirect(w, r, "/", http.StatusMovedPermanently)
 }
 
 //----------------------------------------------------------------------
 
-func (zm *ZoneMaster) edit(w http.ResponseWriter, r *http.Request) {
+func (zm *ZoneMaster) editRec(w http.ResponseWriter, r *http.Request, id int64) (err error) {
+	// get edited resource record
+	var rec *store.Record
+	if rec, err = zm.zdb.GetRecord(id); err != nil {
+		return
+	}
+	// build map of attribute values
+	params := make(map[string]string)
+	pf := dlgPrefix[rec.RType]
+
+	// save shared attributes
+	params["id"] = util.CastToString(id)
+	params["type"] = util.CastToString(rec.RType)
+	params["created"] = guiTime(rec.Created)
+	params["modified"] = guiTime(rec.Modified)
+	if rec.Expire.IsNever() {
+		params[pf+"never"] = "on"
+	} else {
+		params[pf+"expire"] = guiTime(rec.Expire)
+	}
+	if rec.Flags&enums.GNS_FLAG_PRIVATE != 0 {
+		params[pf+"private"] = "on"
+	}
+	if rec.Flags&enums.GNS_FLAG_SHADOW != 0 {
+		params[pf+"shadow"] = "on"
+	}
+	if rec.Flags&enums.GNS_FLAG_SUPPL != 0 {
+		params[pf+"suppl"] = "on"
+	}
+	// get record instance
+	if rr := rr.NewRR(rec.RType); rr != nil {
+		// reconstruct record
+		if err = data.Unmarshal(rr, rec.Data); err != nil {
+			return
+		}
+		// add RR attributes to list
+		rr.ToMap(params)
+	}
+
 	// show dialog
-	renderPage(w, nil, "new")
+	renderPage(w, params, "debug")
+
+	return
 }
 
+//----------------------------------------------------------------------
+// Remove zone. label or resource record
 //----------------------------------------------------------------------
 
 func (zm *ZoneMaster) remove(w http.ResponseWriter, r *http.Request) {
@@ -371,6 +510,25 @@ func renderPage(w io.Writer, data interface{}, page string) {
 	if err := t.Execute(w, content.String()); err != nil {
 		_, _ = io.WriteString(w, err.Error())
 	}
+}
+
+// convert GNUnet time to string for GUI
+func guiTime(ts util.AbsoluteTime) string {
+	if ts.IsNever() {
+		return "Never"
+	}
+	return time.UnixMicro(int64(ts.Val)).Format(timeGUI)
+}
+
+// convert zone key type to string
+func guiKeyType(t enums.GNSType) string {
+	switch t {
+	case enums.GNS_TYPE_PKEY:
+		return "PKEY"
+	case enums.GNS_TYPE_EDKEY:
+		return "EDKEY"
+	}
+	return "???"
 }
 
 type DebugData struct {
