@@ -197,10 +197,25 @@ func (db *ZoneDB) SetZone(z *Zone) error {
 	return err
 }
 
+// GetZone gets a zone with given identifier
+func (db *ZoneDB) GetZone(id int64) (zone *Zone, err error) {
+	// assemble zone from database row
+	stmt := "select name,created,modified,ztype,zdata from zones where id=?"
+	zone = new(Zone)
+	var ztype enums.GNSType
+	var zdata []byte
+	row := db.conn.QueryRow(stmt, id)
+	if err = row.Scan(&zone.Name, &zone.Created.Val, &zone.Modified.Val, &ztype, &zdata); err == nil {
+		// reconstruct private zone key
+		zone.Key, err = crypto.NewZonePrivate(ztype, zdata)
+	}
+	return
+}
+
 // GetZones retrieves zone instances from database matching a filter
 // ("where" clause)
 func (db *ZoneDB) GetZones(filter string, args ...any) (list []*Zone, err error) {
-	// assemble querey
+	// assemble query
 	stmt := "select id,name,created,modified,ztype,zdata from zones"
 	if len(filter) > 0 {
 		stmt += " where " + fmt.Sprintf(filter, args...)
@@ -276,6 +291,16 @@ func (db *ZoneDB) SetLabel(l *Label) error {
 	return err
 }
 
+// GetLabel gets a label with given identifier
+func (db *ZoneDB) GetLabel(id int64) (label *Label, err error) {
+	// assemble label from database row
+	stmt := "select zid,name,created,modified from labels where id=?"
+	label = new(Label)
+	row := db.conn.QueryRow(stmt, id)
+	err = row.Scan(&label.Zone, &label.Name, &label.Created.Val, &label.Modified.Val)
+	return
+}
+
 // GetLabels retrieves record instances from database matching a filter
 // ("where" clause)
 func (db *ZoneDB) GetLabels(filter string, args ...any) (list []*Label, err error) {
@@ -318,6 +343,7 @@ func (db *ZoneDB) SetRecord(r *Record) error {
 	// work around a SQLite3 bug when storing uint64 with high bit set
 	var exp *uint64
 	if !r.Expire.IsNever() {
+		exp = new(uint64)
 		*exp = r.Expire.Val
 	}
 	// check for record insert
@@ -348,6 +374,27 @@ func (db *ZoneDB) SetRecord(r *Record) error {
 	// remove record from database
 	_, err := db.conn.Exec("delete from records where id=?", r.ID)
 	return err
+}
+
+// GetRecord gets a resource record with given identifier
+func (db *ZoneDB) GetRecord(id int64) (rec *Record, err error) {
+	// assemble resource record from database row
+	stmt := "select lid,expire,created,modified,flags,rtype,rdata from records where id=?"
+	rec = new(Record)
+	row := db.conn.QueryRow(stmt, id)
+	var exp *uint64
+	if err = row.Scan(&rec.Label, &exp, &rec.Created.Val, &rec.Modified.Val, &rec.Flags, &rec.RType, &rec.Data); err != nil {
+		// terminate on error
+		return
+	}
+	// setup missing fields
+	rec.Size = uint32(len(rec.Data))
+	if exp != nil {
+		rec.Expire.Val = *exp
+	} else {
+		rec.Expire = util.AbsoluteTimeNever()
+	}
+	return
 }
 
 // GetRecords retrieves record instances from database matching a filter
@@ -465,24 +512,23 @@ func (db *ZoneDB) GetNames(tbl string) (names []string, err error) {
 	return
 }
 
-// RRData contains the type and flags of a resource record
-type RRData struct {
-	Type  enums.GNSType
-	Flags enums.GNSFlag
-}
-
 // GetRRTypes returns a list record types stored under a label
-func (db *ZoneDB) GetRRTypes(lid int64) (rrtypes []*RRData, err error) {
+func (db *ZoneDB) GetRRTypes(lid int64) (rrtypes []*enums.GNSSpec, label string, err error) {
+	// select label name
+	row := db.conn.QueryRow("select name from labels where id=?", lid)
+	if err = row.Scan(&label); err != nil {
+		return
+	}
 	// select all record types under label
-	stmt := fmt.Sprintf("select rtype,flags from records where lid=%d", lid)
+	stmt := "select rtype,flags from records where lid=?"
 	var rows *sql.Rows
-	if rows, err = db.conn.Query(stmt); err != nil {
+	if rows, err = db.conn.Query(stmt, lid); err != nil {
 		return
 	}
 	// process records
 	defer rows.Close()
 	for rows.Next() {
-		e := new(RRData)
+		e := new(enums.GNSSpec)
 		if err = rows.Scan(&e.Type, &e.Flags); err != nil {
 			// terminate on error; return list so far
 			return
