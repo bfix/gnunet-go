@@ -22,8 +22,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"gnunet/enums"
-	"gnunet/service/gns"
-	"gnunet/service/store"
+	"gnunet/service/gns/rr"
 	"gnunet/util"
 	"net"
 
@@ -47,23 +46,6 @@ var (
 		enums.GNS_TYPE_DNS_MX,    // Mailbox
 	}
 )
-
-//----------------------------------------------------------------------
-// RR data types
-//----------------------------------------------------------------------
-
-// RRtlsa is a TLSA record in a BOX
-type RRtlsa struct {
-	Usage    uint8
-	Selector uint8
-	Match    uint8
-	Cert     []byte `size:"*"`
-}
-
-type RRmx struct {
-	Prio   uint16 `order:"big"`
-	Server []byte `size:"*"`
-}
 
 //======================================================================
 // Convert binary resource records to ParameterSet and vice-versa.
@@ -117,15 +99,15 @@ func RRData2Map(t enums.GNSType, buf []byte) (set map[string]string) {
 
 	// DNS MX
 	case enums.GNS_TYPE_DNS_MX:
-		mx := new(RRmx)
+		mx := new(rr.MX)
 		_ = data.Unmarshal(mx, buf)
 		set[pf+"prio"] = util.CastToString(mx.Prio)
-		set[pf+"host"], _ = util.ReadCString(mx.Server, 0)
+		set[pf+"host"] = mx.Server
 
 	// BOX
 	case enums.GNS_TYPE_BOX:
 		// get BOX from data
-		box := gns.NewBox(buf)
+		box := rr.NewBOX(buf)
 		set[pf+"proto"] = util.CastToString(box.Proto)
 		set[pf+"svc"] = util.CastToString(box.Svc)
 		set[pf+"type"] = util.CastToString(box.Type)
@@ -133,7 +115,7 @@ func RRData2Map(t enums.GNSType, buf []byte) (set map[string]string) {
 		// handle TLSA and SRV cases
 		switch box.Type {
 		case enums.GNS_TYPE_DNS_TLSA:
-			tlsa := new(RRtlsa)
+			tlsa := new(rr.TLSA)
 			_ = data.Unmarshal(tlsa, box.RR)
 			set[pf+"tlsa_usage"] = util.CastToString(tlsa.Usage)
 			set[pf+"tlsa_selector"] = util.CastToString(tlsa.Selector)
@@ -184,15 +166,15 @@ func Map2RRData(t enums.GNSType, set map[string]string) (buf []byte, err error) 
 
 	// DNS MX
 	case enums.GNS_TYPE_DNS_MX:
-		mx := new(RRmx)
+		mx := new(rr.MX)
 		mx.Prio, _ = util.CastFromString[uint16](set[pf+"prio"])
-		mx.Server = util.WriteCString(set[pf+"host"])
+		mx.Server = set[pf+"host"]
 		return data.Marshal(mx)
 
 	// BOX
 	case enums.GNS_TYPE_BOX:
 		// assemble box
-		box := new(gns.Box)
+		box := new(rr.BOX)
 		box.Proto, _ = util.CastFromString[uint16](set[pf+"proto"])
 		box.Svc, _ = util.CastFromString[uint16](set[pf+"svc"])
 		box.Type, _ = util.CastFromString[enums.GNSType](set[pf+"type"])
@@ -200,7 +182,7 @@ func Map2RRData(t enums.GNSType, set map[string]string) (buf []byte, err error) 
 		// handle TLSA and SRV cases
 		switch box.Type {
 		case enums.GNS_TYPE_DNS_TLSA:
-			tlsa := new(RRtlsa)
+			tlsa := new(rr.TLSA)
 			tlsa.Usage, _ = util.CastFromString[uint8](set[pf+"tlsa_usage"])
 			tlsa.Selector, _ = util.CastFromString[uint8](set[pf+"tlsa_sel"])
 			tlsa.Match, _ = util.CastFromString[uint8](set[pf+"tlsa_match"])
@@ -226,12 +208,14 @@ func Map2RRData(t enums.GNSType, set map[string]string) (buf []byte, err error) 
 
 // Create a list of compatible record types from list of
 // existing record types.
-func compatibleRR(in []*store.RRData) (out []*store.RRData) {
+func compatibleRR(in []*enums.GNSSpec, label string) (out []*enums.GNSSpec) {
 	for _, t := range rrtypes {
-		out = append(out, &store.RRData{
-			Type:  t,
-			Flags: 0,
-		})
+		if ok, forced := rr.CanCoexist(t, in, label); ok {
+			out = append(out, &enums.GNSSpec{
+				Type:  t,
+				Flags: forced,
+			})
+		}
 	}
 	return
 }
