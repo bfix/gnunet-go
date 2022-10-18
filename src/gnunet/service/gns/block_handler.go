@@ -19,12 +19,14 @@
 package gns
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 
 	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/message"
+	"gnunet/service/gns/rr"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/logger"
@@ -360,6 +362,13 @@ func (h *Gns2DnsHandler) Name() string {
 // BOX handler
 //----------------------------------------------------------------------
 
+// Box record for handler logic
+type Box struct {
+	rr.BOX
+	key string                  // map key for box instance
+	rec *message.ResourceRecord // originating RR
+}
+
 // BoxHandler implementing the BlockHandler interface
 type BoxHandler struct {
 	boxes map[string]*Box // map of found boxes
@@ -395,8 +404,12 @@ func (h *BoxHandler) AddRecord(rec *message.ResourceRecord, labels []string) err
 		return nil
 	}
 	// (3) check of "svc" and "proto" match values in the BOX
-	box := NewBox(rec.Data)
-	box.rec = rec
+	hsh := sha256.Sum256(rec.Data)
+	box := &Box{
+		BOX: *rr.NewBOX(rec.Data),
+		key: hex.EncodeToString(hsh[:8]),
+		rec: rec,
+	}
 	if box.Matches(labels) {
 		logger.Println(logger.DBG, "[box-rr] MATCH -- adding record")
 		h.boxes[box.key] = box

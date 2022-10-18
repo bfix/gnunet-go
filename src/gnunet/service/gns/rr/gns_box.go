@@ -16,7 +16,7 @@
 //
 // SPDX-License-Identifier: AGPL3.0-or-later
 
-package gns
+package rr
 
 import (
 	"encoding/hex"
@@ -24,38 +24,36 @@ import (
 	"strings"
 
 	"gnunet/enums"
-	"gnunet/message"
 
 	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
 )
 
-// Box is an encapsulated RR for special names
-type Box struct {
+//----------------------------------------------------------------------
+// GNS box record that embeds either a TLSA or SRV record
+//----------------------------------------------------------------------
+
+// BOX is an encapsulated RR for special names
+type BOX struct {
 	Proto uint16        `order:"big"` // Protcol identifier
 	Svc   uint16        `order:"big"` // Service identifier
 	Type  enums.GNSType `order:"big"` // Type of embedded RR
 	RR    []byte        `size:"*"`    // embedded RR
-
-	// transient attributes (not serialized)
-	key string                  // map key for box instance
-	rec *message.ResourceRecord // originating RR
 }
 
-// NewBox creates a new box instance from a BOX resource record data.
-func NewBox(buf []byte) *Box {
-	b := new(Box)
+// NewBOX creates a new box instance from a BOX resource record data.
+func NewBOX(buf []byte) *BOX {
+	b := new(BOX)
 	if err := data.Unmarshal(b, buf); err != nil {
 		logger.Printf(logger.ERROR, "[gns] Can't unmarshal BOX")
 		return nil
 	}
-	b.key = hex.EncodeToString(buf[:8])
 	return b
 }
 
 // Matches verifies that the remaining labels comply with the values
 // in the BOX record.
-func (b *Box) Matches(labels []string) bool {
+func (b *BOX) Matches(labels []string) bool {
 	// resolve protocol and service names
 	proto, protoName := GetProtocol(labels[0])
 	svc, _ := GetService(labels[1], protoName)
@@ -67,8 +65,83 @@ func (b *Box) Matches(labels []string) bool {
 	return proto == b.Proto && svc == b.Svc
 }
 
+// Coexist checks if a new resource record could coexist with given set
+// of records under a label (can be called with a nil receiver)
+func (b *BOX) Coexist([]*enums.GNSSpec, string) (bool, enums.GNSFlag) {
+	return true, 0
+}
+
+// ToMap adds the RR attributes to a stringed map
+func (b *BOX) ToMap(params map[string]string) {
+	// shared attributes
+	params["box_proto"] = strconv.Itoa(int(b.Proto))
+	params["box_svc"] = strconv.Itoa(int(b.Svc))
+	params["box_type"] = strconv.Itoa(int(b.Type))
+	// attributes of embedded record
+	if rr, err := b.EmbeddedRR(); err != nil && rr != nil {
+		rr.ToMap(params)
+	}
+}
+
+// EmbeddedRR returns the embedded RR as an instance
+func (b *BOX) EmbeddedRR() (rr RR, err error) {
+	switch b.Type {
+	case enums.GNS_TYPE_DNS_TLSA:
+		rr = new(TLSA)
+	case enums.GNS_TYPE_DNS_SRV:
+		rr = new(SRV)
+	}
+	err = data.Unmarshal(rr, b.RR)
+	return
+}
+
+//----------------------------------------------------------------------
+// embedded resource records
+//----------------------------------------------------------------------
+
+// TLSA is a DNSSEC TLS asscoication
+type TLSA struct {
+	Usage    uint8
+	Selector uint8
+	Match    uint8
+	Cert     []byte `size:"*"`
+}
+
+// Coexist checks if a new resource record could coexist with given set
+// of records under a label (can be called with a nil receiver)
+func (rr *TLSA) Coexist([]*enums.GNSSpec, string) (bool, enums.GNSFlag) {
+	return true, 0
+}
+
+// ToMap adds the RR attributes to a stringed map
+func (rr *TLSA) ToMap(params map[string]string) {
+	params["box_tlsa_usage"] = strconv.Itoa(int(rr.Usage))
+	params["box_tlsa_selector"] = strconv.Itoa(int(rr.Selector))
+	params["box_tlsa_match"] = strconv.Itoa(int(rr.Match))
+	params["box_tlsa_cert"] = hex.EncodeToString(rr.Cert)
+}
+
+//----------------------------------------------------------------------
+
+// SRV for service definitions
+type SRV struct {
+	Host string
+}
+
+// Coexist checks if a new resource record could coexist with given set
+// of records under a label (can be called with a nil receiver)
+func (rr *SRV) Coexist([]*enums.GNSSpec, string) (bool, enums.GNSFlag) {
+	return true, 0
+}
+
+// ToMap adds the RR attributes to a stringed map
+func (rr *SRV) ToMap(params map[string]string) {
+	params["box_srv_server"] = rr.Host
+}
+
 //----------------------------------------------------------------------
 // helper functions
+//----------------------------------------------------------------------
 
 // list of handled protocols in BOX records
 var protocols = map[string]int{
