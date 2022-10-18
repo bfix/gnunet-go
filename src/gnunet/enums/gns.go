@@ -19,6 +19,7 @@
 //nolint:stylecheck // allow non-camel-case for constants
 package enums
 
+// GNSFlag type
 type GNSFlag uint32
 
 const (
@@ -41,3 +42,9 @@ const (
 //go:generate go run generate.go gnunet-gns.rec gnunet-gns.tpl gns_type.go
 
 //go:generate stringer -type=GNSType gns_type.go
+
+// GNSSpec is the combination of type and flags
+type GNSSpec struct {
+	Type  GNSType
+	Flags GNSFlag
+}
