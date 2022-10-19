@@ -21,10 +21,12 @@ package zonemaster
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"gnunet/enums"
 	"gnunet/service/gns/rr"
 	"gnunet/util"
 	"net"
+	"time"
 
 	"github.com/bfix/gospel/data"
 )
@@ -52,6 +54,10 @@ var (
 // The map keys must match the HTML names of dialog fields.
 //======================================================================
 
+//----------------------------------------------------------------------
+// GUI rendering hepers
+//----------------------------------------------------------------------
+
 var (
 	// List of key prefixes based on RR type
 	dlgPrefix = map[enums.GNSType]string{
@@ -69,6 +75,89 @@ var (
 		enums.GNS_TYPE_DNS_MX:    "dnsmx_",
 	}
 )
+
+// convert GNUnet time to string for GUI
+func guiTime(ts util.AbsoluteTime) string {
+	if ts.IsNever() {
+		return "Never"
+	}
+	return time.UnixMicro(int64(ts.Val)).Format(timeGUI)
+}
+
+// convert zone key type to string
+func guiKeyType(t enums.GNSType) string {
+	switch t {
+	case enums.GNS_TYPE_PKEY:
+		return "PKEY"
+	case enums.GNS_TYPE_EDKEY:
+		return "EDKEY"
+	}
+	return "???"
+}
+
+func guiRRdata(t enums.GNSType, buf []byte) string {
+	// get record instance
+	inst, err := rr.ParseRR(t, buf)
+	if err != nil {
+		return "<unknown>"
+	}
+	// type-dependent rendering
+	switch rec := inst.(type) {
+	case *rr.PKEY:
+		return fmt.Sprintf("<span title='public zone key'>%s</span>", rec.ZoneKey.ID())
+	case *rr.EDKEY:
+		return fmt.Sprintf("<span title='public zone key'>%s</span>", rec.ZoneKey.ID())
+	case *rr.REDIRECT:
+		return fmt.Sprintf("<span title='redirect target'>%s</span>", rec.Name)
+	case *rr.NICK:
+		return fmt.Sprintf("<span title='nick name'>%s</span>", rec.Name)
+	case *rr.LEHO:
+		return fmt.Sprintf("<span title='legacy hostname'>%s</span>", rec.Name)
+	case *rr.CNAME:
+		return fmt.Sprintf("<span title='canonical name'>%s</span>", rec.Name)
+	case *rr.TXT:
+		return fmt.Sprintf("<span title='text'>%s</span>", rec.Text)
+	case *rr.DNSA:
+		return fmt.Sprintf("<span title='IPv4 address'>%s</span>", rec.Addr.String())
+	case *rr.DNSAAAA:
+		return fmt.Sprintf("<span title='IPv6 address'>%s</span>", rec.Addr.String())
+	case *rr.MX:
+		s := fmt.Sprintf("<span title='priority'>[%d]</span>&nbsp;", rec.Prio)
+		return s + fmt.Sprintf("<span title='server'>%s</span>", rec.Server)
+	case *rr.BOX:
+		s := fmt.Sprintf("<span title='service'>%s</span>/", rr.GetServiceName(rec.Svc, rec.Proto))
+		s += fmt.Sprintf("<span title='protocol'>%s</span> ", rr.GetProtocolName(rec.Proto))
+		switch rec.Type {
+		case enums.GNS_TYPE_DNS_TLSA:
+			tlsa := new(rr.TLSA)
+			_ = data.Unmarshal(tlsa, rec.RR)
+			s += fmt.Sprintf("TLSA[ Usage(%s), Selector(%s), Match(%s), Cert(%s) ]",
+				rr.TLSAUsage[tlsa.Usage], rr.TLSASelector[tlsa.Selector],
+				rr.TLSAMatch[tlsa.Match], hex.EncodeToString(tlsa.Cert))
+		case enums.GNS_TYPE_DNS_SRV:
+			srv, _ := util.ReadCString(rec.RR, 0)
+			s += fmt.Sprintf("SRV[ %s ]", srv)
+		}
+		return s
+	case *rr.GNS2DNS:
+		s := fmt.Sprintf("<span title='name'>%s</span> (Resolver: ", rec.Name)
+		return s + fmt.Sprintf("<span title='server'>%s</span>)", rec.Server)
+	}
+	return "(unknown)"
+}
+
+// get prefix for GUI fields for given RR type
+func guiPrefix(t enums.GNSType) string {
+	pf, ok := dlgPrefix[t]
+	if !ok {
+		return ""
+	}
+	return pf
+}
+
+//----------------------------------------------------------------------
+// Convert RR to string-keyed map and vice-versa.
+//----------------------------------------------------------------------
 
 // RRData2Map converts resource record data in to a map
 func RRData2Map(t enums.GNSType, buf []byte) (set map[string]string) {
