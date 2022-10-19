@@ -177,8 +177,6 @@ func (zm *ZoneMaster) action(w http.ResponseWriter, r *http.Request) {
 			err = zm.actionNew(w, r, mode, id)
 		case "upd":
 			err = zm.actionUpd(w, r, mode, id)
-		case "del":
-			err = zm.actionDel(w, r, mode, id)
 		}
 	} else {
 		err = errors.New("action: missing object id")
@@ -340,14 +338,6 @@ func (zm *ZoneMaster) updRec(w http.ResponseWriter, r *http.Request, id int64) e
 			return err
 		}
 	}
-	return nil
-}
-
-//----------------------------------------------------------------------
-// DEL: remove zone, label or resource record
-//----------------------------------------------------------------------
-
-func (zm *ZoneMaster) actionDel(w http.ResponseWriter, r *http.Request, mode string, id int64) error {
 	return nil
 }
 
@@ -558,8 +548,42 @@ func (zm *ZoneMaster) editRec(w http.ResponseWriter, r *http.Request, data *NewE
 //----------------------------------------------------------------------
 
 func (zm *ZoneMaster) remove(w http.ResponseWriter, r *http.Request) {
-	// show dialog
-	renderPage(w, nil, "new")
+	// get database id of edited object
+	vars := mux.Vars(r)
+	var err error
+	id, ok := util.CastFromString[int64](vars["id"])
+	if !ok {
+		err = errors.New("missing remove id")
+	} else {
+		switch vars["mode"] {
+
+		// remove zone
+		case "zone":
+			zone := store.NewZone("", nil)
+			zone.ID = id
+			err = zm.zdb.SetZone(zone)
+
+		// remove label
+		case "label":
+			label := store.NewLabel("")
+			label.ID = id
+			err = zm.zdb.SetLabel(label)
+
+		// remove resource record
+		case "rr":
+			rec := new(store.Record)
+			rec.ID = id
+			rec.Label = 0
+			err = zm.zdb.SetRecord(rec)
+		}
+	}
+	// handle error
+	if err != nil {
+		_, _ = io.WriteString(w, "ERROR: "+err.Error())
+		return
+	}
+	// redirect back to dashboard
+	http.Redirect(w, r, "/", http.StatusMovedPermanently)
 }
 
 //======================================================================
