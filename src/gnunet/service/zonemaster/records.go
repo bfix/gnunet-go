@@ -76,7 +76,14 @@ var (
 	}
 )
 
-// convert GNUnet time to string for GUI
+// convert GNUnet time to string for HTML
+func htmlTime(ts util.AbsoluteTime) string {
+	if ts.IsNever() {
+		return ""
+	}
+	return time.UnixMicro(int64(ts.Val)).Format(timeHTML)
+}
+
 func guiTime(ts util.AbsoluteTime) string {
 	if ts.IsNever() {
 		return "Never"
@@ -131,14 +138,23 @@ func guiRRdata(t enums.GNSType, buf []byte) string {
 		case enums.GNS_TYPE_DNS_TLSA:
 			tlsa := new(rr.TLSA)
 			_ = data.Unmarshal(tlsa, rec.RR)
-			s += fmt.Sprintf("TLSA[ Usage(%s), Selector(%s), Match(%s), Cert(%s) ]",
-				rr.TLSAUsage[tlsa.Usage], rr.TLSASelector[tlsa.Selector],
-				rr.TLSAMatch[tlsa.Match], hex.EncodeToString(tlsa.Cert))
+			s += "TLSA[<br>"
+			s += fmt.Sprintf("&#8729;&nbsp;Usage: %s<br>", rr.TLSAUsage[tlsa.Usage])
+			s += fmt.Sprintf("&#8729;&nbsp;Selector: %s<br>", rr.TLSASelector[tlsa.Selector])
+			s += fmt.Sprintf("&#8729;&nbsp;Match: %s<br>", rr.TLSAMatch[tlsa.Match])
+			s += "&#8729;&nbsp;CertData:<br>"
+			cert := hex.EncodeToString(tlsa.Cert)
+			for len(cert) > 32 {
+				s += "&nbsp;&nbsp;" + cert[:32] + "<br>"
+				cert = cert[32:]
+			}
+			s += "&nbsp;&nbsp;" + cert + "<br>]"
+			return s
 		case enums.GNS_TYPE_DNS_SRV:
 			srv, _ := util.ReadCString(rec.RR, 0)
 			s += fmt.Sprintf("SRV[ %s ]", srv)
+			return s
 		}
-		return s
 	case *rr.GNS2DNS:
 		s := fmt.Sprintf("<span title='name'>%s</span> (Resolver: ", rec.Name)
 		return s + fmt.Sprintf("<span title='server'>%s</span>)", rec.Server)
@@ -153,6 +169,28 @@ func guiPrefix(t enums.GNSType) string {
 		return ""
 	}
 	return pf
+}
+
+// parse expiration time and flags from GUI parameters
+func guiParse(params map[string]string, pf string) (exp util.AbsoluteTime, flags enums.GNSFlag) {
+	// parse expiration time
+	exp = util.AbsoluteTimeNever()
+	if _, ok := params[pf+"never"]; !ok {
+		ts, _ := time.Parse(timeHTML, params[pf+"expires"])
+		exp.Val = uint64(ts.UnixMicro())
+	}
+	// parse flags
+	flags = 0
+	if _, ok := params[pf+"private"]; ok {
+		flags |= enums.GNS_FLAG_PRIVATE
+	}
+	if _, ok := params[pf+"shadow"]; ok {
+		flags |= enums.GNS_FLAG_SHADOW
+	}
+	if _, ok := params[pf+"suppl"]; ok {
+		flags |= enums.GNS_FLAG_SUPPL
+	}
+	return
 }
 
 //----------------------------------------------------------------------
@@ -273,7 +311,7 @@ func Map2RRData(t enums.GNSType, set map[string]string) (buf []byte, err error) 
 		case enums.GNS_TYPE_DNS_TLSA:
 			tlsa := new(rr.TLSA)
 			tlsa.Usage, _ = util.CastFromString[uint8](set[pf+"tlsa_usage"])
-			tlsa.Selector, _ = util.CastFromString[uint8](set[pf+"tlsa_sel"])
+			tlsa.Selector, _ = util.CastFromString[uint8](set[pf+"tlsa_selector"])
 			tlsa.Match, _ = util.CastFromString[uint8](set[pf+"tlsa_match"])
 			tlsa.Cert, _ = hex.DecodeString(set[pf+"tlsa_cert"])
 			box.RR, _ = data.Marshal(tlsa)
