@@ -37,7 +37,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
 	"github.com/gorilla/mux"
 )
@@ -46,7 +45,7 @@ import (
 // HTTP service
 //======================================================================
 
-//go:embed *.htpl
+//go:embed gui.htpl gui_css.htpl gui_rr.htpl gui_debug.htpl gui_edit.htpl gui_new.htpl
 var fsys embed.FS
 
 var (
@@ -70,6 +69,26 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 		"keytype": func(t enums.GNSType) string {
 			return guiKeyType(t)
 		},
+		"setspecs": func(data map[string]string, spec enums.GNSSpec) string {
+			pf := guiPrefix(spec.Type)
+			data["prefix"] = pf
+			if spec.Flags&enums.GNS_FLAG_PRIVATE != 0 {
+				data[pf+"private"] = "on"
+			}
+			if spec.Flags&enums.GNS_FLAG_SHADOW != 0 {
+				data[pf+"shadow"] = "on"
+			}
+			if spec.Flags&enums.GNS_FLAG_SUPPL != 0 {
+				data[pf+"suppl"] = "on"
+			}
+			return pf
+		},
+		"boxprotos": func() map[uint16]string {
+			return rr.GetProtocols()
+		},
+		"boxsvcs": func() map[uint16]string {
+			return rr.GetServices()
+		},
 		"rrtype": func(t enums.GNSType) string {
 			return strings.Replace(t.String(), "GNS_TYPE_", "", -1)
 		},
@@ -90,12 +109,7 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 			return strings.Join(flags, ",<br>")
 		},
 		"rrdata": func(t enums.GNSType, buf []byte) string {
-			params := RRData2Map(t, buf)
-			list := make([]string, 0)
-			for k, v := range params {
-				list = append(list, fmt.Sprintf("<span title='%s'>%v</span>", k, v))
-			}
-			return strings.Join(list, ",<br>")
+			return guiRRdata(t, buf)
 		},
 	})
 	if _, err := tpl.ParseFS(fsys, "*.htpl"); err != nil {
@@ -279,16 +293,11 @@ func (zm *ZoneMaster) actionDel(w http.ResponseWriter, r *http.Request, mode str
 //----------------------------------------------------------------------
 
 type NewEditData struct {
-	// shared attributes (new/edit)
-	Ref    int64    // database id of reference object
-	Action string   // "Add" or "Edit" action
-	Names  []string // list of names in use (ZONE,LABEL)
-
-	// "new" attributes
-	RRtypes []*enums.GNSSpec // list of allowed record types (REC)
-
-	// "edit" attributes
-	Params map[string]string // list of current values
+	Ref     int64             // database id of reference object
+	Action  string            // "Add" or "Edit" action
+	Names   []string          // list of names in use (ZONE,LABEL)
+	RRspecs []*enums.GNSSpec  // list of allowed record types and flags (REC)
+	Params  map[string]string // list of current values
 }
 
 func (zm *ZoneMaster) new(w http.ResponseWriter, r *http.Request) {
@@ -296,6 +305,7 @@ func (zm *ZoneMaster) new(w http.ResponseWriter, r *http.Request) {
 	var err error
 	data := new(NewEditData)
 	data.Action = "Add"
+	data.Params = make(map[string]string)
 	switch vars["mode"] {
 
 	// new zone dialog
@@ -318,6 +328,7 @@ func (zm *ZoneMaster) new(w http.ResponseWriter, r *http.Request) {
 		stmt := fmt.Sprintf("labels where zid=%d", id)
 		if data.Names, err = zm.zdb.GetNames(stmt); err == nil {
 			data.Ref = id
+			data.Params["zone"], _ = zm.zdb.GetName("zones", id)
 			renderPage(w, data, "new_label")
 			return
 		}
@@ -335,8 +346,9 @@ func (zm *ZoneMaster) new(w http.ResponseWriter, r *http.Request) {
 		var label string
 		if rrs, label, err = zm.zdb.GetRRTypes(id); err == nil {
 			// compile a list of acceptable types for new records
-			data.RRtypes = compatibleRR(rrs, label)
+			data.RRspecs = compatibleRR(rrs, label)
 			data.Ref = id
+			data.Params["label"] = label
 			renderPage(w, data, "new_record")
 			return
 		}
@@ -404,6 +416,7 @@ func (zm *ZoneMaster) edit(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			// set edit parameters
+			data.Params["zone"], _ = zm.zdb.GetName("zones", id)
 			data.Params["name"] = label.Name
 			data.Params["created"] = guiTime(label.Created)
 			data.Params["modified"] = guiTime(label.Modified)
@@ -460,18 +473,13 @@ func (zm *ZoneMaster) editRec(w http.ResponseWriter, r *http.Request, id int64) 
 		params[pf+"suppl"] = "on"
 	}
 	// get record instance
-	if rr := rr.NewRR(rec.RType); rr != nil {
-		// reconstruct record
-		if err = data.Unmarshal(rr, rec.Data); err != nil {
-			return
-		}
+	var inst rr.RR
+	if inst, err = rr.ParseRR(rec.RType, rec.Data); err == nil {
 		// add RR attributes to list
-		rr.ToMap(params)
+		inst.ToMap(params, pf)
 	}
-
 	// show dialog
 	renderPage(w, params, "debug")
-
 	return
 }
 
@@ -512,25 +520,11 @@ func renderPage(w io.Writer, data interface{}, page string) {
 	}
 }
 
-// convert GNUnet time to string for GUI
-func guiTime(ts util.AbsoluteTime) string {
-	if ts.IsNever() {
-		return "Never"
-	}
-	return time.UnixMicro(int64(ts.Val)).Format(timeGUI)
-}
+//----------------------------------------------------------------------
+// Debug rendering
+//----------------------------------------------------------------------
 
-// convert zone key type to string
-func guiKeyType(t enums.GNSType) string {
-	switch t {
-	case enums.GNS_TYPE_PKEY:
-		return "PKEY"
-	case enums.GNS_TYPE_EDKEY:
-		return "EDKEY"
-	}
-	return "???"
-}
-
+// DebugData for error page
 type DebugData struct {
 	Params map[string]string
 	RR     string
