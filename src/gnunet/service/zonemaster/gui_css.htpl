@@ -4,7 +4,18 @@
         box-sizing: border-box;
     }
     body {
-        margin: 2em 10em 2em 10em;
+        margin: 2em 9em 2em 9em;
+    }
+    input[type=text] {
+        font-size: 1.2em;
+        padding: 5px;
+        border: 2px solid #ddd;
+        border-radius: 7px;
+    }
+    input[type=text]:focus { 
+        outline: none;
+        border-color: #ace;
+        box-shadow: 0 0 10px #ace;
     }
     div.row::after {
         content: "";
@@ -66,6 +77,9 @@
     }
     .red {
         color: red !important;
+    }
+    .disabled {
+        pointer-events:none;
     }
     .headline {
         color: white;

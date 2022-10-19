@@ -1,0 +1,112 @@
+{{define "new_zone"}}
+<div>
+    <h3>Creating a new GNS zone:</h3>
+    <form action="/action/new/zone/0" method="post" onsubmit="return(zone_validate());">
+        <table>
+            <tr>
+                <td align="right"><b>Zone name:</b></td>
+                <td><input type="text" id="name" name="name"></td>
+            </tr>
+            <tr>
+                <td align="right" valign="top"><b>Key type:</b></td>
+                <td>
+                    <input type="radio" id="pkey" name="keytype" value="PKEY" checked="checked">&nbsp;PKEY (Ed25519+EcDSA)<br>
+                    <input type="radio" id="edkey" name="keytype" value="EDKEY">&nbsp;EDKEY (EdDSA)
+                </td>
+            </tr>
+        </table>
+        <button id="submit">Add zone</button>&nbsp;<a href="/"><button id="leave">Leave</button></a>
+    </form>
+</div>
+<script>
+    const zone_names = [
+        {{range $i, $n := .Names}}
+        '{{$n}}',
+        {{end}}
+    ];
+    function zone_validate() {
+        const name = document.getElementById("name").value;
+        if (!name) {
+            alert("Empty zone name not allowed");
+            return false;
+        }
+        for (var i = 0; i < names.length; i++) {
+            if (zone_names[i] == name) {
+                alert("Zone name already used");
+                return false;
+            }
+        }
+        return(true);
+    }
+</script>
+{{end}}
+
+{{define "new_label"}}
+<div>
+    <h3>Creating a new GNS label for zone "{{index .Params "zone"}}":</h3>
+    <form action="/action/new/label/{{.Ref}}" onsubmit="return(label_validate());">
+        <table>
+            <tr>
+                <td align="right">Name:</td>
+                <td><input type="text" id="name" name="name"></td>
+            </tr>
+        </table>
+        <button id="submit">Add label</button>&nbsp;<a href="/"><button>Leave</button></a>
+    </form>
+</div>
+<script>
+    const label_names = [
+        {{range $i, $n := .Names}}
+        '{{$n}}',
+        {{end}}
+    ];
+    function label_validate() {
+        const name = document.getElementById("name").value;
+        if (!name) {
+            alert("Empty labels not allowed");
+            return false;
+        }
+        for (var i = 0; i < names.length; i++) {
+            if (label_names[i] == name) {
+                alert("Label already used");
+                return false;
+            }
+        }
+        return(true);
+    }
+</script>
+{{end}}
+
+{{define "new_record"}}
+{{$data := .}}
+<div>
+    <h3>Creating a new GNS resource record for label "{{index .Params "label"}}":</h3>
+    <div class="tabset">
+        {{range $i, $type := .RRspecs}}
+        <input type="radio" name="tabset" id="tab{{$i}}" aria-controls="tab{{$i}}" {{if eq $i 0}}checked{{end}}>
+        <label for="tab{{$i}}">{{rrtype $type.Type}}</label>
+        {{end}}
+        <div class="tab-panels">
+            {{range $i, $spec := .RRspecs}}
+            <section id="tab{{$i}}" class="tab-panel">
+                {{$t := rrtype $spec.Type}}
+                {{$pf := setspecs $data.Params $spec}}
+                {{if eq $t "PKEY"}}{{template "PKEY" $data}}{{end}}
+                {{if eq $t "EDKEY"}}{{template "EDKEY" $data}}{{end}}
+                {{if eq $t "NICK"}}{{template "NICK" $data}}{{end}}
+                {{if eq $t "LEHO"}}{{template "LEHO" $data}}{{end}}
+                {{if eq $t "REDIRECT"}}{{template "REDIRECT" $data}}{{end}}
+                {{if eq $t "GNS2DNS"}}{{template "GNS2DNS" $data}}{{end}}
+                {{if eq $t "BOX"}}{{template "BOX" $data}}{{end}}
+                {{if eq $t "DNS_CNAME"}}{{template "DNS_CNAME" $data}}{{end}}
+                {{if eq $t "DNS_A"}}{{template "DNS_A" $data}}{{end}}
+                {{if eq $t "DNS_AAAA"}}{{template "DNS_AAAA" $data}}{{end}}
+                {{if eq $t "DNS_MX"}}{{template "DNS_MX" $data}}{{end}}
+                {{if eq $t "DNS_TXT"}}{{template "DNS_TXT" $data}}{{end}}
+            </section>
+            {{end}}
+        </div>
+    </div>
+    <a href="/"><button>Leave</button></a>
+</div>
+{{end}}

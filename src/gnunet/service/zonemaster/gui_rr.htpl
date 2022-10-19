@@ -1,29 +1,36 @@
 {{define "RRCommon"}}
-<tr>
-    <td align="right" valign="top"><b>Expires:</b></td>
-    <td>
-        Never <input type="checkbox" class="alternate" name="{{.}}_never">
-        <div class="alternate">
-            At given date and time:
-            <input type="datetime-local" id="{{.}}_expires" name="{{.}}_expires" required>
-        </div>
-    </td>
-</tr>
-<tr>
-    <td align="right" valign="top"><b>Flags:</b></td>
-    <td>
-        <input type="checkbox" name="{{.}}_private"> Private<br>
-        <input type="checkbox" name="{{.}}_shadow"> Shadow<br>
-        <input type="checkbox" name="{{.}}_suppl"> Supplemental<br>
-    </td>
-</tr>
-<script>
-    var dt = document.getElementById("{{.}}_expires");
-    if (!dt.value) {
-        var exp = new Date(new Date().getTime() + 31536000000);
-        dt.value = exp.toISOString().slice(0, 16);
-    }
-</script>
+    {{$pf := index . "prefix"}}
+    <tr>
+        <td align="right" valign="top"><b>Expires:</b></td>
+        <td>
+            Never <input type="checkbox" class="alternate" name="{{$pf}}never">
+            <div class="alternate">
+                At given date and time:
+                <input type="datetime-local" id="{{$pf}}expires" name="{{$pf}}expires" required>
+            </div>
+        </td>
+    </tr>
+    <tr>
+        <td align="right" valign="top"><b>Flags:</b></td>
+        <td>
+            <input type="checkbox" name="{{$pf}}private"
+                {{if eq "on" (index . (print $pf "private"))}}checked="checked" class="disabled"{{end}}
+                > Private<br>
+            <input type="checkbox" name="{{$pf}}shadow"
+                {{if eq "on" (index . (print $pf "shadow"))}}checked="checked" class="disabled"{{end}}
+                > Shadow<br>
+            <input type="checkbox" name="{{$pf}}suppl"
+                {{if eq "on" (index . (print $pf "suppl"))}}checked="checked" class="disabled"{{end}}
+                > Supplemental<br>
+        </td>
+    </tr>
+    <script>
+        var dt = document.getElementById("{{$pf}}expires");
+        if (!dt.value) {
+            var exp = new Date(new Date().getTime() + 31536000000);
+            dt.value = exp.toISOString().slice(0, 16);
+        }
+    </script>
 {{end}}
 
 {{define "PKEY"}}
@@ -50,7 +57,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" "pkey"}}
+            {{template "RRCommon" .Params}}
             <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
         </table>
     </form>
@@ -79,7 +86,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" "edkey"}}
+            {{template "RRCommon" .Params}}
             <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
         </table>
     </form>
@@ -105,7 +112,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" "redirect"}}
+            {{template "RRCommon" .Params}}
             <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
         </table>
     </form>
@@ -124,7 +131,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" "leho"}}
+            {{template "RRCommon" .Params}}
             <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
         </table>
     </form>
@@ -143,7 +150,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" "nick"}}
+            {{template "RRCommon" .Params}}
             <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
         </table>
     </form>
@@ -177,7 +184,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" "gns2dns"}}
+            {{template "RRCommon" .Params}}
             <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
         </table>
     </form>
@@ -198,8 +205,9 @@
                 <td>
                     <input type="text" name="box_proto" size="16" list="protocols" required>
                     <datalist id="protocols">
-                        <option value="6 (TCP)">
-                        <option value="17 (UDP)">
+                    {{range $id,$name := boxprotos}}
+                        <option value="{{$id}} ({{$name}})">
+                    {{end}}
                     </datalist>
                 </td>
             </tr>
@@ -208,52 +216,9 @@
                 <td>
                     <input type="text" name="box_svc" size="16" list="services" required>
                     <datalist id="services">
-                        <option value='20 (ftp-data/tcp)'>
-                        <option value='21 (ftp/tcp)'>
-                        <option value='22 (ssh/tcp)'>
-                        <option value='23 (telnet/tcp)'>
-                        <option value='25 (smtp/tcp)'>
-                        <option value='53 (domain)'>
-                        <option value='67 (bootps/udp)'>
-                        <option value='68 (bootpc/udp)'>
-                        <option value='69 (tftp/udp)'>
-                        <option value='70 (gopher/tcp)'>
-                        <option value='79 (finger/tcp)'>
-                        <option value='80 (http/tcp)'>
-                        <option value='88 (kerberos)'>
-                        <option value='110 (pop3/tcp)'>
-                        <option value='123 (ntp/udp)'>
-                        <option value='143 (imap2/tcp)'>
-                        <option value='161 (snmp)'>
-                        <option value='389 (ldap)'>
-                        <option value='443 (https)'>
-                        <option value='500 (isakmp/udp)'>
-                        <option value='513 (login/tcp)'>
-                        <option value='513 (who/udp)'>
-                        <option value='514 (shell/tcp)'>
-                        <option value='514 (syslog/udp)'>
-                        <option value='515 (printer/tcp)'>
-                        <option value='540 (uucp/tcp)'>
-                        <option value='554 (rtsp)'>
-                        <option value='636 (ldaps)'>
-                        <option value='750 (kerberos4)'>
-                        <option value='873 (rsync/tcp)'>
-                        <option value='989 (ftps-data/tcp)'>
-                        <option value='990 (ftps/tcp)'>
-                        <option value='992 (telnets/tcp)'>
-                        <option value='993 (imaps/tcp)'>
-                        <option value='995 (pop3s/tcp)'>
-                        <option value='1194 (openvpn)'>
-                        <option value='1649 (kermit/tcp)'>
-                        <option value='1812 (radius)'>
-                        <option value='2086 (gnunet)'>
-                        <option value='3306 (mysql/tcp)'>
-                        <option value='5060 (sip)'>
-                        <option value='5061 (sip-tls)'>
-                        <option value='6000 (x11/tcp)'>
-                        <option value='6379 (redis/tcp)'>
-                        <option value='9418 (git/tcp)'>
-                        <option value='10000 (webmin/tcp)'>
+                    {{range $id,$name := boxsvcs}}
+                        <option value='{{$id}} {{$name}}'>
+                    {{end}}
                     </datalist>
                 </td>
             </tr>
@@ -308,7 +273,7 @@
                     </div>
                 </td>
             </tr>
-            {{template "RRCommon" "box"}}
+            {{template "RRCommon" .Params}}
             <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
         </table>
     </form>
@@ -328,7 +293,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" "dnsa"}}
+            {{template "RRCommon" .Params}}
             <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
         </table>
     </form>
@@ -348,7 +313,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" "dnsaaaa"}}
+            {{template "RRCommon" .Params}}
             <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
         </table>
     </form>
@@ -367,7 +332,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" "dnscname"}}
+            {{template "RRCommon" .Params}}
             <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
         </table>
     </form>
@@ -386,7 +351,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" "dnstxt"}}
+            {{template "RRCommon" .Params}}
             <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
         </table>
     </form>
@@ -409,7 +374,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" "dnsmx"}}
+            {{template "RRCommon" .Params}}
             <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
         </table>
     </form>
