@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"gnunet/enums"
+	"gnunet/util"
 
 	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
@@ -72,14 +73,14 @@ func (b *BOX) Coexist([]*enums.GNSSpec, string) (bool, enums.GNSFlag) {
 }
 
 // ToMap adds the RR attributes to a stringed map
-func (b *BOX) ToMap(params map[string]string) {
+func (b *BOX) ToMap(params map[string]string, prefix string) {
 	// shared attributes
-	params["box_proto"] = strconv.Itoa(int(b.Proto))
-	params["box_svc"] = strconv.Itoa(int(b.Svc))
-	params["box_type"] = strconv.Itoa(int(b.Type))
+	params[prefix+"proto"] = strconv.Itoa(int(b.Proto))
+	params[prefix+"svc"] = strconv.Itoa(int(b.Svc))
+	params[prefix+"type"] = strconv.Itoa(int(b.Type))
 	// attributes of embedded record
 	if rr, err := b.EmbeddedRR(); err != nil && rr != nil {
-		rr.ToMap(params)
+		rr.ToMap(params, prefix)
 	}
 }
 
@@ -99,6 +100,30 @@ func (b *BOX) EmbeddedRR() (rr RR, err error) {
 // embedded resource records
 //----------------------------------------------------------------------
 
+var (
+	// TLSAUsage for defined usage values
+	TLSAUsage = map[uint8]string{
+		0:   "CA certificate",
+		1:   "Service certificate constraint",
+		2:   "Trust anchor assertion",
+		3:   "Domain-issued certificate",
+		255: "Private use",
+	}
+	// TLSASelector for defined selector values
+	TLSASelector = map[uint8]string{
+		0:   "Full certificate",
+		1:   "SubjectPublicKeyInfo",
+		255: "Private use",
+	}
+	// TLSAMatch for defined match values
+	TLSAMatch = map[uint8]string{
+		0:   "No hash",
+		1:   "SHA-256",
+		2:   "SHA-512",
+		255: "Private use",
+	}
+)
+
 // TLSA is a DNSSEC TLS asscoication
 type TLSA struct {
 	Usage    uint8
@@ -114,11 +139,11 @@ func (rr *TLSA) Coexist([]*enums.GNSSpec, string) (bool, enums.GNSFlag) {
 }
 
 // ToMap adds the RR attributes to a stringed map
-func (rr *TLSA) ToMap(params map[string]string) {
-	params["box_tlsa_usage"] = strconv.Itoa(int(rr.Usage))
-	params["box_tlsa_selector"] = strconv.Itoa(int(rr.Selector))
-	params["box_tlsa_match"] = strconv.Itoa(int(rr.Match))
-	params["box_tlsa_cert"] = hex.EncodeToString(rr.Cert)
+func (rr *TLSA) ToMap(params map[string]string, prefix string) {
+	params[prefix+"tlsa_usage"] = strconv.Itoa(int(rr.Usage))
+	params[prefix+"tlsa_selector"] = strconv.Itoa(int(rr.Selector))
+	params[prefix+"tlsa_match"] = strconv.Itoa(int(rr.Match))
+	params[prefix+"tlsa_cert"] = hex.EncodeToString(rr.Cert)
 }
 
 //----------------------------------------------------------------------
@@ -135,21 +160,43 @@ func (rr *SRV) Coexist([]*enums.GNSSpec, string) (bool, enums.GNSFlag) {
 }
 
 // ToMap adds the RR attributes to a stringed map
-func (rr *SRV) ToMap(params map[string]string) {
-	params["box_srv_server"] = rr.Host
+func (rr *SRV) ToMap(params map[string]string, prefix string) {
+	params[prefix+"srv_server"] = rr.Host
 }
 
 //----------------------------------------------------------------------
-// helper functions
+// BOX protocols
 //----------------------------------------------------------------------
 
 // list of handled protocols in BOX records
-var protocols = map[string]int{
+var protocols = map[string]uint16{
 	"icmp":      1,
 	"igmp":      2,
 	"tcp":       6,
 	"udp":       17,
 	"ipv6-icmp": 58,
+}
+
+// GetProtocolName returns the name of a protocol for given nu,ber
+func GetProtocolName(proto uint16) string {
+	// check for valid number (reverse protocol lookup)
+	for label, id := range protocols {
+		if id == proto {
+			// return found entry
+			return label
+		}
+	}
+	return util.CastToString(proto)
+}
+
+// GetProtocols returns a list of supported protocols for use
+// by caller (e.g. UI handling)
+func GetProtocols() (protos map[uint16]string) {
+	protos = make(map[uint16]string)
+	for name, id := range protocols {
+		protos[id] = name
+	}
+	return
 }
 
 // GetProtocol returns the protocol number and name for a given name. The
@@ -164,44 +211,121 @@ func GetProtocol(name string) (uint16, string) {
 
 	// if label is an integer value it is the protocol number
 	if val, err := strconv.Atoi(name); err == nil {
-		// check for valid number (reverse protocol lookup)
-		for label, id := range protocols {
-			if id == val {
-				// return found entry
-				return uint16(val), label
-			}
+		proto := uint16(val)
+		label := GetProtocolName(proto)
+		if len(label) == 0 {
+			proto = 0
 		}
-		// number out of range
-		return 0, ""
+		return proto, label
 	}
 	// try to resolve via protocol map
 	if id, ok := protocols[name]; ok {
-		return uint16(id), name
+		return id, name
 	}
 	// resolution failed
 	return 0, ""
 }
 
+//----------------------------------------------------------------------
+// BOX services
+//----------------------------------------------------------------------
+
 // list of services (per protocol) handled in BOX records
-var services = map[string]map[string]int{
+var services = map[string]map[string]uint16{
 	"udp": {
-		"domain": 53,
+		"bootpc":    68,
+		"bootps":    67,
+		"domain":    53,
+		"gnunet":    2086,
+		"https":     443,
+		"isakmp":    500,
+		"kerberos4": 750,
+		"kerberos":  88,
+		"ldap":      389,
+		"ldaps":     636,
+		"ntp":       123,
+		"openvpn":   1194,
+		"radius":    1812,
+		"rtsp":      554,
+		"sip":       5060,
+		"sip-tls":   5061,
+		"snmp":      161,
+		"syslog":    514,
+		"tftp":      69,
+		"who":       513,
 	},
 	"tcp": {
-		"ftp":    21,
-		"ftps":   990,
-		"gopher": 70,
-		"http":   80,
-		"https":  443,
-		"imap2":  143,
-		"imap3":  220,
-		"imaps":  993,
-		"pop3":   110,
-		"pop3s":  995,
-		"smtp":   25,
-		"ssh":    22,
-		"telnet": 23,
+		"domain":    53,
+		"finger":    79,
+		"ftp":       21,
+		"ftp-data":  20,
+		"ftps":      990,
+		"ftps-data": 989,
+		"git":       9418,
+		"gnunet":    2086,
+		"gopher":    70,
+		"http":      80,
+		"https":     443,
+		"imap2":     143,
+		"imaps":     993,
+		"kerberos4": 750,
+		"kerberos":  88,
+		"kermit":    1649,
+		"ldap":      389,
+		"ldaps":     636,
+		"login":     513,
+		"mysql":     3306,
+		"openvpn":   1194,
+		"pop3":      110,
+		"pop3s":     995,
+		"printer":   515,
+		"radius":    1812,
+		"redis":     6379,
+		"rsync":     873,
+		"rtsp":      554,
+		"shell":     514,
+		"sip":       5060,
+		"sip-tls":   5061,
+		"smtp":      25,
+		"snmp":      161,
+		"ssh":       22,
+		"telnet":    23,
+		"telnets":   992,
+		"uucp":      540,
+		"webmin":    10000,
+		"x11":       6000,
 	},
+}
+
+// GetServiceName returns the service spec on given port
+func GetServiceName(svc, proto uint16) string {
+	for n, id := range services[GetProtocolName(proto)] {
+		if id == svc {
+			return n
+		}
+	}
+	return util.CastToString(svc)
+}
+
+// GetServices returns a list of supported services for use
+// by caller (e.g. UI handling)
+func GetServices() (svcs map[uint16]string) {
+	svcs = make(map[uint16]string)
+	for n, id := range services["tcp"] {
+		svcs[id] = n + " (tcp"
+	}
+	for n, id := range services["udp"] {
+		nn, ok := svcs[id]
+		if ok {
+			svcs[id] = nn + "/udp"
+		} else {
+			svcs[id] = n + " (udp"
+		}
+	}
+	for id, n := range svcs {
+		svcs[id] = n + ")"
+	}
+	return
 }
 
 // GetService returns the port number and the name of a service (with given
@@ -223,11 +347,12 @@ func GetService(name, proto string) (uint16, string) {
 
 	// if label is an integer value it is the port number
 	if val, err := strconv.Atoi(name); err == nil {
+		svc := uint16(val)
 		// check for valid number (reverse service lookup)
 		for label, id := range svcs {
-			if id == val {
+			if id == svc {
 				// return found entry
-				return uint16(val), label
+				return svc, label
 			}
 		}
 		// number out of range
@@ -235,7 +360,7 @@ func GetService(name, proto string) (uint16, string) {
 	}
 	// try to resolve via services map
 	if id, ok := svcs[name]; ok {
-		return uint16(id), name
+		return id, name
 	}
 	// resolution failed
 	return 0, ""

@@ -19,8 +19,11 @@
 package rr
 
 import (
+	"errors"
 	"gnunet/enums"
 	"gnunet/util"
+
+	"github.com/bfix/gospel/data"
 )
 
 // RR interface for resource records
@@ -30,7 +33,7 @@ type RR interface {
 	Coexist(list []*enums.GNSSpec, label string) (bool, enums.GNSFlag)
 
 	// ToMap adds the RR attributes to a stringed map
-	ToMap(map[string]string)
+	ToMap(map[string]string, string)
 }
 
 // CanCoexist checks if a (new) resource record of type 't' can coexist
@@ -63,6 +66,18 @@ func CanCoexist(t enums.GNSType, list []*enums.GNSSpec, label string) (ok bool, 
 	}
 	// all checks passed
 	forced = eNew.Flags
+	return
+}
+
+// ParseRR returns a RR instance from data for given type
+func ParseRR(t enums.GNSType, buf []byte) (rr RR, err error) {
+	// get record instance
+	if rr = NewRR(t); rr == nil {
+		err = errors.New("parse RR failed")
+		return
+	}
+	// reconstruct record
+	err = data.Unmarshal(rr, buf)
 	return
 }
 

@@ -40,8 +40,8 @@ func (rr *CNAME) Coexist([]*enums.GNSSpec, string) (bool, enums.GNSFlag) {
 }
 
 // ToMap adds the RR attributes to a stringed map
-func (rr *CNAME) ToMap(params map[string]string) {
-	params["dnscname_name"] = rr.Name
+func (rr *CNAME) ToMap(params map[string]string, prefix string) {
+	params[prefix+"name"] = rr.Name
 }
 
 //----------------------------------------------------------------------
@@ -58,8 +58,8 @@ func (rr *TXT) Coexist([]*enums.GNSSpec, string) (bool, enums.GNSFlag) {
 }
 
 // ToMap adds the RR attributes to a stringed map
-func (rr *TXT) ToMap(params map[string]string) {
-	params["dnstxt_text"] = rr.Text
+func (rr *TXT) ToMap(params map[string]string, prefix string) {
+	params[prefix+"text"] = rr.Text
 }
 
 //----------------------------------------------------------------------
@@ -76,8 +76,8 @@ func (rr *DNSA) Coexist([]*enums.GNSSpec, string) (bool, enums.GNSFlag) {
 }
 
 // ToMap adds the RR attributes to a stringed map
-func (rr *DNSA) ToMap(params map[string]string) {
-	params["dnsa_addr"] = rr.Addr.String()
+func (rr *DNSA) ToMap(params map[string]string, prefix string) {
+	params[prefix+"addr"] = rr.Addr.String()
 }
 
 //----------------------------------------------------------------------
@@ -94,8 +94,8 @@ func (rr *DNSAAAA) Coexist([]*enums.GNSSpec, string) (bool, enums.GNSFlag) {
 }
 
 // ToMap adds the RR attributes to a stringed map
-func (rr *DNSAAAA) ToMap(params map[string]string) {
-	params["dnsaaaa_addr"] = rr.Addr.String()
+func (rr *DNSAAAA) ToMap(params map[string]string, prefix string) {
+	params[prefix+"addr"] = rr.Addr.String()
 }
 
 //----------------------------------------------------------------------
@@ -113,7 +113,7 @@ func (rr *MX) Coexist([]*enums.GNSSpec, string) (bool, enums.GNSFlag) {
 }
 
 // ToMap adds the RR attributes to a stringed map
-func (rr *MX) ToMap(params map[string]string) {
-	params["dnsmx_prio"] = fmt.Sprintf("%d", rr.Prio)
-	params["dnsmx_host"] = rr.Server
+func (rr *MX) ToMap(params map[string]string, prefix string) {
+	params[prefix+"prio"] = fmt.Sprintf("%d", rr.Prio)
+	params[prefix+"host"] = rr.Server
 }

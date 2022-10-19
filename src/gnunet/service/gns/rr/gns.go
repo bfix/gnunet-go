@@ -41,7 +41,7 @@ func (rr *PKEY) Coexist(list []*enums.GNSSpec, label string) (ok bool, forced en
 	}
 	// make sure all existing records are PKEYs too
 	for _, e := range list {
-		if e.Type != enums.GNS_TYPE_PKEY {
+		if e.Type != enums.GNS_TYPE_PKEY && e.Type != enums.GNS_TYPE_EDKEY {
 			// check failed on non-PKEY
 			return
 		}
@@ -56,8 +56,8 @@ func (rr *PKEY) Coexist(list []*enums.GNSSpec, label string) (ok bool, forced en
 }
 
 // ToMap adds the RR attributes to a stringed map
-func (rr *PKEY) ToMap(params map[string]string) {
-	params["pkey_data"] = rr.ID()
+func (rr *PKEY) ToMap(params map[string]string, prefix string) {
+	params[prefix+"data"] = rr.ID()
 }
 
 //----------------------------------------------------------------------
@@ -76,7 +76,7 @@ func (rr *EDKEY) Coexist(list []*enums.GNSSpec, label string) (ok bool, forced e
 	}
 	// make sure all existing records are EDKEYs too
 	for _, e := range list {
-		if e.Type != enums.GNS_TYPE_EDKEY {
+		if e.Type != enums.GNS_TYPE_EDKEY && e.Type != enums.GNS_TYPE_PKEY {
 			// check failed on non-EDKEY
 			return
 		}
@@ -91,8 +91,8 @@ func (rr *EDKEY) Coexist(list []*enums.GNSSpec, label string) (ok bool, forced e
 }
 
 // ToMap adds the RR attributes to a stringed map
-func (rr *EDKEY) ToMap(params map[string]string) {
-	params["edkey_data"] = rr.ID()
+func (rr *EDKEY) ToMap(params map[string]string, prefix string) {
+	params[prefix+"data"] = rr.ID()
 }
 
 //----------------------------------------------------------------------
@@ -126,8 +126,8 @@ func (rr *REDIRECT) Coexist(list []*enums.GNSSpec, label string) (ok bool, force
 }
 
 // ToMap adds the RR attributes to a stringed map
-func (rr *REDIRECT) ToMap(params map[string]string) {
-	params["redirect_name"] = rr.Name
+func (rr *REDIRECT) ToMap(params map[string]string, prefix string) {
+	params[prefix+"name"] = rr.Name
 }
 
 //----------------------------------------------------------------------
@@ -156,8 +156,8 @@ func (rr *NICK) Coexist(list []*enums.GNSSpec, label string) (ok bool, forced en
 }
 
 // ToMap adds the RR attributes to a stringed map
-func (rr *NICK) ToMap(params map[string]string) {
-	params["nick_name"] = rr.Name
+func (rr *NICK) ToMap(params map[string]string, prefix string) {
+	params[prefix+"name"] = rr.Name
 }
 
 //----------------------------------------------------------------------
@@ -174,8 +174,8 @@ func (rr *LEHO) Coexist([]*enums.GNSSpec, string) (bool, enums.GNSFlag) {
 }
 
 // ToMap adds the RR attributes to a stringed map
-func (rr *LEHO) ToMap(params map[string]string) {
-	params["leho_name"] = rr.Name
+func (rr *LEHO) ToMap(params map[string]string, prefix string) {
+	params[prefix+"name"] = rr.Name
 }
 
 //----------------------------------------------------------------------
@@ -193,7 +193,7 @@ func (rr *GNS2DNS) Coexist([]*enums.GNSSpec, string) (bool, enums.GNSFlag) {
 }
 
 // ToMap adds the RR attributes to a stringed map
-func (rr *GNS2DNS) ToMap(params map[string]string) {
-	params["gns2dns_name"] = rr.Name
-	params["gns2dns_server"] = rr.Server
+func (rr *GNS2DNS) ToMap(params map[string]string, prefix string) {
+	params[prefix+"name"] = rr.Name
+	params[prefix+"server"] = rr.Server
 }
