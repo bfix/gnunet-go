@@ -92,6 +92,10 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 		"rrtype": func(t enums.GNSType) string {
 			return strings.Replace(t.String(), "GNS_TYPE_", "", -1)
 		},
+		"rritype": func(ts string) string {
+			t, _ := util.CastFromString[enums.GNSType](ts)
+			return strings.Replace(t.String(), "GNS_TYPE_", "", -1)
+		},
 		"rrflags": func(f enums.GNSFlag) string {
 			flags := make([]string, 0)
 			if f&enums.GNS_FLAG_PRIVATE != 0 {
@@ -160,9 +164,12 @@ func (zm *ZoneMaster) dashboard(w http.ResponseWriter, r *http.Request) {
 
 // action dispatcher
 func (zm *ZoneMaster) action(w http.ResponseWriter, r *http.Request) {
+	// prepare variables and form values
 	vars := mux.Vars(r)
 	mode := vars["mode"]
 	id, ok := util.CastFromString[int64](vars["id"])
+	_ = r.ParseForm()
+
 	var err error
 	if ok {
 		switch vars["cmd"] {
@@ -190,7 +197,6 @@ func (zm *ZoneMaster) action(w http.ResponseWriter, r *http.Request) {
 
 func (zm *ZoneMaster) actionNew(w http.ResponseWriter, r *http.Request, mode string, id int64) (err error) {
 	switch mode {
-
 	// new zone
 	case "zone":
 		name := r.FormValue("name")
@@ -232,7 +238,6 @@ func (zm *ZoneMaster) actionNew(w http.ResponseWriter, r *http.Request, mode str
 // create new resource record from dialog data
 func (zm *ZoneMaster) newRec(w http.ResponseWriter, r *http.Request, label int64) error {
 	// get list of parameters from resource record dialog
-	_ = r.ParseForm()
 	params := make(map[string]string)
 	for key, val := range r.Form {
 		params[key] = strings.Join(val, ",")
@@ -244,24 +249,8 @@ func (zm *ZoneMaster) newRec(w http.ResponseWriter, r *http.Request, label int64
 	}
 	pf := dlgPrefix[t]
 
-	// parse expiration
-	exp := util.AbsoluteTimeNever()
-	if _, ok := params[pf+"never"]; !ok {
-		ts, _ := time.Parse(timeHTML, params[pf+"expires"])
-		exp.Val = uint64(ts.UnixMicro())
-	}
-	// parse flags
-	var flags enums.GNSFlag
-	if _, ok := params[pf+"private"]; ok {
-		flags |= enums.GNS_FLAG_PRIVATE
-	}
-	if _, ok := params[pf+"shadow"]; ok {
-		flags |= enums.GNS_FLAG_SHADOW
-	}
-	if _, ok := params[pf+"suppl"]; ok {
-		flags |= enums.GNS_FLAG_SUPPL
-	}
 	// construct RR data
+	exp, flags := guiParse(params, pf)
 	rrdata, err := Map2RRData(t, params)
 	if err == nil {
 		// assemble record and store in database
@@ -277,11 +266,85 @@ func (zm *ZoneMaster) newRec(w http.ResponseWriter, r *http.Request, label int64
 //----------------------------------------------------------------------
 
 func (zm *ZoneMaster) actionUpd(w http.ResponseWriter, r *http.Request, mode string, id int64) error {
+	// handle type
+	switch mode {
+	case "zone":
+		// update zone name
+		zone := store.NewZone(r.FormValue("name"), nil)
+		zone.ID = id
+		zone.Modified = util.AbsoluteTimeNow()
+		if err := zm.zdb.SetZone(zone); err != nil {
+			return err
+		}
+	case "label":
+		// update label name
+		label := store.NewLabel(r.FormValue("name"))
+		label.ID = id
+		label.Modified = util.AbsoluteTimeNow()
+		if err := zm.zdb.SetLabel(label); err != nil {
+			return err
+		}
+	case "rr":
+		// update record
+		if err := zm.updRec(w, r, id); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
 //----------------------------------------------------------------------
-// NEW: create zone, label or resource record
+
+// update resource record
+func (zm *ZoneMaster) updRec(w http.ResponseWriter, r *http.Request, id int64) error {
+	// get list of parameters from resource record dialog
+	oldParams := make(map[string]string)
+	newParams := make(map[string]string)
+	for key, val := range r.Form {
+		v := strings.Join(val, ",")
+		if strings.HasPrefix(key, "old_") {
+			oldParams[key[4:]] = v
+		} else {
+			newParams[key] = v
+		}
+	}
+	// parse RR type (and set prefix for map keys)
+	t, ok := util.CastFromString[enums.GNSType](oldParams["type"])
+	if !ok {
+		return errors.New("new: missing resource record type")
+	}
+	pf := guiPrefix(t)
+
+	// check for changed resource record
+	changed := false
+	for key, val := range newParams {
+		old, ok := oldParams[key]
+		if ok && old != val {
+			changed = true
+			break
+		}
+	}
+	if changed {
+		// reconstruct record from GUI parameters
+		rrData, err := Map2RRData(t, newParams)
+		if err != nil {
+			return err
+		}
+		exp, flags := guiParse(newParams, pf)
+		rec := store.NewRecord(exp, t, flags, rrData)
+		rec.ID = id
+		rec.Label, _ = util.CastFromString[int64](newParams["lid"])
+
+		// update in database
+		if err := zm.zdb.SetRecord(rec); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+//----------------------------------------------------------------------
+// DEL: remove zone, label or resource record
 //----------------------------------------------------------------------
 
 func (zm *ZoneMaster) actionDel(w http.ResponseWriter, r *http.Request, mode string, id int64) error {
@@ -294,7 +357,8 @@ func (zm *ZoneMaster) actionDel(w http.ResponseWriter, r *http.Request, mode str
 
 type NewEditData struct {
 	Ref     int64             // database id of reference object
-	Action  string            // "Add" or "Edit" action
+	Action  string            // "new" or "upd" action
+	Button  string            // "Add new" or "Update"
 	Names   []string          // list of names in use (ZONE,LABEL)
 	RRspecs []*enums.GNSSpec  // list of allowed record types and flags (REC)
 	Params  map[string]string // list of current values
@@ -304,7 +368,8 @@ func (zm *ZoneMaster) new(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	var err error
 	data := new(NewEditData)
-	data.Action = "Add"
+	data.Action = "new"
+	data.Button = "Add new"
 	data.Params = make(map[string]string)
 	switch vars["mode"] {
 
@@ -329,6 +394,7 @@ func (zm *ZoneMaster) new(w http.ResponseWriter, r *http.Request) {
 		if data.Names, err = zm.zdb.GetNames(stmt); err == nil {
 			data.Ref = id
 			data.Params["zone"], _ = zm.zdb.GetName("zones", id)
+			data.Params["zid"] = util.CastToString(id)
 			renderPage(w, data, "new_label")
 			return
 		}
@@ -349,6 +415,7 @@ func (zm *ZoneMaster) new(w http.ResponseWriter, r *http.Request) {
 			data.RRspecs = compatibleRR(rrs, label)
 			data.Ref = id
 			data.Params["label"] = label
+			data.Params["lid"] = util.CastToString(id)
 			renderPage(w, data, "new_record")
 			return
 		}
@@ -363,7 +430,7 @@ func (zm *ZoneMaster) new(w http.ResponseWriter, r *http.Request) {
 }
 
 //----------------------------------------------------------------------
-// Edit zone. label or resource record
+// Edit zone, label or resource record
 //----------------------------------------------------------------------
 
 func (zm *ZoneMaster) edit(w http.ResponseWriter, r *http.Request) {
@@ -377,7 +444,8 @@ func (zm *ZoneMaster) edit(w http.ResponseWriter, r *http.Request) {
 		// create edit data instance
 		data := new(NewEditData)
 		data.Ref = id
-		data.Action = "Edit"
+		data.Action = "upd"
+		data.Button = "Update"
 		data.Params = make(map[string]string)
 
 		switch vars["mode"] {
@@ -417,6 +485,7 @@ func (zm *ZoneMaster) edit(w http.ResponseWriter, r *http.Request) {
 			}
 			// set edit parameters
 			data.Params["zone"], _ = zm.zdb.GetName("zones", id)
+			data.Params["zid"] = util.CastToString(label.Zone)
 			data.Params["name"] = label.Name
 			data.Params["created"] = guiTime(label.Created)
 			data.Params["modified"] = guiTime(label.Modified)
@@ -427,7 +496,7 @@ func (zm *ZoneMaster) edit(w http.ResponseWriter, r *http.Request) {
 
 		// edit resource record
 		case "rr":
-			if err = zm.editRec(w, r, id); err == nil {
+			if err = zm.editRec(w, r, data); err == nil {
 				return
 			}
 		}
@@ -443,43 +512,44 @@ func (zm *ZoneMaster) edit(w http.ResponseWriter, r *http.Request) {
 
 //----------------------------------------------------------------------
 
-func (zm *ZoneMaster) editRec(w http.ResponseWriter, r *http.Request, id int64) (err error) {
+func (zm *ZoneMaster) editRec(w http.ResponseWriter, r *http.Request, data *NewEditData) (err error) {
 	// get edited resource record
 	var rec *store.Record
-	if rec, err = zm.zdb.GetRecord(id); err != nil {
+	if rec, err = zm.zdb.GetRecord(data.Ref); err != nil {
 		return
 	}
 	// build map of attribute values
-	params := make(map[string]string)
 	pf := dlgPrefix[rec.RType]
 
 	// save shared attributes
-	params["id"] = util.CastToString(id)
-	params["type"] = util.CastToString(rec.RType)
-	params["created"] = guiTime(rec.Created)
-	params["modified"] = guiTime(rec.Modified)
+	data.Params["prefix"] = pf
+	data.Params["type"] = util.CastToString(int(rec.RType))
+	data.Params["created"] = guiTime(rec.Created)
+	data.Params["modified"] = guiTime(rec.Modified)
+	data.Params["label"], _ = zm.zdb.GetName("labels", rec.Label)
+	data.Params["lid"] = util.CastToString(rec.Label)
 	if rec.Expire.IsNever() {
-		params[pf+"never"] = "on"
+		data.Params[pf+"never"] = "on"
 	} else {
-		params[pf+"expire"] = guiTime(rec.Expire)
+		data.Params[pf+"expires"] = htmlTime(rec.Expire)
 	}
 	if rec.Flags&enums.GNS_FLAG_PRIVATE != 0 {
-		params[pf+"private"] = "on"
+		data.Params[pf+"private"] = "on"
 	}
 	if rec.Flags&enums.GNS_FLAG_SHADOW != 0 {
-		params[pf+"shadow"] = "on"
+		data.Params[pf+"shadow"] = "on"
 	}
 	if rec.Flags&enums.GNS_FLAG_SUPPL != 0 {
-		params[pf+"suppl"] = "on"
+		data.Params[pf+"suppl"] = "on"
 	}
 	// get record instance
 	var inst rr.RR
 	if inst, err = rr.ParseRR(rec.RType, rec.Data); err == nil {
 		// add RR attributes to list
-		inst.ToMap(params, pf)
+		inst.ToMap(data.Params, pf)
 	}
 	// show dialog
-	renderPage(w, params, "debug")
+	renderPage(w, data, "edit_rec")
 	return
 }
 
