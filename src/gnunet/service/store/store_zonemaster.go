@@ -173,10 +173,10 @@ func (db *ZoneDB) SetZone(z *Zone) error {
 		z.ID, err = result.LastInsertId()
 		return err
 	}
-	// check for zone update
+	// check for zone update (name only)
 	if len(z.Name) > 0 {
-		stmt := "update zones set name=?,created=?,modified=?,ztype=?,zdata=? where id=?"
-		result, err := db.conn.Exec(stmt, z.Name, z.Created.Val, z.Modified.Val, z.Key.Type, z.Key.KeyData, z.ID)
+		stmt := "update zones set name=?,modified=? where id=?"
+		result, err := db.conn.Exec(stmt, z.Name, z.Modified.Val, z.ID)
 		if err != nil {
 			return err
 		}
@@ -267,10 +267,10 @@ func (db *ZoneDB) SetLabel(l *Label) error {
 		l.ID, err = result.LastInsertId()
 		return err
 	}
-	// check for label update
+	// check for label update (name only)
 	if len(l.Name) > 0 {
-		stmt := "update labels set zid=?,name=?,created=?,modified=? where id=?"
-		result, err := db.conn.Exec(stmt, l.Zone, l.Name, l.Created.Val, l.Modified.Val, l.ID)
+		stmt := "update labels set name=?,modified=? where id=?"
+		result, err := db.conn.Exec(stmt, l.Name, l.Modified.Val, l.ID)
 		if err != nil {
 			return err
 		}
@@ -358,8 +358,8 @@ func (db *ZoneDB) SetRecord(r *Record) error {
 	}
 	// check for record update
 	if r.Label != 0 {
-		stmt := "update records set lid=?,expire=?,created=?,modified=?,flags=?,rtype=?,rdata=? where id=?"
-		result, err := db.conn.Exec(stmt, r.Label, exp, r.Created.Val, r.Modified.Val, r.Flags, r.RType, r.Data, r.ID)
+		stmt := "update records set lid=?,expire=?,modified=?,flags=?,rtype=?,rdata=? where id=?"
+		result, err := db.conn.Exec(stmt, r.Label, exp, r.Modified.Val, r.Flags, r.RType, r.Data, r.ID)
 		if err != nil {
 			return err
 		}
