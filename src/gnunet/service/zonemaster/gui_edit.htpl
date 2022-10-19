@@ -3,8 +3,9 @@
     {{$name := index .Params "name"}}
     <div>
         <h3>Edit a [{{$type}}] GNS zone:</h3>
-        <p><small>(Created: {{index .Params "created"}}, Last edited: {{index .Params "modified"}}</small></p>
+        <p><small>(Created: {{index .Params "created"}}, Last edited: {{index .Params "modified"}})</small></p>
         <form action="/action/upd/zone/{{.Ref}}" method="post" onsubmit="return(zone_validate());">
+            <input type="hidden" name="old_name" value="{{$name}}">
             <table>
                 <tr>
                     <td align="right"><b>Zone name:</b></td>
@@ -51,9 +52,13 @@
 
 {{define "edit_label"}}
     {{$name := index .Params "name"}}
+    {{$zone := index .Params "zone"}}
     <div>
-        <h3>Edit a GNS zone label:</h3>
-        <form action="/action/upd/label/{{.Ref}}" onsubmit="return(label_validate());">
+        <h3>Edit a GNS label for zone "{{$zone}}":</h3>
+        <p><small>(Created: {{index .Params "created"}}, Last edited: {{index .Params "modified"}})</small></p>
+        <form action="/action/upd/label/{{.Ref}}" method="post" onsubmit="return(label_validate());">
+            <input type="hidden" name="old_name" value="{{$name}}">
+            <input type="hidden" name="zid" value="{{index .Params "zid"}}">
             <table>
                 <tr>
                     <td align="right">Name:</td>
@@ -90,4 +95,26 @@
             return(true);
         }
     </script>
+{{end}}
+
+{{define "edit_rec"}}
+    {{$label := index .Params "label"}}
+    <div>
+        <h3>Edit a resource record for label "{{$label}}":</h3>
+        <p><small>(Created: {{index .Params "created"}}, Last edited: {{index .Params "modified"}})</small></p>
+        {{$t := rritype (index .Params "type")}}
+        {{if eq $t "PKEY"}}{{template "PKEY" .}}{{end}}
+        {{if eq $t "EDKEY"}}{{template "EDKEY" .}}{{end}}
+        {{if eq $t "NICK"}}{{template "NICK" .}}{{end}}
+        {{if eq $t "LEHO"}}{{template "LEHO" .}}{{end}}
+        {{if eq $t "REDIRECT"}}{{template "REDIRECT" .}}{{end}}
+        {{if eq $t "GNS2DNS"}}{{template "GNS2DNS" .}}{{end}}
+        {{if eq $t "BOX"}}{{template "BOX" .}}{{end}}
+        {{if eq $t "DNS_CNAME"}}{{template "DNS_CNAME" .}}{{end}}
+        {{if eq $t "DNS_A"}}{{template "DNS_A" .}}{{end}}
+        {{if eq $t "DNS_AAAA"}}{{template "DNS_AAAA" .}}{{end}}
+        {{if eq $t "DNS_MX"}}{{template "DNS_MX" .}}{{end}}
+        {{if eq $t "DNS_TXT"}}{{template "DNS_TXT" .}}{{end}}
+    </div>
+    <a href="/"><button>Leave</button></a>
 {{end}}

@@ -1,12 +1,20 @@
 {{define "RRCommon"}}
+    <input type="hidden" name="lid" value="{{index . "lid"}}">
+    {{range $k, $v := .}}
+        <input type="hidden" name="old_{{$k}}" value="{{$v}}">
+    {{end}}
     {{$pf := index . "prefix"}}
     <tr>
         <td align="right" valign="top"><b>Expires:</b></td>
         <td>
-            Never <input type="checkbox" class="alternate" name="{{$pf}}never">
+            Never <input type="checkbox" class="alternate" name="{{$pf}}never"
+                {{if eq "on" (index . (print $pf "never"))}}checked="checked"{{end}}
+            >
             <div class="alternate">
                 At given date and time:
-                <input type="datetime-local" id="{{$pf}}expires" name="{{$pf}}expires" required>
+                <input type="datetime-local" id="{{$pf}}expires" name="{{$pf}}expires" required
+                    value="{{index . (print $pf "expires")}}"
+                >
             </div>
         </td>
     </tr>
@@ -24,6 +32,7 @@
                 > Supplemental<br>
         </td>
     </tr>
+    {{if eq .Action "new"}}
     <script>
         var dt = document.getElementById("{{$pf}}expires");
         if (!dt.value) {
@@ -31,11 +40,12 @@
             dt.value = exp.toISOString().slice(0, 16);
         }
     </script>
+    {{end}}
 {{end}}
 
 {{define "PKEY"}}
     <h3>PKEY delegation</h3>
-    <form action="/action/new/rr/{{.Ref}}">
+    <form action="/action/{{.Action}}/rr/{{.Ref}}" {{if eq .Action "upd"}}method="post"{{end}}>
         <input type="hidden" name="type" value="65536">
         <table>
             <tr><td/>
@@ -54,17 +64,18 @@
                         maxlength="58" minlength="58" size="64"
                         pattern="[0-9A-HJKMNP-TV-Z]{58}"
                         autofocus required
+                        value="{{index .Params "pkey_data"}}"
                     >
                 </td>
             </tr>
             {{template "RRCommon" .Params}}
-            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+            <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
 {{end}}
 {{define "EDKEY"}}
     <h3>EDKEY delegation</h3>
-    <form action="/action/new/rr/{{.Ref}}">
+    <form action="/action/{{.Action}}/rr/{{.Ref}}" {{if eq .Action "upd"}}method="post"{{end}}>
         <input type="hidden" name="type" value="65556">
         <table>
             <tr><td/>
@@ -83,17 +94,18 @@
                         maxlength="58" minlength="58" size="64"
                         pattern="[0-9A-HJKMNP-TV-Z]{58}"
                         autofocus required
+                        value="{{index .Params "edkey_data"}}"
                     >
                 </td>
             </tr>
             {{template "RRCommon" .Params}}
-            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+            <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
 {{end}}
 {{define "REDIRECT"}}
     <h3>REDIRECT (GNS delegation)</h3>
-    <form action="/action/new/rr/{{.Ref}}">
+    <form action="/action/{{.Action}}/rr/{{.Ref}}" {{if eq .Action "upd"}}method="post"{{end}}>
         <input type="hidden" name="type" value="65551">
         <table>
             <tr><td/>
@@ -109,17 +121,18 @@
                     <input type="text" name="redirect_name"
                         maxlength="63" size="63"
                         autofocus required
+                        value="{{index .Params "redirect_name"}}"
                     >
                 </td>
             </tr>
             {{template "RRCommon" .Params}}
-            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+            <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
 {{end}}
 {{define "LEHO"}}
     <h3>LEHO (legacy hostname)</h3>
-    <form action="/action/new/rr/{{.Ref}}">
+    <form action="/action/{{.Action}}/rr/{{.Ref}}" {{if eq .Action "upd"}}method="post"{{end}}>
         <input type="hidden" name="type" value="65538">
         <table>
             <tr>
@@ -128,17 +141,18 @@
                     <input type="text" name="leho_name"
                         maxlength="63" size="63"
                         autofocus required
+                        value="{{index .Params "leho_name"}}"
                     >
                 </td>
             </tr>
             {{template "RRCommon" .Params}}
-            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+            <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
 {{end}}
 {{define "NICK"}}
     <h3>NICK</h3>
-    <form action="/action/new/rr/{{.Ref}}">
+    <form action="/action/{{.Action}}/rr/{{.Ref}}" {{if eq .Action "upd"}}method="post"{{end}}>
         <input type="hidden" name="type" value="65537">
         <table>
             <tr>
@@ -147,17 +161,18 @@
                     <input type="text" name="nick_name"
                         maxlength="63" size="63"
                         autofocus required
+                        value="{{index .Params "nick_name"}}"
                     >
                 </td>
             </tr>
             {{template "RRCommon" .Params}}
-            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+            <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
 {{end}}
 {{define "GNS2DNS"}}
     <h3>GNS2DNS delegation</h3>
-    <form action="/action/new/rr/{{.Ref}}">
+    <form action="/action/{{.Action}}/rr/{{.Ref}}" {{if eq .Action "upd"}}method="post"{{end}}>
         <input type="hidden" name="type" value="65540">
         <table>
             <tr><td/>
@@ -172,6 +187,7 @@
                     <input type="text" name="gns2dns_name"
                         maxlength="63" size="63"
                         autofocus required
+                        value="{{index .Params "gns2dns_name"}}"
                     >
                 </td>
             </tr>
@@ -179,19 +195,19 @@
                 <td align="right"><b>DNS server:</b></td>
                 <td>
                     <input type="text" name="gns2dns_server"
-                        maxlength="63" size="63"
-                        autofocus required
+                        maxlength="63" size="63" required
+                        value="{{index .Params "gns2dns_server"}}"
                     >
                 </td>
             </tr>
             {{template "RRCommon" .Params}}
-            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+            <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
 {{end}}
 {{define "BOX"}}
     <h3>BOX</h3>
-    <form action="/action/new/rr/{{.Ref}}">
+    <form action="/action/{{.Action}}/rr/{{.Ref}}" {{if eq .Action "upd"}}method="post"{{end}}>
         <input type="hidden" name="type" value="65541">
         <table>
             <tr><td/>
@@ -203,7 +219,9 @@
             <tr>
                 <td align="right"><b>Protocol:</b></td>
                 <td>
-                    <input type="text" name="box_proto" size="16" list="protocols" required>
+                    <input type="text" name="box_proto" size="16" list="protocols" required
+                        value="{{index .Params "box_proto"}}"
+                    >
                     <datalist id="protocols">
                     {{range $id,$name := boxprotos}}
                         <option value="{{$id}} ({{$name}})">
@@ -214,7 +232,9 @@
             <tr>
                 <td align="right"><b>Service:</b></td>
                 <td>
-                    <input type="text" name="box_svc" size="16" list="services" required>
+                    <input type="text" name="box_svc" size="16" list="services" required
+                        value="{{index .Params "box_svc"}}"
+                    >
                     <datalist id="services">
                     {{range $id,$name := boxsvcs}}
                         <option value='{{$id}} {{$name}}'>
@@ -225,11 +245,15 @@
             <tr>
                 <td align="right" valign="top"><b>Type:</b></td>
                 <td>
-                    <input type="radio" class="switch" name="box_type" value="33" checked> SRV (Service description)
+                    <input type="radio" class="switch" name="box_type" value="33"
+                        {{if eq (index .Params "box_type") "33"}}checked{{end}}
+                    > SRV (Service description)
                     <div class="switch">
                         <div class="block">
                             <label for="box_srv_host">Host:</label>
-                            <input type="text" name="box_srv_host" maxlength="63" size="63" required>
+                            <input type="text" name="box_srv_host" maxlength="63" size="63"
+                                value="{{index .Params "box_srv_host"}}"
+                            >
                         </div>
                     </div>
                 </td>
@@ -237,50 +261,55 @@
             </tr>
             <tr>
                 <td/><td>
-                    <input type="radio" class="switch" name="box_type" value="52"> TLSA (TLS Association)
+                    <input type="radio" class="switch" name="box_type" value="52"
+                        {{if eq (index .Params "box_type") "52"}}checked{{end}}
+                    > TLSA (TLS Association)
                     <div class="switch">
                         <div class="block">
                             <label for="box_tlsa_usage">Usage:</label>
+                            {{$x := index .Params "box_tlsa_usage"}}
                             <select size="1" name="box_tlsa_usage">
-                                <option value="0">CA certificate</option>
-                                <option value="1">Service certificate constraint</option>
-                                <option value="2">Trust anchor assertion</option>
-                                <option value="3">Domain-issued certificate</option>
-                                <option value="255">Private use</option>
+                                <option value="0" {{if eq $x "0"}}selected{{end}}>CA certificate</option>
+                                <option value="1" {{if eq $x "1"}}selected{{end}}>Service certificate constraint</option>
+                                <option value="2" {{if eq $x "2"}}selected{{end}}>Trust anchor assertion</option>
+                                <option value="3" {{if eq $x "3"}}selected{{end}}>Domain-issued certificate</option>
+                                <option value="255" {{if eq $x "255"}}selected{{end}}>Private use</option>
                             </select>
                         </div>
                         <div class="block">
                             <label for="box_tlsa_selector">Selector:</label>
+                            {{$x = index .Params "box_tlsa_selector"}}
                             <select size="1" name="box_tlsa_selector">
-                                <option value="0">Full certificate</option>
-                                <option value="1">SubjectPublicKeyInfo</option>
-                                <option value="255">Private use</option>
+                                <option value="0" {{if eq $x "0"}}selected{{end}}>Full certificate</option>
+                                <option value="1" {{if eq $x "1"}}selected{{end}}>SubjectPublicKeyInfo</option>
+                                <option value="255" {{if eq $x "255"}}selected{{end}}>Private use</option>
                             </select>
                         </div>
                         <div class="block">
                             <label for="box_tlsa_match">Match:</label>
+                            {{$x = index .Params "box_tlsa_match"}}
                             <select size="1" name="box_tlsa_match">
-                                <option value="0">No hash</option>
-                                <option value="1">SHA-256</option>
-                                <option value="2">SHA-512</option>
-                                <option value="255">Private use</option>
+                                <option value="0" {{if eq $x "0"}}selected{{end}}>No hash</option>
+                                <option value="1" {{if eq $x "1"}}selected{{end}}>SHA-256</option>
+                                <option value="2" {{if eq $x "2"}}selected{{end}}>SHA-512</option>
+                                <option value="255" {{if eq $x "255"}}selected{{end}}>Private use</option>
                             </select>
                         </div>
                         <div class="block">
                             <label for="box_tlsa_cert">Certificate information (hex):</label><br>
-                            <textarea name="box_tlsa_cert" rows="10" cols="50"></textarea>
+                            <textarea name="box_tlsa_cert" rows="10" cols="50">{{index .Params "box_tlsa_cert"}}</textarea>
                         </div>
                     </div>
                 </td>
             </tr>
             {{template "RRCommon" .Params}}
-            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+            <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
 {{end}}
 {{define "DNS_A"}}
     <h3>DNS A (IPv4 address)</h3>
-    <form action="/action/new/rr/{{.Ref}}">
+    <form action="/action/{{.Action}}/rr/{{.Ref}}" {{if eq .Action "upd"}}method="post"{{end}}>
         <input type="hidden" name="type" value="1">
         <table>
             <tr>
@@ -290,17 +319,18 @@
                         maxlength="15" size="15"
                         pattern="[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}"
                         autofocus required
+                        value="{{index .Params "dnsa_addr"}}"
                     >
                 </td>
             </tr>
             {{template "RRCommon" .Params}}
-            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+            <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
 {{end}}
 {{define "DNS_AAAA"}}
     <h3>DNS AAAA (IPv6 address)</h3>
-    <form action="/action/new/rr/{{.Ref}}">
+    <form action="/action/{{.Action}}/rr/{{.Ref}}" {{if eq .Action "upd"}}method="post"{{end}}>
         <input type="hidden" name="type" value="28">
         <table>
             <tr>
@@ -310,17 +340,18 @@
                         maxlength="15" size="15"
                         pattern="(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))"
                         autofocus required
+                        value="{{index .Params "dnsaaaa_addr"}}"
                     >
                 </td>
             </tr>
             {{template "RRCommon" .Params}}
-            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+            <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
 {{end}}
 {{define "DNS_CNAME"}}
     <h3>DNS CNAME delegation</h3>
-    <form action="/action/new/rr/{{.Ref}}">
+    <form action="/action/{{.Action}}/rr/{{.Ref}}" {{if eq .Action "upd"}}method="post"{{end}}>
         <input type="hidden" name="type" value="5">
         <table>
             <tr>
@@ -329,17 +360,18 @@
                     <input type="text" name="dnscname_name"
                         maxlength="63" size="63"
                         autofocus required
+                        value="{{index .Params "dnscname_name"}}"
                     >
                 </td>
             </tr>
             {{template "RRCommon" .Params}}
-            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+            <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
 {{end}}
 {{define "DNS_TXT"}}
     <h3>DNS TXT</h3>
-    <form action="/action/new/rr/{{.Ref}}">
+    <form action="/action/{{.Action}}/rr/{{.Ref}}" {{if eq .Action "upd"}}method="post"{{end}}>
         <input type="hidden" name="type" value="16">
         <table>
             <tr>
@@ -348,22 +380,28 @@
                     <input type="text" name="dnstxt_text"
                         maxlength="63" size="63"
                         autofocus required
+                        value="{{index .Params "dnstxt_text"}}"
                     >
                 </td>
             </tr>
             {{template "RRCommon" .Params}}
-            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+            <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
 {{end}}
 {{define "DNS_MX"}}
     <h3>DNS MX (Mailbox)</h3>
-    <form action="/action/new/rr/{{.Ref}}">
+    <form action="/action/{{.Action}}/rr/{{.Ref}}" {{if eq .Action "upd"}}method="post"{{end}}>
         <input type="hidden" name="type" value="15">
         <table>
             <tr>
                 <td align="right" valign="top"><b>Priority:</b></td>
-                <td><input type="number" name="dnsmx_prio" min="1" max="100" value="10"></td>
+                <td>
+                    {{$v := index .Params "dnsmx_prio"}}
+                    <input type="number" name="dnsmx_prio" min="1" max="100"
+                        value="{{if $v}}{{$v}}{{else}}10{{end}}"
+                    >
+                </td>
             </tr>
             <tr>
                 <td align="right" valign="top"><b>Mailserver:</b></td>
@@ -371,11 +409,12 @@
                     <input type="text" name="dnsmx_host"
                         maxlength="63" size="63"
                         autofocus required
+                        value="{{index .Params "dnsmx_host"}}"
                     >
                 </td>
             </tr>
             {{template "RRCommon" .Params}}
-            <tr><td/><td><button id="submit">{{.Action}} record</button></td></tr>
+            <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
 {{end}}
