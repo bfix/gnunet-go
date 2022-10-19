@@ -490,15 +490,21 @@ func (db *ZoneDB) GetContent() (zg []*ZoneGroup, err error) {
 // Retrieve list of used names (Zone,Label) or RR types (Record)
 //----------------------------------------------------------------------
 
+// GetName returns an object name (zone,label) for given id
+func (db *ZoneDB) GetName(tbl string, id int64) (name string, err error) {
+	row := db.conn.QueryRow("select name from "+tbl+" where id=?", id)
+	err = row.Scan(&name)
+	return
+}
+
 // GetNames returns a list of used names (table "zones" and "labels")
 func (db *ZoneDB) GetNames(tbl string) (names []string, err error) {
-	// select all zone names
-	stmt := fmt.Sprintf("select name from %s", tbl)
+	// select all table names
 	var rows *sql.Rows
-	if rows, err = db.conn.Query(stmt); err != nil {
+	if rows, err = db.conn.Query("select name from " + tbl); err != nil {
 		return
 	}
-	// process zones
+	// process names
 	defer rows.Close()
 	var name string
 	for rows.Next() {
