@@ -75,11 +75,19 @@ func (b *BOX) Coexist([]*enums.GNSSpec, string) (bool, enums.GNSFlag) {
 // ToMap adds the RR attributes to a stringed map
 func (b *BOX) ToMap(params map[string]string, prefix string) {
 	// shared attributes
-	params[prefix+"proto"] = strconv.Itoa(int(b.Proto))
-	params[prefix+"svc"] = strconv.Itoa(int(b.Svc))
-	params[prefix+"type"] = strconv.Itoa(int(b.Type))
+	protoS := util.CastToString(b.Proto)
+	if pn := GetProtocolName(b.Proto); len(pn) > 0 {
+		protoS += " (" + pn + ")"
+	}
+	params[prefix+"proto"] = protoS
+	svcS := util.CastToString(b.Svc)
+	if sn := GetServiceName(b.Svc, b.Proto); len(sn) > 0 {
+		svcS += " " + sn
+	}
+	params[prefix+"svc"] = svcS
+	params[prefix+"type"] = util.CastToString(int(b.Type))
 	// attributes of embedded record
-	if rr, err := b.EmbeddedRR(); err != nil && rr != nil {
+	if rr, err := b.EmbeddedRR(); err == nil && rr != nil {
 		rr.ToMap(params, prefix)
 	}
 }
@@ -161,7 +169,7 @@ func (rr *SRV) Coexist([]*enums.GNSSpec, string) (bool, enums.GNSFlag) {
 
 // ToMap adds the RR attributes to a stringed map
 func (rr *SRV) ToMap(params map[string]string, prefix string) {
-	params[prefix+"srv_server"] = rr.Host
+	params[prefix+"srv_host"] = rr.Host
 }
 
 //----------------------------------------------------------------------
