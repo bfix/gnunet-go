@@ -22,6 +22,7 @@
     "environ": {
         "TMP": "/tmp",
         "RT_SYS": "${TMP}/gnunet-system-runtime",
+        "RT_USER": "${TMP}/gnunet-user-runtime",
         "VAR_LIB": "/var/lib/gnunet"
     },
     "dht": {
@@ -88,7 +89,13 @@
             "mode": "sqlite3",
             "file": "${VAR_LIB}/gns/zonemaster.sqlite3"
         },
-        "gui": "127.0.0.1:8100"
+        "gui": "127.0.0.1:8100",
+        "service": {
+            "socket": "${RT_USER}/gnunet-service-namestore-go.sock",
+            "params": {
+                "perm": "0770"
+            }
+        }
     },
     "rpc": {
         "endpoint": "tcp:127.0.0.1:80"

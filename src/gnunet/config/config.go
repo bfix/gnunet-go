@@ -97,6 +97,7 @@ type GNSConfig struct {
 
 // ZoneMasterConfig contains parameters for the GNS ZoneMaster process
 type ZoneMasterConfig struct {
+	Service *ServiceConfig    `json:"service"` // socket for NameStore service
 	Period  int               `json:"period"`  // cycle period
 	Storage util.ParameterSet `json:"storage"` // persistence mechanism for zone data
 	GUI     string            `json:"gui"`     // listen address for HTTP GUI
@@ -270,8 +271,6 @@ func applySubstitutions(x interface{}, env map[string]string) {
 					e := fld.Elem()
 					if e.IsValid() {
 						process(fld.Elem())
-					} else {
-						logger.Printf(logger.ERROR, "[config] 'nil' pointer encountered")
 					}
 				}
 			}
