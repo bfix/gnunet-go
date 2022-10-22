@@ -24,18 +24,9 @@ import (
 	"testing"
 )
 
-func TestEdKeyCreate(t *testing.T) {
-	// create private key
-	zp, err := NewZonePrivate(enums.GNS_TYPE_EDKEY, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log(zp.ID())
-}
-
-func TestDeriveEDKEY(t *testing.T) {
+func TestDerivePKEY(t *testing.T) {
 	// create new key pair
-	zp, err := NewZonePrivate(enums.GNS_TYPE_EDKEY, nil)
+	zp, err := NewZonePrivate(enums.GNS_TYPE_PKEY, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,6 +41,7 @@ func TestDeriveEDKEY(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if !bytes.Equal(dzp.Public().Bytes(), dzk.Bytes()) {
 		t.Fatal("derive mismatch")
 	}

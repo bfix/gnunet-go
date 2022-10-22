@@ -20,6 +20,7 @@ package crypto
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/sha512"
 	"errors"
@@ -147,6 +148,7 @@ type ZoneSigImpl interface {
 //nolint:stylecheck // allow non-camel-case in constants
 var (
 	ZONE_EDKEY = enums.GNS_TYPE_EDKEY
+	ZONE_PKEY  = enums.GNS_TYPE_PKEY
 )
 
 var (
@@ -207,12 +209,21 @@ type ZonePrivate struct {
 	impl ZonePrivateImpl // reference to implementation
 }
 
-// NewZonePrivate returns a new initialized ZonePrivate instance
+// NewZonePrivate returns a new initialized ZonePrivate instance. If no data is
+// provided, a new random key is created
 func NewZonePrivate(ztype enums.GNSType, d []byte) (zp *ZonePrivate, err error) {
 	// get factory for given zone type
 	impl, ok := zoneImpl[ztype]
 	if !ok {
 		return nil, ErrNoImplementation
+	}
+	// init data available?
+	if d == nil {
+		// no: create random seed
+		d = make([]byte, impl.PrivateSize)
+		if _, err = rand.Read(d); err != nil {
+			return
+		}
 	}
 	// assemble private zone key
 	zp = &ZonePrivate{
@@ -244,11 +255,9 @@ func (zp *ZonePrivate) KeySize() uint {
 
 // Derive key (key blinding)
 func (zp *ZonePrivate) Derive(label, context string) (dzp *ZonePrivate, h *math.Int, err error) {
-	// get factory for given zone type
-	impl := zoneImpl[zp.Type]
-
 	// calculate derived key
-	h = deriveH(zp.impl.Bytes(), label, context)
+	key := zp.Public().Bytes()
+	h = deriveH(key, label, context)
 	var derived ZonePrivateImpl
 	if derived, h, err = zp.impl.Derive(h); err != nil {
 		return
@@ -262,9 +271,8 @@ func (zp *ZonePrivate) Derive(label, context string) (dzp *ZonePrivate, h *math.
 		},
 		derived,
 	}
-	zp.ZoneKey.KeyData = derived.Public().Bytes()
-	zp.ZoneKey.impl = impl.NewPublic()
-	err = zp.ZoneKey.impl.Init(zp.ZoneKey.KeyData)
+	dzp.ZoneKey.KeyData = derived.Public().Bytes()
+	err = dzp.Init()
 	return
 }
 
@@ -290,21 +298,28 @@ type ZoneKey struct {
 	impl ZoneKeyImpl // reference to implementation
 }
 
+// Init a zone key where only the attributes have been read/deserialized.
+func (zk *ZoneKey) Init() (err error) {
+	if zk.impl == nil {
+		// initialize implementation
+		impl, ok := zoneImpl[zk.Type]
+		if !ok {
+			err = ErrUnknownZoneType
+			return
+		}
+		zk.impl = impl.NewPublic()
+		err = zk.impl.Init(zk.KeyData)
+	}
+	return
+}
+
 // NewZoneKey returns a new initialized ZoneKey instance
 func NewZoneKey(d []byte) (zk *ZoneKey, err error) {
 	// read zone key from data
 	zk = new(ZoneKey)
-	if err = data.Unmarshal(zk, d); err != nil {
-		return
+	if err = data.Unmarshal(zk, d); err == nil {
+		err = zk.Init()
 	}
-	// initialize implementation
-	impl, ok := zoneImpl[zk.Type]
-	if !ok {
-		err = ErrUnknownZoneType
-		return
-	}
-	zk.impl = impl.NewPublic()
-	err = zk.impl.Init(zk.KeyData)
 	return
 }
 
@@ -319,7 +334,8 @@ func (zk *ZoneKey) KeySize() uint {
 
 // Derive key (key blinding)
 func (zk *ZoneKey) Derive(label, context string) (dzk *ZoneKey, h *math.Int, err error) {
-	h = deriveH(zk.KeyData, label, context)
+	key := zk.Bytes()
+	h = deriveH(key, label, context)
 	var derived ZoneKeyImpl
 	if derived, h, err = zk.impl.Derive(h); err != nil {
 		return
@@ -392,31 +408,33 @@ type ZoneSignature struct {
 	impl ZoneSigImpl // reference to implementation
 }
 
-// NewZoneSignature returns a new initialized ZoneSignature instance
-func NewZoneSignature(d []byte) (sig *ZoneSignature, err error) {
-	// read signature
-	sig = new(ZoneSignature)
-	if err = data.Unmarshal(sig, d); err != nil {
-		return
-	}
+func (zs *ZoneSignature) Init() (err error) {
 	// initialize implementations
-	impl, ok := zoneImpl[sig.Type]
+	impl, ok := zoneImpl[zs.Type]
 	if !ok {
 		err = ErrUnknownZoneType
 		return
 	}
 	// set signature implementation
-	zs := impl.NewSignature()
-	if err = zs.Init(sig.Signature); err != nil {
+	sig := impl.NewSignature()
+	if err = sig.Init(zs.Signature); err != nil {
 		return
 	}
-	sig.impl = zs
+	zs.impl = sig
 	// set public key implementation
 	zk := impl.NewPublic()
-	if err = zk.Init(sig.KeyData); err != nil {
-		return
+	err = zk.Init(zs.KeyData)
+	zs.ZoneKey.impl = zk
+	return
+}
+
+// NewZoneSignature returns a new initialized ZoneSignature instance
+func NewZoneSignature(d []byte) (sig *ZoneSignature, err error) {
+	// read signature
+	sig = new(ZoneSignature)
+	if err = data.Unmarshal(sig, d); err == nil {
+		err = sig.Init()
 	}
-	sig.ZoneKey.impl = zk
 	return
 }
 

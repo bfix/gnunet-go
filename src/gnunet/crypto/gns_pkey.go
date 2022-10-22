@@ -42,7 +42,7 @@ import (
 
 // register our implementation
 func init() {
-	zoneImpl[enums.GNS_TYPE_PKEY] = &ZoneImplementation{
+	zoneImpl[ZONE_PKEY] = &ZoneImplementation{
 		NewPrivate:    func() ZonePrivateImpl { return &PKEYPrivateImpl{} },
 		PrivateSize:   32,
 		NewPublic:     func() ZoneKeyImpl { return &PKEYPublicImpl{} },
@@ -65,7 +65,7 @@ type PKEYPublicImpl struct {
 // Init instance from binary data. The data represents a big integer
 // (in big-endian notation) for the private scalar d.
 func (pk *PKEYPublicImpl) Init(data []byte) error {
-	pk.ztype = enums.GNS_TYPE_PKEY
+	pk.ztype = ZONE_PKEY
 	pk.pub = ed25519.NewPublicKeyFromBytes(data)
 	return nil
 }
