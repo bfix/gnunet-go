@@ -160,6 +160,11 @@ func (pk *EDKEYPublicImpl) BlockKey(label string, expire util.AbsoluteTime) (ske
 	return
 }
 
+// ID returns the GNUnet identifier for a public zone key
+func (pk *EDKEYPublicImpl) ID() string {
+	return asID(enums.GNS_TYPE_EDKEY, pk.pub.Bytes())
+}
+
 //----------------------------------------------------------------------
 // Private key
 //----------------------------------------------------------------------
@@ -168,12 +173,14 @@ func (pk *EDKEYPublicImpl) BlockKey(label string, expire util.AbsoluteTime) (ske
 type EDKEYPrivateImpl struct {
 	EDKEYPublicImpl
 
-	prv *ed25519.PrivateKey
+	seed []byte              // seed used to generate key
+	prv  *ed25519.PrivateKey // private key
 }
 
 // Init instance from binary data. The data represents a big integer
 // (in big-endian notation) for the private scalar d.
 func (pk *EDKEYPrivateImpl) Init(data []byte) error {
+	pk.seed = util.Clone(data)
 	pk.prv = ed25519.NewPrivateKeyFromSeed(data)
 	pk.ztype = ZONE_EDKEY
 	pk.pub = pk.prv.Public()
@@ -232,6 +239,11 @@ func (pk *EDKEYPrivateImpl) Sign(data []byte) (sig *ZoneSignature, err error) {
 		sigImpl,
 	}
 	return
+}
+
+// ID returns the GNUnet identifier for a private zone key
+func (pk *EDKEYPrivateImpl) ID() string {
+	return asID(enums.GNS_TYPE_EDKEY, pk.seed)
 }
 
 //----------------------------------------------------------------------

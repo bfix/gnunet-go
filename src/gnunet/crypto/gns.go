@@ -23,6 +23,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/sha512"
+	"encoding/binary"
 	"errors"
 	"gnunet/enums"
 	"gnunet/util"
@@ -119,6 +120,9 @@ type ZoneKeyImpl interface {
 
 	// Verify a signature for binary data
 	Verify(data []byte, sig *ZoneSignature) (bool, error)
+
+	// ID returns the GNUnet identifier for a public zone key
+	ID() string
 }
 
 // ZonePrivateImpl defines the methods for a private zone key.
@@ -134,6 +138,9 @@ type ZonePrivateImpl interface {
 
 	// Public returns the associated public key
 	Public() ZoneKeyImpl
+
+	// ID returns the GNUnet identifier for a private zone key
+	ID() string
 }
 
 // ZoneSigImpl defines the methods for a signature object.
@@ -286,6 +293,11 @@ func (zp *ZonePrivate) Public() *ZoneKey {
 	return &zp.ZoneKey
 }
 
+// ID returns the human-readable zone private key.
+func (zp *ZonePrivate) ID() string {
+	return zp.impl.ID()
+}
+
 //----------------------------------------------------------------------
 // Zone key (public)
 //----------------------------------------------------------------------
@@ -373,7 +385,7 @@ func (zk *ZoneKey) Verify(data []byte, zs *ZoneSignature) (ok bool, err error) {
 
 // ID returns the human-readable zone identifier.
 func (zk *ZoneKey) ID() string {
-	return util.EncodeBinaryToString(zk.Bytes())
+	return zk.impl.ID()
 }
 
 // Bytes returns all bytes of a zone key
@@ -472,4 +484,12 @@ func deriveH(key []byte, label, context string) *math.Int {
 		logger.Printf(logger.ERROR, "[deriveH] failed: %s", err.Error())
 	}
 	return math.NewIntFromBytes(b)
+}
+
+// convert (type|data) to GNUnet identifier
+func asID(t enums.GNSType, data []byte) string {
+	buf := new(bytes.Buffer)
+	_ = binary.Write(buf, binary.BigEndian, t)
+	_, _ = buf.Write(data)
+	return util.EncodeBinaryToString(buf.Bytes())
 }
