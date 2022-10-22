@@ -248,25 +248,10 @@ func (m *Module) Get(ctx context.Context, query blocks.Query) <-chan blocks.Bloc
 
 // Put a block into the DHT ["dht:put"]
 func (m *Module) Put(ctx context.Context, query blocks.Query, block blocks.Block) error {
-	// get additional query parameters
-	expire, ok := util.GetParam[util.AbsoluteTime](query.Params(), "expire")
-	if !ok {
-		expire = util.AbsoluteTimeNever()
-	}
 	// assemble a new PUT message
-	msg := message.NewDHTP2PPutMsg()
-	msg.BType = query.Type()
+	msg := message.NewDHTP2PPutMsg(block)
 	msg.Flags = query.Flags()
-	msg.HopCount = 0
-	msg.PeerFilter = blocks.NewPeerFilter()
-	msg.ReplLvl = uint16(m.cfg.Routing.ReplLevel)
-	msg.Expire = expire
-	msg.Block = block.Bytes()
 	msg.Key = query.Key().Clone()
-	msg.TruncOrigin = nil
-	msg.PutPath = nil
-	msg.LastSig = nil
-	msg.MsgSize += uint16(len(msg.Block))
 
 	// send message
 	self := m.core.PeerID()
