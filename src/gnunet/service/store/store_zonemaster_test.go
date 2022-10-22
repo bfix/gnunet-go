@@ -23,6 +23,7 @@ import (
 	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/util"
+	"os"
 	"testing"
 	"time"
 )
@@ -31,6 +32,7 @@ func TestZoneMaster(t *testing.T) {
 
 	//------------------------------------------------------------------
 	// create database
+	_ = os.Remove("/tmp/zonemaster.db")
 	zdb, err := OpenZoneDB("/tmp/zonemaster.db")
 	if err != nil {
 		t.Fatal(err)
