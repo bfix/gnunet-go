@@ -24,6 +24,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"gnunet/config"
 	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/service/dht/blocks"
@@ -122,9 +123,10 @@ type DHTP2PPutMsg struct {
 }
 
 // NewDHTP2PPutMsg creates an empty new DHTP2PPutMsg
-func NewDHTP2PPutMsg() *DHTP2PPutMsg {
-	return &DHTP2PPutMsg{
-		MsgHeader:   MsgHeader{218, enums.MSG_DHT_P2P_PUT},
+func NewDHTP2PPutMsg(block blocks.Block) *DHTP2PPutMsg {
+	// create empty message
+	msg := &DHTP2PPutMsg{
+		MsgHeader:   MsgHeader{216, enums.MSG_DHT_P2P_PUT},
 		BType:       enums.BLOCK_TYPE_ANY,     // block type
 		Flags:       0,                        // processing flags
 		HopCount:    0,                        // message hops
@@ -138,6 +140,20 @@ func NewDHTP2PPutMsg() *DHTP2PPutMsg {
 		LastSig:     nil,                      // no signature from last hop
 		Block:       nil,                      // no block data
 	}
+	// initialize with block if available
+	if block != nil {
+		msg.BType = block.Type()
+		msg.HopCount = 0
+		msg.PeerFilter = blocks.NewPeerFilter()
+		msg.ReplLvl = uint16(config.Cfg.GNS.ReplLevel)
+		msg.Expire = block.Expire()
+		msg.Block = block.Bytes()
+		msg.TruncOrigin = nil
+		msg.PutPath = nil
+		msg.LastSig = nil
+		msg.MsgSize += uint16(len(msg.Block))
+	}
+	return msg
 }
 
 // IsUsed returns true if an optional field is used
@@ -155,7 +171,7 @@ func (m *DHTP2PPutMsg) IsUsed(field string) bool {
 
 // Update message (forwarding)
 func (m *DHTP2PPutMsg) Update(p *path.Path, pf *blocks.PeerFilter, hop uint16) *DHTP2PPutMsg {
-	msg := NewDHTP2PPutMsg()
+	msg := NewDHTP2PPutMsg(nil)
 	msg.Flags = m.Flags
 	msg.HopCount = hop
 	msg.PathL = p.NumList
