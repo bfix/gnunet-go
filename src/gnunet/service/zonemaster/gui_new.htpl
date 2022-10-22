@@ -15,8 +15,9 @@
                 </td>
             </tr>
         </table>
-        <button id="submit">Add zone</button>&nbsp;<a href="/"><button id="leave">Leave</button></a>
+        <button id="submit">Add zone</button>
     </form>
+    <a href="/"><button id="leave">Leave</button></a>
 </div>
 <script>
     const zone_names = [
@@ -51,8 +52,9 @@
                 <td><input type="text" id="name" name="name"></td>
             </tr>
         </table>
-        <button id="submit">Add label</button>&nbsp;<a href="/"><button>Leave</button></a>
+        <button id="submit">Add label</button>
     </form>
+    <a href="/"><button>Leave</button></a>
 </div>
 <script>
     const label_names = [

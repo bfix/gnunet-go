@@ -143,7 +143,6 @@ func (s *Service) StoreDHT(ctx context.Context, query blocks.Query, block blocks
 func (s *Service) StoreNamecache(ctx context.Context, query *blocks.GNSQuery, block *blocks.GNSBlock) (err error) {
 	// assemble Namecache request
 	req := message.NewNamecacheCacheMsg(block)
-	req.ID = uint32(util.NextID())
 
 	// get response from Namecache service
 	_, err = service.RequestResponse(ctx, "zonemaster", "namecache", config.Cfg.Namecache.Service.Socket, req, false)

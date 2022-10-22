@@ -478,7 +478,8 @@ func (zm *ZoneMaster) edit(w http.ResponseWriter, r *http.Request) {
 			// set edit attributes
 			data.Params["name"] = zone.Name
 			data.Params["keytype"] = guiKeyType(zone.Key.Type)
-			data.Params["keydata"] = zone.Key.ID()
+			data.Params["keydata"] = zone.Key.Public().ID()
+			data.Params["prvdata"] = zone.Key.ID()
 			data.Params["created"] = guiTime(zone.Created)
 			data.Params["modified"] = guiTime(zone.Modified)
 

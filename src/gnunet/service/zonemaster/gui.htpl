@@ -36,7 +36,7 @@
         {{range $zi, $zone := .}}
         <li>
             {{$z := $zone.Zone}}
-            <span class="caret"><b>{{$z.Name}}</b></span> [{{keytype $z.Key.Type}}: {{$z.Key.ID}}]
+            <span class="caret"><b>{{$z.Name}}</b></span> [{{keytype $z.Key.Type}}: {{$zone.PubID}}]
             <a href="/edit/zone/{{$z.ID}}" title="Edit zone"><button class="icon blue">&#9998;</button></a>
             <a href="/del/zone/{{$z.ID}}" title="Remove zone"><button class="icon red">&#10006;</button></a>
             (Created: {{date $z.Created}}, Modified: {{date $z.Modified}})
@@ -47,7 +47,7 @@
                     {{$l := $label.Label}}
                     <span class="caret"><b>{{$l.Name}}</b></span>
                     <a href="/edit/label/{{$l.ID}}" title="Edit label"><button class="icon blue">&#9998;</button></a>
-                    <a href="/del/label/{{$l.ID}}" title="Remove label"><button class="icon red">&#10006;"</button></a>
+                    <a href="/del/label/{{$l.ID}}" title="Remove label"><button class="icon red">&#10006;</button></a>
                     (Created: {{date $l.Created}}, Modified: {{date $l.Modified}})
                     <ul class="nested">
                     {{if $label.Records}}

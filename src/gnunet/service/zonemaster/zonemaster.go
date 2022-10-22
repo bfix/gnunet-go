@@ -69,13 +69,13 @@ func (zm *ZoneMaster) Run(ctx context.Context) {
 
 	// start HTTP GUI
 	zm.startGUI(ctx)
-
-	// first publish on start
-	if err = zm.Publish(ctx); err != nil {
-		logger.Printf(logger.ERROR, "[zonemaster] initial publish failed: %s", err.Error())
-		return
-	}
-
+	/*
+		// publish on start-up
+		if err = zm.Publish(ctx); err != nil {
+			logger.Printf(logger.ERROR, "[zonemaster] initial publish failed: %s", err.Error())
+			return
+		}
+	*/
 	// periodically publish GNS blocks to the DHT
 	tick := time.NewTicker(time.Duration(zm.cfg.ZoneMaster.Period) * time.Second)
 loop:
@@ -122,7 +122,8 @@ func (zm *ZoneMaster) Publish(ctx context.Context) error {
 
 // PublishZoneLabel with public records
 func (zm *ZoneMaster) PublishZoneLabel(ctx context.Context, zone *store.Zone, label *store.Label) error {
-	logger.Printf(logger.INFO, "[zonemaster] Publishing label '%s' of zone %s", label.Name, zone.Key.ID())
+	zk := zone.Key.Public()
+	logger.Printf(logger.INFO, "[zonemaster] Publishing label '%s' of zone %s", label.Name, zk.ID())
 
 	// collect public records for zone label
 	recs, err := zm.zdb.GetRecords("lid=%d and flags&%d = 0", label.ID, enums.GNS_FLAG_PRIVATE)
@@ -139,14 +140,19 @@ func (zm *ZoneMaster) PublishZoneLabel(ctx context.Context, zone *store.Zone, la
 		rrSet.AddRecord(&r.ResourceRecord)
 	}
 	rrSet.SetPadding()
+	if rrSet.Count == 0 {
+		logger.Println(logger.INFO, "[zonemaster] No resource records -- skipped")
+		return nil
+	}
 
 	// assemble GNS query
-	query := blocks.NewGNSQuery(zone.Key.Public(), label.Name)
+	query := blocks.NewGNSQuery(zk, label.Name)
 
 	// assemble, encrypt and sign GNS block
 	blk, _ := blocks.NewGNSBlock().(*blocks.GNSBlock)
+
 	blk.Body.Expire = expire
-	blk.Body.Data, err = zone.Key.Public().Encrypt(rrSet.Bytes(), label.Name, expire)
+	blk.Body.Data, err = zk.Encrypt(rrSet.Bytes(), label.Name, expire)
 	if err != nil {
 		return err
 	}
