@@ -46,7 +46,6 @@ func main() {
 
 	var (
 		cfgFile  string
-		dhtSock  string
 		gui      string
 		err      error
 		logLevel int
@@ -54,7 +53,6 @@ func main() {
 	)
 	// handle command line arguments
 	flag.StringVar(&cfgFile, "c", "gnunet-config.json", "GNUnet configuration file")
-	flag.StringVar(&dhtSock, "d", "", "DHT service socket")
 	flag.StringVar(&gui, "g", "", "GUI listen address")
 	flag.IntVar(&logLevel, "L", logger.INFO, "zonemaster log level (default: INFO)")
 	flag.StringVar(&rpcEndp, "R", "", "JSON-RPC endpoint (default: none)")
@@ -71,17 +69,29 @@ func main() {
 		logLevel = config.Cfg.Logging.Level
 	}
 	logger.SetLogLevel(logLevel)
-	if len(dhtSock) > 0 {
-		config.Cfg.DHT.Service.Socket = dhtSock
-	}
 	if len(gui) > 0 {
 		config.Cfg.ZoneMaster.GUI = gui
 	}
-	// start a new ZONEMASTER service
+
+	// start a new namestore service under zonemaster umbrella
 	ctx, cancel := context.WithCancel(context.Background())
-	// start background service with HTTPS backend
-	zmSrv := zonemaster.NewZoneMaster(config.Cfg)
-	go zmSrv.Run(ctx)
+	srv, ok := zonemaster.NewService(ctx, nil).(*zonemaster.Service)
+	if !ok {
+		logger.Println(logger.ERROR, "[zonemaster] Failed to create service")
+		return
+	}
+	// start UDS listener if service is specified
+	if config.Cfg.ZoneMaster.Service != nil {
+		sockHdlr := service.NewSocketHandler("zonemaster", srv)
+		if err = sockHdlr.Start(ctx, config.Cfg.ZoneMaster.Service.Socket, config.Cfg.ZoneMaster.Service.Params); err != nil {
+			logger.Printf(logger.ERROR, "[zonemaster] Error: '%s'", err.Error())
+			return
+		}
+	}
+
+	// start a new ZONEMASTER (background service with HTTPS backend)
+	zm := zonemaster.NewZoneMaster(config.Cfg, srv)
+	go zm.Run(ctx)
 
 	// handle command-line arguments for RPC
 	if len(rpcEndp) > 0 {
@@ -99,10 +109,7 @@ func main() {
 			logger.Printf(logger.ERROR, "[zonemaster] RPC failed to start: %s", err.Error())
 			return
 		}
-		if err = zmSrv.InitRPC(rpc); err != nil {
-			logger.Printf(logger.ERROR, "[zonemaster] RPC failed to initialize: %s", err.Error())
-			return
-		}
+		srv.InitRPC(rpc)
 	}
 	// handle OS signals
 	sigCh := make(chan os.Signal, 5)
