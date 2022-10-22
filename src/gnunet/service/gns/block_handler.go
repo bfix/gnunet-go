@@ -25,7 +25,7 @@ import (
 
 	"gnunet/crypto"
 	"gnunet/enums"
-	"gnunet/message"
+	"gnunet/service/dht/blocks"
 	"gnunet/service/gns/rr"
 	"gnunet/util"
 
@@ -33,7 +33,7 @@ import (
 )
 
 // HdlrInst is the type for functions that instantiate custom block handlers.
-type HdlrInst func(*message.ResourceRecord, []string) (BlockHandler, error)
+type HdlrInst func(*blocks.ResourceRecord, []string) (BlockHandler, error)
 
 // Error codes
 var (
@@ -72,7 +72,7 @@ type BlockHandler interface {
 	// processing. The handler can inspect the remaining labels in a path
 	// if required. The method returns an error if a record is not accepted
 	// by the block handler (RR not of required type).
-	AddRecord(rr *message.ResourceRecord, labels []string) error
+	AddRecord(rr *blocks.ResourceRecord, labels []string) error
 
 	// Coexist checks if a custom block handler can co-exist with other
 	// resource records in the same block. 'cm' maps the resource type
@@ -82,7 +82,7 @@ type BlockHandler interface {
 
 	// Records returns a list of RR of the given types associated with
 	// the custom handler
-	Records(kind RRTypeList) *message.RecordSet
+	Records(kind RRTypeList) *blocks.RecordSet
 
 	// Name returns the human-readable name of the handler
 	Name() string
@@ -110,7 +110,7 @@ type BlockHandlerList struct {
 
 // NewBlockHandlerList instantiates an a list of active block handlers
 // for a given set of records (GNS block).
-func NewBlockHandlerList(records []*message.ResourceRecord, labels []string) (*BlockHandlerList, []*message.ResourceRecord, error) {
+func NewBlockHandlerList(records []*blocks.ResourceRecord, labels []string) (*BlockHandlerList, []*blocks.ResourceRecord, error) {
 	// initialize block handler list
 	hl := &BlockHandlerList{
 		list:   make(map[enums.GNSType]BlockHandler),
@@ -118,7 +118,7 @@ func NewBlockHandlerList(records []*message.ResourceRecord, labels []string) (*B
 	}
 
 	// first pass: build list of shadow records in this block
-	shadows := make([]*message.ResourceRecord, 0)
+	shadows := make([]*blocks.ResourceRecord, 0)
 	for _, rec := range records {
 		// filter out shadow records...
 		if (rec.Flags & enums.GNS_FLAG_SHADOW) != 0 {
@@ -127,7 +127,7 @@ func NewBlockHandlerList(records []*message.ResourceRecord, labels []string) (*B
 	}
 	// second pass: normalize block by filtering out expired records (and
 	// replacing them with shadow records if available
-	active := make([]*message.ResourceRecord, 0)
+	active := make([]*blocks.ResourceRecord, 0)
 	for _, rec := range records {
 		// don't process shadow records again
 		if (rec.Flags & enums.GNS_FLAG_SHADOW) != 0 {
@@ -207,7 +207,7 @@ func (hl *BlockHandlerList) GetHandler(types ...enums.GNSType) BlockHandler {
 }
 
 // FinalizeRecord post-processes records
-func (hl *BlockHandlerList) FinalizeRecord(rec *message.ResourceRecord) *message.ResourceRecord {
+func (hl *BlockHandlerList) FinalizeRecord(rec *blocks.ResourceRecord) *blocks.ResourceRecord {
 	// no implementation yet
 	return rec
 }
@@ -218,13 +218,13 @@ func (hl *BlockHandlerList) FinalizeRecord(rec *message.ResourceRecord) *message
 
 // ZoneKeyHandler implementing the BlockHandler interface
 type ZoneKeyHandler struct {
-	ztype enums.GNSType           // zone type
-	zkey  *crypto.ZoneKey         // Zone key
-	rec   *message.ResourceRecord // associated recource record
+	ztype enums.GNSType          // zone type
+	zkey  *crypto.ZoneKey        // Zone key
+	rec   *blocks.ResourceRecord // associated recource record
 }
 
 // NewZoneHandler returns a new BlockHandler instance
-func NewZoneHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, error) {
+func NewZoneHandler(rec *blocks.ResourceRecord, labels []string) (BlockHandler, error) {
 	// check if we have an implementation for the zone type
 	if crypto.GetImplementation(rec.RType) == nil {
 		return nil, ErrInvalidRecordType
@@ -242,7 +242,7 @@ func NewZoneHandler(rec *message.ResourceRecord, labels []string) (BlockHandler,
 }
 
 // AddRecord inserts a PKEY record into the handler.
-func (h *ZoneKeyHandler) AddRecord(rec *message.ResourceRecord, labels []string) (err error) {
+func (h *ZoneKeyHandler) AddRecord(rec *blocks.ResourceRecord, labels []string) (err error) {
 	// check record type
 	if rec.RType != h.ztype {
 		return ErrInvalidRecordType
@@ -268,8 +268,8 @@ func (h *ZoneKeyHandler) Coexist(cm util.Counter[enums.GNSType]) bool {
 }
 
 // Records returns a list of RR of the given type associated with this handler
-func (h *ZoneKeyHandler) Records(kind RRTypeList) *message.RecordSet {
-	rs := message.NewRecordSet()
+func (h *ZoneKeyHandler) Records(kind RRTypeList) *blocks.RecordSet {
+	rs := blocks.NewRecordSet()
 	if kind.HasType(enums.GNS_TYPE_PKEY) {
 		rs.AddRecord(h.rec)
 	}
@@ -287,20 +287,20 @@ func (h *ZoneKeyHandler) Name() string {
 
 // Gns2DnsHandler implementing the BlockHandler interface
 type Gns2DnsHandler struct {
-	Query   string                    // DNS query name
-	Servers []string                  // DNS servers to ask
-	recs    []*message.ResourceRecord // list of rersource records
+	Query   string                   // DNS query name
+	Servers []string                 // DNS servers to ask
+	recs    []*blocks.ResourceRecord // list of rersource records
 }
 
 // NewGns2DnsHandler returns a new BlockHandler instance
-func NewGns2DnsHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, error) {
+func NewGns2DnsHandler(rec *blocks.ResourceRecord, labels []string) (BlockHandler, error) {
 	if rec.RType != enums.GNS_TYPE_GNS2DNS {
 		return nil, ErrInvalidRecordType
 	}
 	h := &Gns2DnsHandler{
 		Query:   "",
 		Servers: make([]string, 0),
-		recs:    make([]*message.ResourceRecord, 0),
+		recs:    make([]*blocks.ResourceRecord, 0),
 	}
 	if err := h.AddRecord(rec, labels); err != nil {
 		return nil, err
@@ -309,7 +309,7 @@ func NewGns2DnsHandler(rec *message.ResourceRecord, labels []string) (BlockHandl
 }
 
 // AddRecord inserts a GNS2DNS record into the handler.
-func (h *Gns2DnsHandler) AddRecord(rec *message.ResourceRecord, labels []string) error {
+func (h *Gns2DnsHandler) AddRecord(rec *blocks.ResourceRecord, labels []string) error {
 	if rec.RType != enums.GNS_TYPE_GNS2DNS {
 		return ErrInvalidRecordType
 	}
@@ -343,8 +343,8 @@ func (h *Gns2DnsHandler) Coexist(cm util.Counter[enums.GNSType]) bool {
 }
 
 // Records returns a list of RR of the given type associated with this handler
-func (h *Gns2DnsHandler) Records(kind RRTypeList) *message.RecordSet {
-	rs := message.NewRecordSet()
+func (h *Gns2DnsHandler) Records(kind RRTypeList) *blocks.RecordSet {
+	rs := blocks.NewRecordSet()
 	if kind.HasType(enums.GNS_TYPE_GNS2DNS) {
 		for _, rec := range h.recs {
 			rs.AddRecord(rec)
@@ -365,8 +365,8 @@ func (h *Gns2DnsHandler) Name() string {
 // Box record for handler logic
 type Box struct {
 	rr.BOX
-	key string                  // map key for box instance
-	rec *message.ResourceRecord // originating RR
+	key string                 // map key for box instance
+	rec *blocks.ResourceRecord // originating RR
 }
 
 // BoxHandler implementing the BlockHandler interface
@@ -375,7 +375,7 @@ type BoxHandler struct {
 }
 
 // NewBoxHandler returns a new BlockHandler instance
-func NewBoxHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, error) {
+func NewBoxHandler(rec *blocks.ResourceRecord, labels []string) (BlockHandler, error) {
 	if rec.RType != enums.GNS_TYPE_BOX {
 		return nil, ErrInvalidRecordType
 	}
@@ -389,7 +389,7 @@ func NewBoxHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, 
 }
 
 // AddRecord inserts a BOX record into the handler.
-func (h *BoxHandler) AddRecord(rec *message.ResourceRecord, labels []string) error {
+func (h *BoxHandler) AddRecord(rec *blocks.ResourceRecord, labels []string) error {
 	if rec.RType != enums.GNS_TYPE_BOX {
 		return ErrInvalidRecordType
 	}
@@ -425,12 +425,12 @@ func (h *BoxHandler) Coexist(cm util.Counter[enums.GNSType]) bool {
 }
 
 // Records returns a list of RR of the given type associated with this handler
-func (h *BoxHandler) Records(kind RRTypeList) *message.RecordSet {
-	rs := message.NewRecordSet()
+func (h *BoxHandler) Records(kind RRTypeList) *blocks.RecordSet {
+	rs := blocks.NewRecordSet()
 	for _, box := range h.boxes {
 		if kind.HasType(box.Type) {
 			// valid box found: assemble new resource record.
-			rr := new(message.ResourceRecord)
+			rr := new(blocks.ResourceRecord)
 			rr.Expire = box.rec.Expire
 			rr.Flags = box.rec.Flags
 			rr.RType = box.Type
@@ -454,11 +454,11 @@ func (h *BoxHandler) Name() string {
 // LehoHandler implementing the BlockHandler interface
 type LehoHandler struct {
 	name string
-	rec  *message.ResourceRecord
+	rec  *blocks.ResourceRecord
 }
 
 // NewLehoHandler returns a new BlockHandler instance
-func NewLehoHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, error) {
+func NewLehoHandler(rec *blocks.ResourceRecord, labels []string) (BlockHandler, error) {
 	if rec.RType != enums.GNS_TYPE_LEHO {
 		return nil, ErrInvalidRecordType
 	}
@@ -472,7 +472,7 @@ func NewLehoHandler(rec *message.ResourceRecord, labels []string) (BlockHandler,
 }
 
 // AddRecord inserts a LEHO record into the handler.
-func (h *LehoHandler) AddRecord(rec *message.ResourceRecord, labels []string) error {
+func (h *LehoHandler) AddRecord(rec *blocks.ResourceRecord, labels []string) error {
 	if rec.RType != enums.GNS_TYPE_LEHO {
 		return ErrInvalidRecordType
 	}
@@ -489,8 +489,8 @@ func (h *LehoHandler) Coexist(cm util.Counter[enums.GNSType]) bool {
 }
 
 // Records returns a list of RR of the given type associated with this handler
-func (h *LehoHandler) Records(kind RRTypeList) *message.RecordSet {
-	rs := message.NewRecordSet()
+func (h *LehoHandler) Records(kind RRTypeList) *blocks.RecordSet {
+	rs := blocks.NewRecordSet()
 	if kind.HasType(enums.GNS_TYPE_LEHO) {
 		rs.AddRecord(h.rec)
 	}
@@ -509,11 +509,11 @@ func (h *LehoHandler) Name() string {
 // CnameHandler implementing the BlockHandler interface
 type CnameHandler struct {
 	name string
-	rec  *message.ResourceRecord
+	rec  *blocks.ResourceRecord
 }
 
 // NewCnameHandler returns a new BlockHandler instance
-func NewCnameHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, error) {
+func NewCnameHandler(rec *blocks.ResourceRecord, labels []string) (BlockHandler, error) {
 	if rec.RType != enums.GNS_TYPE_DNS_CNAME {
 		return nil, ErrInvalidRecordType
 	}
@@ -527,7 +527,7 @@ func NewCnameHandler(rec *message.ResourceRecord, labels []string) (BlockHandler
 }
 
 // AddRecord inserts a CNAME record into the handler.
-func (h *CnameHandler) AddRecord(rec *message.ResourceRecord, labels []string) error {
+func (h *CnameHandler) AddRecord(rec *blocks.ResourceRecord, labels []string) error {
 	if rec.RType != enums.GNS_TYPE_DNS_CNAME {
 		return ErrInvalidRecordType
 	}
@@ -547,8 +547,8 @@ func (h *CnameHandler) Coexist(cm util.Counter[enums.GNSType]) bool {
 }
 
 // Records returns a list of RR of the given type associated with this handler
-func (h *CnameHandler) Records(kind RRTypeList) *message.RecordSet {
-	rs := message.NewRecordSet()
+func (h *CnameHandler) Records(kind RRTypeList) *blocks.RecordSet {
+	rs := blocks.NewRecordSet()
 	if kind.HasType(enums.GNS_TYPE_DNS_CNAME) {
 		rs.AddRecord(h.rec)
 	}
@@ -566,11 +566,11 @@ func (h *CnameHandler) Name() string {
 
 // VpnHandler implementing the BlockHandler interface
 type VpnHandler struct {
-	rec *message.ResourceRecord
+	rec *blocks.ResourceRecord
 }
 
 // NewVpnHandler returns a new BlockHandler instance
-func NewVpnHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, error) {
+func NewVpnHandler(rec *blocks.ResourceRecord, labels []string) (BlockHandler, error) {
 	if rec.RType != enums.GNS_TYPE_VPN {
 		return nil, ErrInvalidRecordType
 	}
@@ -582,7 +582,7 @@ func NewVpnHandler(rec *message.ResourceRecord, labels []string) (BlockHandler, 
 }
 
 // AddRecord inserts a VPN record into the handler.
-func (h *VpnHandler) AddRecord(rec *message.ResourceRecord, labels []string) error {
+func (h *VpnHandler) AddRecord(rec *blocks.ResourceRecord, labels []string) error {
 	if rec.RType != enums.GNS_TYPE_VPN {
 		return ErrInvalidRecordType
 	}
@@ -601,8 +601,8 @@ func (h *VpnHandler) Coexist(cm util.Counter[enums.GNSType]) bool {
 }
 
 // Records returns a list of RR of the given type associated with this handler
-func (h *VpnHandler) Records(kind RRTypeList) *message.RecordSet {
-	rs := message.NewRecordSet()
+func (h *VpnHandler) Records(kind RRTypeList) *blocks.RecordSet {
+	rs := blocks.NewRecordSet()
 	if kind.HasType(enums.GNS_TYPE_VPN) {
 		rs.AddRecord(h.rec)
 	}

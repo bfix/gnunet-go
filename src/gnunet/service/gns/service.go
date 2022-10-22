@@ -192,7 +192,7 @@ func (s *Service) QueryKeyRevocation(ctx context.Context, zkey *crypto.ZoneKey) 
 
 	// get response from Revocation service
 	var resp message.Message
-	if resp, err = service.RequestResponse(ctx, "gns", "Revocation", config.Cfg.Revocation.Service.Socket, req); err != nil {
+	if resp, err = service.RequestResponse(ctx, "gns", "Revocation", config.Cfg.Revocation.Service.Socket, req, true); err != nil {
 		return
 	}
 
@@ -218,7 +218,7 @@ func (s *Service) RevokeKey(ctx context.Context, rd *revocation.RevData) (succes
 
 	// get response from Revocation service
 	var resp message.Message
-	if resp, err = service.RequestResponse(ctx, "gns", "Revocation", config.Cfg.Revocation.Service.Socket, req); err != nil {
+	if resp, err = service.RequestResponse(ctx, "gns", "Revocation", config.Cfg.Revocation.Service.Socket, req, true); err != nil {
 		return
 	}
 
@@ -247,7 +247,7 @@ func (s *Service) LookupNamecache(ctx context.Context, query *blocks.GNSQuery) (
 
 	// get response from Namecache service
 	var resp message.Message
-	if resp, err = service.RequestResponse(ctx, "gns", "Namecache", config.Cfg.Namecache.Service.Socket, req); err != nil {
+	if resp, err = service.RequestResponse(ctx, "gns", "Namecache", config.Cfg.Namecache.Service.Socket, req, true); err != nil {
 		return
 	}
 
@@ -308,7 +308,7 @@ func (s *Service) StoreNamecache(ctx context.Context, query *blocks.GNSQuery, bl
 
 	// get response from Namecache service
 	var resp message.Message
-	if resp, err = service.RequestResponse(ctx, "gns", "Namecache", config.Cfg.Namecache.Service.Socket, req); err != nil {
+	if resp, err = service.RequestResponse(ctx, "gns", "Namecache", config.Cfg.Namecache.Service.Socket, req, true); err != nil {
 		return
 	}
 

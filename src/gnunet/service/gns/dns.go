@@ -27,7 +27,7 @@ import (
 
 	"gnunet/crypto"
 	"gnunet/enums"
-	"gnunet/message"
+	"gnunet/service/dht/blocks"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/logger"
@@ -116,7 +116,7 @@ func DNSNameFromBytes(b []byte, offset int) (int, string) {
 }
 
 // QueryDNS queries the specified DNS server for a given name and expected result types.
-func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *message.RecordSet {
+func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *blocks.RecordSet {
 	// get default nameserver if not defined.
 	if server == nil {
 		server = net.IPv4(8, 8, 8, 8)
@@ -161,7 +161,7 @@ func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *message.Reco
 			logger.Printf(logger.ERROR, "[dns][%d] No results\n", id)
 			return nil
 		}
-		set := message.NewRecordSet()
+		set := blocks.NewRecordSet()
 		for _, record := range in.Answer {
 			// check if answer record is of requested type
 			if kind.HasType(enums.GNSType(record.Header().Rrtype)) {
@@ -174,7 +174,7 @@ func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *message.Reco
 				}
 
 				// create a new GNS resource record
-				rr := new(message.ResourceRecord)
+				rr := new(blocks.ResourceRecord)
 				expires := time.Now().Add(time.Duration(record.Header().Ttl) * time.Second)
 				rr.Expire = util.NewAbsoluteTime(expires)
 				rr.Flags = 0
@@ -210,11 +210,11 @@ func (m *Module) ResolveDNS(
 	servers []string,
 	kind RRTypeList,
 	zkey *crypto.ZoneKey,
-	depth int) (set *message.RecordSet, err error) {
+	depth int) (set *blocks.RecordSet, err error) {
 
 	// start DNS queries concurrently
 	logger.Printf(logger.DBG, "[dns] Resolution of '%s' starting...\n", name)
-	res := make(chan *message.RecordSet)
+	res := make(chan *blocks.RecordSet)
 	running := 0
 	for _, srv := range servers {
 		// check if srv is an IPv4/IPv6 address

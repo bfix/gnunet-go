@@ -27,7 +27,6 @@ import (
 	"gnunet/core"
 	"gnunet/crypto"
 	"gnunet/enums"
-	"gnunet/message"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
 	"gnunet/service/revocation"
@@ -102,9 +101,11 @@ func NewModule(ctx context.Context, c *core.Core) (m *Module) {
 	m = &Module{
 		ModuleImpl: *service.NewModuleImpl(),
 	}
-	// register as listener for core events
-	listener := m.ModuleImpl.Run(ctx, m.event, m.Filter(), 0, nil)
-	c.Register("gns", listener)
+	if c != nil {
+		// register as listener for core events
+		listener := m.ModuleImpl.Run(ctx, m.event, m.Filter(), 0, nil)
+		c.Register("gns", listener)
+	}
 	return
 }
 
@@ -152,7 +153,7 @@ func (m *Module) Resolve(
 	zkey *crypto.ZoneKey,
 	kind RRTypeList,
 	mode int,
-	depth int) (set *message.RecordSet, err error) {
+	depth int) (set *blocks.RecordSet, err error) {
 
 	// check for recursion depth
 	if depth > config.Cfg.GNS.MaxDepth {
@@ -178,7 +179,7 @@ func (m *Module) ResolveAbsolute(
 	labels []string,
 	kind RRTypeList,
 	mode int,
-	depth int) (set *message.RecordSet, err error) {
+	depth int) (set *blocks.RecordSet, err error) {
 
 	// get the zone key for the TLD
 	zkey := m.GetZoneKey(labels[0])
@@ -189,7 +190,7 @@ func (m *Module) ResolveAbsolute(
 	}
 	// check if zone key has been revoked
 	var valid bool
-	set = message.NewRecordSet()
+	set = blocks.NewRecordSet()
 	if valid, err = m.RevocationQuery(ctx, zkey); err != nil || !valid {
 		return
 	}
@@ -208,12 +209,12 @@ func (m *Module) ResolveRelative(
 	zkey *crypto.ZoneKey,
 	kind RRTypeList,
 	mode int,
-	depth int) (set *message.RecordSet, err error) {
+	depth int) (set *blocks.RecordSet, err error) {
 
 	// Process all names in sequence
 	var (
-		records []*message.ResourceRecord // final resource records from resolution
-		hdlrs   *BlockHandlerList         // list of block handlers in final step
+		records []*blocks.ResourceRecord // final resource records from resolution
+		hdlrs   *BlockHandlerList        // list of block handlers in final step
 	)
 	for ; len(labels) > 0; labels = labels[1:] {
 		logger.Printf(logger.DBG, "[gns] ResolveRelative '%s' in '%s'\n", labels[0], util.EncodeBinaryToString(zkey.Bytes()))
@@ -229,7 +230,7 @@ func (m *Module) ResolveRelative(
 			// if we have no results at this point, return NXDOMAIN
 			if block == nil {
 				// return record set with no entries as signal for NXDOMAIN
-				set = message.NewRecordSet()
+				set = blocks.NewRecordSet()
 				return
 			}
 			mode = enums.GNS_LO_DEFAULT
@@ -270,7 +271,7 @@ func (m *Module) ResolveRelative(
 			var valid bool
 			if valid, err = m.RevocationQuery(ctx, inst.zkey); err != nil || !valid {
 				// revoked key -> no results!
-				records = make([]*message.ResourceRecord, 0)
+				records = make([]*blocks.ResourceRecord, 0)
 				break
 			}
 		} else if hdlr := hdlrs.GetHandler(enums.GNS_TYPE_GNS2DNS); hdlr != nil {
@@ -338,7 +339,7 @@ func (m *Module) ResolveRelative(
 	}
 	// Assemble resulting resource record set by filtering for requested types.
 	// Records might get transformed by active block handlers.
-	set = message.NewRecordSet()
+	set = blocks.NewRecordSet()
 	for _, rec := range records {
 		// is this the record type we are looking for?
 		if kind.HasType(rec.RType) {
@@ -383,7 +384,7 @@ func (m *Module) ResolveUnknown(
 	labels []string,
 	zkey *crypto.ZoneKey,
 	kind RRTypeList,
-	depth int) (set *message.RecordSet, err error) {
+	depth int) (set *blocks.RecordSet, err error) {
 
 	// relative GNS-based server name?
 	if strings.HasSuffix(name, ".+") {
@@ -471,8 +472,8 @@ func (m *Module) Lookup(
 }
 
 // newLEHORecord creates a new supplemental GNS record of type LEHO.
-func (m *Module) newLEHORecord(name string, expires util.AbsoluteTime) *message.ResourceRecord {
-	rr := new(message.ResourceRecord)
+func (m *Module) newLEHORecord(name string, expires util.AbsoluteTime) *blocks.ResourceRecord {
+	rr := new(blocks.ResourceRecord)
 	rr.Expire = expires
 	rr.Flags = enums.GNS_FLAG_SUPPL
 	rr.RType = enums.GNS_TYPE_LEHO
@@ -484,9 +485,9 @@ func (m *Module) newLEHORecord(name string, expires util.AbsoluteTime) *message.
 }
 
 // Records returns the list of resource records from binary data.
-func (m *Module) records(buf []byte) ([]*message.ResourceRecord, error) {
+func (m *Module) records(buf []byte) ([]*blocks.ResourceRecord, error) {
 	// parse  data into record set
-	rs := message.NewRecordSet()
+	rs := blocks.NewRecordSet()
 	if err := data.Unmarshal(rs, buf); err != nil {
 		return nil, err
 	}
