@@ -66,7 +66,8 @@ func RequestResponse(
 	caller string,
 	callee string,
 	path string,
-	req message.Message) (message.Message, error) {
+	req message.Message,
+	withResponse bool) (message.Message, error) {
 	// client-connect to the service
 	logger.Printf(logger.DBG, "[%s] Connecting to %s service...\n", caller, callee)
 	cl, err := NewClient(ctx, path)
@@ -78,11 +79,13 @@ func RequestResponse(
 	if err = cl.SendRequest(ctx, req); err != nil {
 		return nil, err
 	}
-	// wait for a single response, then close the connection
-	logger.Printf(logger.DBG, "[%s] Waiting for response from %s service\n", caller, callee)
 	var resp message.Message
-	if resp, err = cl.ReceiveResponse(ctx); err != nil {
-		return nil, err
+	if withResponse {
+		// wait for a single response, then close the connection
+		logger.Printf(logger.DBG, "[%s] Waiting for response from %s service\n", caller, callee)
+		if resp, err = cl.ReceiveResponse(ctx); err != nil {
+			return nil, err
+		}
 	}
 	logger.Printf(logger.DBG, "[%s] Closing connection to %s service\n", caller, callee)
 	cl.Close()
