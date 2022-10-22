@@ -97,10 +97,16 @@ func OpenMetaDB(path string) (db *FileMetaDB, err error) {
 // Store metadata in database: creates or updates a record for the metadata
 // in the database; primary key is the query key
 func (db *FileMetaDB) Store(md *FileMetadata) (err error) {
+	// work around a SQLite3 bug when storing uint64 with high bit set
+	var exp *uint64
+	if !md.expires.IsNever() {
+		exp = new(uint64)
+		*exp = md.expires.Val
+	}
 	sql := "replace into meta(qkey,btype,bhash,size,stored,expires,lastUsed,usedCount) values(?,?,?,?,?,?,?,?)"
 	_, err = db.conn.Exec(sql,
 		md.key.Data, md.btype, md.bhash.Data, md.size, md.stored.Epoch(),
-		md.expires.Val, md.lastUsed.Epoch(), md.usedCount)
+		exp, md.lastUsed.Epoch(), md.usedCount)
 	return
 }
 
@@ -124,12 +130,18 @@ func (db *FileMetaDB) Get(query blocks.Query) (mds []*FileMetadata, err error) {
 		md.key = query.Key()
 		md.btype = btype
 		var st, lu uint64
-		if err = rows.Scan(&md.size, &md.bhash.Data, &st, &md.expires.Val, &lu, &md.usedCount); err != nil {
+		var exp *uint64
+		if err = rows.Scan(&md.size, &md.bhash.Data, &st, &exp, &lu, &md.usedCount); err != nil {
 			if err == sql.ErrNoRows {
 				md = nil
 				err = nil
 			}
 			return
+		}
+		if exp != nil {
+			md.expires.Val = *exp
+		} else {
+			md.expires = util.AbsoluteTimeNever()
 		}
 		md.stored.Val = st * 1000000
 		md.lastUsed.Val = lu * 1000000
@@ -192,9 +204,15 @@ func (db *FileMetaDB) Traverse(f func(*FileMetadata)) error {
 	md := NewFileMetadata()
 	for rows.Next() {
 		var st, lu uint64
-		err = rows.Scan(&md.key.Data, &md.btype, &md.bhash.Data, &md.size, &st, &md.expires.Val, &lu, &md.usedCount)
+		var exp *uint64
+		err = rows.Scan(&md.key.Data, &md.btype, &md.bhash.Data, &md.size, &st, &exp, &lu, &md.usedCount)
 		if err != nil {
 			return err
+		}
+		if exp != nil {
+			md.expires.Val = *exp
+		} else {
+			md.expires = util.AbsoluteTimeNever()
 		}
 		md.stored.Val = st * 1000000
 		md.lastUsed.Val = lu * 1000000
