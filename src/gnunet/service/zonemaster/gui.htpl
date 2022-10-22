@@ -36,7 +36,7 @@
         {{range $zi, $zone := .}}
         <li>
             {{$z := $zone.Zone}}
-            <span class="caret"><b>{{$z.Name}}</b> [{{keytype $z.Key.Type}}]</span>
+            <span class="caret"><b>{{$z.Name}}</b></span> [{{keytype $z.Key.Type}}: {{$z.Key.ID}}]
             <a href="/edit/zone/{{$z.ID}}" title="Edit zone"><button class="icon blue">&#9998;</button></a>
             <a href="/del/zone/{{$z.ID}}" title="Remove zone"><button class="icon red">&#10006;</button></a>
             (Created: {{date $z.Created}}, Modified: {{date $z.Modified}})

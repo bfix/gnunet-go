@@ -54,6 +54,13 @@ var (
 	timeGUI  = "02.01.06 15:04"   // time format for GUI
 )
 
+// state-change constants
+const (
+	ChangeNew = iota
+	ChangeUpdate
+	ChangeDelete
+)
+
 //----------------------------------------------------------------------
 
 // Start HTTP server to provide GUI
@@ -216,6 +223,9 @@ func (zm *ZoneMaster) actionNew(w http.ResponseWriter, r *http.Request, mode str
 		zone := store.NewZone(name, zp)
 		err = zm.zdb.SetZone(zone)
 
+		// notify listeners
+		zm.OnChange("zones", zone.ID, ChangeNew)
+
 	// new label
 	case "label":
 		name := r.FormValue("name")
@@ -223,6 +233,9 @@ func (zm *ZoneMaster) actionNew(w http.ResponseWriter, r *http.Request, mode str
 		label := store.NewLabel(name)
 		label.Zone = id
 		err = zm.zdb.SetLabel(label)
+
+		// notify listeners
+		zm.OnChange("labels", label.ID, ChangeNew)
 
 	// new resource record
 	case "rr":
@@ -255,6 +268,9 @@ func (zm *ZoneMaster) newRec(w http.ResponseWriter, r *http.Request, label int64
 		rr := store.NewRecord(exp, t, flags, rrdata)
 		rr.Label = label
 		err = zm.zdb.SetRecord(rr)
+
+		// notify listeners
+		zm.OnChange("records", rr.ID, ChangeNew)
 	}
 	return err
 }
@@ -263,32 +279,37 @@ func (zm *ZoneMaster) newRec(w http.ResponseWriter, r *http.Request, label int64
 // UPD: update zone, label or resource record
 //----------------------------------------------------------------------
 
-func (zm *ZoneMaster) actionUpd(w http.ResponseWriter, r *http.Request, mode string, id int64) error {
+func (zm *ZoneMaster) actionUpd(w http.ResponseWriter, r *http.Request, mode string, id int64) (err error) {
 	// handle type
 	switch mode {
 	case "zone":
-		// update zone name
-		zone := store.NewZone(r.FormValue("name"), nil)
-		zone.ID = id
-		zone.Modified = util.AbsoluteTimeNow()
-		if err := zm.zdb.SetZone(zone); err != nil {
-			return err
+		// update zone name in database
+		var zone *store.Zone
+		if zone, err = zm.zdb.GetZone(id); err != nil {
+			return
 		}
+		zone.Name = r.FormValue("name")
+		zone.Modified = util.AbsoluteTimeNow()
+		err = zm.zdb.SetZone(zone)
+
+		// notify listeners
+		zm.OnChange("zones", zone.ID, ChangeUpdate)
+
 	case "label":
 		// update label name
 		label := store.NewLabel(r.FormValue("name"))
 		label.ID = id
 		label.Modified = util.AbsoluteTimeNow()
-		if err := zm.zdb.SetLabel(label); err != nil {
-			return err
-		}
+		err = zm.zdb.SetLabel(label)
+
+		// notify listeners
+		zm.OnChange("labels", label.ID, ChangeUpdate)
+
 	case "rr":
 		// update record
-		if err := zm.updRec(w, r, id); err != nil {
-			return err
-		}
+		err = zm.updRec(w, r, id)
 	}
-	return nil
+	return
 }
 
 //----------------------------------------------------------------------
@@ -337,6 +358,9 @@ func (zm *ZoneMaster) updRec(w http.ResponseWriter, r *http.Request, id int64) e
 		if err := zm.zdb.SetRecord(rec); err != nil {
 			return err
 		}
+
+		// notify listeners
+		zm.OnChange("records", rec.ID, ChangeUpdate)
 	}
 	return nil
 }
@@ -454,6 +478,7 @@ func (zm *ZoneMaster) edit(w http.ResponseWriter, r *http.Request) {
 			// set edit attributes
 			data.Params["name"] = zone.Name
 			data.Params["keytype"] = guiKeyType(zone.Key.Type)
+			data.Params["keydata"] = zone.Key.ID()
 			data.Params["created"] = guiTime(zone.Created)
 			data.Params["modified"] = guiTime(zone.Modified)
 
@@ -559,22 +584,36 @@ func (zm *ZoneMaster) remove(w http.ResponseWriter, r *http.Request) {
 
 		// remove zone
 		case "zone":
-			zone := store.NewZone("", nil)
-			zone.ID = id
-			err = zm.zdb.SetZone(zone)
+			// get zone from database
+			var zone *store.Zone
+			if zone, err = zm.zdb.GetZone(id); err != nil {
+				return
+			}
+			// remove zone in database
+			zone.Name = ""
+			if err = zm.zdb.SetZone(zone); err != nil {
+				return
+			}
+			zm.OnChange("zones", id, ChangeDelete)
 
 		// remove label
 		case "label":
 			label := store.NewLabel("")
 			label.ID = id
-			err = zm.zdb.SetLabel(label)
+			if err = zm.zdb.SetLabel(label); err != nil {
+				return
+			}
+			zm.OnChange("labels", id, ChangeDelete)
 
 		// remove resource record
 		case "rr":
 			rec := new(store.Record)
 			rec.ID = id
 			rec.Label = 0
-			err = zm.zdb.SetRecord(rec)
+			if err = zm.zdb.SetRecord(rec); err != nil {
+				return
+			}
+			zm.OnChange("records", id, ChangeDelete)
 		}
 	}
 	// handle error
