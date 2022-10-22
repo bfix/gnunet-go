@@ -25,7 +25,7 @@ import (
 	"fmt"
 	"gnunet/crypto"
 	"gnunet/enums"
-	"gnunet/message"
+	"gnunet/service/dht/blocks"
 	"gnunet/util"
 	"os"
 	// "https://github.com/go-zeromq/zmq4"
@@ -87,7 +87,7 @@ type Record struct {
 	Created  util.AbsoluteTime // date of creation
 	Modified util.AbsoluteTime // date of last modification
 
-	message.ResourceRecord
+	blocks.ResourceRecord
 }
 
 // NewRecord creates a new record for given data. The record is not
