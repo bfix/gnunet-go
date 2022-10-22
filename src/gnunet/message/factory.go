@@ -24,6 +24,8 @@ import (
 )
 
 // NewEmptyMessage creates a new empty message object for the given type.
+//
+//nolint:gocyclo // it's a long switch intentionally
 func NewEmptyMessage(msgType enums.MsgType) (Message, error) {
 	switch msgType {
 	//------------------------------------------------------------------
@@ -76,7 +78,7 @@ func NewEmptyMessage(msgType enums.MsgType) (Message, error) {
 	case enums.MSG_DHT_P2P_GET:
 		return NewDHTP2PGetMsg(), nil
 	case enums.MSG_DHT_P2P_PUT:
-		return NewDHTP2PPutMsg(), nil
+		return NewDHTP2PPutMsg(nil), nil
 	case enums.MSG_DHT_P2P_RESULT:
 		return NewDHTP2PResultMsg(), nil
 
@@ -111,6 +113,24 @@ func NewEmptyMessage(msgType enums.MsgType) (Message, error) {
 		return NewRevocationRevokeMsg(nil), nil
 	case enums.MSG_REVOCATION_REVOKE_RESPONSE:
 		return NewRevocationRevokeResponseMsg(false), nil
+
+	//------------------------------------------------------------------
+	// Namestore service
+	//------------------------------------------------------------------
+	case enums.MSG_NAMESTORE_ZONE_ITERATION_START:
+		return NewNamestoreZoneIterStartMsg(nil), nil
+	case enums.MSG_NAMESTORE_ZONE_ITERATION_NEXT:
+	case enums.MSG_NAMESTORE_ZONE_ITERATION_STOP:
+	case enums.MSG_NAMESTORE_RECORD_STORE:
+	case enums.MSG_NAMESTORE_RECORD_STORE_RESPONSE:
+	case enums.MSG_NAMESTORE_RECORD_LOOKUP:
+	case enums.MSG_NAMESTORE_RECORD_LOOKUP_RESPONSE:
+	case enums.MSG_NAMESTORE_ZONE_TO_NAME:
+	case enums.MSG_NAMESTORE_ZONE_TO_NAME_RESPONSE:
+	case enums.MSG_NAMESTORE_MONITOR_START:
+	case enums.MSG_NAMESTORE_MONITOR_SYNC:
+	case enums.MSG_NAMESTORE_RECORD_RESULT:
+	case enums.MSG_NAMESTORE_MONITOR_NEXT:
 	}
 	return nil, fmt.Errorf("unknown message type %d", msgType)
 }

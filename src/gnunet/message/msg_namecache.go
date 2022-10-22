@@ -102,9 +102,9 @@ type NamecacheCacheMsg struct {
 // NewNamecacheCacheMsg creates a new default message.
 func NewNamecacheCacheMsg(block *blocks.GNSBlock) *NamecacheCacheMsg {
 	msg := &NamecacheCacheMsg{
-		MsgHeader:     MsgHeader{108, enums.MSG_NAMECACHE_BLOCK_CACHE},
+		MsgHeader:     MsgHeader{116, enums.MSG_NAMECACHE_BLOCK_CACHE},
 		ID:            0,
-		Expire:        *new(util.AbsoluteTime),
+		Expire:        util.AbsoluteTimeNever(),
 		DerivedKeySig: nil,
 		EncData:       make([]byte, 0),
 	}
@@ -121,7 +121,7 @@ func NewNamecacheCacheMsg(block *blocks.GNSBlock) *NamecacheCacheMsg {
 
 // String returns a human-readable representation of the message.
 func (m *NamecacheCacheMsg) String() string {
-	return fmt.Sprintf("NewNamecacheCacheMsg{id=%d,expire=%s}",
+	return fmt.Sprintf("NamecacheCacheMsg{id=%d,expire=%s}",
 		m.ID, m.Expire)
 }
 
