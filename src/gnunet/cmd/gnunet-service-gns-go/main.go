@@ -28,7 +28,6 @@ import (
 	"time"
 
 	"gnunet/config"
-	"gnunet/core"
 	"gnunet/service"
 	"gnunet/service/gns"
 
@@ -80,17 +79,9 @@ func main() {
 		params = config.Cfg.GNS.Service.Params
 	}
 
-	// instantiate core service
-	ctx, cancel := context.WithCancel(context.Background())
-	var c *core.Core
-	if c, err = core.NewCore(ctx, config.Cfg.Local); err != nil {
-		logger.Printf(logger.ERROR, "[gns] core failed: %s\n", err.Error())
-		return
-	}
-	defer c.Shutdown()
-
 	// start a new GNS service
-	gns := gns.NewService(ctx, c)
+	ctx, cancel := context.WithCancel(context.Background())
+	gns := gns.NewService(ctx, nil)
 	srv := service.NewSocketHandler("gns", gns)
 	if err = srv.Start(ctx, socket, params); err != nil {
 		logger.Printf(logger.ERROR, "[gns] Error: '%s'", err.Error())
