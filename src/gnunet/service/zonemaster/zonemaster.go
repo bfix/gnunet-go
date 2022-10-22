@@ -158,6 +158,10 @@ func (zm *ZoneMaster) PublishZoneLabel(ctx context.Context, zone *store.Zone, la
 		return err
 	}
 
+	// DEBUG:
+	// logger.Printf(logger.DBG, "[zonemaster]  Query key = %s", hex.EncodeToString(query.Key().Data))
+	// logger.Printf(logger.DBG, "[zonemaster] Block data = %s", hex.EncodeToString(blk.Bytes()))
+
 	// publish GNS block to DHT and Namecache
 	if err = zm.srv.StoreDHT(ctx, query, blk); err != nil {
 		return err
