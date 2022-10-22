@@ -195,14 +195,19 @@ func (pk *EDKEYPrivateImpl) Public() ZoneKeyImpl {
 // (key blinding). Returns the derived key and the blinding value.
 func (pk *EDKEYPrivateImpl) Derive(h *math.Int) (dPk ZonePrivateImpl, hOut *math.Int, err error) {
 	// limit to allowed value range
-	hOut = h.Mod(ed25519.GetCurve().N)
+	hOut = h.SetBit(255, 0)
+	// derive private key
 	derived := pk.prv.Mult(hOut)
+	// derive nonce
+	md := sha256.Sum256(append(pk.prv.Nonce, h.Bytes()...))
+	derived.Nonce = md[:]
+	// assemble EDKEY private key implementation
 	dPk = &EDKEYPrivateImpl{
-		EDKEYPublicImpl{
+		EDKEYPublicImpl: EDKEYPublicImpl{
 			pk.ztype,
 			derived.Public(),
 		},
-		derived,
+		prv: derived,
 	}
 	return
 }
