@@ -28,13 +28,31 @@ import (
 )
 
 //----------------------------------------------------------------------
+// Generic Namecache message header
+//----------------------------------------------------------------------
+
+// GenericNamecacheMsg is the common header for Namestore messages
+type GenericNamecacheMsg struct {
+	MsgHeader
+	ID uint32 `order:"big"` // unique reference ID
+}
+
+// return initialized common message header
+func newGenericNamecacheMsg(size uint16, mtype enums.MsgType) GenericNamecacheMsg {
+	return GenericNamecacheMsg{
+		MsgHeader: MsgHeader{size, mtype},
+		ID:        uint32(util.NextID()),
+	}
+}
+
+//----------------------------------------------------------------------
 // NAMECACHE_LOOKUP_BLOCK
 //----------------------------------------------------------------------
 
 // NamecacheLookupMsg is request message for lookups in local namecache
 type NamecacheLookupMsg struct {
-	MsgHeader
-	ID    uint32           `order:"big"` // Request Id
+	GenericNamecacheMsg
+
 	Query *crypto.HashCode // Query data
 }
 
@@ -44,9 +62,8 @@ func NewNamecacheLookupMsg(query *crypto.HashCode) *NamecacheLookupMsg {
 		query = crypto.NewHashCode(nil)
 	}
 	return &NamecacheLookupMsg{
-		MsgHeader: MsgHeader{72, enums.MSG_NAMECACHE_LOOKUP_BLOCK},
-		ID:        0,
-		Query:     query,
+		GenericNamecacheMsg: newGenericNamecacheMsg(72, enums.MSG_NAMECACHE_LOOKUP_BLOCK),
+		Query:               query,
 	}
 }
 
@@ -62,21 +79,20 @@ func (m *NamecacheLookupMsg) String() string {
 
 // NamecacheLookupResultMsg is the response message for namecache lookups.
 type NamecacheLookupResultMsg struct {
-	MsgHeader
-	ID            uint32                `order:"big"` // Request Id
-	Expire        util.AbsoluteTime     ``            // Expiration time
-	DerivedKeySig *crypto.ZoneSignature ``            // Derived public key
-	EncData       []byte                `size:"*"`    // Encrypted block data
+	GenericNamecacheMsg
+
+	Expire        util.AbsoluteTime     ``         // Expiration time
+	DerivedKeySig *crypto.ZoneSignature ``         // Derived public key
+	EncData       []byte                `size:"*"` // Encrypted block data
 }
 
 // NewNamecacheLookupResultMsg creates a new default message.
 func NewNamecacheLookupResultMsg() *NamecacheLookupResultMsg {
 	return &NamecacheLookupResultMsg{
-		MsgHeader:     MsgHeader{112, enums.MSG_NAMECACHE_LOOKUP_BLOCK_RESPONSE},
-		ID:            0,
-		Expire:        *new(util.AbsoluteTime),
-		DerivedKeySig: nil,
-		EncData:       nil,
+		GenericNamecacheMsg: newGenericNamecacheMsg(112, enums.MSG_NAMECACHE_LOOKUP_BLOCK_RESPONSE),
+		Expire:              util.AbsoluteTimeNever(),
+		DerivedKeySig:       nil,
+		EncData:             nil,
 	}
 }
 
@@ -92,24 +108,38 @@ func (m *NamecacheLookupResultMsg) String() string {
 
 // NamecacheCacheMsg is the request message to put a name into the local cache.
 type NamecacheCacheMsg struct {
-	MsgHeader
-	ID            uint32                `order:"big"` // Request Id
-	Expire        util.AbsoluteTime     ``            // Expiration time
-	DerivedKeySig *crypto.ZoneSignature ``            // Derived public key and signature
-	EncData       []byte                `size:"*"`    // Encrypted block data
+	GenericNamecacheMsg
+
+	Expire     util.AbsoluteTime ``                 // Expiration time
+	DerivedSig []byte            `size:"(FldSize)"` // Derived signature
+	DerivedKey []byte            `size:"(FldSize)"` // Derived public key
+	EncData    []byte            `size:"*"`         // Encrypted block data
+}
+
+// Size returns buffer sizes for fields
+func (m *NamecacheCacheMsg) FldSize(field string) uint {
+	switch field {
+	case "DerivedSig":
+		return 64
+	case "DerivedKey":
+		return 36
+	}
+	// defaults to empty buffer
+	return 0
 }
 
 // NewNamecacheCacheMsg creates a new default message.
 func NewNamecacheCacheMsg(block *blocks.GNSBlock) *NamecacheCacheMsg {
 	msg := &NamecacheCacheMsg{
-		MsgHeader:     MsgHeader{116, enums.MSG_NAMECACHE_BLOCK_CACHE},
-		ID:            0,
-		Expire:        util.AbsoluteTimeNever(),
-		DerivedKeySig: nil,
-		EncData:       make([]byte, 0),
+		GenericNamecacheMsg: newGenericNamecacheMsg(116, enums.MSG_NAMECACHE_BLOCK_CACHE),
+		Expire:              util.AbsoluteTimeNever(),
+		DerivedSig:          nil,
+		DerivedKey:          nil,
+		EncData:             make([]byte, 0),
 	}
 	if block != nil {
-		msg.DerivedKeySig = block.DerivedKeySig
+		msg.DerivedKey = util.Clone(block.DerivedKeySig.ZoneKey.Bytes())
+		msg.DerivedSig = util.Clone(block.DerivedKeySig.Signature)
 		msg.Expire = block.Body.Expire
 		size := len(block.Body.Data)
 		msg.EncData = make([]byte, size)
@@ -121,8 +151,8 @@ func NewNamecacheCacheMsg(block *blocks.GNSBlock) *NamecacheCacheMsg {
 
 // String returns a human-readable representation of the message.
 func (m *NamecacheCacheMsg) String() string {
-	return fmt.Sprintf("NamecacheCacheMsg{id=%d,expire=%s}",
-		m.ID, m.Expire)
+	return fmt.Sprintf("NamecacheCacheMsg{size=%d,id=%d,expire=%s}",
+		m.Size(), m.ID, m.Expire)
 }
 
 //----------------------------------------------------------------------
@@ -131,17 +161,16 @@ func (m *NamecacheCacheMsg) String() string {
 
 // NamecacheCacheResponseMsg is the response message for a put request
 type NamecacheCacheResponseMsg struct {
-	MsgHeader
-	ID     uint32 `order:"big"` // Request Id
-	Result int32  `order:"big"` // Result code
+	GenericNamecacheMsg
+
+	Result int32 `order:"big"` // Result code
 }
 
 // NewNamecacheCacheResponseMsg creates a new default message.
 func NewNamecacheCacheResponseMsg() *NamecacheCacheResponseMsg {
 	return &NamecacheCacheResponseMsg{
-		MsgHeader: MsgHeader{12, enums.MSG_NAMECACHE_BLOCK_CACHE_RESPONSE},
-		ID:        0,
-		Result:    0,
+		GenericNamecacheMsg: newGenericNamecacheMsg(12, enums.MSG_NAMECACHE_BLOCK_CACHE_RESPONSE),
+		Result:              0,
 	}
 }
 
