@@ -445,6 +445,7 @@ type LabelGroup struct {
 // ZoneGroup is a nested zone entry (with labels)
 type ZoneGroup struct {
 	Zone   *Zone
+	PubID  string
 	Labels []*LabelGroup
 }
 
@@ -461,6 +462,7 @@ func (db *ZoneDB) GetContent() (zg []*ZoneGroup, err error) {
 		// create group instance for zone
 		zGroup := &ZoneGroup{
 			Zone:   z,
+			PubID:  z.Key.Public().ID(),
 			Labels: make([]*LabelGroup, 0),
 		}
 		zg = append(zg, zGroup)
