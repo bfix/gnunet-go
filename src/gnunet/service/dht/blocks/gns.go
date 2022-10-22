@@ -47,7 +47,7 @@ type GNSQuery struct {
 	GenericQuery
 	Zone    *crypto.ZoneKey // Public zone key
 	Label   string          // Atomic label
-	derived *crypto.ZoneKey // Derived zone key from (pkey,label)
+	derived *crypto.ZoneKey // Derived zone key from (zone,label)
 }
 
 // Verify the integrity of the block data from a signature.
@@ -103,6 +103,7 @@ func NewGNSQuery(zkey *crypto.ZoneKey, label string) *GNSQuery {
 	pd, _, err := zkey.Derive(label, "gns")
 	if err != nil {
 		logger.Printf(logger.ERROR, "[NewGNSQuery] failed: %s", err.Error())
+		return nil
 	}
 	gq := crypto.Hash(pd.Bytes())
 	return &GNSQuery{
@@ -138,6 +139,11 @@ type GNSBlock struct {
 	verified  bool   // block signature verified (internal)
 	decrypted bool   // block decrypted (internal)
 	data      []byte // decrypted data
+}
+
+// Payload returns the decrypted block data (or nil)
+func (b *GNSBlock) Payload() []byte {
+	return util.Clone(b.data)
 }
 
 // Bytes return th binary representation of block
@@ -213,4 +219,79 @@ func (b *GNSBlock) Verify() (ok bool, err error) {
 		return
 	}
 	return b.DerivedKeySig.Verify(buf)
+}
+
+// RecordSet ist the GNUnet data structure for a list of resource records
+// in a GNSBlock. As part of GNUnet messages, the record set is padded so that
+// the binary size of (records||padding) is the smallest power of two.
+type RecordSet struct {
+	Count   uint32            `order:"big"`  // number of resource records
+	Records []*ResourceRecord `size:"Count"` // list of resource records
+	Padding []byte            `size:"*"`     // padding
+}
+
+// NewRecordSet returns an empty resource record set.
+func NewRecordSet() *RecordSet {
+	return &RecordSet{
+		Count:   0,
+		Records: make([]*ResourceRecord, 0),
+		Padding: make([]byte, 0),
+	}
+}
+
+// AddRecord to append a resource record to the set.
+func (rs *RecordSet) AddRecord(rec *ResourceRecord) {
+	rs.Count++
+	rs.Records = append(rs.Records, rec)
+}
+
+// SetPadding (re-)calculates and allocates the padding.
+func (rs *RecordSet) SetPadding() {
+	size := 0
+	for _, rr := range rs.Records {
+		size += int(rr.Size) + 20
+	}
+	n := 1
+	for n < size {
+		n <<= 1
+	}
+	rs.Padding = make([]byte, n-size)
+}
+
+// Expire returns the earliest expiration timestamp for the records.
+func (rs *RecordSet) Expire() util.AbsoluteTime {
+	var expires util.AbsoluteTime
+	for i, rr := range rs.Records {
+		if i == 0 {
+			expires = rr.Expire
+		} else if rr.Expire.Compare(expires) < 0 {
+			expires = rr.Expire
+		}
+	}
+	return expires
+}
+
+// Bytes returns the binary representation
+func (rs *RecordSet) Bytes() []byte {
+	buf, err := data.Marshal(rs)
+	if err != nil {
+		return nil
+	}
+	return buf
+}
+
+// ResourceRecord is the GNUnet-specific representation of resource
+// records (not to be confused with DNS resource records).
+type ResourceRecord struct {
+	Expire util.AbsoluteTime // Expiration time for the record
+	Size   uint32            `order:"big"` // Number of bytes in 'Data'
+	RType  enums.GNSType     `order:"big"` // Type of the GNS/DNS record
+	Flags  enums.GNSFlag     `order:"big"` // Flags for the record
+	Data   []byte            `size:"Size"` // Record data
+}
+
+// String returns a human-readable representation of the message.
+func (r *ResourceRecord) String() string {
+	return fmt.Sprintf("GNSResourceRecord{type=%s,expire=%s,flags=%d,size=%d}",
+		r.RType.String(), r.Expire, r.Flags, r.Size)
 }

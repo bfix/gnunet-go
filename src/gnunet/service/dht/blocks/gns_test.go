@@ -16,7 +16,7 @@
 //
 // SPDX-License-Identifier: AGPL3.0-or-later
 
-package message
+package blocks
 
 import (
 	"bytes"
@@ -28,6 +28,69 @@ import (
 
 	"github.com/bfix/gospel/data"
 )
+
+func TestGNSBlock(t *testing.T) {
+	blkData, err := hex.DecodeString("000100142ee8a0b33c8b853818ed62c43a5326e1e05d92860310c422d8891b9caf6f35f825448a29eba09c35ceb20a3e2fcdbc8d1585d8f3263be36bcf9daf01e5eef60d2ea7301bc324bf979f0807cd15b56208935ac09e2344f19bff666af9db3d9d03000000100000000f00060800b5992a00d07a2b9e0245540d6526a1058026cec270d52238809aed632f96604d0259d09a4e71fa30d6f9f4845db860a4dfea34063f6f769e")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// unmarshal block
+	blk := new(GNSBlock)
+	if err = data.Unmarshal(blk, blkData); err != nil {
+		t.Fatal(err)
+	}
+
+	// Initialize signature
+	if err = blk.DerivedKeySig.Init(); err != nil {
+		t.Fatal(err)
+	}
+
+	// assemble query from public zone key and label
+	zkData, err := util.DecodeStringToBinary("000G054G4G3HWZP2WFNVS1XJ4VXWY85G49AVYBZ7TV4EWP5J5V59H5QN40", 36)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zk, err := crypto.NewZoneKey(zkData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	query := NewGNSQuery(zk, "@")
+	t.Logf("Query = %v\n", query)
+
+	// check query key
+	key, err := hex.DecodeString("43b3fe529eea10134350e8c709c5d6eeb5e1eb77b692cf97547f1581b97d1f56abd92ebc0c86bbb434a182f564a7603aac6aa2c379353f2c3cfaaacdc59ede19")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(key, query.Key().Data) {
+		t.Fatal("query key mismatch")
+	}
+
+	dkey2, _, err := zk.Derive("@", "gns")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(blk.DerivedKeySig.KeyData, dkey2.Bytes()) {
+		t.Logf("[1] %s\n", hex.EncodeToString(blk.DerivedKeySig.ZoneKey.Bytes()))
+		t.Logf("[2] %s\n", hex.EncodeToString(dkey2.Bytes()))
+		t.Fatal("key mismatch")
+	}
+
+	// verify signature
+	if err = query.Verify(blk); err != nil {
+		t.Fatal(err)
+	}
+	// decrypt payload
+	if err = query.Decrypt(blk); err != nil {
+		t.Fatal(err)
+	}
+	rrs := new(RecordSet)
+	if err = data.Unmarshal(rrs, blk.Payload()); err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("RecordSet=%v\n", rrs)
+
+}
 
 // TestRecordsetPKEY implements the test case as defined in the GNS draft
 // (see section 13. Test vectors, case "PKEY")
