@@ -77,7 +77,7 @@ func (m *Module) Get(ctx context.Context, query *blocks.GNSQuery) (block *blocks
 		return
 	}
 	if len(e) != 1 {
-		err = errors.New("only one DHT entry exppected")
+		err = errors.New("only one namecache entry expected")
 	} else {
 		err = blocks.Unwrap(e[0].Blk, block)
 	}
