@@ -25,6 +25,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"gnunet/config"
 	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/service/gns/rr"
@@ -122,6 +123,13 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 		"rrdata": func(t enums.GNSType, buf []byte) string {
 			return guiRRdata(t, buf)
 		},
+		"tabSetList": func(num int) (list map[int]int) {
+			list = make(map[int]int)
+			for i := 0; i < num; i++ {
+				list[i+1] = 2*i + 1
+			}
+			return
+		},
 	})
 	if _, err := tpl.ParseFS(fsys, "*.htpl"); err != nil {
 		logger.Println(logger.ERROR, "[zonemaster] GUI templates failed: "+err.Error())
@@ -136,7 +144,7 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 	router.HandleFunc("/action/{cmd}/{mode}/{id}", zm.action)
 	router.HandleFunc("/", zm.dashboard)
 	srv := &http.Server{
-		Addr:              zm.cfg.ZoneMaster.GUI,
+		Addr:              config.Cfg.ZoneMaster.GUI,
 		ReadTimeout:       10 * time.Second,
 		ReadHeaderTimeout: 5 * time.Second,
 		Handler:           router,
@@ -630,8 +638,15 @@ func (zm *ZoneMaster) remove(w http.ResponseWriter, r *http.Request) {
 // Helper methods
 //======================================================================
 
+// MainData for the template "main"
+type MainData struct {
+	Content string // Page content
+	Params  any    // reference to parameters
+	NumRR   int    // number of RR types supported
+}
+
 // render a webpage with given data and template reference
-func renderPage(w io.Writer, data interface{}, page string) {
+func renderPage(w io.Writer, data any, page string) {
 	// create content section
 	t := tpl.Lookup(page)
 	if t == nil {
@@ -649,7 +664,11 @@ func renderPage(w io.Writer, data interface{}, page string) {
 		_, _ = io.WriteString(w, "No main template found")
 		return
 	}
-	if err := t.Execute(w, content.String()); err != nil {
+	md := new(MainData)
+	md.Params = data
+	md.Content = content.String()
+	md.NumRR = len(rrtypes)
+	if err := t.Execute(w, md); err != nil {
 		_, _ = io.WriteString(w, err.Error())
 	}
 }

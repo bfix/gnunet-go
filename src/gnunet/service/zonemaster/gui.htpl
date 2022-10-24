@@ -3,12 +3,12 @@
 <html lang="en">
     <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-        {{template "css"}}
+        {{template "css" .NumRR}}
     </head>
     <body>
         <h1>GNUnet Zone Master</h1>
         <hr/>
-        {{.}}
+        {{.Content}}
         <script>
             function notify(msg) {
                 if ('Notification' in window) {
