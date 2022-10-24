@@ -22,8 +22,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"gnunet/crypto"
 	"gnunet/enums"
+	"gnunet/service/dht/blocks"
 	"gnunet/service/gns/rr"
+	"gnunet/service/store"
 	"gnunet/util"
 	"net"
 	"time"
@@ -330,7 +333,7 @@ func Map2RRData(t enums.GNSType, set map[string]string) (buf []byte, err error) 
 }
 
 //======================================================================
-// Get list of allowed new RRs given a set of existing RRs.
+// ResourceRecord helpers
 //======================================================================
 
 // Create a list of compatible record types from list of
@@ -344,5 +347,25 @@ func compatibleRR(in []*enums.GNSSpec, label string) (out []*enums.GNSSpec) {
 			})
 		}
 	}
+	return
+}
+
+// get a list of resource records for a given label in a zone.
+func (zm *ZoneMaster) getRecords(zk *crypto.ZoneKey, label int64) (rs *blocks.RecordSet, expire util.AbsoluteTime, err error) {
+	// collect records for zone label
+	var recs []*store.Record
+	if recs, err = zm.zdb.GetRecords("lid=%d", label); err != nil {
+		return
+	}
+	// assemble record set and find earliest expiration
+	expire = util.AbsoluteTimeNever()
+	rrSet := blocks.NewRecordSet()
+	for _, r := range recs {
+		if r.Expire.Compare(expire) < 0 {
+			expire = r.Expire
+		}
+		rrSet.AddRecord(&r.ResourceRecord)
+	}
+	// do not add padding yet as record set may be filtered before use.
 	return
 }
