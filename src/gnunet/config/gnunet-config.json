@@ -91,7 +91,7 @@
         },
         "gui": "127.0.0.1:8100",
         "service": {
-            "socket": "${RT_USER}/gnunet-service-namestore-go.sock",
+            "socket": "${RT_USER}/gnunet-service-zonemaster-go.sock",
             "params": {
                 "perm": "0770"
             }
