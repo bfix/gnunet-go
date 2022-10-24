@@ -251,6 +251,28 @@ func NewZonePrivate(ztype enums.GNSType, d []byte) (zp *ZonePrivate, err error) 
 	return
 }
 
+// Null returns a "NULL" ZonePrivate for given key
+func NullZonePrivate(ztype enums.GNSType) (*ZonePrivate, uint16) {
+	// get factory for given zone type
+	impl, ok := zoneImpl[ztype]
+	if !ok {
+		return nil, 0
+	}
+	kd := make([]byte, impl.PrivateSize)
+	zp := &ZonePrivate{
+		ZoneKey: ZoneKey{
+			Type:    0,
+			KeyData: kd,
+		},
+	}
+	return zp, uint16(len(zp.KeyData) + 4)
+}
+
+// Bytes returns the binary representation (can be used with 'init()')
+func (zp *ZonePrivate) Bytes() []byte {
+	return zp.impl.Bytes()
+}
+
 // KeySize returns the number of bytes of a key representation.
 // This method is used during serialization (Unmarshal).
 func (zp *ZonePrivate) KeySize() uint {
@@ -335,6 +357,11 @@ func NewZoneKey(d []byte) (zk *ZoneKey, err error) {
 	return
 }
 
+// Bytes returns the binary representation (can be used with 'init()')
+func (zk *ZoneKey) Bytes() []byte {
+	return zk.impl.Bytes()
+}
+
 // KeySize returns the number of bytes of a key representation.
 // This method is used during serialization (Unmarshal).
 func (zk *ZoneKey) KeySize() uint {
@@ -386,12 +413,6 @@ func (zk *ZoneKey) Verify(data []byte, zs *ZoneSignature) (ok bool, err error) {
 // ID returns the human-readable zone identifier.
 func (zk *ZoneKey) ID() string {
 	return zk.impl.ID()
-}
-
-// Bytes returns all bytes of a zone key
-func (zk *ZoneKey) Bytes() []byte {
-	data, _ := data.Marshal(zk)
-	return data
 }
 
 // Equal checks if two zone keys are equal
@@ -458,6 +479,11 @@ func (zs *ZoneSignature) SigSize() uint {
 		return impl.SignatureSize
 	}
 	return 0
+}
+
+// Bytes returns the binary representation (can be used with 'init()')
+func (zs *ZoneSignature) Bytes() []byte {
+	return zs.impl.Bytes()
 }
 
 // Key returns the associated zone key object
