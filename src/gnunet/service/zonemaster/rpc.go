@@ -20,5 +20,5 @@ package zonemaster
 
 import "gnunet/service"
 
-func (s *Service) InitRPC(rpc *service.JRPCServer) {
+func (zm *ZoneMaster) InitRPC(rpc *service.JRPCServer) {
 }

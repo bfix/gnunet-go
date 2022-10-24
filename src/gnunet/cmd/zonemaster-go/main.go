@@ -73,13 +73,11 @@ func main() {
 		config.Cfg.ZoneMaster.GUI = gui
 	}
 
-	// start a new namestore service under zonemaster umbrella
+	// start services under zonemaster umbrella
 	ctx, cancel := context.WithCancel(context.Background())
-	srv, ok := zonemaster.NewService(ctx, nil).(*zonemaster.Service)
-	if !ok {
-		logger.Println(logger.ERROR, "[zonemaster] Failed to create service")
-		return
-	}
+	srv := zonemaster.NewService(ctx, nil)
+	go srv.Run(ctx)
+
 	// start UDS listener if service is specified
 	if config.Cfg.ZoneMaster.Service != nil {
 		sockHdlr := service.NewSocketHandler("zonemaster", srv)
@@ -88,10 +86,6 @@ func main() {
 			return
 		}
 	}
-
-	// start a new ZONEMASTER (background service with HTTPS backend)
-	zm := zonemaster.NewZoneMaster(config.Cfg, srv)
-	go zm.Run(ctx)
 
 	// handle command-line arguments for RPC
 	if len(rpcEndp) > 0 {

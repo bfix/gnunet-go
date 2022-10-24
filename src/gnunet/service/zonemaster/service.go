@@ -25,52 +25,29 @@ import (
 
 	"gnunet/config"
 	"gnunet/core"
-	"gnunet/crypto"
 	"gnunet/message"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
+	"gnunet/service/store"
 	"gnunet/transport"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/logger"
 )
 
-type ZoneIterator struct {
-	zk *crypto.ZonePrivate
-}
-
 //----------------------------------------------------------------------
-// "GNUnet Zonemaster" service implementation:
-// The zonemaster service handles Namestore messages
+// "GNUnet Zonemaster" socket service implementation:
+// Zonemaster handles Namestore and Identity messages.
 //----------------------------------------------------------------------
-
-// Service implements a GNS service
-type Service struct {
-	Module
-
-	ZoneIters *util.Map[uint32, *ZoneIterator]
-}
-
-// NewService creates a new GNS service instance
-func NewService(ctx context.Context, c *core.Core) service.Service {
-	// instantiate service
-	mod := NewModule(ctx, c)
-	srv := &Service{
-		Module:    *mod,
-		ZoneIters: util.NewMap[uint32, *ZoneIterator](),
-	}
-	// set external function references (external services)
-	srv.StoreLocal = srv.StoreNamecache
-	srv.StoreRemote = srv.StoreDHT
-
-	return srv
-}
 
 // ServeClient processes a client channel.
-func (s *Service) ServeClient(ctx context.Context, id int, mc *service.Connection) {
+func (zm *ZoneMaster) ServeClient(ctx context.Context, id int, mc *service.Connection) {
 	reqID := 0
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithCancel(ctx)
+
+	// inform sub-service about new session
+	zm.identity.NewSession(id, mc)
 
 	for {
 		// receive next message from client
@@ -89,33 +66,89 @@ func (s *Service) ServeClient(ctx context.Context, id int, mc *service.Connectio
 		}
 		logger.Printf(logger.INFO, "[zonemaster:%d:%d] Received request: %v\n", id, reqID, msg)
 
+		// context with values
+		values := make(util.ParameterSet)
+		values["id"] = id
+		values["label"] = fmt.Sprintf(":%d:%d", id, reqID)
+		valueCtx := context.WithValue(ctx, core.CtxKey("params"), values)
+
 		// handle message
-		valueCtx := context.WithValue(ctx, core.CtxKey("label"), fmt.Sprintf(":%d:%d", id, reqID))
-		s.HandleMessage(valueCtx, nil, msg, mc)
+		zm.HandleMessage(valueCtx, nil, msg, mc)
 	}
+	// inform sub.services about closed session
+	zm.identity.CloseSession(id)
+
 	// close client connection
 	mc.Close()
 
 	// cancel all tasks running for this session/connection
-	logger.Printf(logger.INFO, "[zonemaster:%d] Start closing session...\n", id)
+	logger.Printf(logger.INFO, "[zonemaster:%d] Closing session...\n", id)
 	cancel()
 }
 
 // Handle a single incoming message
-func (s *Service) HandleMessage(ctx context.Context, sender *util.PeerID, msg message.Message, back transport.Responder) bool {
+func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, msg message.Message, back transport.Responder) bool {
 	// assemble log label
-	label := ""
-	if v := ctx.Value("label"); v != nil {
-		label, _ = v.(string)
+	var id int
+	var label string
+	if v := ctx.Value("params"); v != nil {
+		if ps, ok := v.(util.ParameterSet); ok {
+			label, _ = util.GetParam[string](ps, "label")
+			id, _ = util.GetParam[int](ps, "id")
+		}
 	}
 	// perform lookup
 	switch m := msg.(type) {
 
+	//------------------------------------------------------------------
+	// Identity service
+	//------------------------------------------------------------------
+	case *message.IdentityStartMsg:
+		// flag client as update receiver
+		zm.identity.FollowUpdates(id)
+		// initial update is to send all existing identites
+		var err error
+		var list []*store.Identity
+		if list, err = zm.zdb.GetIdentities(""); err != nil {
+			logger.Printf(logger.ERROR, "[zonemaster%s] %s", label, err.Error())
+			return false
+
+		}
+		for _, ident := range list {
+			resp := message.NewIdentityUpdateMsg(ident.Name, ident.Key)
+			logger.Printf(logger.DBG, "[zonemaster%s] Sending %v", label, resp)
+			if err = back.Send(ctx, resp); err != nil {
+				logger.Printf(logger.ERROR, "[zonemaster%s] Can't send response (%v): %v\n", label, resp, err)
+				return false
+			}
+		}
+		// terminate with EOL
+		resp := message.NewIdentityUpdateMsg("", nil)
+		if err = back.Send(ctx, resp); err != nil {
+			logger.Printf(logger.ERROR, "[zonemaster%s] Can't send response (%v): %v\n", label, resp, err)
+			return false
+		}
+
+		/*
+			resp := message.NewIdentityResultCodeMsg(enums.RC_OK, "")
+			if err := back.Send(ctx, resp); err != nil {
+				logger.Printf(logger.ERROR, "[zonemaster%s] Can't send response (%v)\n", label, resp)
+				return false
+			}
+		*/
+
+	//------------------------------------------------------------------
+	// Namestore service
+	//------------------------------------------------------------------
+
 	// start new zone iteration
 	case *message.NamestoreZoneIterStartMsg:
-		zi := new(ZoneIterator)
-		zi.zk = m.ZoneKey
-		s.ZoneIters.Put(m.ID, zi, 0)
+		iter := zm.namestore.NewIterator(m.ID, m.ZoneKey)
+		resp := iter.Next()
+		if err := back.Send(ctx, resp); err != nil {
+			logger.Printf(logger.ERROR, "[zonemaster%s] Can't send response (%v)\n", label, resp)
+			return false
+		}
 
 	default:
 		//----------------------------------------------------------
@@ -128,7 +161,7 @@ func (s *Service) HandleMessage(ctx context.Context, sender *util.PeerID, msg me
 }
 
 // storeDHT stores a GNS block in the DHT.
-func (s *Service) StoreDHT(ctx context.Context, query blocks.Query, block blocks.Block) (err error) {
+func (zm *ZoneMaster) StoreDHT(ctx context.Context, query blocks.Query, block blocks.Block) (err error) {
 	// assemble DHT request
 	req := message.NewDHTP2PPutMsg(block)
 	req.Flags = query.Flags()
@@ -140,7 +173,7 @@ func (s *Service) StoreDHT(ctx context.Context, query blocks.Query, block blocks
 }
 
 // storeNamecache stores a GNS block in the local namecache.
-func (s *Service) StoreNamecache(ctx context.Context, query *blocks.GNSQuery, block *blocks.GNSBlock) (err error) {
+func (zm *ZoneMaster) StoreNamecache(ctx context.Context, query *blocks.GNSQuery, block *blocks.GNSBlock) (err error) {
 	// assemble Namecache request
 	req := message.NewNamecacheCacheMsg(block)
 

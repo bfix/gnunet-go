@@ -21,6 +21,7 @@ package zonemaster
 import (
 	"context"
 	"gnunet/config"
+	"gnunet/core"
 	"gnunet/enums"
 	"gnunet/service/dht/blocks"
 	"gnunet/service/store"
@@ -31,22 +32,36 @@ import (
 )
 
 //======================================================================
-// "GNS ZoneMaster" implementation:
-// Manage and publish local zone records
+// "GNS ZoneMaster" implementation (extended):
+// Manage local identities for subsystems. Manage and publish
+// local GNS zone records.
 //======================================================================
 
-// ZoneMaster instance
+// ZoneMaster implements
 type ZoneMaster struct {
-	cfg *config.Config // Zonemaster configuration
-	zdb *store.ZoneDB  // ZoneDB connection
-	srv *Service       // NameStore service
+	Module
+
+	zdb       *store.ZoneDB     // ZoneDB connection
+	namestore *NamestoreService // namestore subservice
+	identity  *IdentityService  // identity subservice
 }
 
-// NewZoneMaster initializes a new zone master instance.
-func NewZoneMaster(cfg *config.Config, srv *Service) *ZoneMaster {
-	zm := new(ZoneMaster)
-	zm.cfg = cfg
-	return zm
+// NewService initializes a new zone master service.
+func NewService(ctx context.Context, c *core.Core) *ZoneMaster {
+	mod := NewModule(ctx, c)
+	srv := &ZoneMaster{
+		Module: *mod,
+	}
+
+	// set external function references (external services)
+	srv.StoreLocal = srv.StoreNamecache
+	srv.StoreRemote = srv.StoreDHT
+
+	// instantiate sub-services
+	srv.namestore = NewNamestoreService()
+	srv.identity = NewIdentityService()
+
+	return srv
 }
 
 // Run zone master: connect to zone database and start the RPC/HTTP
@@ -55,12 +70,8 @@ func NewZoneMaster(cfg *config.Config, srv *Service) *ZoneMaster {
 func (zm *ZoneMaster) Run(ctx context.Context) {
 	// connect to database
 	logger.Println(logger.INFO, "[zonemaster] Connecting to zone database...")
-	dbFile, ok := util.GetParam[string](zm.cfg.ZoneMaster.Storage, "file")
-	if !ok {
-		logger.Printf(logger.ERROR, "[zonemaster] missing database file specification")
-		return
-	}
 	var err error
+	dbFile, _ := util.GetParam[string](config.Cfg.ZoneMaster.Storage, "file")
 	if zm.zdb, err = store.OpenZoneDB(dbFile); err != nil {
 		logger.Printf(logger.ERROR, "[zonemaster] open database: %v", err)
 		return
@@ -69,15 +80,17 @@ func (zm *ZoneMaster) Run(ctx context.Context) {
 
 	// start HTTP GUI
 	zm.startGUI(ctx)
+
+	// publish on start-up
 	/*
-		// publish on start-up
 		if err = zm.Publish(ctx); err != nil {
 			logger.Printf(logger.ERROR, "[zonemaster] initial publish failed: %s", err.Error())
 			return
 		}
 	*/
+
 	// periodically publish GNS blocks to the DHT
-	tick := time.NewTicker(time.Duration(zm.cfg.ZoneMaster.Period) * time.Second)
+	tick := time.NewTicker(time.Duration(config.Cfg.ZoneMaster.Period) * time.Second)
 loop:
 	for {
 		select {
@@ -122,37 +135,53 @@ func (zm *ZoneMaster) Publish(ctx context.Context) error {
 
 // PublishZoneLabel with public records
 func (zm *ZoneMaster) PublishZoneLabel(ctx context.Context, zone *store.Zone, label *store.Label) error {
+
+	// @@@ DEBUG:
+	if ctx != nil {
+		return nil
+	}
+
 	zk := zone.Key.Public()
 	logger.Printf(logger.INFO, "[zonemaster] Publishing label '%s' of zone %s", label.Name, zk.ID())
 
-	// collect public records for zone label
-	recs, err := zm.zdb.GetRecords("lid=%d and flags&%d = 0", label.ID, enums.GNS_FLAG_PRIVATE)
+	// collect all records for label
+	rrSet, expire, err := zm.getRecords(zk, label.ID)
 	if err != nil {
 		return err
 	}
-	// assemble record set and find earliest expiration
-	expire := util.AbsoluteTimeNever()
-	rrSet := blocks.NewRecordSet()
-	for _, r := range recs {
-		if r.Expire.Compare(expire) < 0 {
-			expire = r.Expire
-		}
-		rrSet.AddRecord(&r.ResourceRecord)
-	}
-	rrSet.SetPadding()
 	if rrSet.Count == 0 {
 		logger.Println(logger.INFO, "[zonemaster] No resource records -- skipped")
 		return nil
 	}
 
-	// assemble GNS query
+	// assemble GNS query (common for DHT and Namecache)
 	query := blocks.NewGNSQuery(zk, label.Name)
 
-	// assemble, encrypt and sign GNS block
-	blk, _ := blocks.NewGNSBlock().(*blocks.GNSBlock)
+	//------------------------------------------------------------------
+	// Publish to DHT
+	//------------------------------------------------------------------
 
-	blk.Body.Expire = expire
-	blk.Body.Data, err = zk.Encrypt(rrSet.Bytes(), label.Name, expire)
+	// filter out private resource records.
+	recsDHT := util.Clone(rrSet.Records)
+	num := uint32(len(recsDHT))
+	for i, rec := range recsDHT {
+		if rec.Flags&enums.GNS_FLAG_PRIVATE != 0 {
+			copy(recsDHT[i:], recsDHT[i+1:])
+			num--
+			recsDHT = recsDHT[:num]
+		}
+	}
+	rrsDHT := &blocks.RecordSet{
+		Count:   num,
+		Records: recsDHT,
+		Padding: nil,
+	}
+	rrsDHT.SetPadding()
+
+	// build block for DHT
+	blkDHT, _ := blocks.NewGNSBlock().(*blocks.GNSBlock)
+	blkDHT.Body.Expire = expire
+	blkDHT.Body.Data, err = zk.Encrypt(rrSet.Bytes(), label.Name, expire)
 	if err != nil {
 		return err
 	}
@@ -160,19 +189,25 @@ func (zm *ZoneMaster) PublishZoneLabel(ctx context.Context, zone *store.Zone, la
 	if err != nil {
 		return err
 	}
-	if err = blk.Sign(dzk); err != nil {
+	if err = blkDHT.Sign(dzk); err != nil {
+		return err
+	}
+	// publish GNS block to DHT
+	if err = zm.StoreDHT(ctx, query, blkDHT); err != nil {
 		return err
 	}
 
-	// DEBUG:
-	// logger.Printf(logger.DBG, "[zonemaster]  Query key = %s", hex.EncodeToString(query.Key().Data))
-	// logger.Printf(logger.DBG, "[zonemaster] Block data = %s", hex.EncodeToString(blk.Bytes()))
+	//------------------------------------------------------------------
+	// Publish to Namecache
+	//------------------------------------------------------------------
 
-	// publish GNS block to DHT and Namecache
-	if err = zm.srv.StoreDHT(ctx, query, blk); err != nil {
-		return err
-	}
-	if err = zm.srv.StoreNamecache(ctx, query, blk); err != nil {
+	// build block for Namecache
+	blkNC, _ := blocks.NewGNSBlock().(*blocks.GNSBlock)
+	blkNC.Body.Expire = expire
+	blkNC.Body.Data = rrSet.Bytes()
+
+	// publish GNS block to namecache
+	if err = zm.StoreNamecache(ctx, query, blkNC); err != nil {
 		return err
 	}
 	return nil
