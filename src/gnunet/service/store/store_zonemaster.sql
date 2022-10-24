@@ -16,15 +16,21 @@
 --
 -- SPDX-License-Identifier: AGPL3.0-or-later
 
-create table zones (
+create table identities (
     id       integer primary key autoincrement,
-    name     text unique,
+    svc      text,
+    name     text,
     created  integer,
     modified integer,
-	ztype    integer,
-    zdata    blob
+    ztype    integer,
+    zdata    blob,
+    unique (svc,name)
 );
 
+create view zones as select
+    id, name, created, modified, ztype, zdata
+from identities
+where svc = 'gns';
 
 create table labels (
     id       integer primary key autoincrement,

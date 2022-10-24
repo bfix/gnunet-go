@@ -32,11 +32,15 @@ import (
 )
 
 //============================================================
-// Local zone records stored in SQLite3 database
+// Local identities and zone records (SQLite3 database)
+// Identities are named ZonePrivate keys that are associated
+// with a GNUnet subsystem (like GNS, CADET and others).
+// Identities for the subsystem "gns" are called zones and
+// are collections of labeled resource record sets. All other
+// identities are usuall called "egos".
 //============================================================
 
 // Zone is the definition of a local GNS zone
-// and is stored in a SQL database for faster access.
 type Zone struct {
 	ID       int64               // database identifier
 	Name     string              // zone name
@@ -55,6 +59,15 @@ func NewZone(name string, sk *crypto.ZonePrivate) *Zone {
 		Modified: util.AbsoluteTimeNow(),
 		Key:      sk,
 	}
+}
+
+//----------------------------------------------------------------------
+
+// Identity is a Zone associated with a service
+type Identity struct {
+	Zone
+
+	Svc string // associated service
 }
 
 //----------------------------------------------------------------------
@@ -136,7 +149,7 @@ func OpenZoneDB(fname string) (db *ZoneDB, err error) {
 		return
 	}
 	// check for initialized database
-	res := db.conn.QueryRow("select name from sqlite_master where type='table' and name='zones'")
+	res := db.conn.QueryRow("select name from sqlite_master where type='table' and name='identities'")
 	var s string
 	if res.Scan(&s) != nil {
 		// initialize database
@@ -153,6 +166,42 @@ func (db *ZoneDB) Close() error {
 }
 
 //----------------------------------------------------------------------
+// Identity handling
+//----------------------------------------------------------------------
+
+func (db *ZoneDB) GetIdentities(filter string, args ...any) (list []*Identity, err error) {
+	// assemble query
+	stmt := "select id,name,svc,created,modified,ztype,zdata from identities"
+	if len(filter) > 0 {
+		stmt += " where " + fmt.Sprintf(filter, args...)
+	}
+	// select zones
+	var rows *sql.Rows
+	if rows, err = db.conn.Query(stmt); err != nil {
+		return
+	}
+	// process zones
+	defer rows.Close()
+	for rows.Next() {
+		// assemble identity from database row
+		i := new(Identity)
+		var ztype enums.GNSType
+		var zdata []byte
+		if err = rows.Scan(&i.ID, &i.Name, &i.Svc, &i.Created.Val, &i.Modified.Val, &ztype, &zdata); err != nil {
+			// terminate on error; return list so far
+			return
+		}
+		// reconstruct private key
+		if i.Key, err = crypto.NewZonePrivate(ztype, zdata); err != nil {
+			return
+		}
+		// append to result list
+		list = append(list, i)
+	}
+	return
+}
+
+//----------------------------------------------------------------------
 // Zone handling
 //----------------------------------------------------------------------
 
@@ -165,7 +214,7 @@ func (db *ZoneDB) Close() error {
 func (db *ZoneDB) SetZone(z *Zone) error {
 	// check for zone insert
 	if z.ID == 0 {
-		stmt := "insert into zones(name,created,modified,ztype,zdata) values(?,?,?,?,?)"
+		stmt := "insert into identities(svc,name,created,modified,ztype,zdata) values('gns',?,?,?,?,?)"
 		result, err := db.conn.Exec(stmt, z.Name, z.Created.Val, z.Modified.Val, z.Key.Type, z.Key.KeyData)
 		if err != nil {
 			return err
@@ -175,7 +224,7 @@ func (db *ZoneDB) SetZone(z *Zone) error {
 	}
 	// check for zone update (name only)
 	if len(z.Name) > 0 {
-		stmt := "update zones set name=?,modified=? where id=?"
+		stmt := "update identities set name=?,modified=? where id=? and svc='gns'"
 		result, err := db.conn.Exec(stmt, z.Name, z.Modified.Val, z.ID)
 		if err != nil {
 			return err
@@ -325,6 +374,29 @@ func (db *ZoneDB) GetLabels(filter string, args ...any) (list []*Label, err erro
 		}
 		// append to result list
 		list = append(list, lbl)
+	}
+	return
+}
+
+func (db *ZoneDB) GetLabelIDs(zk *crypto.ZonePrivate) (list []int64, err error) {
+	// get zone database id
+	row := db.conn.QueryRow("select id from zones where ztype=? and zdata=?", zk.Type, zk.Bytes())
+	var zid int64
+	if err = row.Scan(&zid); err != nil {
+		return
+	}
+	// select all labels for zone
+	var rows *sql.Rows
+	if rows, err = db.conn.Query("select id from labels where zid=?", zid); err != nil {
+		return
+	}
+	defer rows.Close()
+	var id int64
+	for rows.Next() {
+		if err = rows.Scan(&id); err != nil {
+			return
+		}
+		list = append(list, id)
 	}
 	return
 }
