@@ -20,7 +20,9 @@ package crypto
 
 import (
 	"bytes"
+	"encoding/hex"
 	"gnunet/enums"
+	"gnunet/util"
 	"testing"
 )
 
@@ -45,4 +47,20 @@ func TestDerivePKEY(t *testing.T) {
 	if !bytes.Equal(dzp.Public().Bytes(), dzk.Bytes()) {
 		t.Fatal("derive mismatch")
 	}
+}
+
+func TestDebugPublicPKEY(t *testing.T) {
+	pk1s := "000G007PAMFY251EFN5MCCGCGTR8JE95XN8XCP4JGJH0FNABR9JWZRYCFW"
+	pk2s := "000G002Z6KZSJQGGTWKW2GY2KMPAANF3DZVPN3J88N8TAHMDVRJMAANXV8"
+
+	pk1d, err := util.DecodeStringToBinary(pk1s, 36)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pk2d, err := util.DecodeStringToBinary(pk2s, 36)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("pk1: %s\n", hex.EncodeToString(pk1d))
+	t.Logf("pk2: %s\n", hex.EncodeToString(pk2d))
 }
