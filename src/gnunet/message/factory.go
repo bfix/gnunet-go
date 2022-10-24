@@ -31,6 +31,7 @@ func NewEmptyMessage(msgType enums.MsgType) (Message, error) {
 	//------------------------------------------------------------------
 	// Transport
 	//------------------------------------------------------------------
+
 	case enums.MSG_TRANSPORT_TCP_WELCOME:
 		return NewTransportTCPWelcomeMsg(nil), nil
 	case enums.MSG_HELLO:
@@ -53,12 +54,14 @@ func NewEmptyMessage(msgType enums.MsgType) (Message, error) {
 	//------------------------------------------------------------------
 	// Core
 	//------------------------------------------------------------------
+
 	case enums.MSG_CORE_EPHEMERAL_KEY:
 		return NewEphemeralKeyMsg(), nil
 
 	//------------------------------------------------------------------
 	// DHT
 	//------------------------------------------------------------------
+
 	case enums.MSG_DHT_CLIENT_PUT:
 		return NewDHTClientPutMsg(nil, 0, nil), nil
 	case enums.MSG_DHT_CLIENT_GET:
@@ -73,6 +76,7 @@ func NewEmptyMessage(msgType enums.MsgType) (Message, error) {
 	//------------------------------------------------------------------
 	// DHT-P2P
 	//------------------------------------------------------------------
+
 	case enums.MSG_DHT_P2P_HELLO:
 		return NewDHTP2PHelloMsg(), nil
 	case enums.MSG_DHT_P2P_GET:
@@ -85,6 +89,7 @@ func NewEmptyMessage(msgType enums.MsgType) (Message, error) {
 	//------------------------------------------------------------------
 	// GNS
 	//------------------------------------------------------------------
+
 	case enums.MSG_GNS_LOOKUP:
 		return NewGNSLookupMsg(), nil
 	case enums.MSG_GNS_LOOKUP_RESULT:
@@ -93,6 +98,7 @@ func NewEmptyMessage(msgType enums.MsgType) (Message, error) {
 	//------------------------------------------------------------------
 	// Namecache
 	//------------------------------------------------------------------
+
 	case enums.MSG_NAMECACHE_LOOKUP_BLOCK:
 		return NewNamecacheLookupMsg(nil), nil
 	case enums.MSG_NAMECACHE_LOOKUP_BLOCK_RESPONSE:
@@ -105,6 +111,7 @@ func NewEmptyMessage(msgType enums.MsgType) (Message, error) {
 	//------------------------------------------------------------------
 	// Revocation
 	//------------------------------------------------------------------
+
 	case enums.MSG_REVOCATION_QUERY:
 		return NewRevocationQueryMsg(nil), nil
 	case enums.MSG_REVOCATION_QUERY_RESPONSE:
@@ -115,8 +122,27 @@ func NewEmptyMessage(msgType enums.MsgType) (Message, error) {
 		return NewRevocationRevokeResponseMsg(false), nil
 
 	//------------------------------------------------------------------
+	// Identity service
+	//------------------------------------------------------------------
+
+	case enums.MSG_IDENTITY_START:
+		return NewIdentityStartMsg(), nil
+	case enums.MSG_IDENTITY_RESULT_CODE:
+		return NewIdentityResultCodeMsg(enums.RC_OK, ""), nil
+	case enums.MSG_IDENTITY_UPDATE:
+		return NewIdentityUpdateMsg("", nil), nil
+	case enums.MSG_IDENTITY_GET_DEFAULT:
+	case enums.MSG_IDENTITY_SET_DEFAULT:
+	case enums.MSG_IDENTITY_CREATE:
+	case enums.MSG_IDENTITY_RENAME:
+	case enums.MSG_IDENTITY_DELETE:
+	case enums.MSG_IDENTITY_LOOKUP:
+	case enums.MSG_IDENTITY_LOOKUP_BY_NAME:
+
+	//------------------------------------------------------------------
 	// Namestore service
 	//------------------------------------------------------------------
+
 	case enums.MSG_NAMESTORE_ZONE_ITERATION_START:
 		return NewNamestoreZoneIterStartMsg(nil), nil
 	case enums.MSG_NAMESTORE_ZONE_ITERATION_NEXT:
@@ -130,6 +156,7 @@ func NewEmptyMessage(msgType enums.MsgType) (Message, error) {
 	case enums.MSG_NAMESTORE_MONITOR_START:
 	case enums.MSG_NAMESTORE_MONITOR_SYNC:
 	case enums.MSG_NAMESTORE_RECORD_RESULT:
+		return NewNamestoreRecordResultMsg(nil, ""), nil
 	case enums.MSG_NAMESTORE_MONITOR_NEXT:
 	}
 	return nil, fmt.Errorf("unknown message type %d", msgType)

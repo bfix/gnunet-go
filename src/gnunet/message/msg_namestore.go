@@ -96,6 +96,39 @@ type NamestoreZoneIterStopMsg struct {
 }
 
 //----------------------------------------------------------------------
+// MSG_NAMESTORE_RECORD_RESULT
+//----------------------------------------------------------------------
+
+type NamestoreRecordResultMsg struct {
+	GenericNamestoreMsg
+
+	Expire   util.AbsoluteTime   ``               // expiration date
+	NameLen  uint16              `order:"big"`    // length of name
+	RdLen    uint16              `order:"big"`    // size of record data
+	RdCount  uint16              `order:"big"`    // number of records
+	Reserved uint16              `order:"big"`    // alignment
+	ZoneKey  *crypto.ZonePrivate ``               // private zone key
+	Name     []byte              `size:"NameLen"` // name string
+	Records  []byte              `size:"RdLen"`   // serialized record data
+}
+
+func NewNamestoreRecordResultMsg(zk *crypto.ZonePrivate, label string) *NamestoreRecordResultMsg {
+	return &NamestoreRecordResultMsg{
+		Expire:  util.AbsoluteTimeNever(),
+		ZoneKey: zk,
+		NameLen: uint16(len(label)),
+		Name:    []byte(label),
+		RdLen:   0,
+		RdCount: 0,
+	}
+}
+
+// String returns a human-readable representation of the message.
+func (m *NamestoreRecordResultMsg) String() string {
+	return fmt.Sprintf("NamestoreRecordResultMsg{id=%d,zone=%s,label='%s'}", m.ID, m.ZoneKey.ID(), string(m.Name))
+}
+
+//----------------------------------------------------------------------
 //----------------------------------------------------------------------
 
 type NamestoreRecordStoreMsg struct {
@@ -152,19 +185,6 @@ type NamestoreZoneToNameRespMsg struct {
 	ZoneKey *crypto.ZonePrivate // private zone key
 	Name    []byte              `size:"NameLen"` // name string
 	Records []byte              `size:"RdLen"`   // serialized record data
-}
-
-type NamestoreRecordResultMsg struct {
-	GenericNamestoreMsg
-
-	Expire   util.AbsoluteTime   ``            // expiration date
-	NameLen  uint16              `order:"big"` // length of name
-	RdLen    uint16              `order:"big"` // size of record data
-	RdCount  uint16              `order:"big"` // number of records
-	Reserved uint16              `order:"big"` // alignment
-	ZoneKey  *crypto.ZonePrivate // private zone key
-	Name     []byte              `size:"NameLen"` // name string
-	Records  []byte              `size:"RdLen"`   // serialized record data
 }
 
 type NamestoreTxControlMsg struct {
