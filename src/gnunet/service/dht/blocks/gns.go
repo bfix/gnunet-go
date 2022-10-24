@@ -235,7 +235,7 @@ func NewRecordSet() *RecordSet {
 	return &RecordSet{
 		Count:   0,
 		Records: make([]*ResourceRecord, 0),
-		Padding: make([]byte, 0),
+		Padding: nil,
 	}
 }
 
@@ -273,6 +273,11 @@ func (rs *RecordSet) Expire() util.AbsoluteTime {
 
 // Bytes returns the binary representation
 func (rs *RecordSet) Bytes() []byte {
+	// make sure padding exists
+	if rs.Padding == nil {
+		rs.SetPadding()
+	}
+	// unmarshal record set
 	buf, err := data.Marshal(rs)
 	if err != nil {
 		return nil
