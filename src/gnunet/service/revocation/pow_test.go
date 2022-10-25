@@ -86,7 +86,11 @@ func TestRevocationRFC(t *testing.T) {
 	if err = data.Unmarshal(revData, revD); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(revData.ZoneKeySig.Bytes(), zkey) {
+	if err = revData.ZoneKeySig.Init(); err != nil {
+		t.Fatal(err)
+	}
+	// check sigature
+	if !bytes.Equal(revData.ZoneKeySig.ZoneKey.Bytes(), zkey) {
 		t.Logf("zkey  = %s\n", hex.EncodeToString(revData.ZoneKeySig.Bytes()))
 		t.Logf("ZKEY  = %s\n", hex.EncodeToString(zkey))
 		t.Fatal("Wrong zone key in test revocation")
