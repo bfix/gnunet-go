@@ -359,12 +359,12 @@ func (zm *ZoneMaster) getRecords(zk *crypto.ZoneKey, label int64) (rs *blocks.Re
 	}
 	// assemble record set and find earliest expiration
 	expire = util.AbsoluteTimeNever()
-	rrSet := blocks.NewRecordSet()
+	rs = blocks.NewRecordSet()
 	for _, r := range recs {
 		if r.Expire.Compare(expire) < 0 {
 			expire = r.Expire
 		}
-		rrSet.AddRecord(&r.ResourceRecord)
+		rs.AddRecord(&r.ResourceRecord)
 	}
 	// do not add padding yet as record set may be filtered before use.
 	return
