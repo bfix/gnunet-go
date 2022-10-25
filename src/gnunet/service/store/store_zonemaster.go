@@ -380,7 +380,7 @@ func (db *ZoneDB) GetLabels(filter string, args ...any) (list []*Label, err erro
 
 func (db *ZoneDB) GetLabelIDs(zk *crypto.ZonePrivate) (list []int64, err error) {
 	// get zone database id
-	row := db.conn.QueryRow("select id from zones where ztype=? and zdata=?", zk.Type, zk.Bytes())
+	row := db.conn.QueryRow("select id from zones where ztype=? and zdata=?", zk.Type, zk.KeyData)
 	var zid int64
 	if err = row.Scan(&zid); err != nil {
 		return
