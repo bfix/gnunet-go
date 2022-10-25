@@ -82,12 +82,10 @@ func (zm *ZoneMaster) Run(ctx context.Context) {
 	zm.startGUI(ctx)
 
 	// publish on start-up
-	/*
-		if err = zm.Publish(ctx); err != nil {
-			logger.Printf(logger.ERROR, "[zonemaster] initial publish failed: %s", err.Error())
-			return
-		}
-	*/
+	if err = zm.Publish(ctx); err != nil {
+		logger.Printf(logger.ERROR, "[zonemaster] initial publish failed: %s", err.Error())
+		return
+	}
 
 	// periodically publish GNS blocks to the DHT
 	tick := time.NewTicker(time.Duration(config.Cfg.ZoneMaster.Period) * time.Second)
@@ -135,12 +133,6 @@ func (zm *ZoneMaster) Publish(ctx context.Context) error {
 
 // PublishZoneLabel with public records
 func (zm *ZoneMaster) PublishZoneLabel(ctx context.Context, zone *store.Zone, label *store.Label) error {
-
-	// @@@ DEBUG:
-	if ctx != nil {
-		return nil
-	}
-
 	zk := zone.Key.Public()
 	logger.Printf(logger.INFO, "[zonemaster] Publishing label '%s' of zone %s", label.Name, zk.ID())
 
@@ -197,6 +189,13 @@ func (zm *ZoneMaster) PublishZoneLabel(ctx context.Context, zone *store.Zone, la
 		return err
 	}
 
+	// DEBUG
+	/*
+		logger.Printf(logger.DBG, "[zonemaster] pub = %s", util.EncodeBinaryToString(zk.Bytes()))
+		logger.Printf(logger.DBG, "[zonemaster] query = %s", hex.EncodeToString(query.Key().Data))
+		logger.Printf(logger.DBG, "[zonemaster] blk = %s", hex.EncodeToString(blkDHT.Bytes()))
+	*/
+
 	//------------------------------------------------------------------
 	// Publish to Namecache
 	//------------------------------------------------------------------
@@ -205,6 +204,13 @@ func (zm *ZoneMaster) PublishZoneLabel(ctx context.Context, zone *store.Zone, la
 	blkNC, _ := blocks.NewGNSBlock().(*blocks.GNSBlock)
 	blkNC.Body.Expire = expire
 	blkNC.Body.Data = rrSet.Bytes()
+	// sign block
+	if dzk, _, err = zone.Key.Derive(label.Name, "gns"); err != nil {
+		return err
+	}
+	if err = blkNC.Sign(dzk); err != nil {
+		return err
+	}
 
 	// publish GNS block to namecache
 	if err = zm.StoreNamecache(ctx, query, blkNC); err != nil {
