@@ -20,6 +20,7 @@ package crypto
 
 import (
 	"bytes"
+	"encoding/hex"
 	"gnunet/enums"
 	"testing"
 )
@@ -50,7 +51,10 @@ func TestDeriveEDKEY(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// check resuts
 	if !bytes.Equal(dzp.Public().Bytes(), dzk.Bytes()) {
+		t.Logf("dzp.Public = %s", hex.EncodeToString(dzp.Public().Bytes()))
+		t.Logf("dzk = %s", hex.EncodeToString(dzk.Bytes()))
 		t.Fatal("derive mismatch")
 	}
 }
