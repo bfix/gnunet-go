@@ -187,6 +187,11 @@ func (pk *EDKEYPrivateImpl) Init(data []byte) error {
 	return nil
 }
 
+// Prepare a random byte array to be used as a random private EDKEY
+func (pk *EDKEYPrivateImpl) Prepare(rnd []byte) []byte {
+	return rnd
+}
+
 // Bytes returns a binary representation of the instance suitable for
 // consumption in 'Init()'.
 func (pk *EDKEYPrivateImpl) Bytes() []byte {

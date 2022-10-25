@@ -173,13 +173,23 @@ type PKEYPrivateImpl struct {
 }
 
 // Init instance from binary data. The data represents a big integer
-// (in big-endian notation) for the private scalar d.
+// (in little-endian notation) for the private scalar d (clamped).
 func (pk *PKEYPrivateImpl) Init(data []byte) error {
-	d := math.NewIntFromBytes(data)
+	// generate key material
+	d := math.NewIntFromBytes(util.Reverse(data))
 	pk.prv = ed25519.NewPrivateKeyFromD(d)
 	pk.ztype = enums.GNS_TYPE_PKEY
 	pk.pub = pk.prv.Public()
 	return nil
+}
+
+// Prepare a random byte array to be used as a random private PKEY
+func (pk *PKEYPrivateImpl) Prepare(rnd []byte) []byte {
+	// clamp little-endian skalar
+	d := util.Clone(rnd)
+	d[31] = (d[31] & 0x3f) | 0x40
+	d[0] &= 0xf8
+	return d
 }
 
 // Bytes returns a binary representation of the instance suitable for

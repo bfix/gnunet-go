@@ -129,6 +129,10 @@ type ZoneKeyImpl interface {
 type ZonePrivateImpl interface {
 	ZoneAbstractImpl
 
+	// Prepare a random byte array to be used as a random
+	// private key of given type.
+	Prepare(rnd []byte) []byte
+
 	// Derive a private key from this zone key based on a big integer
 	// (key blinding). Returns the derived key and the blinding value.
 	Derive(h *math.Int) (ZonePrivateImpl, *math.Int, error)
@@ -217,30 +221,33 @@ type ZonePrivate struct {
 	impl ZonePrivateImpl // reference to implementation
 }
 
-// NewZonePrivate returns a new initialized ZonePrivate instance. If no data is
-// provided, a new random key is created
-func NewZonePrivate(ztype enums.GNSType, d []byte) (zp *ZonePrivate, err error) {
+// NewZonePrivate returns a new initialized ZonePrivate instance of given ztype.
+// If no data is provided, a new random key is created. If data is provided, it
+// must be in the correct format specified by a ZonePrivate implementation.
+func NewZonePrivate(ztype enums.GNSType, zdata []byte) (zp *ZonePrivate, err error) {
 	// get factory for given zone type
 	impl, ok := zoneImpl[ztype]
 	if !ok {
 		return nil, ErrNoImplementation
 	}
+	prvImpl := impl.NewPrivate()
+
 	// init data available?
-	if d == nil {
+	if zdata == nil {
 		// no: create random seed
-		d = make([]byte, impl.PrivateSize)
-		if _, err = rand.Read(d); err != nil {
+		zdata = make([]byte, impl.PrivateSize)
+		if _, err = rand.Read(zdata); err != nil {
 			return
 		}
+		zdata = prvImpl.Prepare(zdata)
 	}
 	// assemble private zone key
 	zp = &ZonePrivate{
 		Type:    ztype,
-		KeyData: d,
-		impl:    nil,
+		KeyData: zdata,
+		impl:    prvImpl,
 	}
-	zp.impl = impl.NewPrivate()
-	err = zp.impl.Init(d)
+	err = zp.impl.Init(zdata)
 	return
 }
 
@@ -253,8 +260,8 @@ func NullZonePrivate(ztype enums.GNSType) (*ZonePrivate, uint16) {
 	}
 	kd := make([]byte, impl.PrivateSize)
 	zp := &ZonePrivate{
-		Type:    ztype, // @@@
-		KeyData: kd,    // untyped key data
+		Type:    ztype, // need key type for length calculation
+		KeyData: kd,    // untyped key data (all 0)
 		impl:    nil,   // no implementation!
 	}
 	return zp, uint16(len(zp.KeyData) + 4)
