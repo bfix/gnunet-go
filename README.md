@@ -56,6 +56,11 @@ and DHT are implemented.
 Use `./build.sh withgen` to build the executables (services and utilities, see
 below). The resulting programs are stored in `${GOPATH}/bin`.
 
+The `withgen` argument is optional (only needed if GANA registry files have
+changed and been updated in this repository by the user). The `go generate`
+step requires the `stringer` tool to be available; you can install it
+by running `go install golang.org/x/tools/cmd/stringer@latest`.
+
 To run the unit tests, use `./test.sh`. 
 
 ## `./src/gnunet/enums`
