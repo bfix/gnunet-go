@@ -116,7 +116,10 @@ func ReadMessage(ctx context.Context, rdr io.ReadCloser, buf []byte) (msg messag
 		err = fmt.Errorf("message{%d} is nil", mh.MsgType)
 		return
 	}
-	err = data.Unmarshal(msg, buf[:mh.MsgSize])
+	if err = data.Unmarshal(msg, buf[:mh.MsgSize]); err != nil {
+		return
+	}
+	err = msg.Init()
 	/*
 		// DEBUG: incoming messages
 		if mh.MsgType == enums.MSG_DHT_P2P_RESULT {
