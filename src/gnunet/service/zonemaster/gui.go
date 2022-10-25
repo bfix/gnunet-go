@@ -21,7 +21,6 @@ package zonemaster
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"embed"
 	"errors"
 	"fmt"
@@ -213,17 +212,17 @@ func (zm *ZoneMaster) actionNew(w http.ResponseWriter, r *http.Request, mode str
 	// new zone
 	case "zone":
 		name := r.FormValue("name")
-		// create private key
-		seed := make([]byte, 32)
-		if _, err = rand.Read(seed); err != nil {
-			return
-		}
-		var zp *crypto.ZonePrivate
-		kt := enums.GNS_TYPE_PKEY
-		if r.FormValue("keytype") == "EDKEY" {
+		// get key type
+		var kt enums.GNSType
+		switch r.FormValue("keytype") {
+		case "EDKEY":
 			kt = enums.GNS_TYPE_EDKEY
+		case "PKEY":
+			kt = enums.GNS_TYPE_PKEY
 		}
-		zp, err = crypto.NewZonePrivate(kt, seed)
+		// cretae private key
+		var zp *crypto.ZonePrivate
+		zp, err = crypto.NewZonePrivate(kt, nil)
 		if err != nil {
 			return
 		}
@@ -374,7 +373,7 @@ func (zm *ZoneMaster) updRec(w http.ResponseWriter, r *http.Request, id int64) e
 }
 
 //----------------------------------------------------------------------
-// Create new zone. label or resource record
+// Create new zone, label or resource record
 //----------------------------------------------------------------------
 
 type NewEditData struct {

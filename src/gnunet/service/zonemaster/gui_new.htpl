@@ -31,7 +31,7 @@
             alert("Empty zone name not allowed");
             return false;
         }
-        for (var i = 0; i < names.length; i++) {
+        for (var i = 0; i < zone_names.length; i++) {
             if (zone_names[i] == name) {
                 alert("Zone name already used");
                 return false;
@@ -45,7 +45,7 @@
 {{define "new_label"}}
 <div>
     <h3>Creating a new GNS label for zone "{{index .Params "zone"}}":</h3>
-    <form action="/action/new/label/{{.Ref}}" onsubmit="return(label_validate());">
+    <form action="/action/new/label/{{.Ref}}" method="post" onsubmit="return(label_validate());">
         <table>
             <tr>
                 <td align="right">Name:</td>
@@ -68,7 +68,7 @@
             alert("Empty labels not allowed");
             return false;
         }
-        for (var i = 0; i < names.length; i++) {
+        for (var i = 0; i < label_names.length; i++) {
             if (label_names[i] == name) {
                 alert("Label already used");
                 return false;

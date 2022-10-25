@@ -1,19 +1,19 @@
 {{define "RRCommon"}}
-    <input type="hidden" name="lid" value="{{index . "lid"}}">
-    {{range $k, $v := .}}
+    <input type="hidden" name="lid" value="{{index .Params "lid"}}">
+    {{range $k, $v := .Params}}
         <input type="hidden" name="old_{{$k}}" value="{{$v}}">
     {{end}}
-    {{$pf := index . "prefix"}}
+    {{$pf := index .Params "prefix"}}
     <tr>
         <td align="right" valign="top"><b>Expires:</b></td>
         <td>
             Never <input type="checkbox" class="alternate" name="{{$pf}}never"
-                {{if eq "on" (index . (print $pf "never"))}}checked="checked"{{end}}
+                {{if eq "on" (index .Params (print $pf "never"))}}checked="checked"{{end}}
             >
             <div class="alternate">
                 At given date and time:
                 <input type="datetime-local" id="{{$pf}}expires" name="{{$pf}}expires" required
-                    value="{{index . (print $pf "expires")}}"
+                    value="{{index .Params (print $pf "expires")}}"
                 >
             </div>
         </td>
@@ -22,13 +22,13 @@
         <td align="right" valign="top"><b>Flags:</b></td>
         <td>
             <input type="checkbox" name="{{$pf}}private"
-                {{if eq "on" (index . (print $pf "private"))}}checked="checked" class="disabled"{{end}}
+                {{if eq "on" (index .Params (print $pf "private"))}}checked="checked" class="disabled"{{end}}
                 > Private<br>
             <input type="checkbox" name="{{$pf}}shadow"
-                {{if eq "on" (index . (print $pf "shadow"))}}checked="checked" class="disabled"{{end}}
+                {{if eq "on" (index .Params (print $pf "shadow"))}}checked="checked" class="disabled"{{end}}
                 > Shadow<br>
             <input type="checkbox" name="{{$pf}}suppl"
-                {{if eq "on" (index . (print $pf "suppl"))}}checked="checked" class="disabled"{{end}}
+                {{if eq "on" (index .Params (print $pf "suppl"))}}checked="checked" class="disabled"{{end}}
                 > Supplemental<br>
         </td>
     </tr>
@@ -68,7 +68,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" .Params}}
+            {{template "RRCommon" .}}
             <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
@@ -98,7 +98,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" .Params}}
+            {{template "RRCommon" .}}
             <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
@@ -125,7 +125,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" .Params}}
+            {{template "RRCommon" .}}
             <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
@@ -145,7 +145,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" .Params}}
+            {{template "RRCommon" .}}
             <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
@@ -165,7 +165,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" .Params}}
+            {{template "RRCommon" .}}
             <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
@@ -200,7 +200,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" .Params}}
+            {{template "RRCommon" .}}
             <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
@@ -302,7 +302,7 @@
                     </div>
                 </td>
             </tr>
-            {{template "RRCommon" .Params}}
+            {{template "RRCommon" .}}
             <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
@@ -323,7 +323,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" .Params}}
+            {{template "RRCommon" .}}
             <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
@@ -344,7 +344,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" .Params}}
+            {{template "RRCommon" .}}
             <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
@@ -364,7 +364,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" .Params}}
+            {{template "RRCommon" .}}
             <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
@@ -384,7 +384,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" .Params}}
+            {{template "RRCommon" .}}
             <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
@@ -413,7 +413,7 @@
                     >
                 </td>
             </tr>
-            {{template "RRCommon" .Params}}
+            {{template "RRCommon" .}}
             <tr><td/><td><button id="submit">{{.Button}} record</button></td></tr>
         </table>
     </form>
