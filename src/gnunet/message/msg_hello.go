@@ -145,6 +145,32 @@ type HelloMsg struct {
 	FriendsOnly uint32       `order:"big"` // Do not gossip this HELLO message
 	Peer        *util.PeerID ``            // peer identifier for addresses
 	AddrList    []byte       `size:"*"`    // List of end-point addresses (HelloAddress)
+
+	// transient state
+	addresses []*HelloAddress // list of converted addresses
+}
+
+// Init called after unmarshalling a message to setup internal state
+func (m *HelloMsg) Init() (err error) {
+	// check for initialized state
+	if m.addresses != nil {
+		return nil
+	}
+	// convert addresses
+	m.addresses = make([]*HelloAddress, 0)
+	rdr := bytes.NewReader(m.AddrList)
+	var addr *HelloAddress
+	for {
+		// parse address from stream
+		if addr, err = ParseHelloAddr(rdr); err != nil {
+			// end of stream: no more addresses
+			if err == io.EOF {
+				err = nil
+			}
+			return
+		}
+		m.addresses = append(m.addresses, addr)
+	}
 }
 
 // NewHelloMsg creates a new HELLO msg for a given peer.
@@ -164,19 +190,10 @@ func NewHelloMsg(peer *util.PeerID) *HelloMsg {
 
 // Addresses returns the list of HelloAddress
 func (m *HelloMsg) Addresses() (list []*HelloAddress, err error) {
-	rdr := bytes.NewReader(m.AddrList)
-	var addr *HelloAddress
-	for {
-		// parse address from stream
-		if addr, err = ParseHelloAddr(rdr); err != nil {
-			// end of stream: no more addresses
-			if err == io.EOF {
-				err = nil
-			}
-			return
-		}
-		list = append(list, addr)
+	if m.addresses == nil {
+		return
 	}
+	return m.addresses, nil
 }
 
 // String returns a human-readable representation of the message.

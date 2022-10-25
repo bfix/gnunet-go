@@ -45,7 +45,7 @@ type EphKeyBlock struct {
 type EphemeralKeyMsg struct {
 	MsgHeader
 	SenderStatus uint32              `order:"big"` // enum PeerStateMachine
-	Signature    *util.PeerSignature ``            // EdDSA signature
+	Signature    *util.PeerSignature `init:"Init"` // EdDSA signature
 	SignedBlock  *EphKeyBlock
 }
 
@@ -67,6 +67,9 @@ func NewEphemeralKeyMsg() *EphemeralKeyMsg {
 		},
 	}
 }
+
+// Init called after unmarshalling a message to setup internal state
+func (m *EphemeralKeyMsg) Init() error { return nil }
 
 // String returns a human-readable representation of the message.
 func (m *EphemeralKeyMsg) String() string {

@@ -37,7 +37,7 @@ import (
 type LookupMsg struct {
 	MsgHeader
 	ID       uint32          `order:"big"` // Unique identifier for this request (for key collisions).
-	Zone     *crypto.ZoneKey ``            // Zone that is to be used for lookup
+	Zone     *crypto.ZoneKey `init:"Init"` // Zone that is to be used for lookup
 	Options  uint16          `order:"big"` // Local options for where to look for results
 	Reserved uint16          `order:"big"` // Always 0
 	RType    enums.GNSType   `order:"big"` // the type of record to look up
@@ -80,6 +80,9 @@ func (m *LookupMsg) String() string {
 		"GNSLookupMsg{Id=%d,Zone=%s,Options=%d,Type=%d,Name=%s}",
 		m.ID, m.Zone.ID(), m.Options, m.RType, m.GetName())
 }
+
+// Init called after unmarshalling a message to setup internal state
+func (m *LookupMsg) Init() error { return nil }
 
 //----------------------------------------------------------------------
 // GNS_LOOKUP_RESULT
@@ -124,3 +127,6 @@ func (m *LookupResultMsg) String() string {
 func (m *LookupResultMsg) Header() *MsgHeader {
 	return &MsgHeader{m.MsgSize, m.MsgType}
 }
+
+// Init called after unmarshalling a message to setup internal state
+func (m *LookupResultMsg) Init() error { return nil }

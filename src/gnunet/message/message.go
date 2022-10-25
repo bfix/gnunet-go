@@ -43,6 +43,9 @@ type Message interface {
 
 	// String returns a human-readable message
 	String() string
+
+	// Init called after unmarshalling a message to setup internal state
+	Init() error
 }
 
 //----------------------------------------------------------------------

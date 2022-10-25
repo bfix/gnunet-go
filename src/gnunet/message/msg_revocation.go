@@ -34,7 +34,7 @@ import (
 type RevocationQueryMsg struct {
 	MsgHeader
 	Reserved uint32          `order:"big"` // Reserved for future use
-	Zone     *crypto.ZoneKey // Zone that is to be checked for revocation
+	Zone     *crypto.ZoneKey `init:"Init"` // Zone that is to be checked for revocation
 }
 
 // NewRevocationQueryMsg creates a new message for a given zone.
@@ -45,6 +45,9 @@ func NewRevocationQueryMsg(zkey *crypto.ZoneKey) *RevocationQueryMsg {
 		Zone:      zkey,
 	}
 }
+
+// Init called after unmarshalling a message to setup internal state
+func (m *RevocationQueryMsg) Init() error { return nil }
 
 // String returns a human-readable representation of the message.
 func (m *RevocationQueryMsg) String() string {
@@ -73,6 +76,9 @@ func NewRevocationQueryResponseMsg(revoked bool) *RevocationQueryResponseMsg {
 	}
 }
 
+// Init called after unmarshalling a message to setup internal state
+func (m *RevocationQueryResponseMsg) Init() error { return nil }
+
 // String returns a human-readable representation of the message.
 func (m *RevocationQueryResponseMsg) String() string {
 	return fmt.Sprintf("RevocationQueryResponseMsg{valid=%d}", m.Valid)
@@ -88,7 +94,7 @@ type RevocationRevokeMsg struct {
 	Timestamp  util.AbsoluteTime     ``                      // Timestamp of revocation creation
 	TTL        util.RelativeTime     ``                      // TTL of revocation
 	PoWs       []uint64              `size:"32" order:"big"` // (Sorted) list of PoW values
-	ZoneKeySig *crypto.ZoneSignature ``                      // public zone key (with signature) to be revoked
+	ZoneKeySig *crypto.ZoneSignature `init:"Init"`           // public zone key (with signature) to be revoked
 }
 
 // NewRevocationRevokeMsg creates a new message for a given zone.
@@ -101,6 +107,9 @@ func NewRevocationRevokeMsg(zsig *crypto.ZoneSignature) *RevocationRevokeMsg {
 		ZoneKeySig: zsig,
 	}
 }
+
+// Init called after unmarshalling a message to setup internal state
+func (m *RevocationRevokeMsg) Init() error { return nil }
 
 // String returns a human-readable representation of the message.
 func (m *RevocationRevokeMsg) String() string {
@@ -129,6 +138,9 @@ func NewRevocationRevokeResponseMsg(success bool) *RevocationRevokeResponseMsg {
 		Success:   uint32(status),
 	}
 }
+
+// Init called after unmarshalling a message to setup internal state
+func (m *RevocationRevokeResponseMsg) Init() error { return nil }
 
 // String returns a human-readable representation of the message.
 func (m *RevocationRevokeResponseMsg) String() string {

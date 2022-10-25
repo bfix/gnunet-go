@@ -76,6 +76,9 @@ func NewDHTP2PGetMsg() *DHTP2PGetMsg {
 	}
 }
 
+// Init called after unmarshalling a message to setup internal state
+func (m *DHTP2PGetMsg) Init() (err error) { return nil }
+
 // String returns a human-readable representation of the message.
 func (m *DHTP2PGetMsg) String() string {
 	return fmt.Sprintf("DHTP2PGetMsg{btype=%s,hops=%d,flags=%s}",
@@ -165,6 +168,11 @@ func (m *DHTP2PPutMsg) IsUsed(field string) bool {
 		return m.Flags&enums.DHT_RO_RECORD_ROUTE != 0
 	}
 	return false
+}
+
+// Init called after unmarshalling a message to setup internal state
+func (m *DHTP2PPutMsg) Init() (err error) {
+	return nil
 }
 
 //----------------------------------------------------------------------
@@ -287,17 +295,17 @@ func (m *DHTP2PPutMsg) String() string {
 // DHTP2PResultMsg wire layout
 type DHTP2PResultMsg struct {
 	MsgHeader
-	BType       enums.BlockType     `order:"big"`      // Block type of result
-	Reserved    uint16              `order:"big"`      // Reserved
-	Flags       uint16              `order:"big"`      // Message flags
-	PutPathL    uint16              `order:"big"`      // size of PUTPATH field
-	GetPathL    uint16              `order:"big"`      // size of GETPATH field
-	Expire      util.AbsoluteTime   ``                 // expiration date
-	Query       *crypto.HashCode    ``                 // Query key for block
-	TruncOrigin *util.PeerID        `opt:"(IsUsed)"`   // truncated origin (if TRUNCATED flag set)
-	PathList    []*path.Entry       `size:"(NumPath)"` // PATH
-	LastSig     *util.PeerSignature `opt:"(IsUsed)"`   // signature of last hop (if RECORD_ROUTE flag is set)
-	Block       []byte              `size:"*"`         // block data
+	BType       enums.BlockType     `order:"big"`                // Block type of result
+	Reserved    uint16              `order:"big"`                // Reserved
+	Flags       uint16              `order:"big"`                // Message flags
+	PutPathL    uint16              `order:"big"`                // size of PUTPATH field
+	GetPathL    uint16              `order:"big"`                // size of GETPATH field
+	Expire      util.AbsoluteTime   ``                           // expiration date
+	Query       *crypto.HashCode    ``                           // Query key for block
+	TruncOrigin *util.PeerID        `opt:"(IsUsed)"`             // truncated origin (if TRUNCATED flag set)
+	PathList    []*path.Entry       `size:"(NumPath)"`           // PATH
+	LastSig     *util.PeerSignature `opt:"(IsUsed)" init:"Init"` // signature of last hop (if RECORD_ROUTE flag is set)
+	Block       []byte              `size:"*"`                   // block data
 }
 
 // NewDHTP2PResultMsg creates a new empty DHTP2PResultMsg
@@ -328,6 +336,11 @@ func (m *DHTP2PResultMsg) IsUsed(field string) bool {
 // NumPath returns the total number of entries in path
 func (m *DHTP2PResultMsg) NumPath(field string) uint {
 	return uint(m.GetPathL + m.PutPathL)
+}
+
+// Init called after unmarshalling a message to setup internal state
+func (m *DHTP2PResultMsg) Init() (err error) {
+	return nil
 }
 
 //----------------------------------------------------------------------
@@ -471,9 +484,12 @@ type DHTP2PHelloMsg struct {
 	MsgHeader
 	Reserved  uint16              `order:"big"` // Reserved for further use
 	NumAddr   uint16              `order:"big"` // Number of addresses in list
-	Signature *util.PeerSignature ``            // Signature
+	Signature *util.PeerSignature `init:"Init"` // Signature
 	Expire    util.AbsoluteTime   ``            // expiration time
 	AddrList  []byte              `size:"*"`    // List of end-point addresses (HelloAddress)
+
+	// transient state
+	addresses []*util.Address // list of converted addresses
 }
 
 // NewHelloMsgDHT creates an empty DHT_P2P_HELLO message.
@@ -492,8 +508,12 @@ func NewDHTP2PHelloMsg() *DHTP2PHelloMsg {
 	}
 }
 
-// Addresses returns the list of HelloAddress
-func (m *DHTP2PHelloMsg) Addresses() (list []*util.Address, err error) {
+// Init called after unmarshalling a message to setup internal state
+func (m *DHTP2PHelloMsg) Init() (err error) {
+	if m.addresses != nil {
+		return
+	}
+	m.addresses = make([]*util.Address, 0)
 	var addr *util.Address
 	var as string
 	num, pos := 0, 0
@@ -506,14 +526,23 @@ func (m *DHTP2PHelloMsg) Addresses() (list []*util.Address, err error) {
 			return
 		}
 		addr.Expire = m.Expire
-		list = append(list, addr)
+		m.addresses = append(m.addresses, addr)
 		num++
 	}
 	// check numbers
 	if num != int(m.NumAddr) {
-		logger.Printf(logger.WARN, "[DHTP2PHelloMsg] Number of addresses does not match (got %d, expected %d)", num, m.NumAddr)
+		err = errors.New("number of addresses does not match")
 	}
 	return
+}
+
+// Addresses returns the list of HelloAddress
+func (m *DHTP2PHelloMsg) Addresses() (list []*util.Address, err error) {
+	if m.addresses == nil {
+		err = errors.New("no addresses available")
+		return
+	}
+	return m.addresses, nil
 }
 
 // SetAddresses adds addresses to the HELLO message.

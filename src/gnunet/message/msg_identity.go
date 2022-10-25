@@ -44,6 +44,9 @@ func NewIdentityStartMsg() *IdentityStartMsg {
 	}
 }
 
+// Init called after unmarshalling a message to setup internal state
+func (msg *IdentityStartMsg) Init() error { return nil }
+
 // String returns a human-readable representation of the message.
 func (msg *IdentityStartMsg) String() string {
 	return "IdentityStartMsg{}"
@@ -61,7 +64,7 @@ type IdentityUpdateMsg struct {
 
 	NameLen uint16              `order:"big"`
 	EOL     uint16              `order:"big"`
-	ZoneKey *crypto.ZonePrivate ``
+	ZoneKey *crypto.ZonePrivate `init:"Init"`
 	Name    []byte              `size:"NameLen"`
 }
 
@@ -88,8 +91,14 @@ func NewIdentityUpdateMsg(name string, zk *crypto.ZonePrivate) *IdentityUpdateMs
 	return msg
 }
 
+// Init called after unmarshalling a message to setup internal state
+func (msg *IdentityUpdateMsg) Init() error { return nil }
+
 // String returns a human-readable representation of the message.
 func (msg *IdentityUpdateMsg) String() string {
+	if msg.EOL == uint16(enums.RC_OK) {
+		return "IdentityUpdateMsg{end-of-list}"
+	}
 	name, _ := util.ReadCString(msg.Name, 0)
 	return fmt.Sprintf("IdentityUpdateMsg{'%s'@%s}", name, msg.ZoneKey.ID())
 }
@@ -113,6 +122,9 @@ func (msg *IdentityResultCodeMsg) OnError() bool {
 	return msg.ResultCode != enums.RC_OK
 }
 
+// Init called after unmarshalling a message to setup internal state
+func (msg *IdentityResultCodeMsg) Init() error { return nil }
+
 // NewNamecacheLookupMsg creates a new default message.
 func NewIdentityResultCodeMsg(rc enums.ResultCode, err string) *IdentityResultCodeMsg {
 	msg := &IdentityResultCodeMsg{
@@ -132,6 +144,57 @@ func NewIdentityResultCodeMsg(rc enums.ResultCode, err string) *IdentityResultCo
 // String returns a human-readable representation of the message.
 func (msg *IdentityResultCodeMsg) String() string {
 	return fmt.Sprintf("IdentityResultCodeMsg{rc=%d,err='%s'}", msg.ResultCode, msg.Error)
+}
+
+//----------------------------------------------------------------------
+// MSG_IDENTITY_CREATE
+//
+// Create new identity with service association
+//----------------------------------------------------------------------
+
+// IdentityCreateMsg to create a new identity for given service
+type IdentityCreateMsg struct {
+	MsgHeader
+
+	SrvLen   uint16              `order:"big"`
+	Reserved uint16              `order:"big"`
+	ZoneKey  *crypto.ZonePrivate `init:"Init"`
+	Service  []byte              `size:"SrvLen"`
+}
+
+// Init called after unmarshalling a message to setup internal state
+func (msg *IdentityCreateMsg) Init() error { return nil }
+
+// NewNamecacheCreateMsg creates a new default message.
+func NewIdentityCreateMsg(zk *crypto.ZonePrivate, svc string) *IdentityCreateMsg {
+	var size uint16
+	if zk == nil {
+		zk, size = crypto.NullZonePrivate(enums.GNS_TYPE_PKEY)
+	} else {
+		size = uint16(zk.KeySize() + 4)
+	}
+	msg := &IdentityCreateMsg{
+		MsgHeader: MsgHeader{
+			MsgSize: size + 8,
+			MsgType: enums.MSG_IDENTITY_CREATE,
+		},
+		ZoneKey: zk,
+	}
+	if len(svc) > 0 {
+		msg.Service = util.WriteCString(svc)
+		msg.MsgSize += uint16(len(msg.Service))
+	}
+	return msg
+}
+
+// String returns a human-readable representation of the message.
+func (msg *IdentityCreateMsg) String() string {
+	svc, _ := util.ReadCString(msg.Service, 0)
+	zk := ""
+	if !util.IsAll(msg.ZoneKey.KeyData, 0) {
+		zk = fmt.Sprintf(",zk=%s", msg.ZoneKey.ID())
+	}
+	return fmt.Sprintf("IdentityCreateMsg{svc='%s'%s}", svc, zk)
 }
 
 //----------------------------------------------------------------------
@@ -179,21 +242,6 @@ type IdentityGetDefault struct {
 //----------------------------------------------------------------------
 
 type IdentitySetDefaultMsg struct {
-	MsgHeader
-
-	SrvLen   uint16 `order:"big"`
-	Reserved uint16 `order:"big"`
-	ZoneKey  *crypto.ZonePrivate
-	Service  []byte `size:"SrvLen"`
-}
-
-//----------------------------------------------------------------------
-// MSG_IDENTITY_CREATE
-//
-// Create new identity without service association
-//----------------------------------------------------------------------
-
-type IdentityCreateMsg struct {
 	MsgHeader
 
 	SrvLen   uint16 `order:"big"`

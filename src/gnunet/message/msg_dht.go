@@ -67,6 +67,9 @@ func (m *DHTClientPutMsg) String() string {
 		m.BType, m.Expire, m.Options, m.ReplLevel, m.Key)
 }
 
+// Init called after unmarshalling a message to setup internal state
+func (m *DHTClientPutMsg) Init() error { return nil }
+
 //----------------------------------------------------------------------
 // DHT_CLIENT_GET
 //----------------------------------------------------------------------
@@ -113,6 +116,9 @@ func (m *DHTClientGetMsg) String() string {
 		m.ID, m.BType, m.Options, m.ReplLevel, m.Key)
 }
 
+// Init called after unmarshalling a message to setup internal state
+func (m *DHTClientGetMsg) Init() error { return nil }
+
 //----------------------------------------------------------------------
 // DHT_CLIENT_RESULT
 //----------------------------------------------------------------------
@@ -153,6 +159,9 @@ func (m *DHTClientResultMsg) String() string {
 	return fmt.Sprintf("DHTClientResultMsg{id:%d,type=%s,expire=%s}", m.ID, m.BType, m.Expire)
 }
 
+// Init called after unmarshalling a message to setup internal state
+func (m *DHTClientResultMsg) Init() error { return nil }
+
 //----------------------------------------------------------------------
 // DHT_CLIENT_GET_STOP
 //----------------------------------------------------------------------
@@ -182,6 +191,9 @@ func NewDHTClientGetStopMsg(key *crypto.HashCode) *DHTClientGetStopMsg {
 func (m *DHTClientGetStopMsg) String() string {
 	return fmt.Sprintf("DHTClientGetStopMsg{Id:%d,Key=%s}", m.ID, m.Key)
 }
+
+// Init called after unmarshalling a message to setup internal state
+func (m *DHTClientGetStopMsg) Init() error { return nil }
 
 //----------------------------------------------------------------------
 // DHT_CLIENT_GET_RESULTS_KNOWN
@@ -220,3 +232,6 @@ func (m *DHTClientGetResultsKnownMsg) String() string {
 	return fmt.Sprintf("DHTClientGetResultsKnownMsg{Id:%d,Key=%s,Num=%d}",
 		m.ID, m.Key.Data, len(m.Known))
 }
+
+// Init called after unmarshalling a message to setup internal state
+func (m *DHTClientGetResultsKnownMsg) Init() error { return nil }

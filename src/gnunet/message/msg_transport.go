@@ -57,6 +57,9 @@ func (m *TransportTCPWelcomeMsg) String() string {
 	return fmt.Sprintf("TransportTcpWelcomeMsg{peer=%s}", m.PeerID)
 }
 
+// Init called after unmarshalling a message to setup internal state
+func (m *TransportTCPWelcomeMsg) Init() error { return nil }
+
 //----------------------------------------------------------------------
 // TRANSPORT_PING
 //
@@ -104,6 +107,9 @@ func (m *TransportPingMsg) String() string {
 	return fmt.Sprintf("TransportPingMsg{target=%s,addr=%s,challenge=%d}",
 		m.Target, a, m.Challenge)
 }
+
+// Init called after unmarshalling a message to setup internal state
+func (m *TransportPingMsg) Init() error { return nil }
 
 //----------------------------------------------------------------------
 // TRANSPORT_PONG
@@ -206,6 +212,9 @@ func (m *TransportPongMsg) Verify(pub *ed25519.PublicKey) (bool, error) {
 	return pub.EdVerify(data, sig)
 }
 
+// Init called after unmarshalling a message to setup internal state
+func (m *TransportPongMsg) Init() error { return nil }
+
 //----------------------------------------------------------------------
 // TRANSPORT_SESSION_ACK
 //----------------------------------------------------------------------
@@ -226,6 +235,9 @@ func NewSessionAckMsg() *SessionAckMsg {
 func (m *SessionAckMsg) String() string {
 	return "SessionAck{}"
 }
+
+// Init called after unmarshalling a message to setup internal state
+func (m *SessionAckMsg) Init() error { return nil }
 
 //----------------------------------------------------------------------
 // TRANSPORT_SESSION_SYN
@@ -252,6 +264,9 @@ func (m *SessionSynMsg) String() string {
 	return fmt.Sprintf("SessionSyn{timestamp=%s}", m.Timestamp)
 }
 
+// Init called after unmarshalling a message to setup internal state
+func (m *SessionSynMsg) Init() error { return nil }
+
 //----------------------------------------------------------------------
 // TRANSPORT_SESSION_SYN_ACK
 //----------------------------------------------------------------------
@@ -276,6 +291,9 @@ func NewSessionSynAckMsg() *SessionSynAckMsg {
 func (m *SessionSynAckMsg) String() string {
 	return fmt.Sprintf("SessionSynAck{timestamp=%s}", m.Timestamp)
 }
+
+// Init called after unmarshalling a message to setup internal state
+func (m *SessionSynAckMsg) Init() error { return nil }
 
 //----------------------------------------------------------------------
 // TRANSPORT_SESSION_QUOTA
@@ -303,6 +321,9 @@ func (m *SessionQuotaMsg) String() string {
 	return fmt.Sprintf("SessionQuotaMsg{%sB/s}", util.Scale1024(uint64(m.Quota)))
 }
 
+// Init called after unmarshalling a message to setup internal state
+func (m *SessionQuotaMsg) Init() error { return nil }
+
 //----------------------------------------------------------------------
 // TRANSPORT_SESSION_KEEPALIVE
 //----------------------------------------------------------------------
@@ -327,6 +348,9 @@ func (m *SessionKeepAliveMsg) String() string {
 	return fmt.Sprintf("SessionKeepAliveMsg{%d}", m.Nonce)
 }
 
+// Init called after unmarshalling a message to setup internal state
+func (m *SessionKeepAliveMsg) Init() error { return nil }
+
 //----------------------------------------------------------------------
 // TRANSPORT_SESSION_KEEPALIVE_RESPONSE
 //----------------------------------------------------------------------
@@ -350,3 +374,6 @@ func NewSessionKeepAliveRespMsg(nonce uint32) *SessionKeepAliveRespMsg {
 func (m *SessionKeepAliveRespMsg) String() string {
 	return fmt.Sprintf("SessionKeepAliveRespMsg{%d}", m.Nonce)
 }
+
+// Init called after unmarshalling a message to setup internal state
+func (m *SessionKeepAliveRespMsg) Init() error { return nil }

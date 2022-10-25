@@ -67,6 +67,9 @@ func NewNamecacheLookupMsg(query *crypto.HashCode) *NamecacheLookupMsg {
 	}
 }
 
+// Init called after unmarshalling a message to setup internal state
+func (m *NamecacheLookupMsg) Init() error { return nil }
+
 // String returns a human-readable representation of the message.
 func (m *NamecacheLookupMsg) String() string {
 	return fmt.Sprintf("NamecacheLookupMsg{Id=%d,Query=%s}",
@@ -81,10 +84,13 @@ func (m *NamecacheLookupMsg) String() string {
 type NamecacheLookupResultMsg struct {
 	GenericNamecacheMsg
 
-	Expire        util.AbsoluteTime     ``         // Expiration time
-	DerivedKeySig *crypto.ZoneSignature ``         // Derived public key
-	EncData       []byte                `size:"*"` // Encrypted block data
+	Expire        util.AbsoluteTime     ``            // Expiration time
+	DerivedKeySig *crypto.ZoneSignature `init:"Init"` // Derived public key
+	EncData       []byte                `size:"*"`    // Encrypted block data
 }
+
+// Init called after unmarshalling a message to setup internal state
+func (m *NamecacheLookupResultMsg) Init() error { return nil }
 
 // NewNamecacheLookupResultMsg creates a new default message.
 func NewNamecacheLookupResultMsg() *NamecacheLookupResultMsg {
@@ -115,6 +121,9 @@ type NamecacheCacheMsg struct {
 	DerivedKey []byte            `size:"(FldSize)"` // Derived public key
 	EncData    []byte            `size:"*"`         // Encrypted block data
 }
+
+// Init called after unmarshalling a message to setup internal state
+func (m *NamecacheCacheMsg) Init() error { return nil }
 
 // Size returns buffer sizes for fields
 func (m *NamecacheCacheMsg) FldSize(field string) uint {
@@ -173,6 +182,9 @@ func NewNamecacheCacheResponseMsg() *NamecacheCacheResponseMsg {
 		Result:              0,
 	}
 }
+
+// Init called after unmarshalling a message to setup internal state
+func (m *NamecacheCacheResponseMsg) Init() error { return nil }
 
 // String returns a human-readable representation of the message.
 func (m *NamecacheCacheResponseMsg) String() string {

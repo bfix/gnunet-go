@@ -52,7 +52,7 @@ func newGenericNamestoreMsg(size uint16, mtype enums.MsgType) GenericNamestoreMs
 type NamestoreZoneIterStartMsg struct {
 	GenericNamestoreMsg
 
-	ZoneKey *crypto.ZonePrivate // private zone key
+	ZoneKey *crypto.ZonePrivate `init:"Init"` // private zone key
 }
 
 // NewNamecacheCacheMsg creates a new default message.
@@ -62,6 +62,9 @@ func NewNamestoreZoneIterStartMsg(zone *crypto.ZonePrivate) *NamestoreZoneIterSt
 		ZoneKey:             zone,
 	}
 }
+
+// Init called after unmarshalling a message to setup internal state
+func (m *NamestoreZoneIterStartMsg) Init() error { return nil }
 
 // String returns a human-readable representation of the message.
 func (m *NamestoreZoneIterStartMsg) String() string {
@@ -81,6 +84,9 @@ type NamestoreZoneIterNextMsg struct {
 func NewNamestoreZoneIterNextMsg() *NamestoreZoneIterNextMsg {
 	return &NamestoreZoneIterNextMsg{}
 }
+
+// Init called after unmarshalling a message to setup internal state
+func (m *NamestoreZoneIterNextMsg) Init() error { return nil }
 
 // String returns a human-readable representation of the message.
 func (m *NamestoreZoneIterNextMsg) String() string {
@@ -107,7 +113,7 @@ type NamestoreRecordResultMsg struct {
 	RdLen    uint16              `order:"big"`    // size of record data
 	RdCount  uint16              `order:"big"`    // number of records
 	Reserved uint16              `order:"big"`    // alignment
-	ZoneKey  *crypto.ZonePrivate ``               // private zone key
+	ZoneKey  *crypto.ZonePrivate `init:"Init"`    // private zone key
 	Name     []byte              `size:"NameLen"` // name string
 	Records  []byte              `size:"RdLen"`   // serialized record data
 }
@@ -122,6 +128,9 @@ func NewNamestoreRecordResultMsg(zk *crypto.ZonePrivate, label string) *Namestor
 		RdCount: 0,
 	}
 }
+
+// Init called after unmarshalling a message to setup internal state
+func (m *NamestoreRecordResultMsg) Init() error { return nil }
 
 // String returns a human-readable representation of the message.
 func (m *NamestoreRecordResultMsg) String() string {

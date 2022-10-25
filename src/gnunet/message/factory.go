@@ -131,9 +131,10 @@ func NewEmptyMessage(msgType enums.MsgType) (Message, error) {
 		return NewIdentityResultCodeMsg(enums.RC_OK, ""), nil
 	case enums.MSG_IDENTITY_UPDATE:
 		return NewIdentityUpdateMsg("", nil), nil
+	case enums.MSG_IDENTITY_CREATE:
+		return NewIdentityCreateMsg(nil, ""), nil
 	case enums.MSG_IDENTITY_GET_DEFAULT:
 	case enums.MSG_IDENTITY_SET_DEFAULT:
-	case enums.MSG_IDENTITY_CREATE:
 	case enums.MSG_IDENTITY_RENAME:
 	case enums.MSG_IDENTITY_DELETE:
 	case enums.MSG_IDENTITY_LOOKUP:
