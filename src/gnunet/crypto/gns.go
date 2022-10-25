@@ -211,7 +211,8 @@ func GetImplementation(ztype enums.GNSType) *ZoneImplementation {
 
 // ZonePrivate represents the possible types of private zone keys (PKEY, EDKEY,...)
 type ZonePrivate struct {
-	ZoneKey
+	Type    enums.GNSType `json:"type" order:"big"`
+	KeyData []byte        `json:"key" size:"(KeySize)"`
 
 	impl ZonePrivateImpl // reference to implementation
 }
@@ -234,24 +235,16 @@ func NewZonePrivate(ztype enums.GNSType, d []byte) (zp *ZonePrivate, err error) 
 	}
 	// assemble private zone key
 	zp = &ZonePrivate{
-		ZoneKey{
-			ztype,
-			nil,
-			nil,
-		},
-		nil,
+		Type:    ztype,
+		KeyData: d,
+		impl:    nil,
 	}
 	zp.impl = impl.NewPrivate()
-	if err = zp.impl.Init(d); err != nil {
-		return
-	}
-	zp.ZoneKey.KeyData = zp.impl.Public().Bytes()
-	zp.ZoneKey.impl = impl.NewPublic()
-	err = zp.ZoneKey.impl.Init(zp.ZoneKey.KeyData)
+	err = zp.impl.Init(d)
 	return
 }
 
-// Null returns a "NULL" ZonePrivate for given key
+// Null returns a "NULL" ZonePrivate for a given key
 func NullZonePrivate(ztype enums.GNSType) (*ZonePrivate, uint16) {
 	// get factory for given zone type
 	impl, ok := zoneImpl[ztype]
@@ -260,17 +253,19 @@ func NullZonePrivate(ztype enums.GNSType) (*ZonePrivate, uint16) {
 	}
 	kd := make([]byte, impl.PrivateSize)
 	zp := &ZonePrivate{
-		ZoneKey: ZoneKey{
-			Type:    0,
-			KeyData: kd,
-		},
+		Type:    ztype, // @@@
+		KeyData: kd,    // untyped key data
+		impl:    nil,   // no implementation!
 	}
 	return zp, uint16(len(zp.KeyData) + 4)
 }
 
-// Bytes returns the binary representation (can be used with 'init()')
+// Bytes returns the binary representation
 func (zp *ZonePrivate) Bytes() []byte {
-	return zp.impl.Bytes()
+	buf := new(bytes.Buffer)
+	_ = binary.Write(buf, binary.BigEndian, zp.Type)
+	_, _ = buf.Write(zp.KeyData)
+	return buf.Bytes()
 }
 
 // KeySize returns the number of bytes of a key representation.
@@ -285,7 +280,7 @@ func (zp *ZonePrivate) KeySize() uint {
 // Derive key (key blinding)
 func (zp *ZonePrivate) Derive(label, context string) (dzp *ZonePrivate, h *math.Int, err error) {
 	// calculate derived key
-	key := zp.Public().Bytes()
+	key := zp.Public().KeyData
 	h = deriveH(key, label, context)
 	var derived ZonePrivateImpl
 	if derived, h, err = zp.impl.Derive(h); err != nil {
@@ -293,15 +288,10 @@ func (zp *ZonePrivate) Derive(label, context string) (dzp *ZonePrivate, h *math.
 	}
 	// assemble derived pivate key
 	dzp = &ZonePrivate{
-		ZoneKey{
-			zp.Type,
-			nil,
-			nil,
-		},
-		derived,
+		Type:    zp.Type,
+		KeyData: derived.Bytes(),
+		impl:    derived,
 	}
-	dzp.ZoneKey.KeyData = derived.Public().Bytes()
-	err = dzp.Init()
 	return
 }
 
@@ -312,7 +302,12 @@ func (zp *ZonePrivate) Sign(data []byte) (sig *ZoneSignature, err error) {
 
 // Public returns the associated public key
 func (zp *ZonePrivate) Public() *ZoneKey {
-	return &zp.ZoneKey
+	impl := zp.impl.Public()
+	return &ZoneKey{
+		Type:    zp.Type,
+		KeyData: impl.Bytes(),
+		impl:    impl,
+	}
 }
 
 // ID returns the human-readable zone private key.
@@ -359,7 +354,10 @@ func NewZoneKey(d []byte) (zk *ZoneKey, err error) {
 
 // Bytes returns the binary representation (can be used with 'init()')
 func (zk *ZoneKey) Bytes() []byte {
-	return zk.impl.Bytes()
+	buf := new(bytes.Buffer)
+	_ = binary.Write(buf, binary.BigEndian, zk.Type)
+	_, _ = buf.Write(zk.KeyData)
+	return buf.Bytes()
 }
 
 // KeySize returns the number of bytes of a key representation.
@@ -373,7 +371,7 @@ func (zk *ZoneKey) KeySize() uint {
 
 // Derive key (key blinding)
 func (zk *ZoneKey) Derive(label, context string) (dzk *ZoneKey, h *math.Int, err error) {
-	key := zk.Bytes()
+	key := zk.KeyData
 	h = deriveH(key, label, context)
 	var derived ZoneKeyImpl
 	if derived, h, err = zk.impl.Derive(h); err != nil {
@@ -442,22 +440,24 @@ type ZoneSignature struct {
 }
 
 func (zs *ZoneSignature) Init() (err error) {
-	// initialize implementations
-	impl, ok := zoneImpl[zs.Type]
-	if !ok {
-		err = ErrUnknownZoneType
-		return
+	if zs.impl == nil {
+		// initialize implementations
+		impl, ok := zoneImpl[zs.Type]
+		if !ok {
+			err = ErrUnknownZoneType
+			return
+		}
+		// set signature implementation
+		sig := impl.NewSignature()
+		if err = sig.Init(zs.Signature); err != nil {
+			return
+		}
+		zs.impl = sig
+		// set public key implementation
+		zk := impl.NewPublic()
+		err = zk.Init(zs.KeyData)
+		zs.ZoneKey.impl = zk
 	}
-	// set signature implementation
-	sig := impl.NewSignature()
-	if err = sig.Init(zs.Signature); err != nil {
-		return
-	}
-	zs.impl = sig
-	// set public key implementation
-	zk := impl.NewPublic()
-	err = zk.Init(zs.KeyData)
-	zs.ZoneKey.impl = zk
 	return
 }
 
