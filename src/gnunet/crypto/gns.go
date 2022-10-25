@@ -251,6 +251,20 @@ func NewZonePrivate(ztype enums.GNSType, zdata []byte) (zp *ZonePrivate, err err
 	return
 }
 
+// Init is called to setup internal state after unmarshalling object
+func (zp *ZonePrivate) Init() (err error) {
+	// check for initialized key
+	if zp.impl == nil {
+		impl, ok := zoneImpl[zp.Type]
+		if !ok {
+			return ErrNoImplementation
+		}
+		zp.impl = impl.NewPrivate()
+		err = zp.impl.Init(zp.KeyData)
+	}
+	return
+}
+
 // Null returns a "NULL" ZonePrivate for a given key
 func NullZonePrivate(ztype enums.GNSType) (*ZonePrivate, uint16) {
 	// get factory for given zone type
@@ -334,7 +348,7 @@ type ZoneKey struct {
 	impl ZoneKeyImpl // reference to implementation
 }
 
-// Init a zone key where only the attributes have been read/deserialized.
+// Init is called to setup internal state after unmarshalling object
 func (zk *ZoneKey) Init() (err error) {
 	if zk.impl == nil {
 		// initialize implementation
@@ -446,6 +460,7 @@ type ZoneSignature struct {
 	impl ZoneSigImpl // reference to implementation
 }
 
+// Init is called to setup internal state after unmarshalling object
 func (zs *ZoneSignature) Init() (err error) {
 	if zs.impl == nil {
 		// initialize implementations
@@ -519,10 +534,10 @@ func deriveH(key []byte, label, context string) *math.Int {
 	return math.NewIntFromBytes(b)
 }
 
-// convert (type|data) to GNUnet identifier
-func asID(t enums.GNSType, data []byte) string {
+// convert (type|data) to bytes
+func asBytes(t enums.GNSType, data []byte) []byte {
 	buf := new(bytes.Buffer)
 	_ = binary.Write(buf, binary.BigEndian, t)
 	_, _ = buf.Write(data)
-	return util.EncodeBinaryToString(buf.Bytes())
+	return buf.Bytes()
 }

@@ -162,7 +162,7 @@ func (pk *EDKEYPublicImpl) BlockKey(label string, expire util.AbsoluteTime) (ske
 
 // ID returns the GNUnet identifier for a public zone key
 func (pk *EDKEYPublicImpl) ID() string {
-	return asID(enums.GNS_TYPE_EDKEY, pk.pub.Bytes())
+	return util.EncodeBinaryToString(asBytes(enums.GNS_TYPE_EDKEY, pk.pub.Bytes()))
 }
 
 //----------------------------------------------------------------------
@@ -248,7 +248,7 @@ func (pk *EDKEYPrivateImpl) Sign(data []byte) (sig *ZoneSignature, err error) {
 
 // ID returns the GNUnet identifier for a private zone key
 func (pk *EDKEYPrivateImpl) ID() string {
-	return asID(enums.GNS_TYPE_EDKEY, pk.seed)
+	return util.EncodeBinaryToString(asBytes(enums.GNS_TYPE_EDKEY, pk.seed))
 }
 
 //----------------------------------------------------------------------

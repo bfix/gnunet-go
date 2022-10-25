@@ -158,7 +158,7 @@ func (pk *PKEYPublicImpl) cipher(encrypt bool, data []byte, label string, expire
 
 // ID returns the GNUnet identifier for a public zone key
 func (pk *PKEYPublicImpl) ID() string {
-	return asID(enums.GNS_TYPE_PKEY, pk.pub.Bytes())
+	return util.EncodeBinaryToString(asBytes(enums.GNS_TYPE_PKEY, pk.pub.Bytes()))
 }
 
 //----------------------------------------------------------------------
@@ -244,7 +244,9 @@ func (pk *PKEYPrivateImpl) Sign(data []byte) (sig *ZoneSignature, err error) {
 // ID returns the GNUnet identifier for a private zone key
 // (little-endian big integer)
 func (pk *PKEYPrivateImpl) ID() string {
-	return asID(enums.GNS_TYPE_PKEY, util.Reverse(pk.prv.D.Bytes()))
+	return util.EncodeBinaryToString(asBytes(
+		enums.GNS_TYPE_PKEY,
+		util.Reverse(pk.prv.D.Bytes())))
 }
 
 //----------------------------------------------------------------------
