@@ -134,6 +134,9 @@ func (s *Connection) Receive(ctx context.Context) (message.Message, error) {
 	if err = data.Unmarshal(msg, s.buf[:mh.MsgSize]); err != nil {
 		return nil, err
 	}
+	if err = msg.Init(); err != nil {
+		return nil, err
+	}
 	return msg, nil
 }
 
