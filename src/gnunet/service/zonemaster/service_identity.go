@@ -19,8 +19,21 @@
 package zonemaster
 
 import (
+	"context"
+	"fmt"
+	"gnunet/crypto"
+	"gnunet/enums"
+	"gnunet/message"
+	"gnunet/service/store"
 	"gnunet/transport"
 	"gnunet/util"
+
+	"github.com/bfix/gospel/logger"
+)
+
+//nolint:stylecheck // my style is my style...
+const (
+	IDENT_DEFAULT_SERVICE = "ego"
 )
 
 //----------------------------------------------------------------------
@@ -36,13 +49,13 @@ type IdentitySession struct {
 type Identity struct{}
 
 type IdentityService struct {
-	defaults *util.Map[string, int64]
-	clients  *util.Map[int, *IdentitySession]
+	zm      *ZoneMaster                      // reference to main service
+	clients *util.Map[int, *IdentitySession] // client sessions
 }
 
-func NewIdentityService() *IdentityService {
+func NewIdentityService(zm *ZoneMaster) *IdentityService {
 	srv := new(IdentityService)
-	srv.defaults = util.NewMap[string, int64]()
+	srv.zm = zm
 	srv.clients = util.NewMap[int, *IdentitySession]()
 	return srv
 }
@@ -60,8 +73,63 @@ func (ident *IdentityService) CloseSession(id int) {
 	ident.clients.Delete(id, 0)
 }
 
-func (ident *IdentityService) FollowUpdates(id int) {
+func (ident *IdentityService) FollowUpdates(id int) *IdentitySession {
 	if sess, ok := ident.clients.Get(id, 0); ok {
 		sess.updates = true
+		return sess
 	}
+	return nil
+}
+
+func (ident *IdentityService) Start(ctx context.Context, id int) (err error) {
+	// flag client as update receiver
+	sess := ident.FollowUpdates(id)
+	if sess == nil {
+		err = fmt.Errorf("no session available for client %d", id)
+		return
+	}
+	// initial update is to send all existing identites
+	var list []*store.Identity
+	if list, err = ident.zm.zdb.GetIdentities(""); err != nil {
+		return
+	}
+	for _, ident := range list {
+		resp := message.NewIdentityUpdateMsg(ident.Name, ident.Key)
+		logger.Printf(logger.DBG, "[identity:%d] Sending %v", id, resp)
+		if err = sess.back.Send(ctx, resp); err != nil {
+			logger.Printf(logger.ERROR, "[identity:%d] Can't send response (%v): %v\n", id, resp, err)
+			return
+		}
+	}
+	// terminate with EOL
+	resp := message.NewIdentityUpdateMsg("", nil)
+	if err = sess.back.Send(ctx, resp); err != nil {
+		logger.Printf(logger.ERROR, "[identity:%d] Can't send response (%v): %v\n", id, resp, err)
+		return
+	}
+	return
+}
+
+func (ident *IdentityService) Create(ctx context.Context, cid int, zk *crypto.ZonePrivate, name string) (err error) {
+	// get client session
+	sess, ok := ident.clients.Get(cid, 0)
+	if !ok {
+		err = fmt.Errorf("no session available for client %d", cid)
+		return
+	}
+	// add identity
+	id := store.NewIdentity(name, zk, IDENT_DEFAULT_SERVICE)
+	err = ident.zm.zdb.SetIdentity(id)
+	rc := enums.RC_OK
+	msg := ""
+	if err != nil {
+		rc = enums.RC_NO
+		msg = err.Error()
+	}
+	resp := message.NewIdentityResultCodeMsg(rc, msg)
+	if err = sess.back.Send(ctx, resp); err != nil {
+		logger.Printf(logger.ERROR, "[identity:%d] Can't send response (%v): %v\n", cid, resp, err)
+		return
+	}
+	return
 }

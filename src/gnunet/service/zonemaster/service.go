@@ -25,10 +25,10 @@ import (
 
 	"gnunet/config"
 	"gnunet/core"
+	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
-	"gnunet/service/store"
 	"gnunet/transport"
 	"gnunet/util"
 
@@ -91,7 +91,7 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 	// assemble log label
 	var id int
 	var label string
-	if v := ctx.Value("params"); v != nil {
+	if v := ctx.Value(core.CtxKey("params")); v != nil {
 		if ps, ok := v.(util.ParameterSet); ok {
 			label, _ = util.GetParam[string](ps, "label")
 			id, _ = util.GetParam[int](ps, "id")
@@ -103,39 +103,108 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 	//------------------------------------------------------------------
 	// Identity service
 	//------------------------------------------------------------------
+
+	// start identity update listener
 	case *message.IdentityStartMsg:
-		// flag client as update receiver
-		zm.identity.FollowUpdates(id)
-		// initial update is to send all existing identites
-		var err error
-		var list []*store.Identity
-		if list, err = zm.zdb.GetIdentities(""); err != nil {
-			logger.Printf(logger.ERROR, "[zonemaster%s] %s", label, err.Error())
+		if err := zm.identity.Start(ctx, id); err != nil {
+			logger.Printf(logger.ERROR, "[zonemaster%s] Identity session for %d failed: %v\n", label, id, err)
 			return false
+		}
 
+	// create a new identity with given private key
+	case *message.IdentityCreateMsg:
+		if err := zm.identity.Create(ctx, id, m.ZoneKey, m.Name()); err != nil {
+			logger.Printf(logger.ERROR, "[zonemaster%s] Identity create failed: %v\n", label, err)
+			return false
 		}
-		for _, ident := range list {
-			resp := message.NewIdentityUpdateMsg(ident.Name, ident.Key)
-			logger.Printf(logger.DBG, "[zonemaster%s] Sending %v", label, resp)
-			if err = back.Send(ctx, resp); err != nil {
-				logger.Printf(logger.ERROR, "[zonemaster%s] Can't send response (%v): %v\n", label, resp, err)
-				return false
-			}
+
+	// rename identity
+	case *message.IdentityRenameMsg:
+		id, err := zm.zdb.GetIdentityByName(m.OldName(), IDENT_DEFAULT_SERVICE)
+		if err != nil {
+			logger.Printf(logger.ERROR, "[zonemaster%s] Identity lookup failed: %v\n", label, err)
+			return false
 		}
-		// terminate with EOL
-		resp := message.NewIdentityUpdateMsg("", nil)
+		// change name
+		id.Name = m.NewName()
+		err = zm.zdb.SetIdentity(id)
+
+		// send response
+		rc := enums.RC_OK
+		msg := ""
+		if err != nil {
+			rc = enums.RC_NO
+			msg = err.Error()
+		}
+		resp := message.NewIdentityResultCodeMsg(rc, msg)
 		if err = back.Send(ctx, resp); err != nil {
-			logger.Printf(logger.ERROR, "[zonemaster%s] Can't send response (%v): %v\n", label, resp, err)
-			return false
+			logger.Printf(logger.ERROR, "[identity:%s] Can't send response (%v): %v\n", label, resp, err)
 		}
 
-		/*
-			resp := message.NewIdentityResultCodeMsg(enums.RC_OK, "")
-			if err := back.Send(ctx, resp); err != nil {
-				logger.Printf(logger.ERROR, "[zonemaster%s] Can't send response (%v)\n", label, resp)
-				return false
-			}
-		*/
+	// delete identity
+	case *message.IdentityDeleteMsg:
+		id, err := zm.zdb.GetIdentityByName(m.Name(), IDENT_DEFAULT_SERVICE)
+		if err != nil {
+			logger.Printf(logger.ERROR, "[zonemaster%s] Identity lookup failed: %v\n", label, err)
+			return false
+		}
+		// delete in database
+		id.Name = ""
+		err = zm.zdb.SetIdentity(id)
+
+		// send response
+		rc := enums.RC_OK
+		msg := ""
+		if err != nil {
+			rc = enums.RC_NO
+			msg = err.Error()
+		}
+		resp := message.NewIdentityResultCodeMsg(rc, msg)
+		if err = back.Send(ctx, resp); err != nil {
+			logger.Printf(logger.ERROR, "[identity:%s] Can't send response (%v): %v\n", label, resp, err)
+		}
+
+	// lookup identity
+	case *message.IdentityLookupMsg:
+		id, err := zm.zdb.GetIdentityByName(m.Name, IDENT_DEFAULT_SERVICE)
+		if err != nil {
+			logger.Printf(logger.ERROR, "[zonemaster%s] Identity lookup failed: %v\n", label, err)
+			return false
+		}
+		resp := message.NewIdentityUpdateMsg(id.Name, id.Key)
+		logger.Printf(logger.DBG, "[identity:%s] Sending %v", label, resp)
+		if err = back.Send(ctx, resp); err != nil {
+			logger.Printf(logger.ERROR, "[identity:%s] Can't send response (%v): %v\n", label, resp, err)
+		}
+
+	// get default identity for service
+	case *message.IdentityGetDefaultMsg:
+		id, err := zm.zdb.GetDefaultIdentity(m.Service())
+		if err != nil {
+			logger.Printf(logger.ERROR, "[zonemaster%s] Identity lookup failed: %v\n", label, err)
+			return false
+		}
+		resp := message.NewIdentityUpdateMsg(id.Name, id.Key)
+		logger.Printf(logger.DBG, "[identity:%s] Sending %v", label, resp)
+		if err = back.Send(ctx, resp); err != nil {
+			logger.Printf(logger.ERROR, "[identity:%s] Can't send response (%v): %v\n", label, resp, err)
+		}
+
+	// set default identity for service
+	case *message.IdentitySetDefaultMsg:
+		err := zm.zdb.SetDefaultIdentity(m.ZoneKey, m.Service())
+
+		// send response
+		rc := enums.RC_OK
+		msg := ""
+		if err != nil {
+			rc = enums.RC_NO
+			msg = err.Error()
+		}
+		resp := message.NewIdentityResultCodeMsg(rc, msg)
+		if err = back.Send(ctx, resp); err != nil {
+			logger.Printf(logger.ERROR, "[identity:%s] Can't send response (%v): %v\n", label, resp, err)
+		}
 
 	//------------------------------------------------------------------
 	// Namestore service
