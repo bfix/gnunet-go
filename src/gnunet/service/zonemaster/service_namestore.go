@@ -60,6 +60,7 @@ func NewZoneIterator(id uint32, zk *crypto.ZonePrivate, db *store.ZoneDB) (zi *Z
 func (zi *ZoneIterator) Next() *message.NamestoreRecordResultMsg {
 	if zi.pos == len(zi.labels)-1 {
 		// end of list reached
+		return nil
 	}
 
 	return nil
@@ -67,11 +68,13 @@ func (zi *ZoneIterator) Next() *message.NamestoreRecordResultMsg {
 
 // NamestoreService to handle namestore requests
 type NamestoreService struct {
+	zm    *ZoneMaster
 	iters *util.Map[uint32, *ZoneIterator]
 }
 
-func NewNamestoreService() *NamestoreService {
+func NewNamestoreService(zm *ZoneMaster) *NamestoreService {
 	return &NamestoreService{
+		zm:    zm,
 		iters: util.NewMap[uint32, *ZoneIterator](),
 	}
 }
