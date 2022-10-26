@@ -133,12 +133,16 @@ func NewEmptyMessage(msgType enums.MsgType) (Message, error) {
 		return NewIdentityUpdateMsg("", nil), nil
 	case enums.MSG_IDENTITY_CREATE:
 		return NewIdentityCreateMsg(nil, ""), nil
-	case enums.MSG_IDENTITY_GET_DEFAULT:
-	case enums.MSG_IDENTITY_SET_DEFAULT:
 	case enums.MSG_IDENTITY_RENAME:
+		return NewIdentityRenameMsg("", ""), nil
 	case enums.MSG_IDENTITY_DELETE:
+		return NewIdentityDeleteMsg(""), nil
 	case enums.MSG_IDENTITY_LOOKUP:
-	case enums.MSG_IDENTITY_LOOKUP_BY_NAME:
+		return NewIdentityLookupMsg(""), nil
+	case enums.MSG_IDENTITY_GET_DEFAULT:
+		return NewIdentityGetDefaultMsg(""), nil
+	case enums.MSG_IDENTITY_SET_DEFAULT:
+		return NewIdentitySetDefaultMsg(nil, ""), nil
 
 	//------------------------------------------------------------------
 	// Namestore service
