@@ -58,8 +58,8 @@ func NewService(ctx context.Context, c *core.Core) *ZoneMaster {
 	srv.StoreRemote = srv.StoreDHT
 
 	// instantiate sub-services
-	srv.namestore = NewNamestoreService()
-	srv.identity = NewIdentityService()
+	srv.namestore = NewNamestoreService(srv)
+	srv.identity = NewIdentityService(srv)
 
 	return srv
 }
