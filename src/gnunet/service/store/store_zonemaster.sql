@@ -27,6 +27,22 @@ create table identities (
     unique (svc,name)
 );
 
+create table defaults (
+    svc      text unique,
+    ident    integer references identities(id)
+);
+
+create view v_defaults as select
+    i.id as id,
+    d.svc as svc,
+    i.name as name,
+    i.created as created,
+    i.modified as modified,
+    i.ztype as ztype,
+    i.zdata as zdata
+from identities i, defaults d
+where i.id = d.ident;
+
 create view zones as select
     id, name, created, modified, ztype, zdata
 from identities

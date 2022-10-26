@@ -70,6 +70,14 @@ type Identity struct {
 	Svc string // associated service
 }
 
+// NewIdentity creates an initialize instance for database access
+func NewIdentity(name string, sk *crypto.ZonePrivate, svc string) *Identity {
+	return &Identity{
+		Zone: *NewZone(name, sk),
+		Svc:  svc,
+	}
+}
+
 //----------------------------------------------------------------------
 
 type Label struct {
@@ -169,6 +177,87 @@ func (db *ZoneDB) Close() error {
 // Identity handling
 //----------------------------------------------------------------------
 
+// SetIdentity inserts, updates or deletes a zone in the database.
+// The function does not change timestamps which are in the
+// responsibility of the caller.
+//   - insert: Identity.ID is nil (0)
+//   - update: Identity.Name is set
+//   - remove: otherwise
+func (db *ZoneDB) SetIdentity(id *Identity) error {
+	// GNS zones are handled by Zone instances
+	if id.Svc == "gns" {
+		return db.SetZone(&id.Zone)
+	}
+	// check for identity insert
+	if id.ID == 0 {
+		stmt := "insert into identities(svc,name,created,modified,ztype,zdata) values(?,?,?,?,?,?)"
+		result, err := db.conn.Exec(stmt,
+			id.Svc, id.Name, id.Created.Val, id.Modified.Val, id.Key.Type, id.Key.KeyData)
+		if err != nil {
+			return err
+		}
+		id.ID, err = result.LastInsertId()
+		return err
+	}
+	// check for identity update (name and service only only)
+	if len(id.Name) > 0 {
+		stmt := "update identities set svc=?,name=?,modified=? where id=?"
+		result, err := db.conn.Exec(stmt, id.Svc, id.Name, id.Modified.Val, id.ID)
+		if err != nil {
+			return err
+		}
+		var num int64
+		if num, err = result.RowsAffected(); err == nil {
+			if num != 1 {
+				err = errors.New("update identity failed")
+			}
+		}
+		return err
+	}
+	// remove identity from database
+	_, err := db.conn.Exec("delete from identities where id=?", id.ID)
+	return err
+}
+
+// GetIdentity gets an identifier with given database id
+func (db *ZoneDB) GetIdentity(id int64) (ident *Identity, err error) {
+	// assemble identity from database row
+	stmt := "select svc,name,created,modified,ztype,zdata from identities where id=?"
+	ident = new(Identity)
+	ident.ID = id
+	row := db.conn.QueryRow(stmt, id)
+	var ztype enums.GNSType
+	var zdata []byte
+	if err = row.Scan(&ident.Svc, &ident.Name, &ident.Created.Val, &ident.Modified.Val, &ztype, &zdata); err == nil {
+		// reconstruct private zone key
+		ident.Key, err = crypto.NewZonePrivate(ztype, zdata)
+	}
+	return
+}
+
+// GetIdentity gets an identifier with given (name,svc)
+func (db *ZoneDB) GetIdentityByName(name, svc string) (ident *Identity, err error) {
+	// assemble identity from database row
+	var row *sql.Row
+	stmt := "select id,created,modified,ztype,zdata from identities where name=?"
+	if len(svc) > 0 {
+		stmt += " and svc=?"
+		row = db.conn.QueryRow(stmt, name, svc)
+	} else {
+		row = db.conn.QueryRow(stmt, name)
+	}
+	ident = new(Identity)
+	ident.Name = name
+	ident.Svc = svc
+	var ztype enums.GNSType
+	var zdata []byte
+	if err = row.Scan(&ident.ID, &ident.Created.Val, &ident.Modified.Val, &ztype, &zdata); err == nil {
+		// reconstruct private zone key
+		ident.Key, err = crypto.NewZonePrivate(ztype, zdata)
+	}
+	return
+}
+
 func (db *ZoneDB) GetIdentities(filter string, args ...any) (list []*Identity, err error) {
 	// assemble query
 	stmt := "select id,name,svc,created,modified,ztype,zdata from identities"
@@ -198,6 +287,35 @@ func (db *ZoneDB) GetIdentities(filter string, args ...any) (list []*Identity, e
 		// append to result list
 		list = append(list, i)
 	}
+	return
+}
+
+func (db *ZoneDB) GetDefaultIdentity(svc string) (ident *Identity, err error) {
+	// assemble identity from database row
+	stmt := "select id,name,created,modified,ztype,zdata from v_defaults where svc=?"
+	row := db.conn.QueryRow(stmt, svc)
+	ident = new(Identity)
+	ident.Svc = svc
+	var ztype enums.GNSType
+	var zdata []byte
+	if err = row.Scan(&ident.ID, &ident.Name, &ident.Created.Val, &ident.Modified.Val, &ztype, &zdata); err == nil {
+		// reconstruct private zone key
+		ident.Key, err = crypto.NewZonePrivate(ztype, zdata)
+	}
+	return
+}
+
+func (db *ZoneDB) SetDefaultIdentity(zk *crypto.ZonePrivate, svc string) (err error) {
+	// get database id of identity
+	stmt := "select id from identities where zdata=?"
+	row := db.conn.QueryRow(stmt, zk.KeyData)
+	var id int64
+	if err = row.Scan(&id); err != nil {
+		return
+	}
+	// set default
+	stmt = "insert into defaults(svc,ident) values(?,?) on conflict(svc) do update set ident=?"
+	_, err = db.conn.Exec(stmt, svc, id, id)
 	return
 }
 
@@ -251,6 +369,7 @@ func (db *ZoneDB) GetZone(id int64) (zone *Zone, err error) {
 	// assemble zone from database row
 	stmt := "select name,created,modified,ztype,zdata from zones where id=?"
 	zone = new(Zone)
+	zone.ID = id
 	var ztype enums.GNSType
 	var zdata []byte
 	row := db.conn.QueryRow(stmt, id)
