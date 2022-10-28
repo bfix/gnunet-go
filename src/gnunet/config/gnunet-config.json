@@ -90,6 +90,7 @@
             "file": "${VAR_LIB}/gns/zonemaster.sqlite3"
         },
         "gui": "127.0.0.1:8100",
+        "plugins": [],
         "service": {
             "socket": "${RT_USER}/gnunet-service-zonemaster-go.sock",
             "params": {

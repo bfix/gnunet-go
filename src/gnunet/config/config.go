@@ -101,6 +101,7 @@ type ZoneMasterConfig struct {
 	Period  int               `json:"period"`  // cycle period
 	Storage util.ParameterSet `json:"storage"` // persistence mechanism for zone data
 	GUI     string            `json:"gui"`     // listen address for HTTP GUI
+	PlugIns []string          `json:"plugins"` // list of plugins to load
 }
 
 //----------------------------------------------------------------------
