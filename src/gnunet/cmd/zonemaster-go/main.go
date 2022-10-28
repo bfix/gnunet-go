@@ -75,7 +75,7 @@ func main() {
 
 	// start services under zonemaster umbrella
 	ctx, cancel := context.WithCancel(context.Background())
-	srv := zonemaster.NewService(ctx, nil)
+	srv := zonemaster.NewService(ctx, nil, config.Cfg.ZoneMaster.PlugIns)
 	go srv.Run(ctx)
 
 	// start UDS listener if service is specified
