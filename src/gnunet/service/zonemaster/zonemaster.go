@@ -43,7 +43,8 @@ type ZoneMaster struct {
 	Module
 
 	zdb       *store.ZoneDB            // ZoneDB connection
-	plugins   map[enums.GNSType]Plugin // map of record types to handling plugin
+	plugins   []Plugin                 // list of loaded plugins
+	hdlrs     map[enums.GNSType]Plugin // maps record types to handling plugin
 	namestore *NamestoreService        // namestore subservice
 	identity  *IdentityService         // identity subservice
 }
@@ -53,7 +54,8 @@ func NewService(ctx context.Context, c *core.Core, plugins []string) *ZoneMaster
 	mod := NewModule(ctx, c)
 	srv := &ZoneMaster{
 		Module:  *mod,
-		plugins: make(map[enums.GNSType]Plugin),
+		plugins: make([]Plugin, 0),
+		hdlrs:   make(map[enums.GNSType]Plugin),
 	}
 
 	// set external function references (external services)
@@ -86,8 +88,9 @@ func NewService(ctx context.Context, c *core.Core, plugins []string) *ZoneMaster
 		logger.Printf(logger.ERROR, "[zonemaster] plugin '%s' loaded.", inst.Name())
 
 		// add plugin to resource record type handler
-		for _, t := range inst.CanHandle() {
-			srv.plugins[t] = inst
+		srv.plugins = append(srv.plugins, inst)
+		for t := range inst.CanHandle() {
+			srv.hdlrs[enums.GNSType(t)] = inst
 		}
 	}
 	return srv
@@ -113,7 +116,6 @@ func (zm *ZoneMaster) Run(ctx context.Context) {
 	// publish on start-up
 	if err = zm.Publish(ctx); err != nil {
 		logger.Printf(logger.ERROR, "[zonemaster] initial publish failed: %s", err.Error())
-		return
 	}
 
 	// periodically publish GNS blocks to the DHT

@@ -18,10 +18,26 @@
 
 package zonemaster
 
-import "gnunet/enums"
-
 // ZoneMasterPlugin handles resource record type specific functionality
 type Plugin interface {
+	// Name of the plugin
 	Name() string
-	CanHandle() []enums.GNSType
+
+	// CanHandle returns a list of resource record types
+	CanHandle() []uint32
+
+	// Value returns a human-readable description of RR data
+	Value(t uint32, rr []byte) string
+
+	// Template returns the new / edit template for custom types
+	Template() string
+
+	// TemplateNames returns the names for the "new" and "edit" dialogs
+	TemplateNames() (string, string)
+
+	// ToMap converts resource record data into GUI template variables
+	ToMap(t uint32, rr []byte) map[string]string
+
+	// FromMap converts a GUI template variables into resource record data
+	FromMap(t uint32, vars map[string]string) []byte
 }

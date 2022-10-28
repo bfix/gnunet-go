@@ -120,6 +120,10 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 			return strings.Join(flags, ",<br>")
 		},
 		"rrdata": func(t enums.GNSType, buf []byte) string {
+			// check if type is handled by plugin
+			if plugin, ok := zm.hdlrs[t]; ok {
+				return plugin.Value(uint32(t), buf)
+			}
 			return guiRRdata(t, buf)
 		},
 		"tabSetList": func(num int) (list map[int]int) {
@@ -130,9 +134,18 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 			return
 		},
 	})
+	// parse templates from embedded filesystem
 	if _, err := tpl.ParseFS(fsys, "*.htpl"); err != nil {
 		logger.Println(logger.ERROR, "[zonemaster] GUI templates failed: "+err.Error())
 		return
+	}
+
+	// add plugin templates
+	for _, inst := range zm.plugins {
+		if _, err := tpl.Parse(inst.Template()); err != nil {
+			logger.Printf(logger.ERROR, "[zonemaster] can't process plugin templates: %v", err)
+			continue
+		}
 	}
 
 	// start HTTP server
@@ -160,16 +173,28 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 
 //----------------------------------------------------------------------
 
+type DashboardData struct {
+	Plugins []string
+	Zones   []*store.ZoneGroup
+}
+
 // dashboard is the main entry point for the GUI
 func (zm *ZoneMaster) dashboard(w http.ResponseWriter, r *http.Request) {
+	data := new(DashboardData)
+
 	// collect information for the GUI
-	zg, err := zm.zdb.GetContent()
-	if err != nil {
+	var err error
+	if data.Zones, err = zm.zdb.GetContent(); err != nil {
 		_, _ = io.WriteString(w, "ERROR: "+err.Error())
 		return
 	}
+	// add plugin names to handle new resource records
+	data.Plugins = make([]string, 0)
+	for _, plugin := range zm.plugins {
+		data.Plugins = append(data.Plugins, plugin.Name())
+	}
 	// show dashboard
-	renderPage(w, zg, "dashboard")
+	renderPage(w, data, "dashboard")
 }
 
 //======================================================================
@@ -431,13 +456,35 @@ func (zm *ZoneMaster) new(w http.ResponseWriter, r *http.Request) {
 		// get all rrtypes used under given label
 		var rrs []*enums.GNSSpec
 		var label string
+		var templ string
 		if rrs, label, err = zm.zdb.GetRRTypes(id); err == nil {
-			// compile a list of acceptable types for new records
-			data.RRspecs = compatibleRR(rrs, label)
+			// check record mode for custom handling
+			mode, ok := r.URL.Query()["mode"]
+			if ok && mode[0] != "GNS" {
+				var pid int
+				if pid, ok = util.CastFromString[int](mode[0]); ok {
+					inst := zm.plugins[pid]
+					data.RRspecs = make([]*enums.GNSSpec, 0)
+					for _, t := range inst.CanHandle() {
+						s := &enums.GNSSpec{
+							Type:  enums.GNSType(t),
+							Flags: 0,
+						}
+						data.RRspecs = append(data.RRspecs, s)
+					}
+					templ, _ = inst.TemplateNames()
+				}
+			}
+			if !ok {
+				// enforce GNS behaviour:
+				// compile a list of acceptable types for new records
+				data.RRspecs = compatibleRR(rrs, label)
+				templ = "new_record"
+			}
 			data.Ref = id
 			data.Params["label"] = label
 			data.Params["lid"] = util.CastToString(id)
-			renderPage(w, data, "new_record")
+			renderPage(w, data, templ)
 			return
 		}
 	}

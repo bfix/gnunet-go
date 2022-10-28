@@ -33,7 +33,8 @@
 <div>
     <ul id="dashboard">
     {{if .}}
-        {{range $zi, $zone := .}}
+        {{$plugins := .Plugins}}
+        {{range $zi, $zone := .Zones}}
         <li>
             {{$z := $zone.Zone}}
             <span class="caret"><b>{{$z.Name}}</b></span> [{{keytype $z.Key.Type}}: {{$zone.PubID}}]
@@ -82,7 +83,15 @@
                         <li><h3>No resource records for label defined yet.</h3></li>
                     {{end}}
                         <li>
-                            <a href="/new/rr/{{$l.ID}}" title="Add new record..."><button class="icon blue">&#10010;</button></a>
+                            <form action="/new/rr/{{$l.ID}}" method="get">
+                                <select name="mode">
+                                    <option value="GNS" selected>GNS</option>
+                                    {{range $i,$v := $plugins}}
+                                    <option value="{{$i}}">{{$v}}</option>
+                                    {{end}}
+                                </select>
+                                <button id="submit" class="icon blue">&#10010;</button>
+                            </form>
                         </li>
                     </ul>
                 </li>
