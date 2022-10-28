@@ -120,14 +120,14 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 
 	// rename identity
 	case *message.IdentityRenameMsg:
-		id, err := zm.zdb.GetIdentityByName(m.OldName(), IDENT_DEFAULT_SERVICE)
+		id, err := zm.zdb.GetZoneByName(m.OldName())
 		if err != nil {
 			logger.Printf(logger.ERROR, "[zonemaster%s] Identity lookup failed: %v\n", label, err)
 			return false
 		}
 		// change name
 		id.Name = m.NewName()
-		err = zm.zdb.SetIdentity(id)
+		err = zm.zdb.SetZone(id)
 
 		// send response
 		rc := enums.RC_OK
@@ -143,14 +143,14 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 
 	// delete identity
 	case *message.IdentityDeleteMsg:
-		id, err := zm.zdb.GetIdentityByName(m.Name(), IDENT_DEFAULT_SERVICE)
+		id, err := zm.zdb.GetZoneByName(m.Name())
 		if err != nil {
 			logger.Printf(logger.ERROR, "[zonemaster%s] Identity lookup failed: %v\n", label, err)
 			return false
 		}
 		// delete in database
 		id.Name = ""
-		err = zm.zdb.SetIdentity(id)
+		err = zm.zdb.SetZone(id)
 
 		// send response
 		rc := enums.RC_OK
@@ -166,7 +166,7 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 
 	// lookup identity
 	case *message.IdentityLookupMsg:
-		id, err := zm.zdb.GetIdentityByName(m.Name, IDENT_DEFAULT_SERVICE)
+		id, err := zm.zdb.GetZoneByName(m.Name)
 		if err != nil {
 			logger.Printf(logger.ERROR, "[zonemaster%s] Identity lookup failed: %v\n", label, err)
 			return false
@@ -179,7 +179,7 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 
 	// get default identity for service
 	case *message.IdentityGetDefaultMsg:
-		id, err := zm.zdb.GetDefaultIdentity(m.Service())
+		id, err := zm.zdb.GetDefaultZone(m.Service())
 		if err != nil {
 			logger.Printf(logger.ERROR, "[zonemaster%s] Identity lookup failed: %v\n", label, err)
 			return false
@@ -192,7 +192,7 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 
 	// set default identity for service
 	case *message.IdentitySetDefaultMsg:
-		err := zm.zdb.SetDefaultIdentity(m.ZoneKey, m.Service())
+		err := zm.zdb.SetDefaultZone(m.ZoneKey, m.Service())
 
 		// send response
 		rc := enums.RC_OK
