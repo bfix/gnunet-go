@@ -83,7 +83,7 @@ func main() {
 		sockHdlr := service.NewSocketHandler("zonemaster", srv)
 		if err = sockHdlr.Start(ctx, config.Cfg.ZoneMaster.Service.Socket, config.Cfg.ZoneMaster.Service.Params); err != nil {
 			logger.Printf(logger.ERROR, "[zonemaster] Error: '%s'", err.Error())
-			return
+			_ = sockHdlr.Stop()
 		}
 	}
 
@@ -101,9 +101,9 @@ func main() {
 		var rpc *service.JRPCServer
 		if rpc, err = service.RunRPCServer(ctx, ep); err != nil {
 			logger.Printf(logger.ERROR, "[zonemaster] RPC failed to start: %s", err.Error())
-			return
+		} else {
+			srv.InitRPC(rpc)
 		}
-		srv.InitRPC(rpc)
 	}
 	// handle OS signals
 	sigCh := make(chan os.Signal, 5)
