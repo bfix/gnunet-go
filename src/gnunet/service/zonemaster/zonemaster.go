@@ -26,6 +26,7 @@ import (
 	"gnunet/service/dht/blocks"
 	"gnunet/service/store"
 	"gnunet/util"
+	"plugin"
 	"time"
 
 	"github.com/bfix/gospel/logger"
@@ -41,16 +42,18 @@ import (
 type ZoneMaster struct {
 	Module
 
-	zdb       *store.ZoneDB     // ZoneDB connection
-	namestore *NamestoreService // namestore subservice
-	identity  *IdentityService  // identity subservice
+	zdb       *store.ZoneDB            // ZoneDB connection
+	plugins   map[enums.GNSType]Plugin // map of record types to handling plugin
+	namestore *NamestoreService        // namestore subservice
+	identity  *IdentityService         // identity subservice
 }
 
 // NewService initializes a new zone master service.
-func NewService(ctx context.Context, c *core.Core) *ZoneMaster {
+func NewService(ctx context.Context, c *core.Core, plugins []string) *ZoneMaster {
 	mod := NewModule(ctx, c)
 	srv := &ZoneMaster{
-		Module: *mod,
+		Module:  *mod,
+		plugins: make(map[enums.GNSType]Plugin),
 	}
 
 	// set external function references (external services)
@@ -61,6 +64,32 @@ func NewService(ctx context.Context, c *core.Core) *ZoneMaster {
 	srv.namestore = NewNamestoreService(srv)
 	srv.identity = NewIdentityService(srv)
 
+	// load all plugins
+	for _, pn := range plugins {
+		// get handle to plugin
+		plugin, err := plugin.Open(pn)
+		if err != nil {
+			logger.Printf(logger.ERROR, "[zonemaster] %v", err)
+			continue
+		}
+		// get plugin instance
+		sym, err := plugin.Lookup("Plugin")
+		if err != nil {
+			logger.Printf(logger.ERROR, "[zonemaster] can't lookup plugin instance: %v", err)
+			continue
+		}
+		inst, ok := sym.(Plugin)
+		if !ok {
+			logger.Println(logger.ERROR, "[zonemaster] can't cast plugin instance")
+			continue
+		}
+		logger.Printf(logger.ERROR, "[zonemaster] plugin '%s' loaded.", inst.Name())
+
+		// add plugin to resource record type handler
+		for _, t := range inst.CanHandle() {
+			srv.plugins[t] = inst
+		}
+	}
 	return srv
 }
 
