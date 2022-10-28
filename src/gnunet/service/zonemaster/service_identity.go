@@ -31,11 +31,6 @@ import (
 	"github.com/bfix/gospel/logger"
 )
 
-//nolint:stylecheck // my style is my style...
-const (
-	IDENT_DEFAULT_SERVICE = "ego"
-)
-
 //----------------------------------------------------------------------
 // "GNUnet Identity" service implementation:
 //----------------------------------------------------------------------
@@ -89,8 +84,8 @@ func (ident *IdentityService) Start(ctx context.Context, id int) (err error) {
 		return
 	}
 	// initial update is to send all existing identites
-	var list []*store.Identity
-	if list, err = ident.zm.zdb.GetIdentities(""); err != nil {
+	var list []*store.Zone
+	if list, err = ident.zm.zdb.GetZones(""); err != nil {
 		return
 	}
 	for _, ident := range list {
@@ -118,8 +113,8 @@ func (ident *IdentityService) Create(ctx context.Context, cid int, zk *crypto.Zo
 		return
 	}
 	// add identity
-	id := store.NewIdentity(name, zk, IDENT_DEFAULT_SERVICE)
-	err = ident.zm.zdb.SetIdentity(id)
+	id := store.NewZone(name, zk)
+	err = ident.zm.zdb.SetZone(id)
 	rc := enums.RC_OK
 	msg := ""
 	if err != nil {
