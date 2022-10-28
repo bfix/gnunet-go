@@ -16,37 +16,19 @@
 --
 -- SPDX-License-Identifier: AGPL3.0-or-later
 
-create table identities (
+create table zones (
     id       integer primary key autoincrement,
-    svc      text,
-    name     text,
+    name     text unique,
     created  integer,
     modified integer,
     ztype    integer,
-    zdata    blob,
-    unique (svc,name)
+    zdata    blob
 );
 
 create table defaults (
-    svc      text unique,
-    ident    integer references identities(id)
+    svc      text,
+    zid      integer references zones(id) default null
 );
-
-create view v_defaults as select
-    i.id as id,
-    d.svc as svc,
-    i.name as name,
-    i.created as created,
-    i.modified as modified,
-    i.ztype as ztype,
-    i.zdata as zdata
-from identities i, defaults d
-where i.id = d.ident;
-
-create view zones as select
-    id, name, created, modified, ztype, zdata
-from identities
-where svc = 'gns';
 
 create table labels (
     id       integer primary key autoincrement,
