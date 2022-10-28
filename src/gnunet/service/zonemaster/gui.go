@@ -122,7 +122,11 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 		"rrdata": func(t enums.GNSType, buf []byte) string {
 			// check if type is handled by plugin
 			if plugin, ok := zm.hdlrs[t]; ok {
-				return plugin.Value(uint32(t), buf)
+				val, err := plugin.Value(uint32(t), buf)
+				if err != nil {
+					return "Failed: " + err.Error()
+				}
+				return val
 			}
 			return guiRRdata(t, buf)
 		},

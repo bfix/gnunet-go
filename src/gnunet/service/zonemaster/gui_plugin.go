@@ -27,7 +27,7 @@ type Plugin interface {
 	CanHandle() []uint32
 
 	// Value returns a human-readable description of RR data
-	Value(t uint32, rr []byte) string
+	Value(t uint32, rr []byte) (string, error)
 
 	// Template returns the new / edit template for custom types
 	Template() string
@@ -36,8 +36,8 @@ type Plugin interface {
 	TemplateNames() (string, string)
 
 	// ToMap converts resource record data into GUI template variables
-	ToMap(t uint32, rr []byte) map[string]string
+	ToMap(t uint32, rr []byte) (map[string]string, error)
 
 	// FromMap converts a GUI template variables into resource record data
-	FromMap(t uint32, vars map[string]string) []byte
+	FromMap(t uint32, vars map[string]string) ([]byte, error)
 }
