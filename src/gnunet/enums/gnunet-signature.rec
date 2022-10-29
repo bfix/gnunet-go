@@ -1,6 +1,6 @@
 # -*- mode: rec -*-
 #
-# Registry for GNUnet Signature purposes
+# Registry for Signature purposes
 #
 
 %rec: SignaturePurpose
@@ -12,172 +12,572 @@
 %unique: Name
 %mandatory: Name
 %mandatory: Comment
+%mandatory: Package
 %allowed: Subsystem
 %sort: Number Name
 
 
+#-----------------------------------------------------------------------------
+# GNUnet
+
 Number: 0
 Name: TEST
 Comment: Test signature, not valid for anything other than writing a test. (Note that the signature verification code will accept this value).
+Package: GNUnet
 Subsystem: GNUnet
 
 Number: 1
 Name: TRANSPORT_PONG_OWN
 Comment: Signature for confirming that this peer uses a particular address.
+Package: GNUnet
 Subsystem: GNUnet-TRANSPORT
 
 Number: 2
 Name: TRANSPORT_DISCONNECT
 Comment: Signature for confirming that this peer intends to disconnect.
+Package: GNUnet
 Subsystem: GNUnet-TRANSPORT
 
 Number: 3
 Name: REVOCATION
 Comment: Signature for confirming a key revocation.
+Package: GNUnet
 Subsystem: GNUnet-Revocation
 
 Number: 4
 Name: NAMESPACE_ADVERTISEMENT
 Comment: Signature for a namespace/pseudonym advertisement (by the namespace owner).
+Package: GNUnet
 Subsystem: GNUnet-FS
 
 Number: 5
 Name: PEER_PLACEMENT
 Comment: Signature by which a peer affirms that it is providing a certain bit of content for use in LOCation URIs.
+Package: GNUnet
 Subsystem: GNUnet-FS
 
 Number: 6
 Name: DHT_HOP
 Comment: Signature by which a peer affirms that it forwarded a message in the DHT.
+Package: GNUnet
 Subsystem: GNUnet-DHT
 
 Number: 7
 Name: HELLO
 Comment: Signature by which a peer affirms its address.
+Package: GNUnet
 Subsystem: GNUnet-HELLO
-
 
 Number: 11
 Name: DNS_RECORD
 Comment: Signature on a GNUNET_DNS_Advertisement.
+Package: GNUnet
 Subsystem: GNUnet-DNS+Exit
 
 Number: 12
 Name: CHAT_MESSAGE
 Comment: Signature of a chat message.
+Package: GNUnet
 Subsystem: GNUnet-MESSENGER
 
 Number: 13
 Name: CHAT_RECEIPT
 Comment: Signature of confirmation receipt for a chat message.
+Package: GNUnet
 Subsystem: GNUnet-MESSENGER
 
 Number: 14
 Name: NSE_SEND
 Comment: Signature of a network size estimate message.
+Package: GNUnet
 Subsystem: GNUnet-NSE
 
 Number: 15
 Name: GNS_RECORD_SIGN
 Comment: Signature of a gnunet naming system record block
+Package: GNUnet
 Subsystem: GNUnet-GNSRECORD
 
 Number: 16
 Name: SET_ECC_KEY
 Comment: Purpose is to set a session key.
+Package: GNUnet
 Subsystem: GNUnet-CORE
 
 Number: 17
 Name: FS_UBLOCK
 Comment: UBlock Signature, done using DSS, not ECC
+Package: GNUnet
 Subsystem: GNUnet-FS
 
 Number: 18
 Name: REGEX_ACCEPT
 Comment: Accept state in regex DFA.  Peer affirms that it offers the matching service.
+Package: GNUnet
 Subsystem: GNUnet-REGEX
 
 Number: 20
 Name: CONVERSATION_RING
 Comment: Signature of a conversation ring.
+Package: GNUnet
 Subsystem: GNUnet-CONVERSATION
 
 Number: 21
 Name: SECRETSHARING_DKG1
 Comment: Signature for the first round of distributed key generation.
+Package: GNUnet
 Subsystem: GNUnet-SECRETSHARING
 
 Number: 22
 Name: SECRETSHARING_DKG2
 Comment: Signature for the second round of distributed key generation.
+Package: GNUnet
 Subsystem: GNUnet-SECRETSHARING
 
 Number: 23
 Name: SECRETSHARING_DECRYPTION
 Comment: Signature for the cooperative decryption.
+Package: GNUnet
 Subsystem: GNUnet-SECRETSHARING
 
 Number: 27
 Name: RECLAIM_CODE_SIGN
 Comment: Signature for a GNUid Ticket
+Package: GNUnet
 Subsystem: Reclaim
 
 Number: 28
 Name: DELEGATE
 Comment: Signature for a GNUnet credential
+Package: GNUnet
 Subsystem: Reclaim
 
 Number: 29
 Name: TRANSPORT_ADDRESS
 Comment: Signature by a peer affirming that this is one of its addresses for the given time period.
+Package: GNUnet
 Subsystem: GNUnet-TRANSPORT
 
 Number: 30
 Name: TRANSPORT_EPHEMERAL
 Comment: Signature by a peer affirming that the given ephemeral key is currently in use by that peer's transport service.
+Package: GNUnet
 Subsystem: GNUnet-TRANSPORT
 
 Number: 31
 Name: COMMUNICATOR_TCP_HANDSHAKE
 Comment: Signature used by TCP communicator handshake.
+Package: GNUnet
 Subsystem: GNUnet-TRANSPORT-TCP
 
 Number: 32
 Name: COMMUNICATOR_TCP_REKEY
 Comment: Signature used by TCP communicator rekey.
+Package: GNUnet
 Subsystem: GNUnet-TRANSPORT-TCP
 
 Number: 33
 Name: COMMUNICATOR_UDP_HANDSHAKE
 Comment: Signature used by UDP communicator handshake.
+Package: GNUnet
 Subsystem: GNUnet-TRANSPORT-UDP
 
 Number: 34
 Name: COMMUNICATOR_UDP_BROADCAST
 Comment: Signature used by UDP broadcasts.
+Package: GNUnet
 Subsystem: GNUnet-TRANSPORT-UDP
 
 Number: 35
 Name: TRANSPORT_CHALLENGE
 Comment: Signature by a peer affirming that it received a challenge (and stating how long it expects the address on which the challenge was received to remain valid).
+Package: GNUnet
 Subsystem: GNUnet-TRANSPORT
 
 Number: 36
 Name: TRANSPORT_DV_HOP
 Comment: Signature by a peer affirming that it is on a DV path.
+Package: GNUnet
 Subsystem: GNUnet-TRANSPORT
 
 Number: 37
 Name: TRANSPORT_DV_INITIATOR
 Comment: Signature by a peer affirming that it originated the DV path.
+Package: GNUnet
 Subsystem: GNUnet-TRANSPORT
 
 Number: 38
 Name: CADET_CONNECTION_INITIATOR
 Comment: Signature by a peer that like to create a connection.
+Package: GNUnet
 Subsystem: GNUnet-CADET
 
 Number: 39
 Name: COMMUNICATOR_TCP_HANDSHAKE_ACK
 Comment: Signature by a peer sending back the nonce received at initial handshake.
+Package: GNUnet
 Subsystem: GNUnet-TRANSPORT-TCP
+
+#-----------------------------------------------------------------------------
+# GNU Taler, >= 1000
+
+#
+# Exchange offline signatures (with master key)
+#
+Number: 1018
+Name: MASTER_DRAIN_PROFIT
+Comment: Affirm wiring of exchange profits to operator account.
+Package: GNU Taler
+
+Number: 1019
+Name: MASTER_PARTNER_DETAILS
+Comment: Signature affirming a partner configuration for wads.
+Package: GNU Taler
+
+Number: 1020
+Name: MASTER_SIGNING_KEY_REVOKED
+Comment: The given revocation key was revoked and must no longer be used.
+Package: GNU Taler
+
+Number: 1021
+Name: MASTER_ADD_WIRE
+Comment: Add payto URI to the list of our wire methods.
+Package: GNU Taler
+
+Number: 1022
+Name: MASTER_GLOBAL_FEES
+Comment: Signature over global set of fees charged by the exchange.
+Package: GNU Taler
+
+Number: 1023
+Name: MASTER_DEL_WIRE
+Comment: Remove payto URI from the list of our wire methods.
+Package: GNU Taler
+
+Number: 1024
+Name: MASTER_SIGNING_KEY_VALIDITY
+Comment: Purpose for signing public keys signed by the exchange master key.
+Package: GNU Taler
+
+Number: 1025
+Name: MASTER_DENOMINATION_KEY_VALIDITY
+Comment: Purpose for denomination keys signed by the exchange master key.
+Package: GNU Taler
+
+Number: 1026
+Name: MASTER_ADD_AUDITOR
+Comment: Add an auditor to the list of our auditors.
+Package: GNU Taler
+
+Number: 1027
+Name: MASTER_DEL_AUDITOR
+Comment: Remove an auditor from the list of our auditors.
+Package: GNU Taler
+
+Number: 1028
+Name: MASTER_WIRE_FEES
+Comment: Fees charged per (aggregate) wire transfer to the merchant.
+Package: GNU Taler
+
+Number: 1029
+Name: MASTER_DENOMINATION_KEY_REVOKED
+Comment: The given revocation key was revoked and must no longer be used.
+Package: GNU Taler
+
+Number: 1030
+Name: MASTER_WIRE_DETAILS
+Comment: Signature where the Exchange confirms its IBAN details in the /wire response.
+Package: GNU Taler
+
+Number: 1031
+Name: MASTER_EXTENSION
+Comment: Set the configuration of an extension (age-restriction or peer2peer)
+Package: GNU Taler
+
+
+#
+# Exchange online signatures (with signing key)
+#
+
+Number: 1032
+Name: EXCHANGE_RESERVE_STATUS
+Comment: Purpose for the state of a reserve, signed by the exchange's signing key.
+Package: GNU Taler
+
+Number: 1033
+Name: EXCHANGE_CONFIRM_DEPOSIT
+Comment: Signature where the Exchange confirms a deposit request.
+Package: GNU Taler
+
+Number: 1034
+Name: EXCHANGE_CONFIRM_MELT
+Comment: Signature where the exchange (current signing key) confirms the no-reveal index for cut-and-choose and the validity of the melted coins.
+Package: GNU Taler
+
+Number: 1035
+Name: EXCHANGE_KEY_SET
+Comment: Signature where the Exchange confirms the full /keys response set.
+Package: GNU Taler
+
+Number: 1036
+Name: EXCHANGE_CONFIRM_WIRE
+Comment: Signature where the Exchange confirms the /track/transaction response.
+Package: GNU Taler
+
+Number: 1037
+Name: EXCHANGE_CONFIRM_WIRE_DEPOSIT
+Comment: Signature where the Exchange confirms the /wire/deposit response.
+Package: GNU Taler
+
+Number: 1038
+Name: EXCHANGE_CONFIRM_REFUND
+Comment: Signature where the Exchange confirms a refund request.
+Package: GNU Taler
+
+Number: 1039
+Name: EXCHANGE_CONFIRM_RECOUP
+Comment: Signature where the Exchange confirms a recoup.
+Package: GNU Taler
+
+Number: 1040
+Name: EXCHANGE_RESERVE_CLOSED
+Comment: Signature where the Exchange confirms it closed a reserve.
+Package: GNU Taler
+
+Number: 1041
+Name: EXCHANGE_CONFIRM_RECOUP_REFRESH
+Comment: Signature where the Exchange confirms a recoup-refresh operation.
+Package: GNU Taler
+
+Number: 1042
+Name: EXCHANGE_AFFIRM_DENOM_UNKNOWN
+Comment: Signature where the Exchange confirms that it does not know a denomination (hash).
+Package: GNU Taler
+
+Number: 1043
+Name: EXCHANGE_AFFIRM_DENOM_EXPIRED
+Comment: Signature where the Exchange confirms that it does not consider a denomination valid for the given operation at this time.
+Package: GNU Taler
+
+Number: 1044
+Name: EXCHANGE_ACCOUNT_SETUP_SUCCESS
+Comment: Signature by which an exchange affirms that an account successfully passed the KYC checks.
+Package: GNU Taler
+
+Number: 1045
+Name: EXCHANGE_CONFIRM_PURSE_CREATION
+Comment: Signature by which the exchange affirms that a purse was created with a certain amount deposited into it.
+Package: GNU Taler
+
+Number: 1046
+Name: EXCHANGE_CONFIRM_PURSE_MERGED
+Comment: Signature by which the exchange affirms that a purse was merged into a reserve with a certain amount in it.
+Package: GNU Taler
+
+Number: 1047
+Name: EXCHANGE_PURSE_STATUS
+Comment: Purpose for the state of a purse, signed by the exchange's signing key.
+Package: GNU Taler
+
+Number: 1048
+Name: EXCHANGE_RESERVE_ATTEST_DETAILS
+Comment: Signature by which the exchange attests identity attributes of a particular reserve owner.
+Package: GNU Taler
+
+Number: 1049
+Name: EXCHANGE_CONFIRM_PURSE_REFUND
+Comment: Signature by which the exchange confirms that a purse expired and a coin was refunded.
+Package: GNU Taler
+
+#
+# Auditor signatures
+#
+
+Number: 1064
+Name: AUDITOR_EXCHANGE_KEYS
+Comment: Signature where the auditor confirms that he is aware of certain denomination keys from the exchange.
+Package: GNU Taler
+
+#
+# Merchant signatures
+#
+
+Number: 1101
+Name: MERCHANT_CONTRACT
+Comment: Signature where the merchant confirms a contract (to the customer).
+Package: GNU Taler
+
+Number: 1102
+Name: MERCHANT_REFUND
+Comment: Signature where the merchant confirms a refund (of a coin).
+Package: GNU Taler
+
+Number: 1103
+Name: MERCHANT_TRACK_TRANSACTION
+Comment: Signature where the merchant confirms that he needs the wire transfer identifier for a deposit operation.
+Package: GNU Taler
+
+Number: 1104
+Name: MERCHANT_PAYMENT_OK
+Comment: Signature where the merchant confirms that the payment was successful
+Package: GNU Taler
+
+Number: 1107
+Name: MERCHANT_WIRE_DETAILS
+Comment: Signature where the merchant confirms its own (salted) wire details (not yet really used).
+Package: GNU Taler
+
+#
+# Wallet signatures
+#
+
+Number: 1200
+Name: WALLET_RESERVE_WITHDRAW
+Comment: Signature where the reserve key confirms a withdraw request. Signed with the reserve private key.
+Package: GNU Taler
+
+Number: 1201
+Name: WALLET_COIN_DEPOSIT
+Comment: Signature made by the wallet of a user to confirm a deposit of a coin.
+Package: GNU Taler
+
+Number: 1202
+Name: WALLET_COIN_MELT
+Comment: Signature using a coin key confirming the melting of a coin. Signed with the coin's private key.
+Package: GNU Taler
+
+Number: 1203
+Name: WALLET_COIN_RECOUP
+Comment: Signature using a coin key requesting recoup. Signed with the coin's private key.
+Package: GNU Taler
+
+Number: 1204
+Name: WALLET_COIN_LINK
+Comment: Signature using a coin key authenticating link data. Signed with the old coin's private key.
+Package: GNU Taler
+
+Number: 1205
+Name: WALLET_ACCOUNT_SETUP
+Comment: Signature using a reserve key by which a wallet requests a payment target UUID for itself. Signs over just a purpose (no body), as the signature only serves to demonstrate that the request comes from the wallet controlling the private key, and not some third party.
+Package: GNU Taler
+
+Number: 1206
+Name: WALLET_COIN_RECOUP_REFRESH
+Comment: Signature using a coin key requesting recoup-refresh. Signed with the coin private key.
+Package: GNU Taler
+
+Number: 1207
+Name: WALLET_AGE_ATTESTATION
+Comment: Signature using a age restriction key for attestation of a particular age/age-group.
+Package: GNU Taler
+
+Number: 1208
+Name: WALLET_RESERVE_HISTORY
+Comment: Request full reserve history and pay for it. Signed with the reserve private key.
+Package: GNU Taler
+
+Number: 1209
+Name: WALLET_RESERVE_STATUS
+Comment: Request detailed account status (for free). Signed with the reserve private key.
+Package: GNU Taler
+
+Number: 1210
+Name: WALLET_PURSE_CREATE
+Comment: Request purse creation (without reserve). Signed by the purse private key.
+Package: GNU Taler
+
+Number: 1211
+Name: WALLET_PURSE_DEPOSIT
+Comment: Request coin to be deposited into a purse. Signed with the coin private key.
+Package: GNU Taler
+
+Number: 1212
+Name: WALLET_PURSE_STATUS
+Comment: Request purse status. Signed with the purse private key.
+Package: GNU Taler
+
+Number: 1213
+Name: WALLET_PURSE_MERGE
+Comment: Request purse to be merged with a reserve. Signed with the purse private key.
+Package: GNU Taler
+
+Number: 1214
+Name: WALLET_ACCOUNT_MERGE
+Comment: Request purse to be merged with a reserve. Signed by the reserve private key.
+Package: GNU Taler
+
+Number: 1215
+Name: WALLET_RESERVE_CLOSE
+Comment: Request account to be closed. Signed with the reserve private key.
+Package: GNU Taler
+
+Number: 1216
+Name: WALLET_PURSE_ECONTRACT
+Comment: Associates encrypted contract with a purse. Signed with the purse private key.
+Package: GNU Taler
+
+Number: 1217
+Name: WALLET_RESERVE_OPEN
+Comment: Request reserve to be kept open. Signed with the reserve private key.
+Package: GNU Taler
+
+Number: 1218
+Name: WALLET_RESERVE_OPEN_DEPOSIT
+Comment: Request coin to be used to pay for reserve to be kept open. Signed with the coin private key.
+Package: GNU Taler
+
+Number: 1219
+Name: WALLET_RESERVE_ATTEST_DETAILS
+Comment: Request attestation about reserve owner. Signed by the reserve private key.
+Package: GNU Taler
+
+#
+# Security module signatures
+#
+
+Number: 1250
+Name: SM_RSA_DENOMINATION_KEY
+Comment: Signature on a denomination key announcement.
+Package: GNU Taler
+
+Number: 1251
+Name: SM_SIGNING_KEY
+Comment: Signature on an exchange message signing key announcement.
+Package: GNU Taler
+
+Number: 1252
+Name: SM_CS_DENOMINATION_KEY
+Comment: Signature on a denomination key announcement.
+Package: GNU Taler
+
+#
+# Test signatures
+#
+
+Number: 1302
+Name: CLIENT_TEST_EDDSA
+Comment: EdDSA test signature.
+Package: GNU Taler
+
+Number: 1303
+Name: EXCHANGE_TEST_EDDSA
+Comment: EdDSA test signature.
+Package: GNU Taler
+
+#
+# GNU Anastasis signatures, >= 1400
+#
+
+Number: 1400
+Name: ANASTASIS_POLICY_UPLOAD
+Comment: EdDSA signature for a policy upload.
+Package: GNU Taler
+
+#
+# Sync signatures, >= 1450
+#
+
+Number: 1450
+Name: SYNC_BACKUP_UPLOAD
+Comment: EdDSA signature for a backup upload.
+Package: GNU Taler

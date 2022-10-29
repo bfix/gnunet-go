@@ -39,5 +39,6 @@ SIG_TRANSPORT_CHALLENGE SigPurpose = 35 // Signature by a peer affirming that it
 SIG_TRANSPORT_DV_HOP SigPurpose = 36 // Signature by a peer affirming that it is on a DV path.
 SIG_TRANSPORT_DV_INITIATOR SigPurpose = 37 // Signature by a peer affirming that it originated the DV path.
 SIG_CADET_CONNECTION_INITIATOR SigPurpose = 38 // Signature by a peer that like to create a connection.
+SIG_COMMUNICATOR_TCP_HANDSHAKE_ACK SigPurpose = 39 // Signature by a peer sending back the nonce received at initial handshake.
 
 )

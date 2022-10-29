@@ -69,5 +69,6 @@ GNS_TYPE_EDKEY GNSType = 65556 // Record type for EDKEY zone delegations.
 GNS_TYPE_ERIS_READ_CAPABILITY GNSType = 65557 // Encoding for Robust Immutable Storage (ERIS) binary read capability
 GNS_TYPE_MESSENGER_ROOM_ENTRY GNSType = 65558 // Record type to share an entry of a messenger room
 GNS_TYPE_TOMBSTONE GNSType = 65559 // Record type to indicate a previously delete record (PRIVATE only)
+GNS_TYPE_MESSENGER_ROOM_DETAILS GNSType = 65560 // Record type to store details about a messenger room
 
 )

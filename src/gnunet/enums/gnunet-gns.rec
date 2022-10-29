@@ -130,3 +130,8 @@ Number: 65560
 Name: MESSENGER_ROOM_DETAILS
 Comment: Record type to store details about a messenger room
 Contact: thejackimonster@gmail.com
+
+Number: 65561
+Name: DID_DOCUMENT
+Comment: Record type to store DID Documents
+Contact: schanzen@gnunet.org

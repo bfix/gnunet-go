@@ -30,6 +30,6 @@ const (
 	DHT_RO_DISCOVERY = 32768 // Peer discovery
 )
 
-//go:generate go run generate.go gnunet-dht.rec gnunet-dht.tpl dht_block_type.go
+//go:generate go run generate/main.go gnunet-dht.rec gnunet-dht.tpl dht_block_type.go
 
 //go:generate stringer -type=BlockType dht_block_type.go

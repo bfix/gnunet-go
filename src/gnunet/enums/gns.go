@@ -39,7 +39,7 @@ const (
 	GNS_REPLICATION_LEVEL = 10
 )
 
-//go:generate go run generate.go gnunet-gns.rec gnunet-gns.tpl gns_type.go
+//go:generate go run generate/main.go gnunet-gns.rec gnunet-gns.tpl gns_type.go
 
 //go:generate stringer -type=GNSType gns_type.go
 
