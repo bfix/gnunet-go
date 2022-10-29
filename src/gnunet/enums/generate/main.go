@@ -36,12 +36,13 @@ type Record struct {
 	Number     string
 	Name       string
 	Comment    string
+	Package    string
 	References string
 }
 
 // String returns a readable record string
 func (rec *Record) String() string {
-	return fmt.Sprintf("[%s:%s]\n", rec.Number, rec.Name)
+	return fmt.Sprintf("[%s:%s]", rec.Number, rec.Name)
 }
 
 // go:generate generator to read recfiles and fill templates (not exactly
@@ -80,7 +81,6 @@ func main() {
 			}
 		}
 		line := strings.TrimSpace(string(buf))
-		log.Printf("[%d] %s\n", state, line)
 
 		// perform state machine:
 		switch state {
@@ -98,9 +98,11 @@ func main() {
 		// read record data
 		case 1:
 			if len(line) == 0 {
-				// record done; add to list
-				log.Println("Record: " + rec.String())
-				recs = append(recs, rec)
+				// record done
+				if rec.Package == "GNUnet" || rec.Package == "" {
+					log.Println("Record: " + rec.String())
+					recs = append(recs, rec)
+				}
 				rec = nil
 				state = 0
 				continue
@@ -114,6 +116,8 @@ func main() {
 				rec.Name = strings.TrimSpace(kv[1])
 			case "Comment":
 				rec.Comment = strings.TrimSpace(kv[1])
+			case "Package":
+				rec.Package = strings.TrimSpace(kv[1])
 			case "References":
 				rec.References = strings.TrimSpace(kv[1])
 			}
