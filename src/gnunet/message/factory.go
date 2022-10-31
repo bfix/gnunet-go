@@ -149,20 +149,30 @@ func NewEmptyMessage(msgType enums.MsgType) (Message, error) {
 	//------------------------------------------------------------------
 
 	case enums.MSG_NAMESTORE_ZONE_ITERATION_START:
-		return NewNamestoreZoneIterStartMsg(nil), nil
+		return NewNamestoreZoneIterStartMsg(0, nil), nil
 	case enums.MSG_NAMESTORE_ZONE_ITERATION_NEXT:
+		return NewNamestoreZoneIterNextMsg(0, 0), nil
 	case enums.MSG_NAMESTORE_ZONE_ITERATION_STOP:
+		return NewNamestoreZoneIterStopMsg(0), nil
 	case enums.MSG_NAMESTORE_RECORD_STORE:
+		return NewNamestoreRecordStoreMsg(0, nil, ""), nil
 	case enums.MSG_NAMESTORE_RECORD_STORE_RESPONSE:
+		return NewNamestoreRecordStoreRespMsg(0, 0, ""), nil
 	case enums.MSG_NAMESTORE_RECORD_LOOKUP:
+		return NewNamestoreLabelLookupMsg(0, nil, "", false), nil
 	case enums.MSG_NAMESTORE_RECORD_LOOKUP_RESPONSE:
+		return NewNamestoreLabelLookupRespMsg(0, nil, ""), nil
+	case enums.MSG_NAMESTORE_MONITOR_START:
+		return NewNamestoreMonitorStartMsg(0, nil, 0, 0), nil
+	case enums.MSG_NAMESTORE_RECORD_RESULT:
+		return NewNamestoreRecordResultMsg(0, nil, ""), nil
+	case enums.MSG_NAMESTORE_MONITOR_NEXT:
+		return NewNamestoreMonitorNextMsg(0, 0), nil
+
+	// unhandled message
 	case enums.MSG_NAMESTORE_ZONE_TO_NAME:
 	case enums.MSG_NAMESTORE_ZONE_TO_NAME_RESPONSE:
-	case enums.MSG_NAMESTORE_MONITOR_START:
 	case enums.MSG_NAMESTORE_MONITOR_SYNC:
-	case enums.MSG_NAMESTORE_RECORD_RESULT:
-		return NewNamestoreRecordResultMsg(nil, ""), nil
-	case enums.MSG_NAMESTORE_MONITOR_NEXT:
 	}
 	return nil, fmt.Errorf("unknown message type %d", msgType)
 }
