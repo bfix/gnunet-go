@@ -468,11 +468,20 @@ func (zm *ZoneMaster) new(w http.ResponseWriter, r *http.Request) {
 				var pid int
 				if pid, ok = util.CastFromString[int](mode[0]); ok {
 					inst := zm.plugins[pid]
+					// convert rrs to plugin-compatible type
+					rrsPlugin := make([][2]uint32, 0)
+					for _, spec := range rrs {
+						rrsPlugin = append(rrsPlugin, [2]uint32{
+							uint32(spec.Type),
+							uint32(spec.Flags),
+						})
+					}
 					data.RRspecs = make([]*enums.GNSSpec, 0)
-					for _, t := range inst.CanHandle() {
+					// let the plugin decide what is compatible
+					for _, spec := range inst.Compatible(label, rrsPlugin) {
 						s := &enums.GNSSpec{
-							Type:  enums.GNSType(t),
-							Flags: 0,
+							Type:  enums.GNSType(spec[0]),
+							Flags: enums.GNSFlag(spec[1]),
 						}
 						data.RRspecs = append(data.RRspecs, s)
 					}
@@ -592,8 +601,16 @@ func (zm *ZoneMaster) editRec(w http.ResponseWriter, r *http.Request, data *NewE
 	if rec, err = zm.zdb.GetRecord(data.Ref); err != nil {
 		return
 	}
-	// build map of attribute values
-	pf := dlgPrefix[rec.RType]
+	// get prefix used for attributes and fields
+	pf, ok := dlgPrefix[rec.RType]
+	if !ok {
+		// no prefix defined; ask plugin
+		inst, ok := zm.hdlrs[rec.RType]
+		if !ok {
+			return errors.New("no prefix defined for record type")
+		}
+		pf = inst.Prefix(uint32(rec.RType)) + "_"
+	}
 
 	// save shared attributes
 	data.Params["prefix"] = pf
