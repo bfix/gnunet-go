@@ -281,6 +281,11 @@ func NullZonePrivate(ztype enums.GNSType) (*ZonePrivate, uint16) {
 	return zp, uint16(len(zp.KeyData) + 4)
 }
 
+// IsNull returns true for a NULL key
+func (zk *ZonePrivate) IsNull() bool {
+	return util.IsAll(zk.KeyData, 0)
+}
+
 // Bytes returns the binary representation
 func (zp *ZonePrivate) Bytes() []byte {
 	buf := new(bytes.Buffer)
@@ -371,6 +376,27 @@ func NewZoneKey(d []byte) (zk *ZoneKey, err error) {
 		err = zk.Init()
 	}
 	return
+}
+
+// NullZoneKey returns a "NULL" ZonePrivate for a given key
+func NullZoneKey(ztype enums.GNSType) (*ZoneKey, uint16) {
+	// get factory for given zone type
+	impl, ok := zoneImpl[ztype]
+	if !ok {
+		return nil, 0
+	}
+	kd := make([]byte, impl.PublicSize)
+	zp := &ZoneKey{
+		Type:    ztype, // need key type for length calculation
+		KeyData: kd,    // untyped key data (all 0)
+		impl:    nil,   // no implementation!
+	}
+	return zp, uint16(len(zp.KeyData) + 4)
+}
+
+// IsNull returns true for a NULL key
+func (zk *ZoneKey) IsNull() bool {
+	return util.IsAll(zk.KeyData, 0)
 }
 
 // Bytes returns the binary representation (can be used with 'init()')
