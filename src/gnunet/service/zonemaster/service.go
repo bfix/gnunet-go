@@ -25,7 +25,6 @@ import (
 
 	"gnunet/config"
 	"gnunet/core"
-	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
@@ -130,13 +129,11 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 		err = zm.zdb.SetZone(id)
 
 		// send response
-		rc := enums.RC_OK
-		msg := ""
+		rc := 0
 		if err != nil {
-			rc = enums.RC_NO
-			msg = err.Error()
+			rc = 1
 		}
-		resp := message.NewIdentityResultCodeMsg(rc, msg)
+		resp := message.NewIdentityResultCodeMsg(rc)
 		if err = back.Send(ctx, resp); err != nil {
 			logger.Printf(logger.ERROR, "[identity:%s] Can't send response (%v): %v\n", label, resp, err)
 		}
@@ -153,13 +150,11 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 		err = zm.zdb.SetZone(id)
 
 		// send response
-		rc := enums.RC_OK
-		msg := ""
+		rc := 0
 		if err != nil {
-			rc = enums.RC_NO
-			msg = err.Error()
+			rc = 1
 		}
-		resp := message.NewIdentityResultCodeMsg(rc, msg)
+		resp := message.NewIdentityResultCodeMsg(rc)
 		if err = back.Send(ctx, resp); err != nil {
 			logger.Printf(logger.ERROR, "[identity:%s] Can't send response (%v): %v\n", label, resp, err)
 		}
@@ -173,35 +168,6 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 		}
 		resp := message.NewIdentityUpdateMsg(id.Name, id.Key)
 		logger.Printf(logger.DBG, "[identity:%s] Sending %v", label, resp)
-		if err = back.Send(ctx, resp); err != nil {
-			logger.Printf(logger.ERROR, "[identity:%s] Can't send response (%v): %v\n", label, resp, err)
-		}
-
-	// get default identity for service
-	case *message.IdentityGetDefaultMsg:
-		id, err := zm.zdb.GetDefaultZone(m.Service())
-		if err != nil {
-			logger.Printf(logger.ERROR, "[zonemaster%s] Identity lookup failed: %v\n", label, err)
-			return false
-		}
-		resp := message.NewIdentityUpdateMsg(id.Name, id.Key)
-		logger.Printf(logger.DBG, "[identity:%s] Sending %v", label, resp)
-		if err = back.Send(ctx, resp); err != nil {
-			logger.Printf(logger.ERROR, "[identity:%s] Can't send response (%v): %v\n", label, resp, err)
-		}
-
-	// set default identity for service
-	case *message.IdentitySetDefaultMsg:
-		err := zm.zdb.SetDefaultZone(m.ZoneKey, m.Service())
-
-		// send response
-		rc := enums.RC_OK
-		msg := ""
-		if err != nil {
-			rc = enums.RC_NO
-			msg = err.Error()
-		}
-		resp := message.NewIdentityResultCodeMsg(rc, msg)
 		if err = back.Send(ctx, resp); err != nil {
 			logger.Printf(logger.ERROR, "[identity:%s] Can't send response (%v): %v\n", label, resp, err)
 		}

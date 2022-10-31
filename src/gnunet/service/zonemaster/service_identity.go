@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 	"gnunet/crypto"
-	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service/store"
 	"gnunet/transport"
@@ -115,13 +114,11 @@ func (ident *IdentityService) Create(ctx context.Context, cid int, zk *crypto.Zo
 	// add identity
 	id := store.NewZone(name, zk)
 	err = ident.zm.zdb.SetZone(id)
-	rc := enums.RC_OK
-	msg := ""
+	rc := 0
 	if err != nil {
-		rc = enums.RC_NO
-		msg = err.Error()
+		rc = 1
 	}
-	resp := message.NewIdentityResultCodeMsg(rc, msg)
+	resp := message.NewIdentityResultCodeMsg(rc)
 	if err = sess.back.Send(ctx, resp); err != nil {
 		logger.Printf(logger.ERROR, "[identity:%d] Can't send response (%v): %v\n", cid, resp, err)
 		return

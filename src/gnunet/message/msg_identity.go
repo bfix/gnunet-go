@@ -64,11 +64,16 @@ type IdentityUpdateMsg struct {
 
 	NameLen uint16              `order:"big"`
 	EOL     uint16              `order:"big"`
-	ZoneKey *crypto.ZonePrivate `init:"Init"`
 	Name_   []byte              `size:"NameLen"`
+	ZoneKey *crypto.ZonePrivate `init:"Init" opt:"(IsUsed)"`
 
 	// transient state
 	name string
+}
+
+// IsUsed to decide if key is used in message
+func (msg *IdentityUpdateMsg) IsUsed(fld string) bool {
+	return msg.EOL != uint16(enums.RC_YES)
 }
 
 // NewIdentityUpdateMsg creates an update message. If the zone key is nil,
@@ -80,10 +85,6 @@ func NewIdentityUpdateMsg(name string, zk *crypto.ZonePrivate) *IdentityUpdateMs
 	if zk == nil {
 		// tag end-of-list
 		msg.EOL = uint16(enums.RC_YES)
-		var size uint16
-		// assemble an empty zonekey
-		msg.ZoneKey, size = crypto.NullZonePrivate(enums.GNS_TYPE_PKEY)
-		msg.MsgSize += size
 	} else {
 		msg.name = name
 		msg.Name_ = util.WriteCString(name)
@@ -124,37 +125,27 @@ func (msg *IdentityUpdateMsg) Name() string {
 type IdentityResultCodeMsg struct {
 	MsgHeader
 
-	ResultCode enums.ResultCode `order:"big"`
-	Error      string           `opt:"(OnError)"`
-}
-
-// OnError returns true if an error message is attached
-func (msg *IdentityResultCodeMsg) OnError() bool {
-	return msg.ResultCode != enums.RC_OK
+	ResultCode uint32 `order:"big"`
 }
 
 // Init called after unmarshalling a message to setup internal state
 func (msg *IdentityResultCodeMsg) Init() error { return nil }
 
 // NewIdentityResultCodeMsg creates a new default message.
-func NewIdentityResultCodeMsg(rc enums.ResultCode, err string) *IdentityResultCodeMsg {
+func NewIdentityResultCodeMsg(rc int) *IdentityResultCodeMsg {
 	msg := &IdentityResultCodeMsg{
 		MsgHeader: MsgHeader{
 			MsgSize: 8,
 			MsgType: enums.MSG_IDENTITY_RESULT_CODE,
 		},
-		ResultCode: rc,
-	}
-	if rc != enums.RC_OK {
-		msg.Error = err
-		msg.MsgSize += uint16(len(err) + 1)
+		ResultCode: uint32(rc),
 	}
 	return msg
 }
 
 // String returns a human-readable representation of the message.
 func (msg *IdentityResultCodeMsg) String() string {
-	return fmt.Sprintf("IdentityResultCodeMsg{rc=%d,err='%s'}", msg.ResultCode, msg.Error)
+	return fmt.Sprintf("IdentityResultCodeMsg{rc=%d}", msg.ResultCode)
 }
 
 //----------------------------------------------------------------------
@@ -169,6 +160,7 @@ type IdentityCreateMsg struct {
 
 	NameLen  uint16              `order:"big"`
 	Reserved uint16              `order:"big"`
+	KeyLen   uint32              `order:"big"`
 	ZoneKey  *crypto.ZonePrivate `init:"Init"`
 	Name_    []byte              `size:"NameLen"`
 
@@ -360,114 +352,4 @@ func NewIdentityLookupMsg(name string) *IdentityLookupMsg {
 // String returns a human-readable representation of the message.
 func (msg *IdentityLookupMsg) String() string {
 	return fmt.Sprintf("IdentityLookupMsg{name='%s'}", msg.Name)
-}
-
-//----------------------------------------------------------------------
-// MSG_IDENTITY_GET_DEFAULT
-//
-// Get the default identity for named subsystem
-//----------------------------------------------------------------------
-
-// IdentityGetDefault to retrieve the default identity for a service
-type IdentityGetDefaultMsg struct {
-	MsgHeader
-
-	SrvLen   uint16 `order:"big"`
-	Reserved uint16 `order:"big"`
-	Service_ []byte `size:"SrvLen"`
-
-	// transient state
-	service string
-}
-
-// Init called after unmarshalling a message to setup internal state
-func (msg *IdentityGetDefaultMsg) Init() error {
-	msg.service, _ = util.ReadCString(msg.Service_, 0)
-	return nil
-}
-
-// NewIdentityGetDefaultMsg creates a new message
-func NewIdentityGetDefaultMsg(svc string) *IdentityGetDefaultMsg {
-	msg := &IdentityGetDefaultMsg{
-		MsgHeader: MsgHeader{
-			MsgSize: 8,
-			MsgType: enums.MSG_IDENTITY_DELETE,
-		},
-	}
-	if len(svc) > 0 {
-		msg.Service_ = util.WriteCString(svc)
-		msg.MsgSize += uint16(len(msg.Service_))
-		msg.service = svc
-	}
-	return msg
-}
-
-// String returns a human-readable representation of the message.
-func (msg *IdentityGetDefaultMsg) String() string {
-	return fmt.Sprintf("IdentityGetDefaultMsg{svc='%s'}", msg.service)
-}
-
-// Service name
-func (msg *IdentityGetDefaultMsg) Service() string {
-	return msg.service
-}
-
-//----------------------------------------------------------------------
-// MSG_IDENTITY_SET_DEFAULT
-//
-// Set default identity for named subsystem
-//----------------------------------------------------------------------
-
-// IdentitySetDefaultMsg sets a default identity (key) for a service
-type IdentitySetDefaultMsg struct {
-	MsgHeader
-
-	SrvLen   uint16              `order:"big"`
-	Reserved uint16              `order:"big"`
-	ZoneKey  *crypto.ZonePrivate `init:"Init"`
-	Service_ []byte              `size:"SrvLen"`
-
-	// transient state
-	service string
-}
-
-// Init called after unmarshalling a message to setup internal state
-func (msg *IdentitySetDefaultMsg) Init() error {
-	msg.service, _ = util.ReadCString(msg.Service_, 0)
-	return nil
-}
-
-// NewIdentitySetDefaultMsg renames an identity
-func NewIdentitySetDefaultMsg(zk *crypto.ZonePrivate, svc string) *IdentitySetDefaultMsg {
-	msg := &IdentitySetDefaultMsg{
-		MsgHeader: MsgHeader{
-			MsgSize: 8,
-			MsgType: enums.MSG_IDENTITY_DELETE,
-		},
-	}
-	if zk == nil {
-		// assemble an empty zonekey
-		var size uint16
-		msg.ZoneKey, size = crypto.NullZonePrivate(enums.GNS_TYPE_PKEY)
-		msg.MsgSize += size
-	} else {
-		msg.ZoneKey = zk
-		msg.MsgSize += uint16(zk.KeySize() + 4)
-	}
-	if len(svc) > 0 {
-		msg.Service_ = util.WriteCString(svc)
-		msg.MsgSize += uint16(len(msg.Service_))
-		msg.service = svc
-	}
-	return msg
-}
-
-// String returns a human-readable representation of the message.
-func (msg *IdentitySetDefaultMsg) String() string {
-	return fmt.Sprintf("IdentitySetDefaultMsg{key=%s,svc='%s'}", msg.ZoneKey.ID(), msg.service)
-}
-
-// Service name
-func (msg *IdentitySetDefaultMsg) Service() string {
-	return msg.service
 }

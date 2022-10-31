@@ -128,7 +128,7 @@ func NewEmptyMessage(msgType enums.MsgType) (Message, error) {
 	case enums.MSG_IDENTITY_START:
 		return NewIdentityStartMsg(), nil
 	case enums.MSG_IDENTITY_RESULT_CODE:
-		return NewIdentityResultCodeMsg(enums.RC_OK, ""), nil
+		return NewIdentityResultCodeMsg(0), nil
 	case enums.MSG_IDENTITY_UPDATE:
 		return NewIdentityUpdateMsg("", nil), nil
 	case enums.MSG_IDENTITY_CREATE:
@@ -139,10 +139,6 @@ func NewEmptyMessage(msgType enums.MsgType) (Message, error) {
 		return NewIdentityDeleteMsg(""), nil
 	case enums.MSG_IDENTITY_LOOKUP:
 		return NewIdentityLookupMsg(""), nil
-	case enums.MSG_IDENTITY_GET_DEFAULT:
-		return NewIdentityGetDefaultMsg(""), nil
-	case enums.MSG_IDENTITY_SET_DEFAULT:
-		return NewIdentitySetDefaultMsg(nil, ""), nil
 
 	//------------------------------------------------------------------
 	// Namestore service
