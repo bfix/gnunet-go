@@ -26,6 +26,9 @@ type Plugin interface {
 	// CanHandle returns a list of resource record types
 	CanHandle() []uint32
 
+	// Compute a set of record specs allowed under a label with existing records
+	Compatible(label string, rrSpecs [][2]uint32) [][2]uint32
+
 	// Value returns a human-readable description of RR data
 	Value(t uint32, rr []byte) (string, error)
 
@@ -34,6 +37,9 @@ type Plugin interface {
 
 	// TemplateNames returns the names for the "new" and "edit" dialogs
 	TemplateNames() (string, string)
+
+	// Prefix returns the prefix for record attributes in map
+	Prefix(t uint32) string
 
 	// ToMap converts resource record data into GUI template variables
 	ToMap(t uint32, rr []byte) (map[string]string, error)
