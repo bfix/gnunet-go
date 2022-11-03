@@ -73,6 +73,12 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 		"date": func(ts util.AbsoluteTime) string {
 			return guiTime(ts)
 		},
+		"dateExp": func(ts util.AbsoluteTime, flags enums.GNSFlag) string {
+			if flags&enums.GNS_FLAG_EXPREL != 0 {
+				return guiDuration(ts)
+			}
+			return guiTime(ts)
+		},
 		"keytype": func(t enums.GNSType) string {
 			return guiKeyType(t)
 		},
@@ -81,12 +87,22 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 			data["prefix"] = pf
 			if spec.Flags&enums.GNS_FLAG_PRIVATE != 0 {
 				data[pf+"private"] = "on"
+				data[pf+"private_enforced"] = "on"
 			}
 			if spec.Flags&enums.GNS_FLAG_SHADOW != 0 {
 				data[pf+"shadow"] = "on"
+				data[pf+"shadow_enforced"] = "on"
 			}
 			if spec.Flags&enums.GNS_FLAG_SUPPL != 0 {
 				data[pf+"suppl"] = "on"
+				data[pf+"suppl_enforced"] = "on"
+			}
+			if spec.Flags&enums.GNS_FLAG_CRITICAL != 0 {
+				data[pf+"critical"] = "on"
+				data[pf+"critical_enforced"] = "on"
+			}
+			if spec.Flags&enums.GNS_FLAG_EXPREL != 0 {
+				data[pf+"ttl"] = "on"
 			}
 			return pf
 		},
@@ -113,6 +129,12 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 			}
 			if f&enums.GNS_FLAG_SUPPL != 0 {
 				flags = append(flags, "Suppl")
+			}
+			if f&enums.GNS_FLAG_CRITICAL != 0 {
+				flags = append(flags, "Critical")
+			}
+			if f&enums.GNS_FLAG_EXPREL != 0 {
+				flags = append(flags, "TTL")
 			}
 			if len(flags) == 0 {
 				return "None"
@@ -619,10 +641,15 @@ func (zm *ZoneMaster) editRec(w http.ResponseWriter, r *http.Request, data *NewE
 	data.Params["modified"] = guiTime(rec.Modified)
 	data.Params["label"], _ = zm.zdb.GetName("labels", rec.Label)
 	data.Params["lid"] = util.CastToString(rec.Label)
-	if rec.Expire.IsNever() {
-		data.Params[pf+"never"] = "on"
+	if rec.Flags&enums.GNS_FLAG_EXPREL != 0 {
+		data.Params[pf+"ttl"] = "on"
+		data.Params[pf+"ttl_value"] = guiDuration(rec.Expire)
 	} else {
-		data.Params[pf+"expires"] = htmlTime(rec.Expire)
+		if rec.Expire.IsNever() {
+			data.Params[pf+"never"] = "on"
+		} else {
+			data.Params[pf+"expires"] = htmlTime(rec.Expire)
+		}
 	}
 	if rec.Flags&enums.GNS_FLAG_PRIVATE != 0 {
 		data.Params[pf+"private"] = "on"
@@ -632,6 +659,9 @@ func (zm *ZoneMaster) editRec(w http.ResponseWriter, r *http.Request, data *NewE
 	}
 	if rec.Flags&enums.GNS_FLAG_SUPPL != 0 {
 		data.Params[pf+"suppl"] = "on"
+	}
+	if rec.Flags&enums.GNS_FLAG_CRITICAL != 0 {
+		data.Params[pf+"critical"] = "on"
 	}
 	// get record instance
 	var inst rr.RR

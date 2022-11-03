@@ -68,7 +68,7 @@
                                     <td>{{rrtype $rec.RType}}</td>
                                     <td>{{rrdata $rec.RType $rec.Data}}</td>
                                     <td>{{rrflags $rec.Flags}}</td>
-                                    <td>{{date $rec.Expire}}</td>
+                                    <td>{{dateExp $rec.Expire $rec.Flags}}</td>
                                     <td>{{date $rec.Created}}</td>
                                     <td>{{date $rec.Modified}}</td>
                                     <td>

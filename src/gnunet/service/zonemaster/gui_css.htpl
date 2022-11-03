@@ -230,5 +230,17 @@
     input.alternate:checked ~ div.alternate {
         display: none;
     }
+    div.toggle-on {
+        display: none;
+    }
+    div.toggle-off {
+        display: block;
+    }
+    input.toggle:checked ~ div.toggle-on {
+        display: block;
+    }
+    input.toggle:checked ~ div.toggle-off {
+        display: none;
+    }
 </style>
 {{end}}

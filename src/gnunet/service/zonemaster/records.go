@@ -22,7 +22,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/service/dht/blocks"
 	"gnunet/service/gns/rr"
@@ -87,6 +86,19 @@ func htmlTime(ts util.AbsoluteTime) string {
 	return time.UnixMicro(int64(ts.Val)).Format(timeHTML)
 }
 
+func parseDuration(s string) uint64 {
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 3600000000 // 1 hour default
+	}
+	return uint64(d.Microseconds())
+}
+
+func guiDuration(ts util.AbsoluteTime) string {
+	d := time.Duration(ts.Val) * time.Microsecond
+	return d.String()
+}
+
 func guiTime(ts util.AbsoluteTime) string {
 	if ts.IsNever() {
 		return "Never"
@@ -109,7 +121,7 @@ func guiRRdata(t enums.GNSType, buf []byte) string {
 	// get record instance
 	inst, err := rr.ParseRR(t, buf)
 	if err != nil {
-		return "<unknown>"
+		return "(invalid)"
 	}
 	// type-dependent rendering
 	switch rec := inst.(type) {
@@ -177,10 +189,15 @@ func guiPrefix(t enums.GNSType) string {
 // parse expiration time and flags from GUI parameters
 func guiParse(params map[string]string, pf string) (exp util.AbsoluteTime, flags enums.GNSFlag) {
 	// parse expiration time
-	exp = util.AbsoluteTimeNever()
-	if _, ok := params[pf+"never"]; !ok {
-		ts, _ := time.Parse(timeHTML, params[pf+"expires"])
-		exp.Val = uint64(ts.UnixMicro())
+	if _, ok := params[pf+"ttl"]; ok {
+		flags |= enums.GNS_FLAG_EXPREL
+		exp.Val = parseDuration(params[pf+"ttl_value"])
+	} else {
+		exp = util.AbsoluteTimeNever()
+		if _, ok := params[pf+"never"]; !ok {
+			ts, _ := time.Parse(timeHTML, params[pf+"expires"])
+			exp.Val = uint64(ts.UnixMicro())
+		}
 	}
 	// parse flags
 	flags = 0
@@ -192,6 +209,9 @@ func guiParse(params map[string]string, pf string) (exp util.AbsoluteTime, flags
 	}
 	if _, ok := params[pf+"suppl"]; ok {
 		flags |= enums.GNS_FLAG_SUPPL
+	}
+	if _, ok := params[pf+"critical"]; ok {
+		flags |= enums.GNS_FLAG_CRITICAL
 	}
 	return
 }
@@ -351,7 +371,7 @@ func compatibleRR(in []*enums.GNSSpec, label string) (out []*enums.GNSSpec) {
 }
 
 // get a list of resource records for a given label in a zone.
-func (zm *ZoneMaster) getRecords(zk *crypto.ZoneKey, label int64) (rs *blocks.RecordSet, expire util.AbsoluteTime, err error) {
+func (zm *ZoneMaster) GetRecordSet(label int64) (rs *blocks.RecordSet, expire util.AbsoluteTime, err error) {
 	// collect records for zone label
 	var recs []*store.Record
 	if recs, err = zm.zdb.GetRecords("lid=%d", label); err != nil {

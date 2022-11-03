@@ -25,6 +25,8 @@ import (
 
 	"gnunet/config"
 	"gnunet/core"
+	"gnunet/crypto"
+	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
@@ -135,7 +137,7 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 		}
 		resp := message.NewIdentityResultCodeMsg(rc)
 		if err = back.Send(ctx, resp); err != nil {
-			logger.Printf(logger.ERROR, "[identity:%s] Can't send response (%v): %v\n", label, resp, err)
+			logger.Printf(logger.ERROR, "[identity%s] Can't send response (%v): %v\n", label, resp, err)
 		}
 
 	// delete identity
@@ -156,20 +158,20 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 		}
 		resp := message.NewIdentityResultCodeMsg(rc)
 		if err = back.Send(ctx, resp); err != nil {
-			logger.Printf(logger.ERROR, "[identity:%s] Can't send response (%v): %v\n", label, resp, err)
+			logger.Printf(logger.ERROR, "[identity%s] Can't send response (%v): %v\n", label, resp, err)
 		}
 
 	// lookup identity
 	case *message.IdentityLookupMsg:
 		id, err := zm.zdb.GetZoneByName(m.Name)
 		if err != nil {
-			logger.Printf(logger.ERROR, "[zonemaster%s] Identity lookup failed: %v\n", label, err)
+			logger.Printf(logger.ERROR, "[identity%s] Identity lookup failed: %v\n", label, err)
 			return false
 		}
 		resp := message.NewIdentityUpdateMsg(id.Name, id.Key)
-		logger.Printf(logger.DBG, "[identity:%s] Sending %v", label, resp)
+		logger.Printf(logger.DBG, "[identity%s] Sending %v", label, resp)
 		if err = back.Send(ctx, resp); err != nil {
-			logger.Printf(logger.ERROR, "[identity:%s] Can't send response (%v): %v\n", label, resp, err)
+			logger.Printf(logger.ERROR, "[identity%s] Can't send response (%v): %v\n", label, resp, err)
 		}
 
 	//------------------------------------------------------------------
@@ -178,10 +180,51 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 
 	// start new zone iteration
 	case *message.NamestoreZoneIterStartMsg:
+		// setup iterator
 		iter := zm.namestore.NewIterator(m.ID, m.ZoneKey)
-		resp := iter.Next()
+		// return first result
+		resp, done := iter.Next()
+		if done {
+			zm.namestore.DropIterator(m.ID)
+		}
+		logger.Printf(logger.DBG, "[namestore%s] Sending %v", label, resp)
 		if err := back.Send(ctx, resp); err != nil {
-			logger.Printf(logger.ERROR, "[zonemaster%s] Can't send response (%v)\n", label, resp)
+			logger.Printf(logger.ERROR, "[namestore%s] Can't send response (%v)\n", label, resp)
+			return false
+		}
+
+	// next label from zone iteration
+	case *message.NamestoreZoneIterNextMsg:
+		var resp message.Message
+		// lookup zone iterator
+		iter, ok := zm.namestore.GetIterator(m.ID)
+		if !ok {
+			zk, _ := crypto.NullZonePrivate(enums.GNS_TYPE_PKEY)
+			resp = message.NewNamestoreRecordResultMsg(m.ID, zk, "")
+		} else {
+			// return next result
+			var done bool
+			resp, done = iter.Next()
+			if done {
+				zm.namestore.DropIterator(m.ID)
+			}
+		}
+		logger.Printf(logger.DBG, "[namestore%s] Sending %v", label, resp)
+		if err := back.Send(ctx, resp); err != nil {
+			logger.Printf(logger.ERROR, "[namestore%s] Can't send response (%v)\n", label, resp)
+			return false
+		}
+
+	// store labeled record sets to zone
+	case *message.NamestoreRecordStoreMsg:
+		var rc uint32
+		if !zm.namestore.Store(m.ZoneKey, m.RSets) {
+			rc = 1
+		}
+		resp := message.NewNamestoreRecordStoreRespMsg(m.ID, rc)
+		logger.Printf(logger.DBG, "[namestore%s] Sending %v", label, resp)
+		if err := back.Send(ctx, resp); err != nil {
+			logger.Printf(logger.ERROR, "[namestore%s] Can't send response (%v)\n", label, resp)
 			return false
 		}
 

@@ -85,12 +85,14 @@ func NewService(ctx context.Context, c *core.Core, plugins []string) *ZoneMaster
 			logger.Println(logger.ERROR, "[zonemaster] can't cast plugin instance")
 			continue
 		}
-		logger.Printf(logger.ERROR, "[zonemaster] plugin '%s' loaded.", inst.Name())
+		logger.Printf(logger.INFO, "[zonemaster] plugin '%s' loaded.", inst.Name())
 
 		// add plugin to resource record type handler
 		srv.plugins = append(srv.plugins, inst)
-		for t := range inst.CanHandle() {
-			srv.hdlrs[enums.GNSType(t)] = inst
+		for _, t := range inst.CanHandle() {
+			gt := enums.GNSType(t)
+			srv.hdlrs[gt] = inst
+			logger.Printf(logger.INFO, "[zonemaster] Plugin handles type %s (%d)", gt, t)
 		}
 	}
 	return srv
@@ -168,7 +170,7 @@ func (zm *ZoneMaster) PublishZoneLabel(ctx context.Context, zone *store.Zone, la
 	logger.Printf(logger.INFO, "[zonemaster] Publishing label '%s' of zone %s", label.Name, zk.ID())
 
 	// collect all records for label
-	rrSet, expire, err := zm.getRecords(zk, label.ID)
+	rrSet, expire, err := zm.GetRecordSet(label.ID)
 	if err != nil {
 		return err
 	}
@@ -204,7 +206,7 @@ func (zm *ZoneMaster) PublishZoneLabel(ctx context.Context, zone *store.Zone, la
 	// build block for DHT
 	blkDHT, _ := blocks.NewGNSBlock().(*blocks.GNSBlock)
 	blkDHT.Body.Expire = expire
-	blkDHT.Body.Data, err = zk.Encrypt(rrSet.Bytes(), label.Name, expire)
+	blkDHT.Body.Data, err = zk.Encrypt(rrSet.RDATA(), label.Name, expire)
 	if err != nil {
 		return err
 	}
@@ -234,7 +236,7 @@ func (zm *ZoneMaster) PublishZoneLabel(ctx context.Context, zone *store.Zone, la
 	// build block for Namecache
 	blkNC, _ := blocks.NewGNSBlock().(*blocks.GNSBlock)
 	blkNC.Body.Expire = expire
-	blkNC.Body.Data = rrSet.Bytes()
+	blkNC.Body.Data = rrSet.RDATA()
 	// sign block
 	if dzk, _, err = zone.Key.Derive(label.Name, "gns"); err != nil {
 		return err

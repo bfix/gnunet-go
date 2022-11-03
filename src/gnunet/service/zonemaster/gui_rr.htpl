@@ -7,13 +7,24 @@
     <tr>
         <td align="right" valign="top"><b>Expires:</b></td>
         <td>
-            Never <input type="checkbox" class="alternate" name="{{$pf}}never"
-                {{if eq "on" (index .Params (print $pf "never"))}}checked="checked"{{end}}
+            TTL <input type="checkbox" class="toggle" name="{{$pf}}ttl"
+                {{if eq "on" (index .Params (print $pf "ttl"))}}checked="checked"{{end}}
             >
-            <div class="alternate">
-                At given date and time:
-                <input type="datetime-local" id="{{$pf}}expires" name="{{$pf}}expires" required
-                    value="{{index .Params (print $pf "expires")}}"
+            <div class="toggle-off">
+                Never <input type="checkbox" class="alternate" name="{{$pf}}never"
+                    {{if eq "on" (index .Params (print $pf "never"))}}checked="checked"{{end}}
+                >
+                <div class="alternate">
+                    At given date and time:
+                    <input type="datetime-local" id="{{$pf}}expires" name="{{$pf}}expires" required
+                        value="{{index .Params (print $pf "expires")}}"
+                    >
+                </div>
+            </div>
+            <div class="toggle-on">
+                Duration: <input type="text" name="{{$pf}}ttl_value"
+                    pattern="([0-9]*h)?([0-9]*m)?([0-9]*s)?"
+                    value="{{index .Params (print $pf "ttl_value")}}"
                 >
             </div>
         </td>
@@ -22,14 +33,21 @@
         <td align="right" valign="top"><b>Flags:</b></td>
         <td>
             <input type="checkbox" name="{{$pf}}private"
-                {{if eq "on" (index .Params (print $pf "private"))}}checked="checked" class="disabled"{{end}}
+                {{if eq "on" (index .Params (print $pf "private"))}}checked="checked"{{end}}
+                {{if eq "on" (index .Params (print $pf "private_enforced"))}}class="disabled"{{end}}
                 > Private<br>
             <input type="checkbox" name="{{$pf}}shadow"
-                {{if eq "on" (index .Params (print $pf "shadow"))}}checked="checked" class="disabled"{{end}}
+                {{if eq "on" (index .Params (print $pf "shadow"))}}checked="checked"{{end}}
+                {{if eq "on" (index .Params (print $pf "shadow_enforced"))}}class="disabled"{{end}}
                 > Shadow<br>
             <input type="checkbox" name="{{$pf}}suppl"
-                {{if eq "on" (index .Params (print $pf "suppl"))}}checked="checked" class="disabled"{{end}}
+                {{if eq "on" (index .Params (print $pf "suppl"))}}checked="checked"{{end}}
+                {{if eq "on" (index .Params (print $pf "suppl_enforced"))}}class="disabled"{{end}}
                 > Supplemental<br>
+            <input type="checkbox" name="{{$pf}}critical"
+                {{if eq "on" (index .Params (print $pf "critical"))}}checked="checked"{{end}}
+                {{if eq "on" (index .Params (print $pf "critical_enforced"))}}class="disabled"{{end}}
+                > Critical<br>
         </td>
     </tr>
     {{if eq .Action "new"}}
