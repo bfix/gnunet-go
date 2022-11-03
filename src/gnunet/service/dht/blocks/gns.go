@@ -19,6 +19,8 @@
 package blocks
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"gnunet/crypto"
@@ -221,7 +223,11 @@ func (b *GNSBlock) Verify() (ok bool, err error) {
 	return b.DerivedKeySig.Verify(buf)
 }
 
-// RecordSet ist the GNUnet data structure for a list of resource records
+//----------------------------------------------------------------------
+// Resource record
+//----------------------------------------------------------------------
+
+// RecordSet is the GNUnet data structure for a list of resource records
 // in a GNSBlock. As part of GNUnet messages, the record set is padded so that
 // the binary size of (records||padding) is the smallest power of two.
 type RecordSet struct {
@@ -239,6 +245,36 @@ func NewRecordSet() *RecordSet {
 	}
 }
 
+// NewRecordSetFromRDATA converts RDATA (see GNS spec) to rcord set
+func NewRecordSetFromRDATA(count uint32, rdata []byte) (rs *RecordSet, err error) {
+	rs = new(RecordSet)
+
+	// do we know the number of records?
+	if count == 0 {
+		// no: try to compute from rdata
+		var size uint16
+		for pos := 8; pos < len(rdata); {
+			if err = binary.Read(bytes.NewReader(rdata[pos:pos+2]), binary.BigEndian, &size); err != nil {
+				err = nil
+				break
+			}
+			count++
+			pos += int(size) + 16
+		}
+	}
+	if count == 0 {
+		return
+	}
+	// generate intermediate buffer
+	wrt := new(bytes.Buffer)
+	_ = binary.Write(wrt, binary.BigEndian, count)
+	_, _ = wrt.Write(rdata)
+	buf := wrt.Bytes()
+	// unmarshal record set
+	err = data.Unmarshal(rs, buf)
+	return
+}
+
 // AddRecord to append a resource record to the set.
 func (rs *RecordSet) AddRecord(rec *ResourceRecord) {
 	rs.Count++
@@ -249,7 +285,7 @@ func (rs *RecordSet) AddRecord(rec *ResourceRecord) {
 func (rs *RecordSet) SetPadding() {
 	size := 0
 	for _, rr := range rs.Records {
-		size += int(rr.Size) + 20
+		size += int(rr.Size) + 16
 	}
 	n := 1
 	for n < size {
@@ -271,8 +307,9 @@ func (rs *RecordSet) Expire() util.AbsoluteTime {
 	return expires
 }
 
-// Bytes returns the binary representation
-func (rs *RecordSet) Bytes() []byte {
+// RDATA returns the binary representation of the record set as specified
+// in the GNS draft.
+func (rs *RecordSet) RDATA() []byte {
 	// make sure padding exists
 	if rs.Padding == nil {
 		rs.SetPadding()
@@ -282,16 +319,20 @@ func (rs *RecordSet) Bytes() []byte {
 	if err != nil {
 		return nil
 	}
-	return buf
+	return buf[4:]
 }
+
+//----------------------------------------------------------------------
+// Resource record
+//----------------------------------------------------------------------
 
 // ResourceRecord is the GNUnet-specific representation of resource
 // records (not to be confused with DNS resource records).
 type ResourceRecord struct {
-	Expire util.AbsoluteTime // Expiration time for the record
-	Size   uint32            `order:"big"` // Number of bytes in 'Data'
+	Expire util.AbsoluteTime ``            // Expiration time for the record
+	Size   uint16            `order:"big"` // Number of bytes in 'Data'
+	Flags  enums.GNSFlag     `order:"big"` // Flags
 	RType  enums.GNSType     `order:"big"` // Type of the GNS/DNS record
-	Flags  enums.GNSFlag     `order:"big"` // Flags for the record
 	Data   []byte            `size:"Size"` // Record data
 }
 
