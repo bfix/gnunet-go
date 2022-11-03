@@ -32,7 +32,6 @@ import (
 	"gnunet/service/revocation"
 	"gnunet/util"
 
-	"github.com/bfix/gospel/data"
 	"github.com/bfix/gospel/logger"
 )
 
@@ -477,7 +476,7 @@ func (m *Module) newLEHORecord(name string, expires util.AbsoluteTime) *blocks.R
 	rr.Expire = expires
 	rr.Flags = enums.GNS_FLAG_SUPPL
 	rr.RType = enums.GNS_TYPE_LEHO
-	rr.Size = uint32(len(name) + 1)
+	rr.Size = uint16(len(name) + 1)
 	rr.Data = make([]byte, rr.Size)
 	copy(rr.Data, []byte(name))
 	rr.Data[len(name)] = 0
@@ -486,9 +485,9 @@ func (m *Module) newLEHORecord(name string, expires util.AbsoluteTime) *blocks.R
 
 // Records returns the list of resource records from binary data.
 func (m *Module) records(buf []byte) ([]*blocks.ResourceRecord, error) {
-	// parse  data into record set
-	rs := blocks.NewRecordSet()
-	if err := data.Unmarshal(rs, buf); err != nil {
+	// parse data into record set
+	rs, err := blocks.NewRecordSetFromRDATA(0, buf)
+	if err != nil {
 		return nil, err
 	}
 	return rs.Records, nil
