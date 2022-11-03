@@ -434,7 +434,7 @@ func (h *BoxHandler) Records(kind RRTypeList) *blocks.RecordSet {
 			rr.Expire = box.rec.Expire
 			rr.Flags = box.rec.Flags
 			rr.RType = box.Type
-			rr.Size = uint32(len(box.RR))
+			rr.Size = uint16(len(box.RR))
 			rr.Data = box.RR
 			rs.AddRecord(rr)
 		}

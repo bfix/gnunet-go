@@ -179,7 +179,7 @@ func QueryDNS(id int, name string, server net.IP, kind RRTypeList) *blocks.Recor
 				rr.Expire = util.NewAbsoluteTime(expires)
 				rr.Flags = 0
 				rr.RType = enums.GNSType(record.Header().Rrtype)
-				rr.Size = uint32(record.Header().Rdlength)
+				rr.Size = uint16(record.Header().Rdlength)
 				rr.Data = make([]byte, rr.Size)
 
 				if n < int(rr.Size) {
