@@ -380,6 +380,7 @@ const (
 	MSG_NAMESTORE_ZONE_ITERATION_START   MsgType = 445 // Client to service: please start iteration; receives "NAMESTORE_LOOKUP_NAME_RESPONSE" messages in return.
 	MSG_NAMESTORE_ZONE_ITERATION_NEXT    MsgType = 447 // Client to service: next record(s) in iteration please.
 	MSG_NAMESTORE_ZONE_ITERATION_STOP    MsgType = 448 // Client to service: stop iterating.
+	MSG_NAMESTORE_ZONE_ITERATION_END     MsgType = 449 // Service to client: done iterating.
 
 	//------------------------------------------------------------------
 	// LOCKMANAGER message types
