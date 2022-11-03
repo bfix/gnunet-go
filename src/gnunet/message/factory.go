@@ -145,15 +145,17 @@ func NewEmptyMessage(msgType enums.MsgType) (Message, error) {
 	//------------------------------------------------------------------
 
 	case enums.MSG_NAMESTORE_ZONE_ITERATION_START:
-		return NewNamestoreZoneIterStartMsg(0, nil), nil
+		return NewNamestoreZoneIterStartMsg(0, 0, nil), nil
 	case enums.MSG_NAMESTORE_ZONE_ITERATION_NEXT:
 		return NewNamestoreZoneIterNextMsg(0, 0), nil
 	case enums.MSG_NAMESTORE_ZONE_ITERATION_STOP:
 		return NewNamestoreZoneIterStopMsg(0), nil
+	case enums.MSG_NAMESTORE_ZONE_ITERATION_END:
+		return NewNamestoreZoneIterEndMsg(0), nil
 	case enums.MSG_NAMESTORE_RECORD_STORE:
-		return NewNamestoreRecordStoreMsg(0, nil, ""), nil
+		return NewNamestoreRecordStoreMsg(0, nil), nil
 	case enums.MSG_NAMESTORE_RECORD_STORE_RESPONSE:
-		return NewNamestoreRecordStoreRespMsg(0, 0, ""), nil
+		return NewNamestoreRecordStoreRespMsg(0, 0), nil
 	case enums.MSG_NAMESTORE_RECORD_LOOKUP:
 		return NewNamestoreLabelLookupMsg(0, nil, "", false), nil
 	case enums.MSG_NAMESTORE_RECORD_LOOKUP_RESPONSE:

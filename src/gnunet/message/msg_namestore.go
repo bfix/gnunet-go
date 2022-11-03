@@ -39,10 +39,10 @@ type GenericNamestoreMsg struct {
 }
 
 // return initialized common message header
-func newGenericNamestoreMsg(id int, size uint16, mtype enums.MsgType) GenericNamestoreMsg {
+func newGenericNamestoreMsg(id uint32, size uint16, mtype enums.MsgType) GenericNamestoreMsg {
 	return GenericNamestoreMsg{
 		MsgHeader: MsgHeader{size, mtype},
-		ID:        uint32(id),
+		ID:        id,
 	}
 }
 
@@ -54,19 +54,25 @@ func newGenericNamestoreMsg(id int, size uint16, mtype enums.MsgType) GenericNam
 type NamestoreZoneIterStartMsg struct {
 	GenericNamestoreMsg
 
-	ZoneKey *crypto.ZonePrivate `init:"Init"` // private zone key
+	Filter   uint16              `order:"big"` // filter settings
+	Reserved uint16              `order:"big"` // Reserved
+	KeyLen   uint32              `order:"big"` // length of private key
+	ZoneKey  *crypto.ZonePrivate `init:"Init"` // private zone key
 }
 
 // NewNamecacheCacheMsg creates a new default message.
-func NewNamestoreZoneIterStartMsg(id int, zone *crypto.ZonePrivate) *NamestoreZoneIterStartMsg {
-	// check for mandatory key
-	if zone == nil {
-		return nil
+func NewNamestoreZoneIterStartMsg(id uint32, filter int, zone *crypto.ZonePrivate) *NamestoreZoneIterStartMsg {
+	var size uint16 = 16
+	var kl uint32 = 0
+	if zone != nil {
+		kl = uint32(zone.KeySize()) + 4
+		size += uint16(kl)
 	}
-	size := uint16(zone.KeySize() + 12)
 	return &NamestoreZoneIterStartMsg{
 		GenericNamestoreMsg: newGenericNamestoreMsg(id, size, enums.MSG_NAMESTORE_ZONE_ITERATION_START),
+		Filter:              uint16(filter),
 		ZoneKey:             zone,
+		KeyLen:              kl,
 	}
 }
 
@@ -90,7 +96,7 @@ type NamestoreZoneIterNextMsg struct {
 }
 
 // NewNamestoreZoneIterNextMsg creates a message with given limit
-func NewNamestoreZoneIterNextMsg(id int, limit int) *NamestoreZoneIterNextMsg {
+func NewNamestoreZoneIterNextMsg(id uint32, limit int) *NamestoreZoneIterNextMsg {
 	return &NamestoreZoneIterNextMsg{
 		GenericNamestoreMsg: newGenericNamestoreMsg(id, 16, enums.MSG_NAMESTORE_ZONE_ITERATION_NEXT),
 		Limit:               uint64(limit),
@@ -115,7 +121,7 @@ type NamestoreZoneIterStopMsg struct {
 }
 
 // NewNamestoreZoneIterNextMsg creates a stop message
-func NewNamestoreZoneIterStopMsg(id int) *NamestoreZoneIterStopMsg {
+func NewNamestoreZoneIterStopMsg(id uint32) *NamestoreZoneIterStopMsg {
 	return &NamestoreZoneIterStopMsg{
 		GenericNamestoreMsg: newGenericNamestoreMsg(id, 8, enums.MSG_NAMESTORE_ZONE_ITERATION_STOP),
 	}
@@ -127,6 +133,30 @@ func (m *NamestoreZoneIterStopMsg) Init() error { return nil }
 // String returns a human-readable representation of the message.
 func (m *NamestoreZoneIterStopMsg) String() string {
 	return fmt.Sprintf("NamestoreZoneIterStopMsg{id=%d}", m.ID)
+}
+
+//----------------------------------------------------------------------
+// MSG_NAMESTORE_ZONE_ITERATION_END
+//----------------------------------------------------------------------
+
+// NamestoreZoneIterEndMsg stops a running iterator
+type NamestoreZoneIterEndMsg struct {
+	GenericNamestoreMsg
+}
+
+// NewNamestoreZoneIterEndMsg creates a stop message
+func NewNamestoreZoneIterEndMsg(id uint32) *NamestoreZoneIterEndMsg {
+	return &NamestoreZoneIterEndMsg{
+		GenericNamestoreMsg: newGenericNamestoreMsg(id, 8, enums.MSG_NAMESTORE_ZONE_ITERATION_END),
+	}
+}
+
+// Init called after unmarshalling a message to setup internal state
+func (m *NamestoreZoneIterEndMsg) Init() error { return nil }
+
+// String returns a human-readable representation of the message.
+func (m *NamestoreZoneIterEndMsg) String() string {
+	return fmt.Sprintf("NamestoreZoneIterEndMsg{id=%d}", m.ID)
 }
 
 //----------------------------------------------------------------------
@@ -142,6 +172,7 @@ type NamestoreRecordResultMsg struct {
 	RdLen    uint16              `order:"big"`    // size of record data
 	RdCount  uint16              `order:"big"`    // number of records
 	Reserved uint16              `order:"big"`    // alignment
+	KeyLen   uint32              `order:"big"`    // length of key
 	ZoneKey  *crypto.ZonePrivate `init:"Init"`    // private zone key
 	Name     []byte              `size:"NameLen"` // name string
 	Records  []byte              `size:"RdLen"`   // serialized record data
@@ -151,14 +182,20 @@ type NamestoreRecordResultMsg struct {
 }
 
 // NewNamestoreRecordResultMsg returns an initialize record message
-func NewNamestoreRecordResultMsg(id int, zk *crypto.ZonePrivate, label string) *NamestoreRecordResultMsg {
-	size := uint16(zk.KeySize()+4) + uint16(len(label)+16)
+func NewNamestoreRecordResultMsg(id uint32, zk *crypto.ZonePrivate, label string) *NamestoreRecordResultMsg {
+	var kl uint32
+	if zk != nil {
+		kl = uint32(zk.KeySize()) + 4
+	}
+	nl := uint16(len(label) + 1)
+	size := uint16(kl) + nl + 28
 	return &NamestoreRecordResultMsg{
 		GenericNamestoreMsg: newGenericNamestoreMsg(id, size, enums.MSG_NAMESTORE_RECORD_RESULT),
 		Expire:              util.AbsoluteTimeNever(),
+		KeyLen:              kl,
 		ZoneKey:             zk,
-		NameLen:             uint16(len(label)),
-		Name:                []byte(label),
+		NameLen:             nl,
+		Name:                util.WriteCString(label),
 		RdLen:               0,
 		RdCount:             0,
 	}
@@ -179,7 +216,7 @@ func (m *NamestoreRecordResultMsg) AddRecords(rs *blocks.RecordSet) {
 	rs.SetPadding()
 	// copy recordset to message
 	m.RdCount = uint16(rs.Count)
-	m.Records = rs.Bytes()
+	m.Records = rs.RDATA()
 	m.RdLen = uint16(len(m.Records))
 	m.MsgSize += m.RdLen
 	m.recset = rs
@@ -192,73 +229,92 @@ func (m *NamestoreRecordResultMsg) GetRecords() blocks.RecordSet {
 
 // String returns a human-readable representation of the message.
 func (m *NamestoreRecordResultMsg) String() string {
-	return fmt.Sprintf("NamestoreRecordResultMsg{id=%d,zone=%s,label='%s', %d records}",
-		m.ID, m.ZoneKey.ID(), string(m.Name), m.RdCount)
+	zone, label := "", ""
+	if !m.ZoneKey.IsNull() {
+		zone = fmt.Sprintf(",zone=%s", m.ZoneKey.ID())
+	}
+	if m.NameLen > 0 {
+		lbl, _ := util.ReadCString(m.Name, 0)
+		label = fmt.Sprintf(",label='%s'", lbl)
+	}
+	return fmt.Sprintf("NamestoreRecordResultMsg{id=%d%s%s,%d records}",
+		m.ID, zone, label, m.RdCount)
 }
 
 //----------------------------------------------------------------------
 // MSG_NAMESTORE_RECORD_STORE
 //----------------------------------------------------------------------
 
-// NamestoreRecordStoreMsg for storing records
+// NamestoreRecordSet for a label
+type NamestoreRecordSet struct {
+	NameLen  uint16 `order:"big"`    // Length of label
+	RdLen    uint16 `order:"big"`    // length of record data
+	RdCount  uint16 `order:"big"`    // number of records
+	Reserved uint16 `order:"big"`    // reserved
+	Name     []byte `size:"NameLen"` // label name
+	RecData  []byte `size:"RdLen"`   // record data
+}
+
+// NewNamestoreRecordSet for label and resource records.
+func NewNamestoreRecordSet(label string, rr *blocks.RecordSet) (rs *NamestoreRecordSet, size uint16) {
+	// make sure the record set is padded correctly
+	rr.SetPadding()
+
+	// copy recordset to message
+	rs = new(NamestoreRecordSet)
+	rs.NameLen = uint16(len(label) + 1)
+	rs.Name = util.WriteCString(label)
+	rs.RdCount = uint16(rr.Count)
+	rs.RecData = rr.RDATA()
+	rs.RdLen = uint16(len(rs.RecData))
+	size = rs.RdLen + rs.NameLen + 8
+	return
+}
+
+//----------------------------------------------------------------------
+
+// NamestoreRecordStoreMsg for storing records (multiple labels at a
+// time possible)
 type NamestoreRecordStoreMsg struct {
 	GenericNamestoreMsg
 
-	ZoneKey  *crypto.ZonePrivate `init:"Init"`    // private zone key
-	NameLen  uint16              `order:"big"`    // length of name (label)
-	RdLen    uint16              `order:"big"`    // length of record data
-	RdCount  uint16              `order:"big"`    // number of records
-	Reserved uint16              `order:"big"`    // reserved
-	Name     []byte              `size:"NameLen"` // name (label)
-	Records  []byte              `size:"RdLen"`   // record data
-
-	// transient state
-	recset *blocks.RecordSet
+	Count   uint16                `order:"big"`  // number of RecordSets
+	KeyLen  uint32                `order:"big"`  // length of zone key
+	ZoneKey *crypto.ZonePrivate   `init:"Init"`  // private zone key
+	RSets   []*NamestoreRecordSet `size:"Count"` // list of label record sets
 }
 
 // NewNamestoreRecordStoreMsg creates an initialized message (without records)
-func NewNamestoreRecordStoreMsg(id int, zk *crypto.ZonePrivate, label string) *NamestoreRecordStoreMsg {
-	size := uint16(zk.KeySize()+4) + uint16(len(label)+8)
+func NewNamestoreRecordStoreMsg(id uint32, zk *crypto.ZonePrivate) *NamestoreRecordStoreMsg {
+	var kl uint32
+	if zk != nil {
+		kl = uint32(zk.KeySize() + 4)
+	}
+	size := uint16(kl) + 14
 	return &NamestoreRecordStoreMsg{
 		GenericNamestoreMsg: newGenericNamestoreMsg(id, size, enums.MSG_NAMESTORE_RECORD_STORE),
 		ZoneKey:             zk,
-		NameLen:             uint16(len(label)),
-		Name:                []byte(label),
-		RdLen:               0,
-		RdCount:             0,
+		Count:               0,
+		KeyLen:              kl,
 	}
 }
 
 // Init called after unmarshalling a message to setup internal state
 func (m *NamestoreRecordStoreMsg) Init() error {
-	if m.recset == nil {
-		m.recset = new(blocks.RecordSet)
-		return data.Unmarshal(m.recset, m.Records)
-	}
 	return nil
 }
 
 // AddRecords adds the record data to the message
-func (m *NamestoreRecordStoreMsg) AddRecords(rs *blocks.RecordSet) {
-	// make sure the record set is padded correctly
-	rs.SetPadding()
-	// copy recordset to message
-	m.RdCount = uint16(rs.Count)
-	m.Records = rs.Bytes()
-	m.RdLen = uint16(len(m.Records))
-	m.MsgSize += m.RdLen
-	m.recset = rs
-}
-
-// GetRecords returns the record set contained in message
-func (m *NamestoreRecordStoreMsg) GetRecords() blocks.RecordSet {
-	return *m.recset
+func (m *NamestoreRecordStoreMsg) AddRecordSet(label string, rr *blocks.RecordSet) {
+	rs, size := NewNamestoreRecordSet(label, rr)
+	m.RSets = append(m.RSets, rs)
+	m.MsgSize += size
 }
 
 // String returns a human-readable representation of the message.
 func (m *NamestoreRecordStoreMsg) String() string {
-	return fmt.Sprintf("NamestoreRecordStoreMsg{id=%d,zone=%s,label='%s',%d records}",
-		m.ID, m.ZoneKey.ID(), string(m.Name), m.RdCount)
+	return fmt.Sprintf("NamestoreRecordStoreMsg{id=%d,zone=%s,%d record sets}",
+		m.ID, m.ZoneKey.ID(), m.Count)
 }
 
 //----------------------------------------------------------------------
@@ -269,23 +325,15 @@ func (m *NamestoreRecordStoreMsg) String() string {
 type NamestoreRecordStoreRespMsg struct {
 	GenericNamestoreMsg
 
-	Status   int32  `order:"big"`   // result status
-	ErrLen   uint16 `order:"big"`   // length of error message
-	Reserved uint16 `order:"big"`   // alignment
-	Error    []byte `size:"ErrLen"` // error message
+	Status uint32 `order:"big"` // result status
 }
 
 // NewNamestoreRecordStoreRespMsg creates a new message
-func NewNamestoreRecordStoreRespMsg(id int, rc enums.ResultCode, err string) *NamestoreRecordStoreRespMsg {
-	msg := &NamestoreRecordStoreRespMsg{
-		GenericNamestoreMsg: newGenericNamestoreMsg(id, 16, enums.MSG_NAMESTORE_RECORD_STORE_RESPONSE),
-		Status:              int32(rc),
+func NewNamestoreRecordStoreRespMsg(id uint32, rc uint32) *NamestoreRecordStoreRespMsg {
+	return &NamestoreRecordStoreRespMsg{
+		GenericNamestoreMsg: newGenericNamestoreMsg(id, 12, enums.MSG_NAMESTORE_RECORD_STORE_RESPONSE),
+		Status:              rc,
 	}
-	if rc != enums.RC_OK {
-		msg.MsgSize += uint16(len(err))
-		msg.Error = []byte(err)
-	}
-	return msg
 }
 
 // Init called after unmarshalling a message to setup internal state
@@ -293,11 +341,7 @@ func (m *NamestoreRecordStoreRespMsg) Init() error { return nil }
 
 // String returns a human-readable representation of the message.
 func (m *NamestoreRecordStoreRespMsg) String() string {
-	var msg string
-	if m.Status != int32(enums.RC_OK) {
-		msg = ",err=" + string(m.Error)
-	}
-	return fmt.Sprintf("NamestoreRecordStoreRespMsg{id=%d,rc=%d%s}", m.ID, m.Status, msg)
+	return fmt.Sprintf("NamestoreRecordStoreRespMsg{id=%d,rc=%d}", m.ID, m.Status)
 }
 
 //----------------------------------------------------------------------
@@ -314,7 +358,7 @@ type NamestoreLabelLookupMsg struct {
 }
 
 // NewNamestoreLabelLookupMsg creates a new message
-func NewNamestoreLabelLookupMsg(id int, zk *crypto.ZonePrivate, label string, isEdit bool) *NamestoreLabelLookupMsg {
+func NewNamestoreLabelLookupMsg(id uint32, zk *crypto.ZonePrivate, label string, isEdit bool) *NamestoreLabelLookupMsg {
 	var flag uint32
 	if isEdit {
 		flag = 1
@@ -359,7 +403,7 @@ type NamestoreLabelLookupRespMsg struct {
 }
 
 // NewNamestoreLabelLookupRespMsg creates a new message
-func NewNamestoreLabelLookupRespMsg(id int, zk *crypto.ZonePrivate, label string) *NamestoreLabelLookupRespMsg {
+func NewNamestoreLabelLookupRespMsg(id uint32, zk *crypto.ZonePrivate, label string) *NamestoreLabelLookupRespMsg {
 	size := uint16(zk.KeySize()+4) + uint16(len(label)) + 16
 	msg := &NamestoreLabelLookupRespMsg{
 		GenericNamestoreMsg: newGenericNamestoreMsg(id, size, enums.MSG_NAMESTORE_RECORD_LOOKUP_RESPONSE),
@@ -386,7 +430,7 @@ func (m *NamestoreLabelLookupRespMsg) AddRecords(rs *blocks.RecordSet) {
 	rs.SetPadding()
 	// copy recordset to message
 	m.RdCount = uint16(rs.Count)
-	m.Records = rs.Bytes()
+	m.Records = rs.RDATA()
 	m.RdLen = uint16(len(m.Records))
 	m.MsgSize += m.RdLen
 	m.recset = rs
@@ -416,7 +460,7 @@ type NamestoreZoneToNameMsg struct {
 }
 
 // NewNamestoreZoneIterNextMsg creates a new message
-func NewNamestoreZoneToNameMsg(id int, key any) *NamestoreZoneToNameMsg {
+func NewNamestoreZoneToNameMsg(id uint32, key any) *NamestoreZoneToNameMsg {
 	// create message
 	msg := &NamestoreZoneToNameMsg{
 		GenericNamestoreMsg: newGenericNamestoreMsg(id, 8, enums.MSG_NAMESTORE_ZONE_TO_NAME),
@@ -468,7 +512,7 @@ type NamestoreZoneToNameRespMsg struct {
 }
 
 // NewNamestoreNamestoreZoneToNameRespMsgMsg creates a new message
-func NewNamestoreZoneToNameRespMsg(id int, zk *crypto.ZonePrivate, label string, status enums.ResultCode) *NamestoreZoneToNameRespMsg {
+func NewNamestoreZoneToNameRespMsg(id uint32, zk *crypto.ZonePrivate, label string, status enums.ResultCode) *NamestoreZoneToNameRespMsg {
 	return &NamestoreZoneToNameRespMsg{
 		GenericNamestoreMsg: newGenericNamestoreMsg(id, 8, enums.MSG_NAMESTORE_ZONE_TO_NAME_RESPONSE),
 	}
@@ -489,7 +533,7 @@ func (m *NamestoreZoneToNameRespMsg) AddRecords(rs *blocks.RecordSet) {
 	rs.SetPadding()
 	// copy recordset to message
 	m.RdCount = uint16(rs.Count)
-	m.Records = rs.Bytes()
+	m.Records = rs.RDATA()
 	m.RdLen = uint16(len(m.Records))
 	m.MsgSize += m.RdLen
 	m.recset = rs
@@ -521,7 +565,7 @@ type NamestoreMonitorStartMsg struct {
 }
 
 // NewNamestoreMonitorStartMsg creates a new message
-func NewNamestoreMonitorStartMsg(id int, zk *crypto.ZonePrivate, iter enums.ResultCode, filter int) *NamestoreMonitorStartMsg {
+func NewNamestoreMonitorStartMsg(id uint32, zk *crypto.ZonePrivate, iter enums.ResultCode, filter int) *NamestoreMonitorStartMsg {
 	size := uint16(zk.KeySize()+4) + 16
 	return &NamestoreMonitorStartMsg{
 		GenericNamestoreMsg: newGenericNamestoreMsg(id, size, enums.MSG_NAMESTORE_MONITOR_START),
@@ -553,7 +597,7 @@ type NamestoreMonitorNextMsg struct {
 }
 
 // NewNamestoreMonitorNextMsg creates a new message
-func NewNamestoreMonitorNextMsg(id int, limit uint64) *NamestoreMonitorNextMsg {
+func NewNamestoreMonitorNextMsg(id uint32, limit uint64) *NamestoreMonitorNextMsg {
 	return &NamestoreMonitorNextMsg{
 		GenericNamestoreMsg: newGenericNamestoreMsg(id, 20, enums.MSG_NAMESTORE_MONITOR_NEXT),
 		Limit:               limit,
