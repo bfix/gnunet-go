@@ -18,8 +18,25 @@
 
 package zonemaster
 
+import (
+	"gnunet/enums"
+)
+
+// ZoneMasterUtility can perform utility functions on behalf of plugins
+var ZoneMasterUtility = func(fcn string, args ...any) any {
+	switch fcn {
+	case "gns_type_name":
+		return enums.GNSType(args[0].(uint32)).String()
+	}
+	return nil
+}
+
 // ZoneMasterPlugin handles resource record type specific functionality
 type Plugin interface {
+	// SetUtility passes a utility function to plugins
+	// (Callback-like function)
+	SetUtility(any)
+
 	// Name of the plugin
 	Name() string
 

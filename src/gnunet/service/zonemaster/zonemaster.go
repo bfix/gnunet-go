@@ -86,6 +86,7 @@ func NewService(ctx context.Context, c *core.Core, plugins []string) *ZoneMaster
 			continue
 		}
 		logger.Printf(logger.INFO, "[zonemaster] plugin '%s' loaded.", inst.Name())
+		inst.SetUtility(ZoneMasterUtility)
 
 		// add plugin to resource record type handler
 		srv.plugins = append(srv.plugins, inst)
