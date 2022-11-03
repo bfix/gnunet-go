@@ -25,11 +25,6 @@ create table zones (
     zdata    blob
 );
 
-create table defaults (
-    svc      text,
-    zid      integer references zones(id) default null
-);
-
 create table labels (
     id       integer primary key autoincrement,
     zid      integer references zones(id),

@@ -103,7 +103,7 @@ func NewRecord(expire util.AbsoluteTime, rtype enums.GNSType, flags enums.GNSFla
 	rec.RType = rtype
 	rec.Flags = flags
 	rec.Data = data
-	rec.Size = uint32(len(rec.Data))
+	rec.Size = uint16(len(rec.Data))
 	rec.Created = util.AbsoluteTimeNow()
 	rec.Modified = util.AbsoluteTimeNow()
 	return rec
@@ -266,34 +266,14 @@ func (db *ZoneDB) GetZoneByName(name string) (ident *Zone, err error) {
 	return
 }
 
-// GetDefaultZone returns the zone associated with a service
-func (db *ZoneDB) GetDefaultZone(svc string) (zone *Zone, err error) {
+// GetZoneByKey returns an identifier with given key
+func (db *ZoneDB) GetZoneByKey(zk *crypto.ZonePrivate) (ident *Zone, err error) {
 	// assemble zone from database row
-	stmt := "select id,name,created,modified,ztype,zdata from zones " +
-		"where id = (select id from defaults where svc=?)"
-	row := db.conn.QueryRow(stmt, svc)
-	zone = new(Zone)
-	var ztype enums.GNSType
-	var zdata []byte
-	if err = row.Scan(&zone.ID, &zone.Name, &zone.Created.Val, &zone.Modified.Val, &ztype, &zdata); err == nil {
-		// reconstruct private zone key
-		zone.Key, err = crypto.NewZonePrivate(ztype, zdata)
-	}
-	return
-}
-
-// SetDefaultZone sets the default zone for a service
-func (db *ZoneDB) SetDefaultZone(zk *crypto.ZonePrivate, svc string) (err error) {
-	// get database id of zone
-	stmt := "select id from zones where zdata=?"
+	stmt := "select id,name,created,modified from zones where zdata=?"
 	row := db.conn.QueryRow(stmt, zk.KeyData)
-	var id int64
-	if err = row.Scan(&id); err != nil {
-		return
-	}
-	// set default
-	stmt = "insert into defaults(svc,ident) values(?,?) on conflict(svc) do update set ident=?"
-	_, err = db.conn.Exec(stmt, svc, id, id)
+	ident = new(Zone)
+	ident.Key = zk
+	err = row.Scan(&ident.ID, &ident.Name, &ident.Created.Val, &ident.Modified.Val)
 	return
 }
 
@@ -352,6 +332,37 @@ func (db *ZoneDB) GetLabel(id int64) (label *Label, err error) {
 	return
 }
 
+// GetLabelByName gets a label with given name. If 'zid' is not null, create the
+// label if it does not exist.
+func (db *ZoneDB) GetLabelByName(name string, zid int64) (label *Label, err error) {
+	// assemble label from database row
+	stmt := "select id,zid,created,modified from labels where name=?"
+	label = new(Label)
+	label.Name = name
+	row := db.conn.QueryRow(stmt, name)
+	if err = row.Scan(&label.ID, &label.Zone, &label.Created.Val, &label.Modified.Val); err != nil {
+		// check for "does not exist"
+		if err == sql.ErrNoRows {
+			err = nil
+			label.Created = util.AbsoluteTimeNow()
+			label.Modified = util.AbsoluteTimeNow()
+			if zid != 0 {
+				// yes: create label
+				label.Zone = zid
+				stmt = "insert into labels(zid,name,created,modified) values(?,?,?,?)"
+				var res sql.Result
+				if res, err = db.conn.Exec(stmt, zid, name, label.Created.Val, label.Modified.Val); err != nil {
+					return
+				}
+				label.ID, err = res.LastInsertId()
+			}
+		}
+	} else if label.ID != zid && zid != 0 {
+		err = errors.New("label/zone relation mismatch")
+	}
+	return
+}
+
 // GetLabels retrieves record instances from database matching a filter
 // ("where" clause)
 func (db *ZoneDB) GetLabels(filter string, args ...any) (list []*Label, err error) {
@@ -380,10 +391,9 @@ func (db *ZoneDB) GetLabels(filter string, args ...any) (list []*Label, err erro
 	return
 }
 
-func (db *ZoneDB) GetLabelIDs(zk *crypto.ZonePrivate) (list []int64, err error) {
+func (db *ZoneDB) GetLabelIDs(zk *crypto.ZonePrivate) (list []int64, zid int64, err error) {
 	// get zone database id
 	row := db.conn.QueryRow("select id from zones where ztype=? and zdata=?", zk.Type, zk.KeyData)
-	var zid int64
 	if err = row.Scan(&zid); err != nil {
 		return
 	}
@@ -462,7 +472,7 @@ func (db *ZoneDB) GetRecord(id int64) (rec *Record, err error) {
 		return
 	}
 	// setup missing fields
-	rec.Size = uint32(len(rec.Data))
+	rec.Size = uint16(len(rec.Data))
 	if exp != nil {
 		rec.Expire.Val = *exp
 	} else {
@@ -494,7 +504,7 @@ func (db *ZoneDB) GetRecords(filter string, args ...any) (list []*Record, err er
 			// terminate on error; return list so far
 			return
 		}
-		rec.Size = uint32(len(rec.Data))
+		rec.Size = uint16(len(rec.Data))
 		if exp != nil {
 			rec.Expire.Val = *exp
 		} else {
