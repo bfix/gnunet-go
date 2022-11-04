@@ -108,14 +108,14 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 	// start identity update listener
 	case *message.IdentityStartMsg:
 		if err := zm.identity.Start(ctx, id); err != nil {
-			logger.Printf(logger.ERROR, "[zonemaster%s] Identity session for %d failed: %v\n", label, id, err)
+			logger.Printf(logger.ERROR, "[identity%s] Identity session for %d failed: %v\n", label, id, err)
 			return false
 		}
 
 	// create a new identity with given private key
 	case *message.IdentityCreateMsg:
 		if err := zm.identity.Create(ctx, id, m.ZoneKey, m.Name()); err != nil {
-			logger.Printf(logger.ERROR, "[zonemaster%s] Identity create failed: %v\n", label, err)
+			logger.Printf(logger.ERROR, "[identity%s] Identity create failed: %v\n", label, err)
 			return false
 		}
 
@@ -123,7 +123,7 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 	case *message.IdentityRenameMsg:
 		id, err := zm.zdb.GetZoneByName(m.OldName())
 		if err != nil {
-			logger.Printf(logger.ERROR, "[zonemaster%s] Identity lookup failed: %v\n", label, err)
+			logger.Printf(logger.ERROR, "[identity%s] Identity lookup failed: %v\n", label, err)
 			return false
 		}
 		// change name
@@ -136,15 +136,15 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 			rc = 1
 		}
 		resp := message.NewIdentityResultCodeMsg(rc)
-		if err = back.Send(ctx, resp); err != nil {
-			logger.Printf(logger.ERROR, "[identity%s] Can't send response (%v): %v\n", label, resp, err)
+		if !sendResponse(ctx, "identity"+label, resp, back) {
+			return false
 		}
 
 	// delete identity
 	case *message.IdentityDeleteMsg:
 		id, err := zm.zdb.GetZoneByName(m.Name())
 		if err != nil {
-			logger.Printf(logger.ERROR, "[zonemaster%s] Identity lookup failed: %v\n", label, err)
+			logger.Printf(logger.ERROR, "[identity%s] Identity lookup failed: %v\n", label, err)
 			return false
 		}
 		// delete in database
@@ -157,8 +157,8 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 			rc = 1
 		}
 		resp := message.NewIdentityResultCodeMsg(rc)
-		if err = back.Send(ctx, resp); err != nil {
-			logger.Printf(logger.ERROR, "[identity%s] Can't send response (%v): %v\n", label, resp, err)
+		if !sendResponse(ctx, "identity"+label, resp, back) {
+			return false
 		}
 
 	// lookup identity
@@ -169,9 +169,8 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 			return false
 		}
 		resp := message.NewIdentityUpdateMsg(id.Name, id.Key)
-		logger.Printf(logger.DBG, "[identity%s] Sending %v", label, resp)
-		if err = back.Send(ctx, resp); err != nil {
-			logger.Printf(logger.ERROR, "[identity%s] Can't send response (%v): %v\n", label, resp, err)
+		if !sendResponse(ctx, "identity"+label, resp, back) {
+			return false
 		}
 
 	//------------------------------------------------------------------
@@ -187,13 +186,11 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 		if done {
 			zm.namestore.DropIterator(m.ID)
 		}
-		logger.Printf(logger.DBG, "[namestore%s] Sending %v", label, resp)
-		if err := back.Send(ctx, resp); err != nil {
-			logger.Printf(logger.ERROR, "[namestore%s] Can't send response (%v)\n", label, resp)
+		if !sendResponse(ctx, "namestore"+label, resp, back) {
 			return false
 		}
 
-	// next label from zone iteration
+	// next label(s) from zone iteration
 	case *message.NamestoreZoneIterNextMsg:
 		var resp message.Message
 		// lookup zone iterator
@@ -201,30 +198,64 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 		if !ok {
 			zk, _ := crypto.NullZonePrivate(enums.GNS_TYPE_PKEY)
 			resp = message.NewNamestoreRecordResultMsg(m.ID, zk, "")
+			if !sendResponse(ctx, "namestore"+label, resp, back) {
+				return false
+			}
 		} else {
-			// return next result
-			var done bool
-			resp, done = iter.Next()
-			if done {
-				zm.namestore.DropIterator(m.ID)
+			for n := 0; n < int(m.Limit); n++ {
+				// return next result
+				var done bool
+				resp, done = iter.Next()
+				if !sendResponse(ctx, "namestore"+label, resp, back) {
+					return false
+				}
+				if done {
+					zm.namestore.DropIterator(m.ID)
+					break
+				}
 			}
 		}
-		logger.Printf(logger.DBG, "[namestore%s] Sending %v", label, resp)
-		if err := back.Send(ctx, resp); err != nil {
-			logger.Printf(logger.ERROR, "[namestore%s] Can't send response (%v)\n", label, resp)
-			return false
-		}
 
-	// store labeled record sets to zone
+	// store record in zone database
 	case *message.NamestoreRecordStoreMsg:
 		var rc uint32
 		if !zm.namestore.Store(m.ZoneKey, m.RSets) {
 			rc = 1
 		}
 		resp := message.NewNamestoreRecordStoreRespMsg(m.ID, rc)
-		logger.Printf(logger.DBG, "[namestore%s] Sending %v", label, resp)
-		if err := back.Send(ctx, resp); err != nil {
-			logger.Printf(logger.ERROR, "[namestore%s] Can't send response (%v)\n", label, resp)
+		if !sendResponse(ctx, "namestore"+label, resp, back) {
+			return false
+		}
+
+	// lookup records in zone under given label
+	case *message.NamestoreRecordLookupMsg:
+		// get resource records
+		getRecs := func() *blocks.RecordSet {
+			zone, err := zm.zdb.GetZoneByKey(m.ZoneKey)
+			if err != nil {
+				logger.Printf(logger.ERROR, "[namestore%s] zone lookup: %s", label, err.Error())
+				return nil
+			}
+			lbl, err := zm.zdb.GetLabelByName(string(m.Label), zone.ID, m.IsEdit != 0)
+			if err != nil {
+				logger.Printf(logger.ERROR, "[namestore%s] label lookup: %s", label, err.Error())
+				return nil
+			}
+			rrSet, _, err := zm.GetRecordSet(lbl.ID)
+			if err != nil {
+				logger.Printf(logger.ERROR, "[namestore%s] records: %s", label, err.Error())
+				return nil
+			}
+			return rrSet
+		}
+		recs := getRecs()
+		// assemble response
+		resp := message.NewNamestoreRecordLookupRespMsg(m.ID, m.ZoneKey, string(m.Label))
+		if recs != nil {
+			resp.AddRecords(recs)
+			resp.Found = 1
+		}
+		if !sendResponse(ctx, "namestore"+label, resp, back) {
 			return false
 		}
 
@@ -258,4 +289,13 @@ func (zm *ZoneMaster) StoreNamecache(ctx context.Context, query *blocks.GNSQuery
 	// get response from Namecache service
 	_, err = service.RequestResponse(ctx, "zonemaster", "namecache", config.Cfg.Namecache.Service.Socket, req, false)
 	return
+}
+
+func sendResponse(ctx context.Context, label string, resp message.Message, back transport.Responder) bool {
+	logger.Printf(logger.DBG, "[%s] Sending %v", label, resp)
+	if err := back.Send(ctx, resp); err != nil {
+		logger.Printf(logger.ERROR, "[%s] Can't send response (%v)\n", label, resp)
+		return false
+	}
+	return true
 }
