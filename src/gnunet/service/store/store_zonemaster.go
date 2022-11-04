@@ -334,7 +334,7 @@ func (db *ZoneDB) GetLabel(id int64) (label *Label, err error) {
 
 // GetLabelByName gets a label with given name. If 'zid' is not null, create the
 // label if it does not exist.
-func (db *ZoneDB) GetLabelByName(name string, zid int64) (label *Label, err error) {
+func (db *ZoneDB) GetLabelByName(name string, zid int64, create bool) (label *Label, err error) {
 	// assemble label from database row
 	stmt := "select id,zid,created,modified from labels where name=?"
 	label = new(Label)
@@ -342,7 +342,7 @@ func (db *ZoneDB) GetLabelByName(name string, zid int64) (label *Label, err erro
 	row := db.conn.QueryRow(stmt, name)
 	if err = row.Scan(&label.ID, &label.Zone, &label.Created.Val, &label.Modified.Val); err != nil {
 		// check for "does not exist"
-		if err == sql.ErrNoRows {
+		if err == sql.ErrNoRows && create {
 			err = nil
 			label.Created = util.AbsoluteTimeNow()
 			label.Modified = util.AbsoluteTimeNow()
