@@ -348,25 +348,33 @@ func (m *NamestoreRecordStoreRespMsg) String() string {
 // MSG_NAMESTORE_RECORD_LOOKUP
 //----------------------------------------------------------------------
 
-type NamestoreLabelLookupMsg struct {
+// NamestoreRecordLookupMsg looks up a record in the namestore
+type NamestoreRecordLookupMsg struct {
 	GenericNamestoreMsg
 
 	LblLen  uint32              `order:"big"`   // length of label
 	IsEdit  uint32              `order:"big"`   // lookup corresponds to edit request
+	Filter  uint16              `order:"big"`   // filter flags
+	KeyLen  uint32              `order:"big"`   // size of key
 	ZoneKey *crypto.ZonePrivate `init:"Init"`   // private zone key
 	Label   []byte              `size:"LblLen"` // label string
 }
 
-// NewNamestoreLabelLookupMsg creates a new message
-func NewNamestoreLabelLookupMsg(id uint32, zk *crypto.ZonePrivate, label string, isEdit bool) *NamestoreLabelLookupMsg {
+// NewNamestoreRecordLookupMsg creates a new message
+func NewNamestoreRecordLookupMsg(id uint32, zk *crypto.ZonePrivate, label string, isEdit bool) *NamestoreRecordLookupMsg {
 	var flag uint32
 	if isEdit {
 		flag = 1
 	}
-	size := uint16(zk.KeySize()+4) + uint16(len(label)) + 16
-	return &NamestoreLabelLookupMsg{
+	var kl uint32
+	if zk != nil {
+		kl += uint32(zk.KeySize() + 4)
+	}
+	size := uint16(kl) + uint16(len(label)) + 16
+	return &NamestoreRecordLookupMsg{
 		GenericNamestoreMsg: newGenericNamestoreMsg(id, size, enums.MSG_NAMESTORE_RECORD_LOOKUP),
 		IsEdit:              flag,
+		KeyLen:              kl,
 		ZoneKey:             zk,
 		LblLen:              uint32(len(label)),
 		Label:               []byte(label),
@@ -374,11 +382,11 @@ func NewNamestoreLabelLookupMsg(id uint32, zk *crypto.ZonePrivate, label string,
 }
 
 // Init called after unmarshalling a message to setup internal state
-func (m *NamestoreLabelLookupMsg) Init() error { return nil }
+func (m *NamestoreRecordLookupMsg) Init() error { return nil }
 
 // String returns a human-readable representation of the message.
-func (m *NamestoreLabelLookupMsg) String() string {
-	return fmt.Sprintf("NamestoreLabelLookupMsg{id=%d,zk=%s,label=%s,edit=%v}",
+func (m *NamestoreRecordLookupMsg) String() string {
+	return fmt.Sprintf("NamestoreRecordLookupMsg{id=%d,zk=%s,label=%s,edit=%v}",
 		m.ID, m.ZoneKey.ID(), string(m.Label), m.IsEdit != 0)
 }
 
@@ -386,14 +394,15 @@ func (m *NamestoreLabelLookupMsg) String() string {
 // MSG_NAMESTORE_RECORD_LOOKUP_RESPONSE
 //----------------------------------------------------------------------
 
-// NamestoreLabelLookupRespMsg is a lookup response message
-type NamestoreLabelLookupRespMsg struct {
+// NamestoreRecordLookupRespMsg is a lookup response message
+type NamestoreRecordLookupRespMsg struct {
 	GenericNamestoreMsg
 
 	LblLen  uint16              `order:"big"`   // Length of label
 	RdLen   uint16              `order:"big"`   // size of record data
 	RdCount uint16              `order:"big"`   // number of records
 	Found   int16               `order:"big"`   // label found?
+	KeyLen  uint32              `order:"big"`   // length of key
 	ZoneKey *crypto.ZonePrivate `init:"Init"`   // private zone key
 	Label   []byte              `size:"LblLen"` // label string
 	Records []byte              `size:"RdLen"`  // serialized record data
@@ -402,11 +411,16 @@ type NamestoreLabelLookupRespMsg struct {
 	recset *blocks.RecordSet
 }
 
-// NewNamestoreLabelLookupRespMsg creates a new message
-func NewNamestoreLabelLookupRespMsg(id uint32, zk *crypto.ZonePrivate, label string) *NamestoreLabelLookupRespMsg {
-	size := uint16(zk.KeySize()+4) + uint16(len(label)) + 16
-	msg := &NamestoreLabelLookupRespMsg{
+// NewNamestoreRecordLookupRespMsg creates a new message
+func NewNamestoreRecordLookupRespMsg(id uint32, zk *crypto.ZonePrivate, label string) *NamestoreRecordLookupRespMsg {
+	var kl uint32
+	if zk != nil {
+		kl = uint32(zk.KeySize() + 4)
+	}
+	size := uint16(kl) + uint16(len(label)) + 20
+	msg := &NamestoreRecordLookupRespMsg{
 		GenericNamestoreMsg: newGenericNamestoreMsg(id, size, enums.MSG_NAMESTORE_RECORD_LOOKUP_RESPONSE),
+		KeyLen:              kl,
 		ZoneKey:             zk,
 		LblLen:              uint16(len(label)),
 		Label:               []byte(label),
@@ -416,7 +430,7 @@ func NewNamestoreLabelLookupRespMsg(id uint32, zk *crypto.ZonePrivate, label str
 }
 
 // Init called after unmarshalling a message to setup internal state
-func (m *NamestoreLabelLookupRespMsg) Init() error {
+func (m *NamestoreRecordLookupRespMsg) Init() error {
 	if m.recset == nil {
 		m.recset = new(blocks.RecordSet)
 		return data.Unmarshal(m.recset, m.Records)
@@ -425,7 +439,7 @@ func (m *NamestoreLabelLookupRespMsg) Init() error {
 }
 
 // AddRecords adds the record data to the message
-func (m *NamestoreLabelLookupRespMsg) AddRecords(rs *blocks.RecordSet) {
+func (m *NamestoreRecordLookupRespMsg) AddRecords(rs *blocks.RecordSet) {
 	// make sure the record set is padded correctly
 	rs.SetPadding()
 	// copy recordset to message
@@ -437,14 +451,14 @@ func (m *NamestoreLabelLookupRespMsg) AddRecords(rs *blocks.RecordSet) {
 }
 
 // GetRecords returns the record set contained in message
-func (m *NamestoreLabelLookupRespMsg) GetRecords() blocks.RecordSet {
+func (m *NamestoreRecordLookupRespMsg) GetRecords() blocks.RecordSet {
 	return *m.recset
 }
 
 // String returns a human-readable representation of the message.
-func (m *NamestoreLabelLookupRespMsg) String() string {
-	return fmt.Sprintf("NamestoreLabelLookupRespMsg{id=%d,zone=%s,label='%s',%d records}",
-		m.ID, m.ZoneKey.ID(), string(m.Label), m.RdCount)
+func (m *NamestoreRecordLookupRespMsg) String() string {
+	return fmt.Sprintf("NamestoreRecordlLookupRespMsg{id=%d,found=%v,%d records}",
+		m.ID, m.Found != 0, m.RdCount)
 }
 
 //----------------------------------------------------------------------

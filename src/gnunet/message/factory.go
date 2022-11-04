@@ -157,9 +157,9 @@ func NewEmptyMessage(msgType enums.MsgType) (Message, error) {
 	case enums.MSG_NAMESTORE_RECORD_STORE_RESPONSE:
 		return NewNamestoreRecordStoreRespMsg(0, 0), nil
 	case enums.MSG_NAMESTORE_RECORD_LOOKUP:
-		return NewNamestoreLabelLookupMsg(0, nil, "", false), nil
+		return NewNamestoreRecordLookupMsg(0, nil, "", false), nil
 	case enums.MSG_NAMESTORE_RECORD_LOOKUP_RESPONSE:
-		return NewNamestoreLabelLookupRespMsg(0, nil, ""), nil
+		return NewNamestoreRecordLookupRespMsg(0, nil, ""), nil
 	case enums.MSG_NAMESTORE_MONITOR_START:
 		return NewNamestoreMonitorStartMsg(0, nil, 0, 0), nil
 	case enums.MSG_NAMESTORE_RECORD_RESULT:
