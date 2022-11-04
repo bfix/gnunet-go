@@ -78,6 +78,7 @@ func (zi *ZoneIterator) Next() (msg message.Message, done bool) {
 	}
 	// get resource records
 	lid := zi.labels[zi.pos]
+	zi.pos++
 	lbl, err := zi.zm.zdb.GetLabel(lid)
 	if err != nil {
 		logger.Printf(logger.ERROR, "[zone_iter] label name: %s", err.Error())
@@ -88,6 +89,7 @@ func (zi *ZoneIterator) Next() (msg message.Message, done bool) {
 		logger.Printf(logger.ERROR, "[zone_iter] records: %s", err.Error())
 		return
 	}
+	// assemble response
 	rmsg := message.NewNamestoreRecordResultMsg(zi.id, zi.zk, lbl.Name)
 	rmsg.Expire = expire
 	rmsg.AddRecords(rrSet)
@@ -148,7 +150,7 @@ func (s *NamestoreService) Store(zk *crypto.ZonePrivate, list []*message.Namesto
 		label, _ := util.ReadCString(entry.Name, 0)
 		// get label object from database
 		var lbl *store.Label
-		if lbl, err = s.zm.zdb.GetLabelByName(label, zone.ID); err != nil {
+		if lbl, err = s.zm.zdb.GetLabelByName(label, zone.ID, true); err != nil {
 			logger.Printf(logger.ERROR, "[namestore] label from name: %s", err.Error())
 			return false
 		}
