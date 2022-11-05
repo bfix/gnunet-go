@@ -120,22 +120,7 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 			return strings.Replace(t.String(), "GNS_TYPE_", "", -1)
 		},
 		"rrflags": func(f enums.GNSFlag) string {
-			flags := make([]string, 0)
-			if f&enums.GNS_FLAG_PRIVATE != 0 {
-				flags = append(flags, "Private")
-			}
-			if f&enums.GNS_FLAG_SHADOW != 0 {
-				flags = append(flags, "Shadow")
-			}
-			if f&enums.GNS_FLAG_SUPPL != 0 {
-				flags = append(flags, "Suppl")
-			}
-			if f&enums.GNS_FLAG_CRITICAL != 0 {
-				flags = append(flags, "Critical")
-			}
-			if f&enums.GNS_FLAG_EXPREL != 0 {
-				flags = append(flags, "TTL")
-			}
+			flags := f.List()
 			if len(flags) == 0 {
 				return "None"
 			}
