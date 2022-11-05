@@ -20,6 +20,7 @@ package zonemaster
 
 import (
 	"gnunet/crypto"
+	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service/dht/blocks"
 	"gnunet/service/store"
@@ -84,7 +85,7 @@ func (zi *ZoneIterator) Next() (msg message.Message, done bool) {
 		logger.Printf(logger.ERROR, "[zone_iter] label name: %s", err.Error())
 		return
 	}
-	rrSet, expire, err := zi.zm.GetRecordSet(lid, 0)
+	rrSet, expire, err := zi.zm.GetRecordSet(lid, enums.GNS_FILTER_NONE)
 	if err != nil {
 		logger.Printf(logger.ERROR, "[zone_iter] records: %s", err.Error())
 		return

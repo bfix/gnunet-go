@@ -243,7 +243,7 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 				logger.Printf(logger.ERROR, "[namestore%s] label lookup: %s", label, err.Error())
 				return nil
 			}
-			rrSet, _, err := zm.GetRecordSet(lbl.ID, enums.GNSFlag(m.Filter))
+			rrSet, _, err := zm.GetRecordSet(lbl.ID, enums.GNSFilter(m.Filter))
 			if err != nil {
 				logger.Printf(logger.ERROR, "[namestore%s] records: %s", label, err.Error())
 				return nil
