@@ -27,6 +27,8 @@ var ZoneMasterUtility = func(fcn string, args ...any) any {
 	switch fcn {
 	case "gns_type_name":
 		return enums.GNSType(args[0].(uint32)).String()
+	case "gns_flags":
+		return enums.GNSFlag(args[0].(uint32)).List()
 	}
 	return nil
 }
