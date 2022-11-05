@@ -19,11 +19,14 @@
 package zonemaster
 
 import (
+	"context"
+	"gnunet/core"
 	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service/dht/blocks"
 	"gnunet/service/store"
+	"gnunet/transport"
 	"gnunet/util"
 
 	"github.com/bfix/gospel/logger"
@@ -170,6 +173,106 @@ func (s *NamestoreService) Store(zk *crypto.ZonePrivate, list []*message.Namesto
 				return false
 			}
 		}
+	}
+	return true
+}
+
+// HandleMessage processes a single incoming message
+func (s *NamestoreService) HandleMessage(ctx context.Context, sender *util.PeerID, msg message.Message, back transport.Responder) bool {
+	// assemble log label
+	var label string
+	if v := ctx.Value(core.CtxKey("params")); v != nil {
+		if ps, ok := v.(util.ParameterSet); ok {
+			label, _ = util.GetParam[string](ps, "label")
+		}
+	}
+	// perform lookup
+	switch m := msg.(type) {
+
+	// start new zone iteration
+	case *message.NamestoreZoneIterStartMsg:
+		// setup iterator
+		iter := s.NewIterator(m.ID, m.ZoneKey)
+		// return first result
+		resp, done := iter.Next()
+		if done {
+			s.DropIterator(m.ID)
+		}
+		if !sendResponse(ctx, "namestore"+label, resp, back) {
+			return false
+		}
+
+	// next label(s) from zone iteration
+	case *message.NamestoreZoneIterNextMsg:
+		var resp message.Message
+		// lookup zone iterator
+		iter, ok := s.GetIterator(m.ID)
+		if !ok {
+			zk, _ := crypto.NullZonePrivate(enums.GNS_TYPE_PKEY)
+			resp = message.NewNamestoreRecordResultMsg(m.ID, zk, "")
+			if !sendResponse(ctx, "namestore"+label, resp, back) {
+				return false
+			}
+		} else {
+			for n := 0; n < int(m.Limit); n++ {
+				// return next result
+				var done bool
+				resp, done = iter.Next()
+				if !sendResponse(ctx, "namestore"+label, resp, back) {
+					return false
+				}
+				if done {
+					s.DropIterator(m.ID)
+					break
+				}
+			}
+		}
+
+	// store record in zone database
+	case *message.NamestoreRecordStoreMsg:
+		var rc uint32
+		if !s.Store(m.ZoneKey, m.RSets) {
+			rc = 1
+		}
+		resp := message.NewNamestoreRecordStoreRespMsg(m.ID, rc)
+		if !sendResponse(ctx, "namestore"+label, resp, back) {
+			return false
+		}
+
+	// lookup records in zone under given label
+	case *message.NamestoreRecordLookupMsg:
+		// get resource records
+		getRecs := func() *blocks.RecordSet {
+			zone, err := s.zm.zdb.GetZoneByKey(m.ZoneKey)
+			if err != nil {
+				logger.Printf(logger.ERROR, "[namestore%s] zone lookup: %s", label, err.Error())
+				return nil
+			}
+			lbl, err := s.zm.zdb.GetLabelByName(string(m.Label), zone.ID, false)
+			if err != nil {
+				logger.Printf(logger.ERROR, "[namestore%s] label lookup: %s", label, err.Error())
+				return nil
+			}
+			rrSet, _, err := s.zm.GetRecordSet(lbl.ID, enums.GNSFilter(m.Filter))
+			if err != nil {
+				logger.Printf(logger.ERROR, "[namestore%s] records: %s", label, err.Error())
+				return nil
+			}
+			return rrSet
+		}
+		recs := getRecs()
+		// assemble response
+		resp := message.NewNamestoreRecordLookupRespMsg(m.ID, m.ZoneKey, string(m.Label))
+		if recs != nil {
+			resp.AddRecords(recs)
+			resp.Found = 1
+		}
+		if !sendResponse(ctx, "namestore"+label, resp, back) {
+			return false
+		}
+
+	case *message.NamestoreZoneToNameMsg:
+
 	}
 	return true
 }

@@ -25,8 +25,6 @@ import (
 
 	"gnunet/config"
 	"gnunet/core"
-	"gnunet/crypto"
-	"gnunet/enums"
 	"gnunet/message"
 	"gnunet/service"
 	"gnunet/service/dht/blocks"
@@ -88,178 +86,41 @@ func (zm *ZoneMaster) ServeClient(ctx context.Context, id int, mc *service.Conne
 }
 
 // Handle a single incoming message
-//
-//nolint:gocyclo // life is complex sometimes...
 func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, msg message.Message, back transport.Responder) bool {
 	// assemble log label
-	var id int
 	var label string
 	if v := ctx.Value(core.CtxKey("params")); v != nil {
 		if ps, ok := v.(util.ParameterSet); ok {
 			label, _ = util.GetParam[string](ps, "label")
-			id, _ = util.GetParam[int](ps, "id")
 		}
 	}
 	// perform lookup
-	switch m := msg.(type) {
+	switch msg.(type) {
 
 	//------------------------------------------------------------------
 	// Identity service
 	//------------------------------------------------------------------
 
-	// start identity update listener
-	case *message.IdentityStartMsg:
-		if err := zm.identity.Start(ctx, id); err != nil {
-			logger.Printf(logger.ERROR, "[identity%s] Identity session for %d failed: %v\n", label, id, err)
-			return false
-		}
-
-	// create a new identity with given private key
-	case *message.IdentityCreateMsg:
-		if err := zm.identity.Create(ctx, id, m.ZoneKey, m.Name()); err != nil {
-			logger.Printf(logger.ERROR, "[identity%s] Identity create failed: %v\n", label, err)
-			return false
-		}
-
-	// rename identity
-	case *message.IdentityRenameMsg:
-		id, err := zm.zdb.GetZoneByName(m.OldName())
-		if err != nil {
-			logger.Printf(logger.ERROR, "[identity%s] Identity lookup failed: %v\n", label, err)
-			return false
-		}
-		// change name
-		id.Name = m.NewName()
-		err = zm.zdb.SetZone(id)
-
-		// send response
-		rc := 0
-		if err != nil {
-			rc = 1
-		}
-		resp := message.NewIdentityResultCodeMsg(rc)
-		if !sendResponse(ctx, "identity"+label, resp, back) {
-			return false
-		}
-
-	// delete identity
-	case *message.IdentityDeleteMsg:
-		id, err := zm.zdb.GetZoneByName(m.Name())
-		if err != nil {
-			logger.Printf(logger.ERROR, "[identity%s] Identity lookup failed: %v\n", label, err)
-			return false
-		}
-		// delete in database
-		id.Name = ""
-		err = zm.zdb.SetZone(id)
-
-		// send response
-		rc := 0
-		if err != nil {
-			rc = 1
-		}
-		resp := message.NewIdentityResultCodeMsg(rc)
-		if !sendResponse(ctx, "identity"+label, resp, back) {
-			return false
-		}
-
-	// lookup identity
-	case *message.IdentityLookupMsg:
-		id, err := zm.zdb.GetZoneByName(m.Name)
-		if err != nil {
-			logger.Printf(logger.ERROR, "[identity%s] Identity lookup failed: %v\n", label, err)
-			return false
-		}
-		resp := message.NewIdentityUpdateMsg(id.Name, id.Key)
-		if !sendResponse(ctx, "identity"+label, resp, back) {
-			return false
-		}
+	case *message.IdentityStartMsg,
+		*message.IdentityCreateMsg,
+		*message.IdentityRenameMsg,
+		*message.IdentityDeleteMsg,
+		*message.IdentityLookupMsg:
+		zm.identity.HandleMessage(ctx, sender, msg, back)
 
 	//------------------------------------------------------------------
 	// Namestore service
 	//------------------------------------------------------------------
 
-	// start new zone iteration
-	case *message.NamestoreZoneIterStartMsg:
-		// setup iterator
-		iter := zm.namestore.NewIterator(m.ID, m.ZoneKey)
-		// return first result
-		resp, done := iter.Next()
-		if done {
-			zm.namestore.DropIterator(m.ID)
-		}
-		if !sendResponse(ctx, "namestore"+label, resp, back) {
-			return false
-		}
-
-	// next label(s) from zone iteration
-	case *message.NamestoreZoneIterNextMsg:
-		var resp message.Message
-		// lookup zone iterator
-		iter, ok := zm.namestore.GetIterator(m.ID)
-		if !ok {
-			zk, _ := crypto.NullZonePrivate(enums.GNS_TYPE_PKEY)
-			resp = message.NewNamestoreRecordResultMsg(m.ID, zk, "")
-			if !sendResponse(ctx, "namestore"+label, resp, back) {
-				return false
-			}
-		} else {
-			for n := 0; n < int(m.Limit); n++ {
-				// return next result
-				var done bool
-				resp, done = iter.Next()
-				if !sendResponse(ctx, "namestore"+label, resp, back) {
-					return false
-				}
-				if done {
-					zm.namestore.DropIterator(m.ID)
-					break
-				}
-			}
-		}
-
-	// store record in zone database
-	case *message.NamestoreRecordStoreMsg:
-		var rc uint32
-		if !zm.namestore.Store(m.ZoneKey, m.RSets) {
-			rc = 1
-		}
-		resp := message.NewNamestoreRecordStoreRespMsg(m.ID, rc)
-		if !sendResponse(ctx, "namestore"+label, resp, back) {
-			return false
-		}
-
-	// lookup records in zone under given label
-	case *message.NamestoreRecordLookupMsg:
-		// get resource records
-		getRecs := func() *blocks.RecordSet {
-			zone, err := zm.zdb.GetZoneByKey(m.ZoneKey)
-			if err != nil {
-				logger.Printf(logger.ERROR, "[namestore%s] zone lookup: %s", label, err.Error())
-				return nil
-			}
-			lbl, err := zm.zdb.GetLabelByName(string(m.Label), zone.ID, false)
-			if err != nil {
-				logger.Printf(logger.ERROR, "[namestore%s] label lookup: %s", label, err.Error())
-				return nil
-			}
-			rrSet, _, err := zm.GetRecordSet(lbl.ID, enums.GNSFilter(m.Filter))
-			if err != nil {
-				logger.Printf(logger.ERROR, "[namestore%s] records: %s", label, err.Error())
-				return nil
-			}
-			return rrSet
-		}
-		recs := getRecs()
-		// assemble response
-		resp := message.NewNamestoreRecordLookupRespMsg(m.ID, m.ZoneKey, string(m.Label))
-		if recs != nil {
-			resp.AddRecords(recs)
-			resp.Found = 1
-		}
-		if !sendResponse(ctx, "namestore"+label, resp, back) {
-			return false
-		}
+	case *message.NamestoreZoneIterStartMsg,
+		*message.NamestoreZoneIterNextMsg,
+		*message.NamestoreRecordStoreMsg,
+		*message.NamestoreRecordLookupMsg,
+		*message.NamestoreZoneToNameMsg,
+		*message.NamestoreZoneToNameRespMsg,
+		*message.NamestoreMonitorStartMsg,
+		*message.NamestoreMonitorNextMsg:
+		zm.namestore.HandleMessage(ctx, sender, msg, back)
 
 	default:
 		//----------------------------------------------------------

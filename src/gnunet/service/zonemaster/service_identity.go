@@ -21,6 +21,7 @@ package zonemaster
 import (
 	"context"
 	"fmt"
+	"gnunet/core"
 	"gnunet/crypto"
 	"gnunet/message"
 	"gnunet/service/store"
@@ -124,4 +125,89 @@ func (ident *IdentityService) Create(ctx context.Context, cid int, zk *crypto.Zo
 		return
 	}
 	return
+}
+
+// HandleMessage processes a single incoming message
+func (ident *IdentityService) HandleMessage(ctx context.Context, sender *util.PeerID, msg message.Message, back transport.Responder) bool {
+	// assemble log label
+	var id int
+	var label string
+	if v := ctx.Value(core.CtxKey("params")); v != nil {
+		if ps, ok := v.(util.ParameterSet); ok {
+			label, _ = util.GetParam[string](ps, "label")
+			id, _ = util.GetParam[int](ps, "id")
+		}
+	}
+	// perform lookup
+	switch m := msg.(type) {
+
+	// start identity update listener
+	case *message.IdentityStartMsg:
+		if err := ident.Start(ctx, id); err != nil {
+			logger.Printf(logger.ERROR, "[identity%s] Identity session for %d failed: %v\n", label, id, err)
+			return false
+		}
+
+	// create a new identity with given private key
+	case *message.IdentityCreateMsg:
+		if err := ident.Create(ctx, id, m.ZoneKey, m.Name()); err != nil {
+			logger.Printf(logger.ERROR, "[identity%s] Identity create failed: %v\n", label, err)
+			return false
+		}
+
+	// rename identity
+	case *message.IdentityRenameMsg:
+		id, err := ident.zm.zdb.GetZoneByName(m.OldName())
+		if err != nil {
+			logger.Printf(logger.ERROR, "[identity%s] Identity lookup failed: %v\n", label, err)
+			return false
+		}
+		// change name
+		id.Name = m.NewName()
+		err = ident.zm.zdb.SetZone(id)
+
+		// send response
+		rc := 0
+		if err != nil {
+			rc = 1
+		}
+		resp := message.NewIdentityResultCodeMsg(rc)
+		if !sendResponse(ctx, "identity"+label, resp, back) {
+			return false
+		}
+
+	// delete identity
+	case *message.IdentityDeleteMsg:
+		id, err := ident.zm.zdb.GetZoneByName(m.Name())
+		if err != nil {
+			logger.Printf(logger.ERROR, "[identity%s] Identity lookup failed: %v\n", label, err)
+			return false
+		}
+		// delete in database
+		id.Name = ""
+		err = ident.zm.zdb.SetZone(id)
+
+		// send response
+		rc := 0
+		if err != nil {
+			rc = 1
+		}
+		resp := message.NewIdentityResultCodeMsg(rc)
+		if !sendResponse(ctx, "identity"+label, resp, back) {
+			return false
+		}
+
+	// lookup identity
+	case *message.IdentityLookupMsg:
+		id, err := ident.zm.zdb.GetZoneByName(m.Name)
+		if err != nil {
+			logger.Printf(logger.ERROR, "[identity%s] Identity lookup failed: %v\n", label, err)
+			return false
+		}
+		resp := message.NewIdentityUpdateMsg(id.Name, id.Key)
+		if !sendResponse(ctx, "identity"+label, resp, back) {
+			return false
+		}
+	}
+	return true
 }
