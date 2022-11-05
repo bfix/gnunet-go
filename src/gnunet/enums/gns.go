@@ -19,6 +19,10 @@
 //nolint:stylecheck // allow non-camel-case for constants
 package enums
 
+//----------------------------------------------------------------------
+// Resource Record Flags
+//----------------------------------------------------------------------
+
 // GNSFlag type
 type GNSFlag uint16
 
@@ -29,7 +33,56 @@ const (
 	GNS_FLAG_SUPPL    GNSFlag = 4     // Supplemental records (e.g. NICK) in a block
 	GNS_FLAG_EXPREL   GNSFlag = 16384 // Expiry time is relative
 	GNS_FLAG_PRIVATE  GNSFlag = 32768 // Record is not shared on the DHT
+)
 
+// List flags as strings
+func (gf GNSFlag) List() (flags []string) {
+	if gf&GNS_FLAG_PRIVATE != 0 {
+		flags = append(flags, "Private")
+	}
+	if gf&GNS_FLAG_SHADOW != 0 {
+		flags = append(flags, "Shadow")
+	}
+	if gf&GNS_FLAG_SUPPL != 0 {
+		flags = append(flags, "Suppl")
+	}
+	if gf&GNS_FLAG_CRITICAL != 0 {
+		flags = append(flags, "Critical")
+	}
+	if gf&GNS_FLAG_EXPREL != 0 {
+		flags = append(flags, "TTL")
+	}
+	return
+}
+
+//----------------------------------------------------------------------
+// GNS filters
+//----------------------------------------------------------------------
+
+type GNSFilter uint16
+
+const (
+	// GNS filters
+	GNS_FILTER_NONE                GNSFilter = 0
+	GNS_FILTER_INCLUDE_MAINTENANCE GNSFilter = 1
+	GNS_FILTER_OMIT_PRIVATE        GNSFilter = 2
+)
+
+//----------------------------------------------------------------------
+// GNS type/flag combination (spec)
+//----------------------------------------------------------------------
+
+// GNSSpec is the combination of type and flags
+type GNSSpec struct {
+	Type  GNSType
+	Flags GNSFlag
+}
+
+//----------------------------------------------------------------------
+// Local settings
+//----------------------------------------------------------------------
+
+const (
 	// GNS_LocalOptions
 	GNS_LO_DEFAULT      = 0 // Defaults, look in cache, then in DHT.
 	GNS_LO_NO_DHT       = 1 // Never look in the DHT, keep request to local cache.
@@ -43,9 +96,3 @@ const (
 //go:generate go run generate/main.go gnunet-gns.rec gnunet-gns.tpl gns_type.go
 
 //go:generate stringer -type=GNSType gns_type.go
-
-// GNSSpec is the combination of type and flags
-type GNSSpec struct {
-	Type  GNSType
-	Flags GNSFlag
-}
