@@ -371,7 +371,7 @@ func compatibleRR(in []*enums.GNSSpec, label string) (out []*enums.GNSSpec) {
 }
 
 // get a list of resource records for a given label in a zone.
-func (zm *ZoneMaster) GetRecordSet(label int64) (rs *blocks.RecordSet, expire util.AbsoluteTime, err error) {
+func (zm *ZoneMaster) GetRecordSet(label int64, filter enums.GNSFlag) (rs *blocks.RecordSet, expire util.AbsoluteTime, err error) {
 	// collect records for zone label
 	var recs []*store.Record
 	if recs, err = zm.zdb.GetRecords("lid=%d", label); err != nil {
@@ -381,7 +381,12 @@ func (zm *ZoneMaster) GetRecordSet(label int64) (rs *blocks.RecordSet, expire ut
 	expire = util.AbsoluteTimeNever()
 	rs = blocks.NewRecordSet()
 	for _, r := range recs {
-		if r.Expire.Compare(expire) < 0 {
+		// filter out records
+		if r.Flags&filter != 0 {
+			continue
+		}
+		// skip TTL expiry when determining earliest expiry
+		if r.Flags&enums.GNS_FLAG_EXPREL == 0 && r.Expire.Compare(expire) < 0 {
 			expire = r.Expire
 		}
 		rs.AddRecord(&r.ResourceRecord)

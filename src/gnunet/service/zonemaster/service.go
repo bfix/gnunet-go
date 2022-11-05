@@ -88,6 +88,8 @@ func (zm *ZoneMaster) ServeClient(ctx context.Context, id int, mc *service.Conne
 }
 
 // Handle a single incoming message
+//
+//nolint:gocyclo // life is complex sometimes...
 func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, msg message.Message, back transport.Responder) bool {
 	// assemble log label
 	var id int
@@ -236,12 +238,12 @@ func (zm *ZoneMaster) HandleMessage(ctx context.Context, sender *util.PeerID, ms
 				logger.Printf(logger.ERROR, "[namestore%s] zone lookup: %s", label, err.Error())
 				return nil
 			}
-			lbl, err := zm.zdb.GetLabelByName(string(m.Label), zone.ID, m.IsEdit != 0)
+			lbl, err := zm.zdb.GetLabelByName(string(m.Label), zone.ID, false)
 			if err != nil {
 				logger.Printf(logger.ERROR, "[namestore%s] label lookup: %s", label, err.Error())
 				return nil
 			}
-			rrSet, _, err := zm.GetRecordSet(lbl.ID)
+			rrSet, _, err := zm.GetRecordSet(lbl.ID, enums.GNSFlag(m.Filter))
 			if err != nil {
 				logger.Printf(logger.ERROR, "[namestore%s] records: %s", label, err.Error())
 				return nil

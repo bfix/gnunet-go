@@ -84,7 +84,7 @@ func (zi *ZoneIterator) Next() (msg message.Message, done bool) {
 		logger.Printf(logger.ERROR, "[zone_iter] label name: %s", err.Error())
 		return
 	}
-	rrSet, expire, err := zi.zm.GetRecordSet(lid)
+	rrSet, expire, err := zi.zm.GetRecordSet(lid, 0)
 	if err != nil {
 		logger.Printf(logger.ERROR, "[zone_iter] records: %s", err.Error())
 		return
