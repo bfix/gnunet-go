@@ -469,8 +469,21 @@ func (m *NamestoreRecordLookupRespMsg) String() string {
 type NamestoreZoneToNameMsg struct {
 	GenericNamestoreMsg
 
-	ZoneKey    *crypto.ZonePrivate `init:"Init"` // private zone key
-	ZonePublic *crypto.ZoneKey     `init:"Init"` // public zone key
+	KeyLen     uint32              `order:"big"`                // length of private key
+	PubLen     uint32              `order:"big"`                // length of public key
+	ZoneKey    *crypto.ZonePrivate `opt:"(IsUsed)" init:"Init"` // private zone key
+	ZonePublic *crypto.ZoneKey     `opt:"(IsUsed)" init:"Init"` // public zone key
+}
+
+// IsUsed decides if a attribute is used.
+func (m *NamestoreZoneToNameMsg) IsUsed(fld string) bool {
+	switch fld {
+	case "ZoneKey":
+		return m.KeyLen > 0
+	case "ZonePublic":
+		return m.PubLen > 0
+	}
+	return false
 }
 
 // NewNamestoreZoneIterNextMsg creates a new message
@@ -483,10 +496,12 @@ func NewNamestoreZoneToNameMsg(id uint32, key any) *NamestoreZoneToNameMsg {
 	switch x := key.(type) {
 	case *crypto.ZonePrivate:
 		msg.ZoneKey = x
-		msg.ZonePublic, _ = crypto.NullZoneKey(x.Type)
+		msg.KeyLen = uint32(x.KeySize() + 4)
+		msg.PubLen = 0
 	case *crypto.ZoneKey:
 		msg.ZonePublic = x
-		msg.ZoneKey, _ = crypto.NullZonePrivate(x.Type)
+		msg.PubLen = uint32(x.KeySize() + 4)
+		msg.KeyLen = 0
 	}
 	return msg
 }
@@ -497,7 +512,7 @@ func (m *NamestoreZoneToNameMsg) Init() error { return nil }
 // String returns a human-readable representation of the message.
 func (m *NamestoreZoneToNameMsg) String() string {
 	var key string
-	if m.ZoneKey.IsNull() {
+	if m.ZoneKey == nil {
 		key = m.ZonePublic.ID()
 	} else {
 		key = m.ZoneKey.Public().ID()
@@ -599,7 +614,7 @@ func (m *NamestoreMonitorStartMsg) String() string {
 }
 
 //----------------------------------------------------------------------
-// MSG_NAMESTORE_RECORD_STORE_RESP
+// MSG_NAMESTORE_MONITOR_NEXT
 //----------------------------------------------------------------------
 
 // NamestoreMonitorNextMsg to retrieve next set of results
