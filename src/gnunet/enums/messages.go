@@ -367,28 +367,31 @@ const (
 	// NAMESTORE message types
 	//------------------------------------------------------------------
 
-	MSG_NAMESTORE_RECORD_STORE           MsgType = 435 // Client to service: store records (as authority)
-	MSG_NAMESTORE_RECORD_STORE_RESPONSE  MsgType = 436 // Service to client: result of store operation.
-	MSG_NAMESTORE_RECORD_LOOKUP          MsgType = 437 // Client to service: lookup label
-	MSG_NAMESTORE_RECORD_LOOKUP_RESPONSE MsgType = 438 // Service to client: lookup label
-	MSG_NAMESTORE_ZONE_TO_NAME           MsgType = 439 // Client to service: "reverse" lookup for zone name based on zone key
-	MSG_NAMESTORE_ZONE_TO_NAME_RESPONSE  MsgType = 440 // Service to client: result of zone-to-name lookup.
-	MSG_NAMESTORE_MONITOR_START          MsgType = 441 // Client to service: start monitoring (yields sequence of "ZONE_ITERATION_RESPONSES" --- forever).
-	MSG_NAMESTORE_MONITOR_SYNC           MsgType = 442 // Service to client: you're now in sync.
-	MSG_NAMESTORE_RECORD_RESULT          MsgType = 443 // Service to client: here is a (plaintext) record you requested.
-	MSG_NAMESTORE_MONITOR_NEXT           MsgType = 444 // Client to service: I am now ready for the next (set of) monitor events. Monitoring equivalent of #NAMESTORE_ZONE_ITERATION_NEXT.
-	MSG_NAMESTORE_ZONE_ITERATION_START   MsgType = 445 // Client to service: please start iteration; receives "NAMESTORE_LOOKUP_NAME_RESPONSE" messages in return.
-	MSG_NAMESTORE_ZONE_ITERATION_NEXT    MsgType = 447 // Client to service: next record(s) in iteration please.
-	MSG_NAMESTORE_ZONE_ITERATION_STOP    MsgType = 448 // Client to service: stop iterating.
-	MSG_NAMESTORE_ZONE_ITERATION_END     MsgType = 449 // Service to client: done iterating.
+	MSG_NAMESTORE_RECORD_STORE           MsgType = 435  // Client to service: store records (as authority)
+	MSG_NAMESTORE_RECORD_STORE_RESPONSE  MsgType = 436  // Service to client: result of store operation.
+	MSG_NAMESTORE_RECORD_LOOKUP          MsgType = 437  // Client to service: lookup label
+	MSG_NAMESTORE_RECORD_LOOKUP_RESPONSE MsgType = 438  // Service to client: lookup label
+	MSG_NAMESTORE_ZONE_TO_NAME           MsgType = 439  // Client to service: "reverse" lookup for zone name based on zone key
+	MSG_NAMESTORE_ZONE_TO_NAME_RESPONSE  MsgType = 440  // Service to client: result of zone-to-name lookup.
+	MSG_NAMESTORE_MONITOR_START          MsgType = 441  // Client to service: start monitoring (yields sequence of "ZONE_ITERATION_RESPONSES" --- forever).
+	MSG_NAMESTORE_MONITOR_SYNC           MsgType = 442  // Service to client: you're now in sync.
+	MSG_NAMESTORE_RECORD_RESULT          MsgType = 443  // Service to client: here is a (plaintext) record you requested.
+	MSG_NAMESTORE_MONITOR_NEXT           MsgType = 444  // Client to service: I am now ready for the next (set of) monitor events. Monitoring equivalent of #NAMESTORE_ZONE_ITERATION_NEXT.
+	MSG_NAMESTORE_ZONE_ITERATION_START   MsgType = 445  // Client to service: please start iteration; receives "NAMESTORE_LOOKUP_NAME_RESPONSE" messages in return.
+	MSG_NAMESTORE_ZONE_ITERATION_NEXT    MsgType = 447  // Client to service: next record(s) in iteration please.
+	MSG_NAMESTORE_ZONE_ITERATION_STOP    MsgType = 448  // Client to service: stop iterating.
+	MSG_NAMESTORE_ZONE_ITERATION_END     MsgType = 449  // Service to client: done iterating.
+	MSG_NAMESTORE_TX_CONTROL             MsgType = 1750 // Begin, Commit or Rollback
+	MSG_NAMESTORE_TX_CONTROL_RESULT      MsgType = 1751 // status message for control message
+	MSG_NAMESTORE_RECORD_EDIT            MsgType = 1752 // open and lock records for editing message
 
 	//------------------------------------------------------------------
 	// LOCKMANAGER message types
 	//------------------------------------------------------------------
 
-	MSG_LOCKMANAGER_ACQUIREMsgType = 450 // Message to acquire Lock
-	MSG_LOCKMANAGER_RELEASEMsgType = 451 // Message to release lock
-	MSG_LOCKMANAGER_SUCCESSMsgType = 452 // SUCCESS reply from lockmanager
+	MSG_LOCKMANAGER_ACQUIREMsgType MsgType = 450 // Message to acquire Lock
+	MSG_LOCKMANAGER_RELEASEMsgType MsgType = 451 // Message to release lock
+	MSG_LOCKMANAGER_SUCCESSMsgType MsgType = 452 // SUCCESS reply from lockmanager
 
 	//------------------------------------------------------------------
 	// TESTBED message types
