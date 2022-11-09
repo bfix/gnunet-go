@@ -69,6 +69,9 @@ func main() {
 		log.Fatal(err)
 	}
 	defer in.Close()
+	log.Println("-----------------------------------------------")
+	log.Printf("Processing %s\n", args[0])
+	log.Println("-----------------------------------------------")
 
 	rdr := bufio.NewReader(in)
 	state := 0
