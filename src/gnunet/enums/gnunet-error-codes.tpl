@@ -7,6 +7,6 @@ type ErrorCode int32
 
 // Error code values
 const (
-{{ range $i, $kv := . }}EC_{{.Name}} ErrorCode = {{.Value}} // {{.Description}}
+{{ range $i, $kv := . }}EC_{{.Name}} ErrorCode = {{.Number}} // {{.Description}}
 {{ end }}
 )
