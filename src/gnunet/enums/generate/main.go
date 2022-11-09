@@ -38,7 +38,6 @@ type Record struct {
 	Comment     string
 	Package     string
 	References  string
-	Value       string
 	Description string
 }
 
@@ -118,7 +117,7 @@ func main() {
 			case "Number":
 				rec.Number = strings.TrimSpace(kv[1])
 			case "Value":
-				rec.Value = strings.TrimSpace(kv[1])
+				rec.Number = strings.TrimSpace(kv[1])
 			case "Name":
 				rec.Name = strings.TrimSpace(kv[1])
 			case "Comment":
