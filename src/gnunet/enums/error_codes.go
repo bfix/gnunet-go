@@ -3,7 +3,7 @@
 //nolint:stylecheck // allow non-camel-case for constants
 package enums
 
-type ErrorCode uint32
+type ErrorCode int32
 
 // Error code values
 const (

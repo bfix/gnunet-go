@@ -47,7 +47,7 @@ var (
 
 func (i ErrorCode) String() string {
 	switch {
-	case i <= 1:
+	case 0 <= i && i <= 1:
 		return _ErrorCode_name_0[_ErrorCode_index_0[i]:_ErrorCode_index_0[i+1]]
 	case i == 101:
 		return _ErrorCode_name_1
