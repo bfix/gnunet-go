@@ -33,11 +33,13 @@ import (
 
 // Record in the GANA registry (for a given type)
 type Record struct {
-	Number     string
-	Name       string
-	Comment    string
-	Package    string
-	References string
+	Number      string
+	Name        string
+	Comment     string
+	Package     string
+	References  string
+	Value       string
+	Description string
 }
 
 // String returns a readable record string
@@ -112,10 +114,14 @@ func main() {
 			switch kv[0] {
 			case "Number":
 				rec.Number = strings.TrimSpace(kv[1])
+			case "Value":
+				rec.Value = strings.TrimSpace(kv[1])
 			case "Name":
 				rec.Name = strings.TrimSpace(kv[1])
 			case "Comment":
 				rec.Comment = strings.TrimSpace(kv[1])
+			case "Description":
+				rec.Description = strings.TrimSpace(kv[1])
 			case "Package":
 				rec.Package = strings.TrimSpace(kv[1])
 			case "References":

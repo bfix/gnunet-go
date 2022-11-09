@@ -1,0 +1,136 @@
+# -*- mode: rec -*-
+#
+# Registry for GNUnet errors.
+#
+%rec: GnunetErrorCode
+%key: Value
+%typedef: ValueRange_t range 0 9999
+%type: Value ValueRange_t
+%mandatory: Value
+%typedef: Description_t regexp |^[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-][abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_\(\)\.,;!"':#\/ -]*$|
+%type: Description Description_t
+%mandatory: Description
+%typedef: Name_t regexp /^[ABCDEFGHIJKLMNOPQRSTUVWXYZ_][ABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789]*$/
+%type: Name Name_t
+%unique: Name
+%mandatory: Name
+# A status of 0 means no HTTP status is associated
+%type: HttpStatus rec HttpStatusCode
+%mandatory: HttpStatus
+%sort: Value
+
+Value: 0
+Name: NONE
+Description: No error (success).
+HttpStatus: 0
+
+Value: 1
+Name: UNKNOWN
+Description: Unknown and unspecified error.
+HttpStatus: 500
+
+Value: 101
+Name: SERVICE_COMMUNICATION_FAILED
+Description: Communication with service failed.
+HttpStatus: 500
+
+# IDENTITY Error Codes
+
+Value: 200
+Name: IDENTITY_NOT_FOUND
+Description: Ego not found.
+HttpStatus: 404
+
+Value: 201
+Name: IDENTITY_NAME_CONFLICT
+Description: Identifier already in use for another ego.
+HttpStatus: 409
+
+Value: 202
+Name: IDENTITY_INVALID
+Description: The given ego is invalid or malformed.
+HttpStatus: 500
+
+# NAMESTORE Error Codes
+
+Value: 5000
+Name: NAMESTORE_UNKNOWN
+Description: Unknown namestore error.
+HttpStatus: 500
+
+Value: 5001
+Name: NAMESTORE_ITERATION_FAILED
+Description: Zone iteration failed.
+HttpStatus: 500
+
+Value: 5002
+Name: NAMESTORE_ZONE_NOT_FOUND
+Description: Zone not found.
+HttpStatus: 404
+
+Value: 5003
+Name: NAMESTORE_RECORD_NOT_FOUND
+Description: Record not found.
+HttpStatus: 404
+
+Value: 5004
+Name: NAMESTORE_RECORD_DELETE_FAILED
+Description: Zone iteration failed.
+HttpStatus: 500
+
+Value: 5005
+Name: NAMESTORE_ZONE_EMPTY
+Description: Zone does not contain any records.
+HttpStatus: 404
+
+Value: 5006
+Name: NAMESTORE_LOOKUP_ERROR
+Description: Failed to lookup record.
+HttpStatus: 500
+
+Value: 5007
+Name: NAMESTORE_NO_RECORDS_GIVEN
+Description: No records given.
+HttpStatus: 400
+
+Value: 5008
+Name: NAMESTORE_RECORD_DATA_INVALID
+Description: Record data invalid.
+HttpStatus: 400
+
+Value: 5009
+Name: NAMESTORE_NO_LABEL_GIVEN
+Description: No label given.
+HttpStatus: 400
+
+Value: 5010
+Name: NAMESTORE_NO_RESULTS
+Description: No results given.
+HttpStatus: 404
+
+Value: 5011
+Name: NAMESTORE_RECORD_EXISTS
+Description: Record already exists.
+HttpStatus: 409
+
+Value: 5012
+Name: NAMESTORE_RECORD_TOO_BIG
+Description: Record size exceeds maximum limit.
+HttpStatus: 500
+
+Value: 5013
+Name: NAMESTORE_BACKEND_FAILED
+Description: There was an error in the database backend.
+HttpStatus: 500
+
+Value: 5014
+Name: NAMESTORE_STORE_FAILED
+Description: Failed to store the given records.
+HttpStatus: 500
+
+Value: 5015
+Name: NAMESTORE_LABEL_INVALID
+Description: Label invalid or malformed.
+HttpStatus: 400
+
+
