@@ -271,8 +271,40 @@ func (s *NamestoreService) HandleMessage(ctx context.Context, sender *util.PeerI
 			return false
 		}
 
+	// lookup records based on query hash
 	case *message.NamestoreZoneToNameMsg:
+		ec := enums.EC_NONE
+		var label string
 
+		// get resource records
+		getRecs := func(hsh *crypto.HashCode) *blocks.RecordSet {
+			lbl, err := s.zm.zdb.GetLabelByKeyHash(hsh)
+			if err != nil {
+				logger.Printf(logger.ERROR, "[namestore%s] label hash lookup: %s", label, err.Error())
+				ec = enums.EC_NAMESTORE_LOOKUP_ERROR
+				return nil
+			}
+			label = lbl.Name
+			rrSet, _, err := s.zm.GetRecordSet(lbl.ID, enums.GNS_FILTER_NONE)
+			if err != nil {
+				logger.Printf(logger.ERROR, "[namestore%s] records: %s", label, err.Error())
+				ec = enums.EC_NAMESTORE_LOOKUP_ERROR
+				return nil
+			}
+			if rrSet.Count == 0 {
+				ec = enums.EC_NAMESTORE_NO_RESULTS
+			}
+			return rrSet
+		}
+		recs := getRecs(crypto.Hash(m.ZonePublic.KeyData))
+
+		resp := message.NewNamestoreZoneToNameRespMsg(m.ID, m.ZoneKey, label, ec)
+		if recs != nil {
+			resp.AddRecords(recs)
+		}
+		if !sendResponse(ctx, "namestore"+label, resp, back) {
+			return false
+		}
 	}
 	return true
 }
