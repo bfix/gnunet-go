@@ -186,7 +186,7 @@ func NewNamestoreRecordResultMsg(id uint32, zk *crypto.ZonePrivate, label string
 		kl = uint16(zk.KeySize()) + 4
 	}
 	nl := uint16(len(label) + 1)
-	size := kl + nl + 28
+	size := kl + nl + 24
 	return &NamestoreRecordResultMsg{
 		GenericNamestoreMsg: newGenericNamestoreMsg(id, size, enums.MSG_NAMESTORE_RECORD_RESULT),
 		Expire:              util.AbsoluteTimeNever(),
@@ -396,14 +396,15 @@ func (m *NamestoreRecordLookupMsg) String() string {
 type NamestoreRecordLookupRespMsg struct {
 	GenericNamestoreMsg
 
-	LblLen  uint16              `order:"big"`   // Length of label
-	RdLen   uint16              `order:"big"`   // size of record data
-	RdCount uint16              `order:"big"`   // number of records
-	Found   int16               `order:"big"`   // label found?
-	KeyLen  uint16              `order:"big"`   // length of key
-	ZoneKey *crypto.ZonePrivate `init:"Init"`   // private zone key
-	Label   []byte              `size:"LblLen"` // label string
-	Records []byte              `size:"RdLen"`  // serialized record data
+	LblLen   uint16              `order:"big"`   // Length of label
+	RdLen    uint16              `order:"big"`   // size of record data
+	RdCount  uint16              `order:"big"`   // number of records
+	Found    int16               `order:"big"`   // label found?
+	Reserved uint16              `order:"big"`   // reserved
+	KeyLen   uint16              `order:"big"`   // length of key
+	ZoneKey  *crypto.ZonePrivate `init:"Init"`   // private zone key
+	Label    []byte              `size:"LblLen"` // label string
+	Records  []byte              `size:"RdLen"`  // serialized record data
 
 	// transient state
 	recset *blocks.RecordSet
@@ -456,7 +457,7 @@ func (m *NamestoreRecordLookupRespMsg) GetRecords() blocks.RecordSet {
 // String returns a human-readable representation of the message.
 func (m *NamestoreRecordLookupRespMsg) String() string {
 	return fmt.Sprintf("NamestoreRecordlLookupRespMsg{id=%d,found=%v,%d records}",
-		m.ID, m.Found != 0, m.RdCount)
+		m.ID, m.Found == int16(enums.RC_YES), m.RdCount)
 }
 
 //----------------------------------------------------------------------
