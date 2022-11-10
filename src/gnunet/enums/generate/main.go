@@ -76,12 +76,13 @@ func main() {
 	state := 0
 	var recs []*Record
 	var rec *Record
-	for {
+	done := false
+	for !done {
 		// read next line from recfile
 		buf, _, err := rdr.ReadLine()
 		if err != nil {
 			if err == io.EOF {
-				break
+				done = true
 			}
 		}
 		line := strings.TrimSpace(string(buf))
