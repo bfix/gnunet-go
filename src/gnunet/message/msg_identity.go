@@ -81,19 +81,24 @@ func (msg *IdentityUpdateMsg) IsUsed(fld string) bool {
 // NewIdentityUpdateMsg creates an update message. If the zone key is nil,
 // a End-Of-List is triggered so the client knows we are done.
 func NewIdentityUpdateMsg(name string, zk *crypto.ZonePrivate) *IdentityUpdateMsg {
+	var kl uint16
+	if zk != nil {
+		kl = uint16(zk.KeySize() + 4)
+	}
+	nl := uint16(len(name) + 1)
+	size := kl + nl + 12
 	msg := &IdentityUpdateMsg{
-		MsgHeader: MsgHeader{8, enums.MSG_IDENTITY_UPDATE},
+		MsgHeader: MsgHeader{size, enums.MSG_IDENTITY_UPDATE},
+		name:      name,
+		Name_:     util.WriteCString(name),
+		NameLen:   nl,
+		KeyLen:    kl,
 	}
 	if zk == nil {
 		// tag end-of-list
 		msg.EOL = uint16(enums.RC_YES)
 	} else {
-		msg.name = name
-		msg.Name_ = util.WriteCString(name)
-		msg.NameLen = uint16(len(msg.Name_))
-		msg.MsgSize += msg.NameLen
 		msg.ZoneKey = zk
-		msg.MsgSize += uint16(zk.KeySize() + 4)
 	}
 	return msg
 }
