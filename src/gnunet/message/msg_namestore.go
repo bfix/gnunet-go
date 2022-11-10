@@ -54,19 +54,18 @@ func newGenericNamestoreMsg(id uint32, size uint16, mtype enums.MsgType) Generic
 type NamestoreZoneIterStartMsg struct {
 	GenericNamestoreMsg
 
-	Filter   uint16              `order:"big"` // filter settings
-	Reserved uint16              `order:"big"` // Reserved
-	KeyLen   uint32              `order:"big"` // length of private key
-	ZoneKey  *crypto.ZonePrivate `init:"Init"` // private zone key
+	Filter  uint16              `order:"big"` // filter settings
+	KeyLen  uint16              `order:"big"` // length of private key
+	ZoneKey *crypto.ZonePrivate `init:"Init"` // private zone key
 }
 
 // NewNamecacheCacheMsg creates a new default message.
 func NewNamestoreZoneIterStartMsg(id uint32, filter int, zone *crypto.ZonePrivate) *NamestoreZoneIterStartMsg {
 	var size uint16 = 16
-	var kl uint32 = 0
+	var kl uint16 = 0
 	if zone != nil {
-		kl = uint32(zone.KeySize()) + 4
-		size += uint16(kl)
+		kl = uint16(zone.KeySize()) + 4
+		size += kl
 	}
 	return &NamestoreZoneIterStartMsg{
 		GenericNamestoreMsg: newGenericNamestoreMsg(id, size, enums.MSG_NAMESTORE_ZONE_ITERATION_START),
@@ -167,15 +166,14 @@ func (m *NamestoreZoneIterEndMsg) String() string {
 type NamestoreRecordResultMsg struct {
 	GenericNamestoreMsg
 
-	Expire   util.AbsoluteTime   ``               // expiration date
-	NameLen  uint16              `order:"big"`    // length of name
-	RdLen    uint16              `order:"big"`    // size of record data
-	RdCount  uint16              `order:"big"`    // number of records
-	Reserved uint16              `order:"big"`    // alignment
-	KeyLen   uint32              `order:"big"`    // length of key
-	ZoneKey  *crypto.ZonePrivate `init:"Init"`    // private zone key
-	Name     []byte              `size:"NameLen"` // name string
-	Records  []byte              `size:"RdLen"`   // serialized record data
+	Expire  util.AbsoluteTime   ``               // expiration date
+	NameLen uint16              `order:"big"`    // length of name
+	RdLen   uint16              `order:"big"`    // size of record data
+	RdCount uint16              `order:"big"`    // number of records
+	KeyLen  uint16              `order:"big"`    // length of key
+	ZoneKey *crypto.ZonePrivate `init:"Init"`    // private zone key
+	Name    []byte              `size:"NameLen"` // name string
+	Records []byte              `size:"RdLen"`   // serialized record data
 
 	// transient state
 	recset *blocks.RecordSet
@@ -183,12 +181,12 @@ type NamestoreRecordResultMsg struct {
 
 // NewNamestoreRecordResultMsg returns an initialize record message
 func NewNamestoreRecordResultMsg(id uint32, zk *crypto.ZonePrivate, label string) *NamestoreRecordResultMsg {
-	var kl uint32
+	var kl uint16
 	if zk != nil {
-		kl = uint32(zk.KeySize()) + 4
+		kl = uint16(zk.KeySize()) + 4
 	}
 	nl := uint16(len(label) + 1)
-	size := uint16(kl) + nl + 28
+	size := kl + nl + 28
 	return &NamestoreRecordResultMsg{
 		GenericNamestoreMsg: newGenericNamestoreMsg(id, size, enums.MSG_NAMESTORE_RECORD_RESULT),
 		Expire:              util.AbsoluteTimeNever(),
@@ -279,18 +277,18 @@ type NamestoreRecordStoreMsg struct {
 	GenericNamestoreMsg
 
 	Count   uint16                `order:"big"`  // number of RecordSets
-	KeyLen  uint32                `order:"big"`  // length of zone key
+	KeyLen  uint16                `order:"big"`  // length of zone key
 	ZoneKey *crypto.ZonePrivate   `init:"Init"`  // private zone key
 	RSets   []*NamestoreRecordSet `size:"Count"` // list of label record sets
 }
 
 // NewNamestoreRecordStoreMsg creates an initialized message (without records)
 func NewNamestoreRecordStoreMsg(id uint32, zk *crypto.ZonePrivate) *NamestoreRecordStoreMsg {
-	var kl uint32
+	var kl uint16
 	if zk != nil {
-		kl = uint32(zk.KeySize() + 4)
+		kl = uint16(zk.KeySize() + 4)
 	}
-	size := uint16(kl) + 14
+	size := kl + 14
 	return &NamestoreRecordStoreMsg{
 		GenericNamestoreMsg: newGenericNamestoreMsg(id, size, enums.MSG_NAMESTORE_RECORD_STORE),
 		ZoneKey:             zk,
@@ -352,31 +350,31 @@ func (m *NamestoreRecordStoreRespMsg) String() string {
 type NamestoreRecordLookupMsg struct {
 	GenericNamestoreMsg
 
-	LblLen  uint32              `order:"big"`   // length of label
-	IsEdit  uint32              `order:"big"`   // lookup corresponds to edit request
+	LblLen  uint16              `order:"big"`   // length of label
+	IsEdit  uint16              `order:"big"`   // lookup corresponds to edit request
 	Filter  uint16              `order:"big"`   // filter flags
-	KeyLen  uint32              `order:"big"`   // size of key
+	KeyLen  uint16              `order:"big"`   // size of key
 	ZoneKey *crypto.ZonePrivate `init:"Init"`   // private zone key
 	Label   []byte              `size:"LblLen"` // label string
 }
 
 // NewNamestoreRecordLookupMsg creates a new message
 func NewNamestoreRecordLookupMsg(id uint32, zk *crypto.ZonePrivate, label string, isEdit bool) *NamestoreRecordLookupMsg {
-	var flag uint32
+	var flag uint16
 	if isEdit {
 		flag = 1
 	}
-	var kl uint32
+	var kl uint16
 	if zk != nil {
-		kl += uint32(zk.KeySize() + 4)
+		kl += uint16(zk.KeySize() + 4)
 	}
-	size := uint16(kl) + uint16(len(label)) + 16
+	size := kl + uint16(len(label)) + 16
 	return &NamestoreRecordLookupMsg{
 		GenericNamestoreMsg: newGenericNamestoreMsg(id, size, enums.MSG_NAMESTORE_RECORD_LOOKUP),
 		IsEdit:              flag,
 		KeyLen:              kl,
 		ZoneKey:             zk,
-		LblLen:              uint32(len(label)),
+		LblLen:              uint16(len(label)),
 		Label:               []byte(label),
 	}
 }
@@ -402,7 +400,7 @@ type NamestoreRecordLookupRespMsg struct {
 	RdLen   uint16              `order:"big"`   // size of record data
 	RdCount uint16              `order:"big"`   // number of records
 	Found   int16               `order:"big"`   // label found?
-	KeyLen  uint32              `order:"big"`   // length of key
+	KeyLen  uint16              `order:"big"`   // length of key
 	ZoneKey *crypto.ZonePrivate `init:"Init"`   // private zone key
 	Label   []byte              `size:"LblLen"` // label string
 	Records []byte              `size:"RdLen"`  // serialized record data
@@ -413,11 +411,11 @@ type NamestoreRecordLookupRespMsg struct {
 
 // NewNamestoreRecordLookupRespMsg creates a new message
 func NewNamestoreRecordLookupRespMsg(id uint32, zk *crypto.ZonePrivate, label string) *NamestoreRecordLookupRespMsg {
-	var kl uint32
+	var kl uint16
 	if zk != nil {
-		kl = uint32(zk.KeySize() + 4)
+		kl = uint16(zk.KeySize() + 4)
 	}
-	size := uint16(kl) + uint16(len(label)) + 20
+	size := kl + uint16(len(label)) + 20
 	msg := &NamestoreRecordLookupRespMsg{
 		GenericNamestoreMsg: newGenericNamestoreMsg(id, size, enums.MSG_NAMESTORE_RECORD_LOOKUP_RESPONSE),
 		KeyLen:              kl,
@@ -469,39 +467,28 @@ func (m *NamestoreRecordLookupRespMsg) String() string {
 type NamestoreZoneToNameMsg struct {
 	GenericNamestoreMsg
 
-	KeyLen     uint32              `order:"big"`                // length of private key
-	PubLen     uint32              `order:"big"`                // length of public key
-	ZoneKey    *crypto.ZonePrivate `opt:"(IsUsed)" init:"Init"` // private zone key
-	ZonePublic *crypto.ZoneKey     `opt:"(IsUsed)" init:"Init"` // public zone key
-}
-
-// IsUsed decides if a attribute is used.
-func (m *NamestoreZoneToNameMsg) IsUsed(fld string) bool {
-	switch fld {
-	case "ZoneKey":
-		return m.KeyLen > 0
-	case "ZonePublic":
-		return m.PubLen > 0
-	}
-	return false
+	KeyLen     uint16              `order:"big"` // length of private key
+	PubLen     uint16              `order:"big"` // length of public key
+	ZoneKey    *crypto.ZonePrivate `init:"Init"` // private zone key
+	ZonePublic *crypto.ZoneKey     `init:"Init"` // public derived zone key
 }
 
 // NewNamestoreZoneIterNextMsg creates a new message
-func NewNamestoreZoneToNameMsg(id uint32, key any) *NamestoreZoneToNameMsg {
-	// create message
-	msg := &NamestoreZoneToNameMsg{
-		GenericNamestoreMsg: newGenericNamestoreMsg(id, 8, enums.MSG_NAMESTORE_ZONE_TO_NAME),
+func NewNamestoreZoneToNameMsg(id uint32, zk *crypto.ZonePrivate, pk *crypto.ZoneKey) *NamestoreZoneToNameMsg {
+	var kl, pl uint16
+	if zk != nil {
+		kl = uint16(zk.KeySize() + 4)
 	}
-	// set either public or private key
-	switch x := key.(type) {
-	case *crypto.ZonePrivate:
-		msg.ZoneKey = x
-		msg.KeyLen = uint32(x.KeySize() + 4)
-		msg.PubLen = 0
-	case *crypto.ZoneKey:
-		msg.ZonePublic = x
-		msg.PubLen = uint32(x.KeySize() + 4)
-		msg.KeyLen = 0
+	if pk != nil {
+		pl = uint16(pk.KeySize() + 4)
+	}
+	size := kl + pl + 12
+	msg := &NamestoreZoneToNameMsg{
+		GenericNamestoreMsg: newGenericNamestoreMsg(id, size, enums.MSG_NAMESTORE_ZONE_TO_NAME),
+		KeyLen:              kl,
+		PubLen:              pl,
+		ZoneKey:             zk,
+		ZonePublic:          pk,
 	}
 	return msg
 }
@@ -513,9 +500,9 @@ func (m *NamestoreZoneToNameMsg) Init() error { return nil }
 func (m *NamestoreZoneToNameMsg) String() string {
 	var key string
 	if m.ZoneKey == nil {
-		key = m.ZonePublic.ID()
+		key = "sec:" + m.ZonePublic.ID()
 	} else {
-		key = m.ZoneKey.Public().ID()
+		key = "pub:" + m.ZoneKey.Public().ID()
 	}
 	return fmt.Sprintf("NamestoreZoneToNameMsg{id=%d,zk=%s}", m.ID, key)
 }
@@ -528,10 +515,11 @@ func (m *NamestoreZoneToNameMsg) String() string {
 type NamestoreZoneToNameRespMsg struct {
 	GenericNamestoreMsg
 
+	Status  enums.ErrorCode     `order:"big"`    // result status (error code)
 	NameLen uint16              `order:"big"`    // length of name
 	RdLen   uint16              `order:"big"`    // size of record data
 	RdCount uint16              `order:"big"`    // number of records
-	Status  int16               `order:"big"`    // result status
+	KeyLen  uint16              `order:"big"`    // length of key
 	ZoneKey *crypto.ZonePrivate `init:"Init"`    // private zone key
 	Name    []byte              `size:"NameLen"` // name string
 	Records []byte              `size:"RdLen"`   // serialized record data
@@ -541,9 +529,20 @@ type NamestoreZoneToNameRespMsg struct {
 }
 
 // NewNamestoreNamestoreZoneToNameRespMsgMsg creates a new message
-func NewNamestoreZoneToNameRespMsg(id uint32, zk *crypto.ZonePrivate, label string, status enums.ResultCode) *NamestoreZoneToNameRespMsg {
+func NewNamestoreZoneToNameRespMsg(id uint32, zk *crypto.ZonePrivate, label string, status enums.ErrorCode) *NamestoreZoneToNameRespMsg {
+	var kl uint16
+	if zk != nil {
+		kl = uint16(zk.KeySize() + 4)
+	}
+	nl := uint16(len(label) + 1)
+	size := kl + nl + 12
 	return &NamestoreZoneToNameRespMsg{
-		GenericNamestoreMsg: newGenericNamestoreMsg(id, 8, enums.MSG_NAMESTORE_ZONE_TO_NAME_RESPONSE),
+		GenericNamestoreMsg: newGenericNamestoreMsg(id, size, enums.MSG_NAMESTORE_ZONE_TO_NAME_RESPONSE),
+		Status:              status,
+		NameLen:             nl,
+		Name:                util.WriteCString(label),
+		KeyLen:              kl,
+		ZoneKey:             zk,
 	}
 }
 
@@ -580,6 +579,65 @@ func (m *NamestoreZoneToNameRespMsg) String() string {
 }
 
 //----------------------------------------------------------------------
+// MSG_NAMESTORE_TX_CONTROL
+//----------------------------------------------------------------------
+
+// NamestoreTxControlMsg to initiate a Tx control
+type NamestoreTxControlMsg struct {
+	GenericNamestoreMsg
+
+	Reserved uint16 `order:"big"` // reserved
+	Control  uint16 `order:"big"` // type of control message to send
+}
+
+// NewNamestoreTxControlMsg creates a new message
+func NewNamestoreTxControlMsg(id uint32, ctrl uint16) *NamestoreTxControlMsg {
+	return &NamestoreTxControlMsg{
+		GenericNamestoreMsg: newGenericNamestoreMsg(id, 12, enums.MSG_NAMESTORE_TX_CONTROL),
+		Control:             ctrl,
+	}
+}
+
+// Init called after unmarshalling a message to setup internal state
+func (m *NamestoreTxControlMsg) Init() error {
+	return nil
+}
+
+// String returns a human-readable representation of the message.
+func (m *NamestoreTxControlMsg) String() string {
+	return fmt.Sprintf("NamestoreTxControlMsg{id=%d,ctrl=%d}", m.ID, m.Control)
+}
+
+//----------------------------------------------------------------------
+// MSG_NAMESTORE_TX_CONTROL_RESULT
+//----------------------------------------------------------------------
+
+// NamestoreTxControlResultMsg is a response to a Tx control message
+type NamestoreTxControlResultMsg struct {
+	GenericNamestoreMsg
+
+	Result enums.ErrorCode `order:"big"` // error code
+}
+
+// NewNamestoreTxControlResultMsg creates a new message
+func NewNamestoreTxControlResultMsg(id uint32, ec enums.ErrorCode) *NamestoreTxControlResultMsg {
+	return &NamestoreTxControlResultMsg{
+		GenericNamestoreMsg: newGenericNamestoreMsg(id, 12, enums.MSG_NAMESTORE_TX_CONTROL_RESULT),
+		Result:              ec,
+	}
+}
+
+// Init called after unmarshalling a message to setup internal state
+func (m *NamestoreTxControlResultMsg) Init() error {
+	return nil
+}
+
+// String returns a human-readable representation of the message.
+func (m *NamestoreTxControlResultMsg) String() string {
+	return fmt.Sprintf("NamestoreTxControlResultMsg{id=%d,result=%s}", m.ID, m.Result)
+}
+
+//----------------------------------------------------------------------
 // MSG_NAMESTORE_MONITOR_START
 //----------------------------------------------------------------------
 
@@ -587,19 +645,24 @@ func (m *NamestoreZoneToNameRespMsg) String() string {
 type NamestoreMonitorStartMsg struct {
 	GenericNamestoreMsg
 
-	Iterate  enums.ResultCode    `order:"big"` // iterate over all records
-	Filter   uint16              `order:"big"` // filter flags
-	Reserved uint16              `order:"big"` // alignment
-	ZoneKey  *crypto.ZonePrivate `init:"Init"` // private zone key
+	Iterate enums.ResultCode    `order:"big"` // iterate over all records
+	Filter  uint16              `order:"big"` // filter flags
+	KeyLen  uint16              `order:"big"` // length of key
+	ZoneKey *crypto.ZonePrivate `init:"Init"` // private zone key
 }
 
 // NewNamestoreMonitorStartMsg creates a new message
 func NewNamestoreMonitorStartMsg(id uint32, zk *crypto.ZonePrivate, iter enums.ResultCode, filter int) *NamestoreMonitorStartMsg {
-	size := uint16(zk.KeySize()+4) + 16
+	var kl uint16
+	if zk != nil {
+		kl = uint16(zk.KeySize() + 4)
+	}
+	size := kl + 16
 	return &NamestoreMonitorStartMsg{
 		GenericNamestoreMsg: newGenericNamestoreMsg(id, size, enums.MSG_NAMESTORE_MONITOR_START),
 		Iterate:             iter,
 		Filter:              uint16(filter),
+		KeyLen:              kl,
 		ZoneKey:             zk,
 	}
 }

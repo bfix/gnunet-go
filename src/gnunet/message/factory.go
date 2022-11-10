@@ -160,16 +160,16 @@ func NewEmptyMessage(msgType enums.MsgType) (Message, error) {
 		return NewNamestoreRecordLookupMsg(0, nil, "", false), nil
 	case enums.MSG_NAMESTORE_RECORD_LOOKUP_RESPONSE:
 		return NewNamestoreRecordLookupRespMsg(0, nil, ""), nil
-	case enums.MSG_NAMESTORE_MONITOR_START:
-		return NewNamestoreMonitorStartMsg(0, nil, 0, 0), nil
 	case enums.MSG_NAMESTORE_RECORD_RESULT:
 		return NewNamestoreRecordResultMsg(0, nil, ""), nil
+	case enums.MSG_NAMESTORE_ZONE_TO_NAME:
+		return NewNamestoreZoneToNameMsg(0, nil, nil), nil
+	case enums.MSG_NAMESTORE_ZONE_TO_NAME_RESPONSE:
+		return NewNamestoreZoneToNameRespMsg(0, nil, "", 0), nil
+	case enums.MSG_NAMESTORE_MONITOR_START:
+		return NewNamestoreMonitorStartMsg(0, nil, 0, 0), nil
 	case enums.MSG_NAMESTORE_MONITOR_NEXT:
 		return NewNamestoreMonitorNextMsg(0, 0), nil
-
-	// unhandled message
-	case enums.MSG_NAMESTORE_ZONE_TO_NAME:
-	case enums.MSG_NAMESTORE_ZONE_TO_NAME_RESPONSE:
 	case enums.MSG_NAMESTORE_MONITOR_SYNC:
 	}
 	return nil, fmt.Errorf("unknown message type %d", msgType)

@@ -62,10 +62,12 @@ func (msg *IdentityStartMsg) String() string {
 type IdentityUpdateMsg struct {
 	MsgHeader
 
-	NameLen uint16              `order:"big"`
-	EOL     uint16              `order:"big"`
-	Name_   []byte              `size:"NameLen"`
-	ZoneKey *crypto.ZonePrivate `init:"Init" opt:"(IsUsed)"`
+	NameLen  uint16              `order:"big"`                // length of name
+	EOL      uint16              `order:"big"`                // flag for "end-of-list"
+	KeyLen   uint16              `order:"big"`                // length of key
+	Reserved uint16              `order:"big"`                // reserved
+	Name_    []byte              `size:"NameLen"`             // label name
+	ZoneKey  *crypto.ZonePrivate `init:"Init" opt:"(IsUsed)"` // zone key
 
 	// transient state
 	name string
@@ -158,11 +160,10 @@ func (msg *IdentityResultCodeMsg) String() string {
 type IdentityCreateMsg struct {
 	MsgHeader
 
-	NameLen  uint16              `order:"big"`
-	Reserved uint16              `order:"big"`
-	KeyLen   uint32              `order:"big"`
-	ZoneKey  *crypto.ZonePrivate `init:"Init"`
-	Name_    []byte              `size:"NameLen"`
+	NameLen uint16              `order:"big"`    // length of label name
+	KeyLen  uint16              `order:"big"`    // length of key
+	ZoneKey *crypto.ZonePrivate `init:"Init"`    // zone key
+	Name_   []byte              `size:"NameLen"` // label name
 
 	// transient state
 	name string
