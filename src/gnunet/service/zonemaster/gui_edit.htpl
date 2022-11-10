@@ -66,6 +66,7 @@
     <div>
         <h3>Edit a GNS label for zone "{{$zone}}":</h3>
         <p><small>(Created: {{index .Params "created"}}, Last edited: {{index .Params "modified"}})</small></p>
+        <p>Query hash({{$name}}): {{index .Params "query"}}</p>
         <form action="/action/upd/label/{{.Ref}}" method="post" onsubmit="return(label_validate());">
             <input type="hidden" name="old_name" value="{{$name}}">
             <input type="hidden" name="zid" value="{{index .Params "zid"}}">
