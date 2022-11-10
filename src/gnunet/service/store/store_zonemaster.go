@@ -351,10 +351,13 @@ func (db *ZoneDB) SetLabel(l *Label) error {
 // GetLabel gets a label with given identifier
 func (db *ZoneDB) GetLabel(id int64) (label *Label, err error) {
 	// assemble label from database row
-	stmt := "select zid,name,created,modified from labels where id=?"
+	stmt := "select zid,name,created,modified,keyhash from labels where id=?"
 	label = new(Label)
 	row := db.conn.QueryRow(stmt, id)
-	err = row.Scan(&label.Zone, &label.Name, &label.Created.Val, &label.Modified.Val)
+	var query []byte
+	if err = row.Scan(&label.Zone, &label.Name, &label.Created.Val, &label.Modified.Val, &query); err == nil {
+		label.KeyHash = crypto.NewHashCode(query)
+	}
 	return
 }
 
