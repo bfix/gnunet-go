@@ -86,6 +86,8 @@ func NewService(ctx context.Context, c *core.Core, plugins []string) *ZoneMaster
 			continue
 		}
 		logger.Printf(logger.INFO, "[zonemaster] plugin '%s' loaded.", inst.Name())
+
+		// register Utility function with plugin
 		inst.SetUtility(ZoneMasterUtility)
 
 		// add plugin to resource record type handler
@@ -171,7 +173,7 @@ func (zm *ZoneMaster) PublishZoneLabel(ctx context.Context, zone *store.Zone, la
 	logger.Printf(logger.INFO, "[zonemaster] Publishing label '%s' of zone %s", label.Name, zk.ID())
 
 	// collect all records for label
-	rrSet, expire, err := zm.GetRecordSet(label.ID)
+	rrSet, expire, err := zm.GetRecordSet(label.ID, enums.GNS_FILTER_NONE)
 	if err != nil {
 		return err
 	}
