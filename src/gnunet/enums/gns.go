@@ -20,42 +20,6 @@
 package enums
 
 //----------------------------------------------------------------------
-// Resource Record Flags
-//----------------------------------------------------------------------
-
-// GNSFlag type
-type GNSFlag uint16
-
-const (
-	// GNS record flags
-	GNS_FLAG_CRITICAL GNSFlag = 1     // Record is critical (abort processing if RR type is not supoorted)
-	GNS_FLAG_SHADOW   GNSFlag = 2     // Record is ignored if non-expired records of same type exist in block
-	GNS_FLAG_SUPPL    GNSFlag = 4     // Supplemental records (e.g. NICK) in a block
-	GNS_FLAG_EXPREL   GNSFlag = 16384 // Expiry time is relative
-	GNS_FLAG_PRIVATE  GNSFlag = 32768 // Record is not shared on the DHT
-)
-
-// List flags as strings
-func (gf GNSFlag) List() (flags []string) {
-	if gf&GNS_FLAG_PRIVATE != 0 {
-		flags = append(flags, "Private")
-	}
-	if gf&GNS_FLAG_SHADOW != 0 {
-		flags = append(flags, "Shadow")
-	}
-	if gf&GNS_FLAG_SUPPL != 0 {
-		flags = append(flags, "Suppl")
-	}
-	if gf&GNS_FLAG_CRITICAL != 0 {
-		flags = append(flags, "Critical")
-	}
-	if gf&GNS_FLAG_EXPREL != 0 {
-		flags = append(flags, "TTL")
-	}
-	return
-}
-
-//----------------------------------------------------------------------
 // GNS filters
 //----------------------------------------------------------------------
 

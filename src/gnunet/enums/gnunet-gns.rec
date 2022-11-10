@@ -19,32 +19,32 @@
 Number: 65536
 Name: PKEY
 Comment: GNS zone transfer
-References: LSD0001
+References: https://lsd.gnunet.org/lsd0001
 
 Number: 65537
 Name: NICK
 Comment: GNS nick names
-References: LSD0001
+References: https://lsd.gnunet.org/lsd0001
 
 Number: 65538
 Name: LEHO
 Comment: legacy hostnames
-References: LSD0001
+References: https://lsd.gnunet.org/lsd0001
 
 Number: 65539
 Name: VPN
 Comment: VPN resolution
-References: LSD0001
+References: https://lsd.gnunet.org/lsd0001
 
 Number: 65540
 Name: GNS2DNS
 Comment: Delegation to DNS
-References: LSD0001
+References: https://lsd.gnunet.org/lsd0001
 
 Number: 65541
 Name: BOX
 Comment: Boxed records (see TLSA/SRV handling in GNS)
-References: LSD0001
+References: https://lsd.gnunet.org/lsd0001
 
 Number: 65542
 Name: PLACE
@@ -84,7 +84,7 @@ Contact: schanzen@gnunet.org
 Number: 65551
 Name: REDIRECT
 Comment: Resolver redirects
-Contact: LSD0001
+Contact: https://lsd.gnunet.org/lsd0001
 
 Number: 65552
 Name: RECLAIM_OIDC_CLIENT

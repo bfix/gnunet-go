@@ -26,6 +26,7 @@ update enums/gnunet-signature.rec $REPO/gnunet-signatures/registry.rec
 update enums/gnunet-dht.rec $REPO/gnunet-dht-block-types/registry.rec
 update enums/gnunet-gns.rec $REPO/gnu-name-system-record-types/registry.rec
 update enums/gnunet-error-codes.rec $REPO/gnunet-error-codes/registry.rec
+update enums/gnunet-gns-flags.rec $REPO/gnu-name-system-record-flags/registry.rec
 
 if [ $changed -eq 1 ]; then
     go generate ./...

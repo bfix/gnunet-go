@@ -49,3 +49,9 @@ package enums
 //go:generate go run generate/main.go gnunet-gns.rec gnunet-gns.tpl gns_type.go
 
 //go:generate stringer -type=GNSType gns_type.go
+
+//----------------------------------------------------------------------
+// GNS record flags
+//----------------------------------------------------------------------
+
+//go:generate go run generate/main.go gnunet-gns-flags.rec gnunet-gns-flags.tpl gns_flags.go

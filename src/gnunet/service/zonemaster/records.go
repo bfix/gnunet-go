@@ -190,7 +190,7 @@ func guiPrefix(t enums.GNSType) string {
 func guiParse(params map[string]string, pf string) (exp util.AbsoluteTime, flags enums.GNSFlag) {
 	// parse expiration time
 	if _, ok := params[pf+"ttl"]; ok {
-		flags |= enums.GNS_FLAG_EXPREL
+		flags |= enums.GNS_FLAG_RELATIVE_EXPIRATION
 		exp.Val = parseDuration(params[pf+"ttl_value"])
 	} else {
 		exp = util.AbsoluteTimeNever()
@@ -208,7 +208,7 @@ func guiParse(params map[string]string, pf string) (exp util.AbsoluteTime, flags
 		flags |= enums.GNS_FLAG_SHADOW
 	}
 	if _, ok := params[pf+"suppl"]; ok {
-		flags |= enums.GNS_FLAG_SUPPL
+		flags |= enums.GNS_FLAG_SUPPLEMENTAL
 	}
 	if _, ok := params[pf+"critical"]; ok {
 		flags |= enums.GNS_FLAG_CRITICAL
@@ -386,7 +386,7 @@ func (zm *ZoneMaster) GetRecordSet(label int64, filter enums.GNSFilter) (rs *blo
 			continue
 		}
 		// skip TTL expiry when determining earliest expiry
-		if r.Flags&enums.GNS_FLAG_EXPREL == 0 && r.Expire.Compare(expire) < 0 {
+		if r.Flags&enums.GNS_FLAG_RELATIVE_EXPIRATION == 0 && r.Expire.Compare(expire) < 0 {
 			expire = r.Expire
 		}
 		rs.AddRecord(&r.ResourceRecord)

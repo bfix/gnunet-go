@@ -151,7 +151,7 @@ func NewBlockHandlerList(records []*blocks.ResourceRecord, labels []string) (*Bl
 	// Third pass: Traverse active list and build list of handler instances.
 	for _, rec := range active {
 		// update counter map for non-supplemental records
-		if (rec.Flags & enums.GNS_FLAG_SUPPL) != 0 {
+		if (rec.Flags & enums.GNS_FLAG_SUPPLEMENTAL) != 0 {
 			logger.Printf(logger.DBG, "[gns] handler_list: skip %v\n", rec)
 			continue
 		}

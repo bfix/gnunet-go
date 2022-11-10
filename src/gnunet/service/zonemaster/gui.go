@@ -74,7 +74,7 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 			return guiTime(ts)
 		},
 		"dateExp": func(ts util.AbsoluteTime, flags enums.GNSFlag) string {
-			if flags&enums.GNS_FLAG_EXPREL != 0 {
+			if flags&enums.GNS_FLAG_RELATIVE_EXPIRATION != 0 {
 				return guiDuration(ts)
 			}
 			return guiTime(ts)
@@ -93,7 +93,7 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 				data[pf+"shadow"] = "on"
 				data[pf+"shadow_enforced"] = "on"
 			}
-			if spec.Flags&enums.GNS_FLAG_SUPPL != 0 {
+			if spec.Flags&enums.GNS_FLAG_SUPPLEMENTAL != 0 {
 				data[pf+"suppl"] = "on"
 				data[pf+"suppl_enforced"] = "on"
 			}
@@ -101,7 +101,7 @@ func (zm *ZoneMaster) startGUI(ctx context.Context) {
 				data[pf+"critical"] = "on"
 				data[pf+"critical_enforced"] = "on"
 			}
-			if spec.Flags&enums.GNS_FLAG_EXPREL != 0 {
+			if spec.Flags&enums.GNS_FLAG_RELATIVE_EXPIRATION != 0 {
 				data[pf+"ttl"] = "on"
 			}
 			return pf
@@ -272,9 +272,16 @@ func (zm *ZoneMaster) actionNew(w http.ResponseWriter, r *http.Request, mode str
 	// new label
 	case "label":
 		name := r.FormValue("name")
+		// get zone
+		var zone *store.Zone
+		if zone, err = zm.zdb.GetZone(id); err != nil {
+			return
+		}
 		// add label to database
 		label := store.NewLabel(name)
-		label.Zone = id
+		if err = label.SetZone(zone); err != nil {
+			return
+		}
 		err = zm.zdb.SetLabel(label)
 
 		// notify listeners
@@ -470,10 +477,16 @@ func (zm *ZoneMaster) new(w http.ResponseWriter, r *http.Request) {
 		var templ string
 		if rrs, label, err = zm.zdb.GetRRTypes(id); err == nil {
 			// check record mode for custom handling
-			mode, ok := r.URL.Query()["mode"]
-			if ok && mode[0] != "GNS" {
+			var mode string
+			if modes, found := r.URL.Query()["mode"]; found {
+				mode = modes[0]
+			} else {
+				mode = "GNS"
+			}
+			// try plugin modes first
+			if mode != "GNS" {
 				var pid int
-				if pid, ok = util.CastFromString[int](mode[0]); ok {
+				if pid, ok = util.CastFromString[int](mode); ok {
 					inst := zm.plugins[pid]
 					// convert rrs to plugin-compatible type
 					rrsPlugin := make([][2]uint32, 0)
@@ -493,9 +506,12 @@ func (zm *ZoneMaster) new(w http.ResponseWriter, r *http.Request) {
 						data.RRspecs = append(data.RRspecs, s)
 					}
 					templ, _ = inst.TemplateNames()
+				} else {
+					mode = "GNS"
 				}
 			}
-			if !ok {
+			// use built-in GNS (fall-back)
+			if mode == "GNS" {
 				// enforce GNS behaviour:
 				// compile a list of acceptable types for new records
 				data.RRspecs = compatibleRR(rrs, label)
@@ -574,11 +590,12 @@ func (zm *ZoneMaster) edit(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			// set edit parameters
-			data.Params["zone"], _ = zm.zdb.GetName("zones", id)
+			data.Params["zone"], _ = zm.zdb.GetName("zones", label.Zone)
 			data.Params["zid"] = util.CastToString(label.Zone)
 			data.Params["name"] = label.Name
 			data.Params["created"] = guiTime(label.Created)
 			data.Params["modified"] = guiTime(label.Modified)
+			data.Params["query"] = label.KeyHash.String()
 
 			// show dialog
 			renderPage(w, data, "edit_label")
@@ -626,7 +643,7 @@ func (zm *ZoneMaster) editRec(w http.ResponseWriter, r *http.Request, data *NewE
 	data.Params["modified"] = guiTime(rec.Modified)
 	data.Params["label"], _ = zm.zdb.GetName("labels", rec.Label)
 	data.Params["lid"] = util.CastToString(rec.Label)
-	if rec.Flags&enums.GNS_FLAG_EXPREL != 0 {
+	if rec.Flags&enums.GNS_FLAG_RELATIVE_EXPIRATION != 0 {
 		data.Params[pf+"ttl"] = "on"
 		data.Params[pf+"ttl_value"] = guiDuration(rec.Expire)
 	} else {
@@ -642,7 +659,7 @@ func (zm *ZoneMaster) editRec(w http.ResponseWriter, r *http.Request, data *NewE
 	if rec.Flags&enums.GNS_FLAG_SHADOW != 0 {
 		data.Params[pf+"shadow"] = "on"
 	}
-	if rec.Flags&enums.GNS_FLAG_SUPPL != 0 {
+	if rec.Flags&enums.GNS_FLAG_SUPPLEMENTAL != 0 {
 		data.Params[pf+"suppl"] = "on"
 	}
 	if rec.Flags&enums.GNS_FLAG_CRITICAL != 0 {

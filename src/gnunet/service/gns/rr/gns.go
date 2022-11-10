@@ -111,7 +111,7 @@ func (rr *REDIRECT) Coexist(list []*enums.GNSSpec, label string) (ok bool, force
 	}
 	// make sure all existing records are supplemental EDKEYs too
 	for _, e := range list {
-		if e.Type != enums.GNS_TYPE_REDIRECT && e.Flags&enums.GNS_FLAG_SUPPL == 0 {
+		if e.Type != enums.GNS_TYPE_REDIRECT && e.Flags&enums.GNS_FLAG_SUPPLEMENTAL == 0 {
 			// check failed on non-supplemental non-REDIRECT record
 			return
 		}

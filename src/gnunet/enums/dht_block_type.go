@@ -23,6 +23,7 @@ BLOCK_TYPE_REGEX_ACCEPT BlockType = 23 // Block to store a cadet regex accepting
 BLOCK_TYPE_SET_TEST BlockType = 24 // Block for testing set/consensus.  If first byte of the block is non-zero, the block is considered invalid.
 BLOCK_TYPE_CONSENSUS_ELEMENT BlockType = 25 // Block type for consensus elements. Contains either special marker elements or a nested block.
 BLOCK_TYPE_SETI_TEST BlockType = 26 // Block for testing set intersection.  If first byte of the block is non-zero, the block is considered invalid.
+BLOCK_TYPE_SETU_TEST BlockType = 27 // Block for testing set union.  If first byte of the block is non-zero, the block is considered invalid.
 
 )
 
