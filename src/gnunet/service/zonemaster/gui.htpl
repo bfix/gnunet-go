@@ -32,7 +32,7 @@
 {{define "dashboard"}}
 <div>
     <ul id="dashboard">
-    {{if .}}
+    {{if .Zones}}
         {{$plugins := .Plugins}}
         {{range $zi, $zone := .Zones}}
         <li>
