@@ -265,7 +265,9 @@ func (s *NamestoreService) HandleMessage(ctx context.Context, sender *util.PeerI
 		resp := message.NewNamestoreRecordLookupRespMsg(m.ID, m.ZoneKey, string(m.Label))
 		if recs != nil {
 			resp.AddRecords(recs)
-			resp.Found = 1
+			resp.Found = int16(enums.RC_YES)
+		} else {
+			resp.Found = int16(enums.RC_NO)
 		}
 		if !sendResponse(ctx, "namestore"+label, resp, back) {
 			return false
