@@ -22,7 +22,8 @@ create table zones (
     created  integer,
     modified integer,
     ztype    integer,
-    zdata    blob
+    zdata    blob,
+    pdata    blob
 );
 
 create table labels (
@@ -31,6 +32,7 @@ create table labels (
 	name     text,
     created  integer,
     modified integer,
+    keyhash  blob,
     unique (zid,name)
 );
 

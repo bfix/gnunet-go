@@ -56,7 +56,9 @@ func TestZoneMaster(t *testing.T) {
 	//------------------------------------------------------------------
 	// create label and add to zone and database
 	label := NewLabel("bar")
-	label.Zone = zone.ID
+	if err = label.SetZone(zone); err != nil {
+		t.Fatal(err)
+	}
 	if err = zdb.SetLabel(label); err != nil {
 		t.Fatal(err)
 	}

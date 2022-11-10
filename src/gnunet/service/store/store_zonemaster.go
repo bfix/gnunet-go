@@ -66,6 +66,7 @@ type Label struct {
 	Name     string            // label name
 	Created  util.AbsoluteTime // date of creation
 	Modified util.AbsoluteTime // date of last modification
+	KeyHash  *crypto.HashCode  // hashcode of the label under zone
 }
 
 // NewLabel returns a new label with given name. It is not
@@ -78,6 +79,17 @@ func NewLabel(label string) *Label {
 	lbl.Created = util.AbsoluteTimeNow()
 	lbl.Modified = util.AbsoluteTimeNow()
 	return lbl
+}
+
+// SetZone links a label with a zone
+func (l *Label) SetZone(z *Zone) error {
+	pk, _, err := z.Key.Public().Derive(l.Name, "gns")
+	if err != nil {
+		return err
+	}
+	l.Zone = z.ID
+	l.KeyHash = crypto.Hash(pk.KeyData)
+	return nil
 }
 
 //----------------------------------------------------------------------
@@ -168,8 +180,8 @@ func (db *ZoneDB) Close() error {
 func (db *ZoneDB) SetZone(z *Zone) error {
 	// check for zone insert
 	if z.ID == 0 {
-		stmt := "insert into zones(name,created,modified,ztype,zdata) values(?,?,?,?,?)"
-		result, err := db.conn.Exec(stmt, z.Name, z.Created.Val, z.Modified.Val, z.Key.Type, z.Key.KeyData)
+		stmt := "insert into zones(name,created,modified,ztype,zdata,pdata) values(?,?,?,?,?,?)"
+		result, err := db.conn.Exec(stmt, z.Name, z.Created.Val, z.Modified.Val, z.Key.Type, z.Key.KeyData, z.Key.Public().KeyData)
 		if err != nil {
 			return err
 		}
@@ -277,6 +289,20 @@ func (db *ZoneDB) GetZoneByKey(zk *crypto.ZonePrivate) (ident *Zone, err error) 
 	return
 }
 
+// GetZoneByPublicKey returns an identifier with given key
+func (db *ZoneDB) GetZoneByPublicKey(zk *crypto.ZoneKey) (ident *Zone, err error) {
+	// assemble zone from database row
+	stmt := "select id,name,created,modified,ztype,zdata from zones where pdata=?"
+	row := db.conn.QueryRow(stmt, zk.KeyData)
+	ident = new(Zone)
+	var ztype enums.GNSType
+	var zdata []byte
+	if err = row.Scan(&ident.ID, &ident.Name, &ident.Created.Val, &ident.Modified.Val, &ztype, &zdata); err == nil {
+		ident.Key, err = crypto.NewZonePrivate(ztype, zdata)
+	}
+	return
+}
+
 //----------------------------------------------------------------------
 // Label handling
 //----------------------------------------------------------------------
@@ -290,8 +316,8 @@ func (db *ZoneDB) GetZoneByKey(zk *crypto.ZonePrivate) (ident *Zone, err error) 
 func (db *ZoneDB) SetLabel(l *Label) error {
 	// check for label insert
 	if l.ID == 0 {
-		stmt := "insert into labels(zid,name,created,modified) values(?,?,?,?)"
-		result, err := db.conn.Exec(stmt, l.Zone, l.Name, l.Created.Val, l.Modified.Val)
+		stmt := "insert into labels(zid,name,created,modified,keyhash) values(?,?,?,?,?)"
+		result, err := db.conn.Exec(stmt, l.Zone, l.Name, l.Created.Val, l.Modified.Val, l.KeyHash.Data)
 		if err != nil {
 			return err
 		}
@@ -329,6 +355,17 @@ func (db *ZoneDB) GetLabel(id int64) (label *Label, err error) {
 	label = new(Label)
 	row := db.conn.QueryRow(stmt, id)
 	err = row.Scan(&label.Zone, &label.Name, &label.Created.Val, &label.Modified.Val)
+	return
+}
+
+// GetLabelByKeyHash returns a label with given query hash
+func (db *ZoneDB) GetLabelByKeyHash(hsh *crypto.HashCode) (label *Label, err error) {
+	// assemble label from database row
+	stmt := "select id,zid,name,created,modified from labels where keyhash=?"
+	label = new(Label)
+	label.KeyHash = hsh
+	row := db.conn.QueryRow(stmt, hsh)
+	err = row.Scan(&label.ID, &label.Zone, &label.Name, &label.Created.Val, &label.Modified.Val)
 	return
 }
 
