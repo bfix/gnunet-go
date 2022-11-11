@@ -142,6 +142,79 @@ loop:
 
 // OnChange is called if a zone or record has changed or was inserted
 func (zm *ZoneMaster) OnChange(table string, id int64, mode int) {
+	// no action on delete
+	if mode == ChangeDelete {
+		return
+	}
+	// handle new and changed entries
+	var (
+		zone  *store.Zone
+		label *store.Label
+		rec   *store.Record
+		err   error
+	)
+	ctx := context.Background()
+	switch table {
+
+	// zone changed
+	case "zones":
+		// a new zone can't have labels...
+		if mode == ChangeNew {
+			return
+		}
+		// get zone
+		if zone, err = zm.zdb.GetZone(id); err != nil {
+			logger.Printf(logger.ERROR, "[zonemaster] OnChange (zone) failed: %s", err.Error())
+			return
+		}
+		// collect labels for zone
+		var labels []*store.Label
+		if labels, err = zm.zdb.GetLabels("zid=%d", id); err != nil {
+			logger.Printf(logger.ERROR, "[zonemaster] OnChange (zone) failed: %s", err.Error())
+			return
+		}
+		for _, l := range labels {
+			// publish label
+			if err = zm.PublishZoneLabel(ctx, zone, l); err != nil {
+				logger.Printf(logger.ERROR, "[zonemaster] OnChange (zone) failed: %s", err.Error())
+				return
+			}
+		}
+
+	// record changed
+	case "records":
+		// get record
+		if rec, err = zm.zdb.GetRecord(id); err != nil {
+			logger.Printf(logger.ERROR, "[zonemaster] OnChange (record) failed: %s", err.Error())
+			return
+		}
+		// intended fall through...
+		id = rec.Label
+		mode = ChangeUpdate
+		fallthrough
+
+	// label changed
+	case "labels":
+		// a new label can't have records...
+		if mode == ChangeNew {
+			return
+		}
+		// get label
+		if label, err = zm.zdb.GetLabel(id); err != nil {
+			logger.Printf(logger.ERROR, "[zonemaster] OnChange (label) failed: %s", err.Error())
+			return
+		}
+		// get zone
+		if zone, err = zm.zdb.GetZone(id); err != nil {
+			logger.Printf(logger.ERROR, "[zonemaster] OnChange (label) failed: %s", err.Error())
+			return
+		}
+		// publish label
+		if err = zm.PublishZoneLabel(ctx, zone, label); err != nil {
+			logger.Printf(logger.ERROR, "[zonemaster] OnChange (label) failed: %s", err.Error())
+			return
+		}
+	}
 }
 
 // Publish all zone labels to the DHT
@@ -180,6 +253,15 @@ func (zm *ZoneMaster) PublishZoneLabel(ctx context.Context, zone *store.Zone, la
 	if rrSet.Count == 0 {
 		logger.Println(logger.INFO, "[zonemaster] No resource records -- skipped")
 		return nil
+	}
+	// post-process records for publication
+	for _, rec := range rrSet.Records {
+		// handle relative expiration
+		if rec.Flags&enums.GNS_FLAG_RELATIVE_EXPIRATION != 0 {
+			rec.Flags &^= enums.GNS_FLAG_RELATIVE_EXPIRATION
+			ttl := time.Duration(rec.Expire.Val) * time.Microsecond
+			rec.Expire = util.AbsoluteTimeNow().Add(ttl)
+		}
 	}
 
 	// assemble GNS query (common for DHT and Namecache)
