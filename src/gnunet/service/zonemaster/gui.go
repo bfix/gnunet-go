@@ -625,15 +625,23 @@ func (zm *ZoneMaster) editRec(w http.ResponseWriter, r *http.Request, data *NewE
 	if rec, err = zm.zdb.GetRecord(data.Ref); err != nil {
 		return
 	}
+	// default GUI dialog template name
+	dialog := "edit_rec"
+
+	// get possible plugin handler
+	plugin, ok := zm.hdlrs[rec.RType]
+	if ok {
+		// get custom edit dialog
+		_, dialog = plugin.TemplateNames()
+	}
 	// get prefix used for attributes and fields
 	pf, ok := dlgPrefix[rec.RType]
 	if !ok {
 		// no prefix defined; ask plugin
-		inst, ok := zm.hdlrs[rec.RType]
-		if !ok {
+		if plugin == nil {
 			return errors.New("no prefix defined for record type")
 		}
-		pf = inst.Prefix(uint32(rec.RType)) + "_"
+		pf = plugin.Prefix(uint32(rec.RType)) + "_"
 	}
 
 	// save shared attributes
@@ -665,14 +673,22 @@ func (zm *ZoneMaster) editRec(w http.ResponseWriter, r *http.Request, data *NewE
 	if rec.Flags&enums.GNS_FLAG_CRITICAL != 0 {
 		data.Params[pf+"critical"] = "on"
 	}
-	// get record instance
-	var inst rr.RR
-	if inst, err = rr.ParseRR(rec.RType, rec.Data); err == nil {
-		// add RR attributes to list
-		inst.ToMap(data.Params, pf)
+	// set record attributes
+	if plugin != nil {
+		var params map[string]string
+		params, err = plugin.ToMap(uint32(rec.RType), rec.Data)
+		for k, v := range params {
+			data.Params[k] = v
+		}
+	} else {
+		var inst rr.RR
+		if inst, err = rr.ParseRR(rec.RType, rec.Data); err == nil {
+			// add RR attributes to list
+			inst.ToMap(data.Params, pf)
+		}
 	}
 	// show dialog
-	renderPage(w, data, "edit_rec")
+	renderPage(w, data, dialog)
 	return
 }
 
