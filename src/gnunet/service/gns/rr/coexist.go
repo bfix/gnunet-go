@@ -56,8 +56,13 @@ func CanCoexist(t enums.GNSType, list []*enums.GNSSpec, label string) (ok bool, 
 		Flags: forced,
 	}
 	for i, e := range testList {
+		// skip unknown types
+		if rr = NilRR(e.Type); rr == nil {
+			return true, 0
+		}
+		// check replacement
 		testList[i] = eNew
-		ok, forced = NilRR(e.Type).Coexist(testList, label)
+		ok, forced = rr.Coexist(testList, label)
 		if !ok {
 			return
 		}
