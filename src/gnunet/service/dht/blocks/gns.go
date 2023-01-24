@@ -39,6 +39,9 @@ var (
 	ErrBlockCantDecrypt     = errors.New("can't decrypt block type")
 )
 
+// GNSContext for key derivation
+const GNSContext = "gns"
+
 //----------------------------------------------------------------------
 // Query key for GNS lookups
 //----------------------------------------------------------------------
@@ -62,7 +65,7 @@ func (q *GNSQuery) Verify(b Block) (err error) {
 		// verify derived key
 		dkey := blk.DerivedKeySig.ZoneKey
 		var dkey2 *crypto.ZoneKey
-		if dkey2, _, err = q.Zone.Derive(q.Label, "gns"); err != nil {
+		if dkey2, _, err = q.Zone.Derive(q.Label, GNSContext); err != nil {
 			return
 		}
 		if !dkey.Equal(dkey2) {
@@ -102,7 +105,7 @@ func NewGNSQuery(zkey *crypto.ZoneKey, label string) *GNSQuery {
 	// derive a public key from (pkey,label) and set the repository
 	// key as the SHA512 hash of the binary key representation.
 	// (key blinding)
-	pd, _, err := zkey.Derive(label, "gns")
+	pd, _, err := zkey.Derive(label, GNSContext)
 	if err != nil {
 		logger.Printf(logger.ERROR, "[NewGNSQuery] failed: %s", err.Error())
 		return nil

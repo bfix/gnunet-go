@@ -33,6 +33,9 @@ type PeerPublicKey struct {
 	Data []byte `size:"(Size)"` // Ed25519 public key data
 }
 
+// PeerPublicKeySize is the size of a binary representation
+const PeerPublicKeySize = 32
+
 // NewPeerPublicKey creates a key instance from binary data
 func NewPeerPublicKey(data []byte) *PeerPublicKey {
 	pk := new(PeerPublicKey)
@@ -51,7 +54,7 @@ func NewPeerPublicKey(data []byte) *PeerPublicKey {
 
 // Size returns the length of the binary data
 func (pk *PeerPublicKey) Size() uint {
-	return 32
+	return PeerPublicKeySize
 }
 
 // Verify peer signature
@@ -115,6 +118,9 @@ type PeerSignature struct {
 	Data []byte `size:"(Size)"`
 }
 
+// PeerSignatureSize is the size of the binary representation
+const PeerSignatureSize = 64
+
 // NewPeerSignature is a EdDSA signatre with the private peer key
 func NewPeerSignature(data []byte) *PeerSignature {
 	s := new(PeerSignature)
@@ -133,7 +139,7 @@ func NewPeerSignature(data []byte) *PeerSignature {
 
 // Size returns the length of the binary data
 func (s *PeerSignature) Size() uint {
-	return 64
+	return PeerSignatureSize
 }
 
 // Bytes returns the binary representation of a peer signature.

@@ -36,7 +36,8 @@ import (
 
 // Routing table constants
 const (
-	numK = 20 // number of entries per k-bucket
+	numK    = 20  // number of entries per k-bucket
+	numBits = 512 // number of bits in SHA-512 value
 )
 
 //======================================================================
@@ -86,7 +87,7 @@ func (addr *PeerAddress) Equal(p *PeerAddress) bool {
 // bucket index (smaller index = less distant).
 func (addr *PeerAddress) Distance(p *PeerAddress) (*math.Int, int) {
 	r := util.Distance(addr.Key.Data, p.Key.Data)
-	return r, 512 - r.BitLen()
+	return r, numBits - r.BitLen()
 }
 
 //======================================================================
@@ -115,7 +116,7 @@ func NewRoutingTable(ref *PeerAddress, cfg *config.RoutingConfig) *RoutingTable 
 	rt := &RoutingTable{
 		ref:        ref,
 		list:       util.NewMap[string, *PeerAddress](),
-		buckets:    make([]*Bucket, 512),
+		buckets:    make([]*Bucket, numBits),
 		l2nse:      -1,
 		inProcess:  make(map[int]struct{}),
 		cfg:        cfg,
@@ -368,7 +369,7 @@ func (rt *RoutingTable) heartbeat(ctx context.Context) {
 func (rt *RoutingTable) LookupHello(addr *PeerAddress, rf blocks.ResultFilter, approx bool, label string) (results []*store.DHTResult) {
 	// iterate over cached HELLOs to find matches;
 	// approximate search is guided by distance
-	list := store.NewSortedDHTResults(10)
+	list := store.NewSortedDHTResults(MaxSortResults)
 	_ = rt.helloCache.ProcessRange(func(key string, hb *blocks.HelloBlock, _ int) error {
 		// check if block is excluded by result filter
 		if !rf.Contains(hb) {

@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
 	"gnunet/config"
 	"gnunet/core"
@@ -35,6 +36,12 @@ var (
 	ErrInvalidID           = fmt.Errorf("invalid/unassociated ID")
 	ErrBlockExpired        = fmt.Errorf("block expired")
 	ErrInvalidResponseType = fmt.Errorf("invald response type")
+)
+
+// Time constants
+var (
+	DefaultGetTTL   = 10 * time.Minute // timeout for GET requests
+	DiscoveryPeriod = 5 * time.Minute  // time between peer discovery runs
 )
 
 //----------------------------------------------------------------------

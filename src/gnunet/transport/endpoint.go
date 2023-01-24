@@ -24,8 +24,8 @@ import (
 	"errors"
 	"gnunet/message"
 	"gnunet/util"
+	"io"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
@@ -41,6 +41,7 @@ var (
 	ErrEndpNoConnection     = errors.New("no connection on endpoint")
 	ErrEndpMaybeSent        = errors.New("message may have been sent - can't know")
 	ErrEndpWriteShort       = errors.New("write too short")
+	ErrEndpReadShort        = errors.New("read too short")
 )
 
 // Endpoint represents a local endpoint that can send and receive messages.
@@ -120,16 +121,13 @@ func (ep *PaketEndpoint) Run(ctx context.Context, hdlr chan *Message) (err error
 			// read next message
 			tm, err := ep.read()
 			if err != nil {
-				// leave go routine if already dead
-				if !active {
-					return
+				// leave go routine if already dead or closed by client
+				if !active || err == io.EOF {
+					break
 				}
 				logger.Println(logger.WARN, "[pkt_ep] read failed: "+err.Error())
-				// gracefully ignore unknown message types
-				if strings.HasPrefix(err.Error(), "unknown message type") {
-					continue
-				}
-				break
+				// gracefully ignore failed messages
+				continue
 			}
 			// label message
 			tm.Label = ep.addr.String()
@@ -158,6 +156,11 @@ func (ep *PaketEndpoint) read() (tm *Message, err error) {
 	)
 	switch ep.addr.Network() {
 	case "ip+udp":
+		// check for minimum size (32 byte peer id + 4 byte header)
+		if n < 36 {
+			err = ErrEndpReadShort
+			return
+		}
 		// parse peer id and message in sequence
 		peer = util.NewPeerID(ep.buf[:32])
 		rdr := bytes.NewBuffer(util.Clone(ep.buf[32:n]))

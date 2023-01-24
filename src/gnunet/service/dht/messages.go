@@ -37,6 +37,9 @@ import (
 // Handle DHT messages from the network
 //----------------------------------------------------------------------
 
+// MaxSortResults is the max. number of sorted results
+const MaxSortResults = 10
+
 // HandleMessage handles a DHT request/response message. Responses are sent
 // to the specified responder.
 //
@@ -154,12 +157,12 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 					// create total result list
 					if len(results) == 0 {
 						results = lclResults
-					} else if len(results)+len(lclResults) <= 10 {
+					} else if len(results)+len(lclResults) <= MaxSortResults {
 						// handle few results directly
 						results = append(results, lclResults...)
 					} else {
 						// compile a new sorted list from results.
-						list := store.NewSortedDHTResults(10)
+						list := store.NewSortedDHTResults(MaxSortResults)
 						for pos, res := range results {
 							list.Add(res, pos)
 						}
@@ -313,24 +316,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		// if the put is for a HELLO block, add the sender to the
 		// routing table (9.3.2.9)
 		if msg.BType == enums.BLOCK_TYPE_DHT_HELLO {
-			// get addresses from HELLO block
-			hello, err := blocks.ParseHelloBlockFromBytes(msg.Block)
-			if err != nil {
-				logger.Printf(logger.ERROR, "[%s] failed to parse HELLO block: %s", label, err.Error())
-			} else {
-				// check state of bucket for given address
-				if m.rtable.Check(NewPeerAddress(hello.PeerID)) == 0 {
-					// we could add the sender to the routing table
-					for _, addr := range hello.Addresses() {
-						if transport.CanHandleAddress(addr) {
-							// try to connect to peer (triggers EV_CONNECTED on success)
-							if err := m.core.TryConnect(sender, addr); err != nil {
-								logger.Printf(logger.ERROR, "[%s] try-connection to %s failed: %s", label, addr.URI(), err.Error())
-							}
-						}
-					}
-				}
-			}
+			m.addSender(msg.Block, label, sender)
 		}
 		//--------------------------------------------------------------
 		// check if we need to forward
@@ -418,24 +404,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		// if the put is for a HELLO block, add the originator to the
 		// routing table (9.5.2.5)
 		if btype == enums.BLOCK_TYPE_DHT_HELLO {
-			// get addresses from HELLO block
-			hello, err := blocks.ParseHelloBlockFromBytes(msg.Block)
-			if err != nil {
-				logger.Printf(logger.ERROR, "[%s] failed to parse HELLO block: %s", label, err.Error())
-			} else {
-				// check state of bucket for given address
-				if m.rtable.Check(NewPeerAddress(hello.PeerID)) == 0 {
-					// we could add the originator to the routing table
-					for _, addr := range hello.Addresses() {
-						if transport.CanHandleAddress(addr) {
-							// try to connect to peer (triggers EV_CONNECTED on success)
-							if err := m.core.TryConnect(sender, addr); err != nil {
-								logger.Printf(logger.ERROR, "[%s] try-connection to %s failed: %s", label, addr.URI(), err.Error())
-							}
-						}
-					}
-				}
-			}
+			m.addSender(msg.Block, label, sender)
 		}
 		// message forwarding to responder
 		logger.Printf(logger.DBG, "[%s] result key = %s", label, msg.Query.Short())
@@ -451,12 +420,10 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 					logger.Printf(logger.DBG, "[%s] Result handler not suitable (%s != %s) -- skipped", label, rh.Type(), btype)
 					continue
 				}
-				/*
-					if rh.Flags()&enums.DHT_RO_FIND_APPROXIMATE != msg.Flags&enums.DHT_RO_FIND_APPROXIMATE {
-						logger.Printf(logger.DBG, "[%s] Result handler asked for match, got approx -- ignored", label)
-						continue
-					}
-				*/
+				if rh.Flags()&enums.DHT_RO_FIND_APPROXIMATE == 0 && msg.Flags&enums.DHT_RO_FIND_APPROXIMATE != 0 {
+					logger.Printf(logger.DBG, "[%s] Result handler asked for match, got approx -- ignored", label)
+					continue
+				}
 				//--------------------------------------------------------------
 				// check task list for handler (9.5.2.6)
 				if rh.Flags()&enums.DHT_RO_FIND_APPROXIMATE == 0 && blkKey != nil && !blkKey.Equal(rh.Key()) {
@@ -587,6 +554,28 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 //----------------------------------------------------------------------
 // Helpers
 //----------------------------------------------------------------------
+
+// add a HELLO block sender to routing table
+func (m *Module) addSender(block []byte, label string, sender *util.PeerID) {
+	// get addresses from HELLO block
+	hello, err := blocks.ParseHelloBlockFromBytes(block)
+	if err != nil {
+		logger.Printf(logger.ERROR, "[%s] failed to parse HELLO block: %s", label, err.Error())
+	} else {
+		// check state of bucket for given address
+		if m.rtable.Check(NewPeerAddress(hello.PeerID)) == 0 {
+			// we could add the sender to the routing table
+			for _, addr := range hello.Addresses() {
+				if transport.CanHandleAddress(addr) {
+					// try to connect to peer (triggers EV_CONNECTED on success)
+					if err := m.core.TryConnect(sender, addr); err != nil {
+						logger.Printf(logger.ERROR, "[%s] try-connection to %s failed: %s", label, addr.URI(), err.Error())
+					}
+				}
+			}
+		}
+	}
+}
 
 // send a result back to caller
 func (m *Module) sendResult(ctx context.Context, query blocks.Query, blk blocks.Block, pth *path.Path, back transport.Responder) error {

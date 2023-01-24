@@ -37,10 +37,13 @@ type PeerFilter struct {
 	BF *BloomFilter
 }
 
+// PeerFilterSize is 128 bytes (fixed).
+const PeerFilterSize = 128
+
 // NewPeerFilter creates an empty peer filter instance.
 func NewPeerFilter() *PeerFilter {
 	return &PeerFilter{
-		BF: NewBloomFilter(128),
+		BF: NewBloomFilter(PeerFilterSize),
 	}
 }
 

@@ -123,13 +123,13 @@ func ParseHelloBlockFromURL(u string, checkExpiry bool) (h *HelloBlock, err erro
 
 	// (1) parse peer public key (peer ID)
 	var buf []byte
-	if buf, err = util.DecodeStringToBinary(p[0], 32); err != nil {
+	if buf, err = util.DecodeStringToBinary(p[0], util.PeerPublicKeySize); err != nil {
 		return
 	}
 	h.PeerID = util.NewPeerID(buf)
 
 	// (2) parse signature
-	if buf, err = util.DecodeStringToBinary(p[1], 64); err != nil {
+	if buf, err = util.DecodeStringToBinary(p[1], util.PeerSignatureSize); err != nil {
 		return
 	}
 	h.Signature = util.NewPeerSignature(buf)
@@ -315,12 +315,14 @@ type _SignedData struct {
 	AddrHash *crypto.HashCode         // address hash
 }
 
+const _SignedDataSize = 80 // (8 + 8 + 64)
+
 // SignedData assembles a data block for sign and verify operations.
 func (h *HelloBlock) SignedData() []byte {
 	// assemble signed data
 	sd := &_SignedData{
 		Purpose: &crypto.SignaturePurpose{
-			Size:    80,
+			Size:    _SignedDataSize,
 			Purpose: enums.SIG_HELLO,
 		},
 		Expire:   h.Expire_,

@@ -142,7 +142,7 @@ func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Mod
 	c.Register("dht", listener)
 
 	// run periodic tasks (8.2. peer discovery)
-	ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(DiscoveryPeriod)
 	key := crypto.Hash(m.core.PeerID().Bytes())
 	flags := uint16(enums.DHT_RO_FIND_APPROXIMATE | enums.DHT_RO_DEMULTIPLEX_EVERYWHERE | enums.DHT_RO_DISCOVERY)
 	var resCh <-chan blocks.Block
@@ -230,7 +230,7 @@ func (m *Module) Get(ctx context.Context, query blocks.Query) <-chan blocks.Bloc
 	ttl, ok := util.GetParam[time.Duration](query.Params(), "timeout")
 	if !ok {
 		// defaults to 10 minutes
-		ttl = 10 * time.Minute
+		ttl = DefaultGetTTL
 	}
 	lctx, cancel := context.WithTimeout(ctx, ttl)
 
