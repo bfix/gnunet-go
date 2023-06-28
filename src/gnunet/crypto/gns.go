@@ -121,6 +121,9 @@ type ZoneKeyImpl interface {
 	// Verify a signature for binary data
 	Verify(data []byte, sig *ZoneSignature) (bool, error)
 
+	// Verify a signature for binary data with derived key
+	VerifyDerived(label string, data []byte, sig *ZoneSignature) (bool, error)
+
 	// ID returns the GNUnet identifier for a public zone key
 	ID() string
 }
@@ -139,6 +142,9 @@ type ZonePrivateImpl interface {
 
 	// Sign binary data and return the signature
 	Sign(data []byte) (*ZoneSignature, error)
+
+	// Sign binary data with derived key and return the signature
+	SignDerived(label string, data []byte) (*ZoneSignature, error)
 
 	// Public returns the associated public key
 	Public() ZoneKeyImpl
@@ -324,6 +330,11 @@ func (zp *ZonePrivate) Derive(label, context string) (dzp *ZonePrivate, h *math.
 // ZoneSign data with a private key
 func (zp *ZonePrivate) Sign(data []byte) (sig *ZoneSignature, err error) {
 	return zp.impl.Sign(data)
+}
+
+// ZoneSign data with a derived key
+func (zp *ZonePrivate) SignDerived(label string, data []byte) (sig *ZoneSignature, err error) {
+	return zp.impl.SignDerived(label, data)
 }
 
 // Public returns the associated public key

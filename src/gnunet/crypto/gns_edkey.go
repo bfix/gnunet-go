@@ -131,6 +131,11 @@ func (pk *EDKEYPublicImpl) Verify(data []byte, zs *ZoneSignature) (ok bool, err 
 	return pk.pub.EdVerify(data, sig)
 }
 
+// Verify a signature for binary data with derived key
+func (pk *EDKEYPublicImpl) VerifyDerived(label string, data []byte, zs *ZoneSignature) (ok bool, err error) {
+	return false, nil
+}
+
 // BlockKey return the symmetric key (and initialization vector) based on
 // label and expiration time.
 func (pk *EDKEYPublicImpl) BlockKey(label string, expire util.AbsoluteTime) (skey []byte) {
@@ -244,6 +249,11 @@ func (pk *EDKEYPrivateImpl) Sign(data []byte) (sig *ZoneSignature, err error) {
 		sigImpl,
 	}
 	return
+}
+
+// Sign binary data with derived key
+func (pk *EDKEYPrivateImpl) SignDerived(label string, data []byte) (sig *ZoneSignature, err error) {
+	return nil, nil
 }
 
 // ID returns the GNUnet identifier for a private zone key

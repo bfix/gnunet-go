@@ -151,10 +151,24 @@ func (b *GNSBlock) Payload() []byte {
 	return util.Clone(b.data)
 }
 
-// Bytes return th binary representation of block
+// Bytes return the binary representation of block
 func (b *GNSBlock) Bytes() []byte {
 	buf, _ := data.Marshal(b)
 	return buf
+}
+
+// RRBLOCK returns the block according to spec
+func (b *GNSBlock) RRBLOCK() []byte {
+	// compute size of output
+	size := uint32(16 + b.DerivedKeySig.SigSize() + b.DerivedKeySig.KeySize() + uint(len(b.Body.Data)))
+	buf := new(bytes.Buffer)
+	_ = binary.Write(buf, binary.BigEndian, size)
+	_ = binary.Write(buf, binary.BigEndian, b.DerivedKeySig.Type)
+	buf.Write(b.DerivedKeySig.KeyData)
+	buf.Write(b.DerivedKeySig.Bytes())
+	_ = binary.Write(buf, binary.BigEndian, b.Body.Expire.Val)
+	buf.Write(b.Body.Data)
+	return buf.Bytes()
 }
 
 // Expire returns the expiration date of the block.
@@ -194,7 +208,9 @@ func NewGNSBlock() Block {
 
 // Prepare a block to be of given type and expiration.
 // Not required for GNS blocks
-func (b *GNSBlock) Prepare(enums.BlockType, util.AbsoluteTime) {}
+func (b *GNSBlock) Prepare(_ enums.BlockType, ts util.AbsoluteTime) {
+	b.Body.Expire = ts
+}
 
 // SetData sets the data for the GNS block
 func (b *GNSBlock) SetData(data []byte) {

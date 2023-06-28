@@ -108,6 +108,11 @@ func (pk *PKEYPublicImpl) Verify(data []byte, zs *ZoneSignature) (ok bool, err e
 	return pk.pub.EcVerify(data, sig)
 }
 
+// Verify a signature for binary data with derived key
+func (pk *PKEYPublicImpl) VerifyDerived(label string, data []byte, zs *ZoneSignature) (ok bool, err error) {
+	return false, nil
+}
+
 // BlockKey return the symmetric key (and initialization vector) based on
 // label and expiration time.
 func (pk *PKEYPublicImpl) BlockKey(label string, expires util.AbsoluteTime) (skey []byte) {
@@ -185,7 +190,7 @@ func (pk *PKEYPrivateImpl) Init(data []byte) error {
 
 // Prepare a random byte array to be used as a random private PKEY
 func (pk *PKEYPrivateImpl) Prepare(rnd []byte) []byte {
-	// clamp little-endian skalar
+	// clamp little-endian scalar
 	d := util.Clone(rnd)
 	d[31] = (d[31] & 0x3f) | 0x40
 	d[0] &= 0xf8
@@ -239,6 +244,11 @@ func (pk *PKEYPrivateImpl) Sign(data []byte) (sig *ZoneSignature, err error) {
 		sigImpl,
 	}
 	return
+}
+
+// Verify a signature for binary data with derived key
+func (pk *PKEYPrivateImpl) SignDerived(label string, data []byte) (sig *ZoneSignature, err error) {
+	return nil, nil
 }
 
 // ID returns the GNUnet identifier for a private zone key
