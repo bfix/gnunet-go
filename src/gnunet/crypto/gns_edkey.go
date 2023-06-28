@@ -92,7 +92,7 @@ func (pk *EDKEYPublicImpl) Derive(h *math.Int) (dPk ZoneKeyImpl, hOut *math.Int,
 // Encrypt binary data (of any size). Output can be larger than input
 func (pk *EDKEYPublicImpl) Encrypt(data []byte, label string, expires util.AbsoluteTime) (out []byte, err error) {
 	// derive key material for decryption
-	skey := pk.BlockKey(label, expires)
+	skey, _ := pk.BlockKey(label, expires)
 
 	// En-/decrypt with XSalsa20-Poly1305 cipher
 	var key [32]byte
@@ -106,7 +106,7 @@ func (pk *EDKEYPublicImpl) Encrypt(data []byte, label string, expires util.Absol
 // Decrypt binary data (of any size). Output can be smaller than input
 func (pk *EDKEYPublicImpl) Decrypt(data []byte, label string, expires util.AbsoluteTime) (out []byte, err error) {
 	// derive key material for decryption
-	skey := pk.BlockKey(label, expires)
+	skey, _ := pk.BlockKey(label, expires)
 
 	// En-/decrypt with XSalsa20-Poly1305 cipher
 	var (
@@ -133,7 +133,7 @@ func (pk *EDKEYPublicImpl) Verify(data []byte, zs *ZoneSignature) (ok bool, err 
 
 // BlockKey return the symmetric key (and initialization vector) based on
 // label and expiration time.
-func (pk *EDKEYPublicImpl) BlockKey(label string, expire util.AbsoluteTime) (skey []byte) {
+func (pk *EDKEYPublicImpl) BlockKey(label string, expire util.AbsoluteTime) (skey []byte, nLen int) {
 	// generate symmetric key
 	skey = make([]byte, 56)
 	kd := pk.Bytes()
@@ -157,6 +157,7 @@ func (pk *EDKEYPublicImpl) BlockKey(label string, expire util.AbsoluteTime) (ske
 	}
 	buf, _ := data.Marshal(iv)
 	copy(skey[32:], buf)
+	nLen = 16
 	return
 }
 

@@ -259,7 +259,7 @@ func TestRecordsetPKEY(t *testing.T) {
 
 	// check symmetric keys and nonce
 	expires := RECSET.Expire()
-	skey := zk.BlockKey(LABEL, expires)
+	skey, _ := zk.BlockKey(LABEL, expires)
 	if !bytes.Equal(skey[32:], NONCE) {
 		t.Logf("nonce = %s\n", hex.EncodeToString(skey[32:]))
 		t.Logf("NONCE = %s\n", hex.EncodeToString(NONCE))
@@ -422,7 +422,7 @@ func TestRecordsetEDKEY(t *testing.T) {
 
 	// check symmetric keys and nonce
 	expires := RECSET.Expire()
-	skey := zk.BlockKey(LABEL, expires)
+	skey, _ := zk.BlockKey(LABEL, expires)
 	if !bytes.Equal(skey[32:], NONCE) {
 		t.Logf("nonce = %s\n", hex.EncodeToString(skey[32:]))
 		t.Logf("NONCE = %s\n", hex.EncodeToString(NONCE))

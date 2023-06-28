@@ -110,7 +110,7 @@ func (pk *PKEYPublicImpl) Verify(data []byte, zs *ZoneSignature) (ok bool, err e
 
 // BlockKey return the symmetric key (and initialization vector) based on
 // label and expiration time.
-func (pk *PKEYPublicImpl) BlockKey(label string, expires util.AbsoluteTime) (skey []byte) {
+func (pk *PKEYPublicImpl) BlockKey(label string, expires util.AbsoluteTime) (skey []byte, nLen int) {
 	// generate symmetric key
 	skey = make([]byte, 48)
 	kd := pk.pub.Bytes()
@@ -137,13 +137,14 @@ func (pk *PKEYPublicImpl) BlockKey(label string, expires util.AbsoluteTime) (ske
 	}
 	buf, _ := data.Marshal(iv)
 	copy(skey[32:], buf)
+	nLen = 4
 	return
 }
 
 // cipher implements symmetric en/-decryption (for block data).
 func (pk *PKEYPublicImpl) cipher(encrypt bool, data []byte, label string, expires util.AbsoluteTime) (out []byte, err error) {
 	// derive key material for decryption
-	skey := pk.BlockKey(label, expires)
+	skey, _ := pk.BlockKey(label, expires)
 
 	// En-/decrypt with AES CTR stream cipher
 	var blk cipher.Block
@@ -185,11 +186,9 @@ func (pk *PKEYPrivateImpl) Init(data []byte) error {
 
 // Prepare a random byte array to be used as a random private PKEY
 func (pk *PKEYPrivateImpl) Prepare(rnd []byte) []byte {
-	// clamp little-endian scalar
-	d := util.Clone(rnd)
-	d[31] = (d[31] & 0x3f) | 0x40
-	d[0] &= 0xf8
-	return d
+	md := sha256.Sum256(rnd)
+	d := math.NewIntFromBytes(md[:]).Mod(ed25519.GetCurve().N)
+	return util.Reverse(d.Bytes())
 }
 
 // Bytes returns a binary representation of the instance suitable for
@@ -258,7 +257,7 @@ type PKEYSigImpl struct {
 	sig *ed25519.EcSignature
 }
 
-// Init instance from binary data. The data represents a big integers
+// Init instance from binary data. The data represents big integers
 // R and S of the signature.
 func (s *PKEYSigImpl) Init(data []byte) (err error) {
 	s.sig, err = ed25519.NewEcSignatureFromBytes(data)

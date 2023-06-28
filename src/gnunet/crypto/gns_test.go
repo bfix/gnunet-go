@@ -61,7 +61,7 @@ func TestDeriveBlockKey(t *testing.T) {
 	}
 
 	// derive and check a key for symmetric cipher
-	skey := zkey.BlockKey(LABEL, EXPIRE)
+	skey, _ := zkey.BlockKey(LABEL, EXPIRE)
 	if !bytes.Equal(IV, skey[32:]) {
 		t.Logf("AES_IV(computed) = %s\n", hex.EncodeToString(skey[32:]))
 		t.Logf("AES_IV(expected) = %s\n", hex.EncodeToString(IV))

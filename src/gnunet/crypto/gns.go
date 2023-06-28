@@ -110,7 +110,7 @@ type ZoneKeyImpl interface {
 	Derive(h *math.Int) (ZoneKeyImpl, *math.Int, error)
 
 	// BlockKey returns the key for block en-/decryption
-	BlockKey(label string, expires util.AbsoluteTime) (skey []byte)
+	BlockKey(label string, expires util.AbsoluteTime) (skey []byte, nLen int)
 
 	// Encrypt binary data (of any size). Output can be larger than input
 	Encrypt(data []byte, label string, expires util.AbsoluteTime) ([]byte, error)
@@ -433,7 +433,7 @@ func (zk *ZoneKey) Derive(label, context string) (dzk *ZoneKey, h *math.Int, err
 }
 
 // BlockKey returns the key for block en-/decryption
-func (zk *ZoneKey) BlockKey(label string, expires util.AbsoluteTime) (skey []byte) {
+func (zk *ZoneKey) BlockKey(label string, expires util.AbsoluteTime) (skey []byte, nLen int) {
 	return zk.impl.BlockKey(label, expires)
 }
 
