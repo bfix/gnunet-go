@@ -102,3 +102,32 @@ func TestBase32Random(t *testing.T) {
 		}
 	}
 }
+
+func TestBase32RFC(t *testing.T) {
+	var (
+		i1 = []byte{0x59, 0x40, 0xB3, 0x2D, 0xB8, 0x86, 0x61, 0xC2}
+		o1 = "B50B6BDRGSGW4"
+		i2 = []byte("Hello World")
+		o2 = "91JPRV3F41BPYWKCCG"
+		o3 = "91JPRU3F4IBPYWKCCG"
+		o4 = "91JPR+3F4!BPYWKCCG"
+	)
+	if EncodeBinaryToString(i1) != o1 {
+		t.Fatal("RFC-1")
+	}
+	if i, err := DecodeStringToBinary(o1, 8); err != nil || !bytes.Equal(i, i1) {
+		t.Fatal("RFC-2")
+	}
+	if EncodeBinaryToString(i2) != o2 {
+		t.Fatal("RFC-3")
+	}
+	if i, err := DecodeStringToBinary(o2, 11); err != nil || !bytes.Equal(i, i2) {
+		t.Fatal("RFC-3")
+	}
+	if i, err := DecodeStringToBinary(o3, 11); err != nil || !bytes.Equal(i, i2) {
+		t.Fatal("RFC-4")
+	}
+	if _, err := DecodeStringToBinary(o4, 11); err == nil {
+		t.Fatal("RFC-5")
+	}
+}
