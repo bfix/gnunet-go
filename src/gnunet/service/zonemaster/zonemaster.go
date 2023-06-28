@@ -22,6 +22,7 @@ import (
 	"context"
 	"gnunet/config"
 	"gnunet/core"
+	"gnunet/crypto"
 	"gnunet/enums"
 	"gnunet/service/dht/blocks"
 	"gnunet/service/store"
@@ -295,8 +296,8 @@ func (zm *ZoneMaster) PublishZoneLabel(ctx context.Context, zone *store.Zone, la
 	if err != nil {
 		return err
 	}
-	dzk, _, err := zone.Key.Derive(label.Name, "gns")
-	if err != nil {
+	var dzk *crypto.ZonePrivate
+	if dzk, _, err = zone.Key.Derive(label.Name, "gns"); err != nil {
 		return err
 	}
 	if err = blkDHT.Sign(dzk); err != nil {
@@ -323,9 +324,6 @@ func (zm *ZoneMaster) PublishZoneLabel(ctx context.Context, zone *store.Zone, la
 	blkNC.Body.Expire = expire
 	blkNC.Body.Data = rrSet.RDATA()
 	// sign block
-	if dzk, _, err = zone.Key.Derive(label.Name, "gns"); err != nil {
-		return err
-	}
 	if err = blkNC.Sign(dzk); err != nil {
 		return err
 	}
