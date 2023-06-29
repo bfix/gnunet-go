@@ -302,6 +302,12 @@ func (rs *RecordSet) AddRecord(rec *ResourceRecord) {
 
 // SetPadding (re-)calculates and allocates the padding.
 func (rs *RecordSet) SetPadding() {
+	// do not add padding to single delegation record
+	typ := rs.Records[0].RType
+	if len(rs.Records) == 1 && (typ == enums.GNS_TYPE_PKEY || typ == enums.GNS_TYPE_EDKEY) {
+		return
+	}
+	// compute padding size
 	size := 0
 	for _, rr := range rs.Records {
 		size += int(rr.Size) + 16
