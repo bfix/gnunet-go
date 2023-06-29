@@ -13,46 +13,47 @@ import (
 // Test revocation with test vector defined in the RFC draft.
 func TestRevocationRFC(t *testing.T) {
 	var (
-		D     = "70ed98b9078c47f7d5783b26ccf98b7dd55f6088d1539597fa8bf55ac032ea6f"
+		D     = "6fea32c05af58bfa979553d188605fd57d8bf9cc263b78d5f7478c07b998ed70"
 		ZKEY  = "000100002ca223e879ecc4bbdeb5da17319281d63b2e3b6955f1c3775c804a98d5f8ddaa"
 		PROOF = "" +
-			"0005d66da3598127" +
+			"0005feb46d865c1c" +
 			"0000395d1827c000" +
-			"3ab877d07570f2b8" +
-			"3ab877d07570f332" +
-			"3ab877d07570f4f5" +
-			"3ab877d07570f50f" +
-			"3ab877d07570f537" +
-			"3ab877d07570f599" +
-			"3ab877d07570f5cd" +
-			"3ab877d07570f5d9" +
-			"3ab877d07570f66a" +
-			"3ab877d07570f69b" +
-			"3ab877d07570f72f" +
-			"3ab877d07570f7c3" +
-			"3ab877d07570f843" +
-			"3ab877d07570f8d8" +
-			"3ab877d07570f91b" +
-			"3ab877d07570f93a" +
-			"3ab877d07570f944" +
-			"3ab877d07570f98a" +
-			"3ab877d07570f9a7" +
-			"3ab877d07570f9b0" +
-			"3ab877d07570f9df" +
-			"3ab877d07570fa05" +
-			"3ab877d07570fa3e" +
-			"3ab877d07570fa63" +
-			"3ab877d07570fa84" +
-			"3ab877d07570fa8f" +
-			"3ab877d07570fa91" +
-			"3ab877d07570fad6" +
-			"3ab877d07570fb0a" +
-			"3ab877d07570fc0f" +
-			"3ab877d07570fc43" +
-			"3ab877d07570fca5" +
+			"e66a570bccd4b393" +
+			"e66a570bccd4b3ea" +
+			"e66a570bccd4b536" +
+			"e66a570bccd4b542" +
+			"e66a570bccd4b613" +
+			"e66a570bccd4b65f" +
+			"e66a570bccd4b672" +
+			"e66a570bccd4b70a" +
+			"e66a570bccd4b71a" +
+			"e66a570bccd4b723" +
+			"e66a570bccd4b747" +
+			"e66a570bccd4b777" +
+			"e66a570bccd4b785" +
+			"e66a570bccd4b789" +
+			"e66a570bccd4b7cf" +
+			"e66a570bccd4b7dc" +
+			"e66a570bccd4b93a" +
+			"e66a570bccd4b956" +
+			"e66a570bccd4ba4a" +
+			"e66a570bccd4ba9d" +
+			"e66a570bccd4bb28" +
+			"e66a570bccd4bb5a" +
+			"e66a570bccd4bb92" +
+			"e66a570bccd4bba2" +
+			"e66a570bccd4bbd8" +
+			"e66a570bccd4bbe2" +
+			"e66a570bccd4bc93" +
+			"e66a570bccd4bc94" +
+			"e66a570bccd4bd0f" +
+			"e66a570bccd4bdce" +
+			"e66a570bccd4be6a" +
+			"e66a570bccd4be73" +
 			"00010000" +
 			"2ca223e879ecc4bbdeb5da17319281d63b2e3b6955f1c3775c804a98d5f8ddaa" +
-			"053b0259700039187d1da4613531502bc4a4eeccc69900d24f8aac5430f28fc5092701331f178e290fe06e82ce2498ce7b23a34058e3d6a2f247e92bc9d7b9ab"
+			"044a878a158b40f0c841d9f978cb1372eaee5199a3d87e5e2bdbc72a6c8c73d0" +
+			"00181dfc39c3aaa481667b165b5844e450713d8ab6a3b2ba8fef447b65076a0f"
 	)
 
 	// construct private/public key pair from test data
