@@ -174,10 +174,10 @@ type PKEYPrivateImpl struct {
 }
 
 // Init instance from binary data. The data represents a big integer
-// (in little-endian notation) for the private scalar d (clamped).
+// (in big-endian notation) for the private scalar d.
 func (pk *PKEYPrivateImpl) Init(data []byte) error {
 	// generate key material
-	d := math.NewIntFromBytes(util.Reverse(data))
+	d := math.NewIntFromBytes(data)
 	pk.prv = ed25519.NewPrivateKeyFromD(d)
 	pk.ztype = enums.GNS_TYPE_PKEY
 	pk.pub = pk.prv.Public()
