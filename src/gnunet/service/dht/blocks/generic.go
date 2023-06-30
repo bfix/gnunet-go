@@ -220,7 +220,7 @@ func (b *GenericBlock) String() string {
 var (
 	blkFactory = map[enums.BlockType]func() Block{
 		enums.BLOCK_TYPE_GNS_NAMERECORD: NewGNSBlock,
-		enums.BLOCK_TYPE_DHT_URL_HELLO:  NewHelloBlock,
+		enums.BLOCK_TYPE_DHT_HELLO:      NewHelloBlock,
 		enums.BLOCK_TYPE_TEST:           NewTestBlock,
 	}
 )

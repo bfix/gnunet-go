@@ -83,6 +83,6 @@ func init() {
 	BlockHandlers = make(map[enums.BlockType]BlockHandler)
 
 	// add validation functions
-	BlockHandlers[enums.BLOCK_TYPE_DHT_URL_HELLO] = new(HelloBlockHandler)
+	BlockHandlers[enums.BLOCK_TYPE_DHT_HELLO] = new(HelloBlockHandler)
 	BlockHandlers[enums.BLOCK_TYPE_TEST] = new(TestBlockHandler)
 }

@@ -152,7 +152,7 @@ func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Mod
 			// initiate peer discovery
 			case <-ticker.C:
 				// query DHT for our own HELLO block
-				query := blocks.NewGenericQuery(key, enums.BLOCK_TYPE_DHT_URL_HELLO, flags)
+				query := blocks.NewGenericQuery(key, enums.BLOCK_TYPE_DHT_HELLO, flags)
 				logger.Printf(logger.DBG, "[dht-discovery] own HELLO key %s", query.Key().Short())
 				resCh = m.Get(ctx, query)
 
@@ -160,7 +160,7 @@ func NewModule(ctx context.Context, c *core.Core, cfg *config.DHTConfig) (m *Mod
 			case res := <-resCh:
 				// check for correct type
 				btype := res.Type()
-				if btype == enums.BLOCK_TYPE_DHT_URL_HELLO {
+				if btype == enums.BLOCK_TYPE_DHT_HELLO {
 					hb, ok := res.(*blocks.HelloBlock)
 					if !ok {
 						logger.Println(logger.WARN, "[dht-discovery] received invalid block data")

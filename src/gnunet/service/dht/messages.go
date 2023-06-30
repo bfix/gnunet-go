@@ -132,7 +132,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 
 		//------------------------------------------------------
 		// query for a HELLO? (9.4.3.3a)
-		if btype == enums.BLOCK_TYPE_DHT_URL_HELLO {
+		if btype == enums.BLOCK_TYPE_DHT_HELLO {
 			// try to find results in HELLO cache
 			results = m.lookupHelloCache(label, addr, rf, approx)
 			// DEBUG:
@@ -315,7 +315,7 @@ func (m *Module) HandleMessage(ctx context.Context, sender *util.PeerID, msgIn m
 		//--------------------------------------------------------------
 		// if the put is for a HELLO block, add the sender to the
 		// routing table (9.3.2.9)
-		if msg.BType == enums.BLOCK_TYPE_DHT_HELLO {
+		if msg.BType == enums.BLOCK_TYPE_LEGACY_HELLO {
 			m.addSender(msg.Block, label, sender)
 		}
 		//--------------------------------------------------------------

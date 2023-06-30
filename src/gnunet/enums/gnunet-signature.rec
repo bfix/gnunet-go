@@ -224,6 +224,12 @@ Subsystem: GNUnet-TRANSPORT-TCP
 #
 # Exchange offline signatures (with master key)
 #
+
+Number: 1017
+Name: MASTER_AML_KEY
+Comment: Initialize or update the status of an AML key for an AML officer
+Package: GNU Taler
+
 Number: 1018
 Name: MASTER_DRAIN_PROFIT
 Comment: Affirm wiring of exchange profits to operator account.
@@ -389,6 +395,11 @@ Name: EXCHANGE_CONFIRM_PURSE_REFUND
 Comment: Signature by which the exchange confirms that a purse expired and a coin was refunded.
 Package: GNU Taler
 
+Number: 1050
+Name: EXCHANGE_CONFIRM_AGE_WITHDRAW
+Comment: Signature where the Exchange confirms an age-withdraw.
+Package: GNU Taler
+
 #
 # Auditor signatures
 #
@@ -531,6 +542,16 @@ Name: WALLET_RESERVE_ATTEST_DETAILS
 Comment: Request attestation about reserve owner. Signed by the reserve private key.
 Package: GNU Taler
 
+Number: 1220
+Name: WALLET_PURSE_DELETE
+Comment: Signature by which a wallet requests a purse to be deleted.
+Package: GNU Taler
+
+Number: 1221
+Name: WALLET_RESERVE_AGE_WITHDRAW
+Comment: Signature where the reserve key confirms an age-withdraw request. Signed with the reserve private key.
+Package: GNU Taler
+
 #
 # Security module signatures
 #
@@ -563,6 +584,21 @@ Number: 1303
 Name: EXCHANGE_TEST_EDDSA
 Comment: EdDSA test signature.
 Package: GNU Taler
+
+#
+# AML officer signatures
+#
+
+Number: 1350
+Name: AML_DECISION
+Comment: Signature by which an AML officer signs an AML decision.
+Package: GNU Taler
+
+Number: 1351
+Name: AML_QUERY
+Comment: Signature by which an AML officer requests AML data.
+Package: GNU Taler
+
 
 #
 # GNU Anastasis signatures, >= 1400

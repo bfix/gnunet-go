@@ -37,8 +37,8 @@ Comment: Type of a block representing a block to be encoded on demand from disk.
 References: None
 
 Number: 7
-Name: DHT_HELLO
-Comment: Type of a block that contains a HELLO for a peer.
+Name: LEGACY_HELLO
+Comment: Legacy type of a block that contains a HELLO for a peer.
 References: None
 
 Number: 8
@@ -67,9 +67,9 @@ Comment: Block type for a revocation message by which a key is revoked.
 References: None
 
 Number: 13
-Name: DHT_URL_HELLO
+Name: DHT_HELLO
 Comment: Type of a block that contains a DHT-NG HELLO for a peer.
-References: None
+References: LSD-0004
 
 Number: 22
 Name: REGEX
