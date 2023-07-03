@@ -288,10 +288,7 @@ func (zk *ZonePrivate) IsNull() bool {
 
 // Bytes returns the binary representation
 func (zp *ZonePrivate) Bytes() []byte {
-	buf := new(bytes.Buffer)
-	_ = binary.Write(buf, binary.BigEndian, zp.Type)
-	_, _ = buf.Write(zp.KeyData)
-	return buf.Bytes()
+	return zp.impl.Bytes()
 }
 
 // KeySize returns the number of bytes of a key representation.
@@ -305,9 +302,11 @@ func (zp *ZonePrivate) KeySize() uint {
 
 // Derive key (key blinding)
 func (zp *ZonePrivate) Derive(label, context string) (dzp *ZonePrivate, h *math.Int, err error) {
-	// calculate derived key
+	// calculate blinding value
 	key := zp.Public().KeyData
 	h = deriveH(key, label, context)
+
+	// derive private implementation
 	var derived ZonePrivateImpl
 	if derived, h, err = zp.impl.Derive(h); err != nil {
 		return
