@@ -3,7 +3,7 @@ module gnunet
 go 1.19
 
 require (
-	github.com/bfix/gospel v1.2.23
+	github.com/bfix/gospel v1.2.24
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/go-sql-driver/mysql v1.6.0
 	github.com/gorilla/mux v1.8.0
@@ -16,7 +16,7 @@ require (
 require (
 	github.com/ProtonMail/go-crypto v0.0.0-20230321155629-9a39f2531310 // indirect
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
-	github.com/cloudflare/circl v1.1.0 // indirect
+	github.com/cloudflare/circl v1.3.3 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/huin/goupnp v1.0.0 // indirect
 	golang.org/x/mod v0.8.0 // indirect
@@ -26,4 +26,4 @@ require (
 	golang.org/x/tools v0.6.0 // indirect
 )
 
-// replace github.com/bfix/gospel v1.2.23 => ../gospel
+// replace github.com/bfix/gospel v1.2.24 => ../gospel
