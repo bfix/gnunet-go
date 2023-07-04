@@ -29,6 +29,8 @@ import (
 	"gnunet/util"
 	"strings"
 	"testing"
+
+	"github.com/bfix/gospel/math"
 )
 
 func TestRFCDump(t *testing.T) {
@@ -41,7 +43,7 @@ func TestRFCDump(t *testing.T) {
 			endian = ", big-endian"
 		}
 		fmt.Printf("Zone private key (d%s):\n", endian)
-		dumpHex("    ", tc.Zpk)
+		dumpHex("    ", tc.Zprv)
 
 		fmt.Println("\n\nZone identifier {")
 		dumpHex("    ZTYPE: ", tc.Zid[:4])
@@ -111,13 +113,13 @@ func TestRecordsRFC(t *testing.T) {
 		fmt.Printf("   ztype = %08x (%d)\n", uint32(ztype), ztype)
 
 		// generate private zone key
-		zprv, err := crypto.NewZonePrivate(ztype, tc.Zpk)
+		zprv, err := crypto.NewZonePrivate(ztype, tc.Zprv)
 		if err != nil {
 			t.Log("Failed: " + err.Error())
 			t.Fail()
 			continue
 		}
-		fmt.Printf("   zprv = %s\n", hex.EncodeToString(zprv.Bytes()))
+		fmt.Printf("   zprv = %s\n", hex.EncodeToString(zprv.Bytes()[32:]))
 
 		// generate zone key (public)
 		zkey := zprv.Public()
@@ -136,19 +138,45 @@ func TestRecordsRFC(t *testing.T) {
 			continue
 		}
 
-		// derive zone key for given label and compute storage key 'q'
-		pd, _, err := zkey.Derive(tc.Label, blocks.GNSContext)
+		// derive zone keys for given label
+		dzprv, _, err := zprv.Derive(tc.Label, blocks.GNSContext)
 		if err != nil {
-			t.Log("Failed: " + err.Error())
+			t.Log("Failed dzprv: " + err.Error())
 			t.Fail()
 			continue
 		}
-		pdb := pd.KeyData // pd.Bytes()
-		q := crypto.Hash(pdb).Data
+		fmt.Printf("   dzprv = %s\n", hex.EncodeToString(dzprv.Bytes()[32:]))
+		d1 := dzprv.Bytes()[32:]
+		if !bytes.Equal(d1, tc.Dzprv) {
+			t.Log("dzprv mismatch")
+			t.Fail()
+
+		}
+		dzpub, _, err := zkey.Derive(tc.Label, blocks.GNSContext)
+		if err != nil {
+			t.Log("Failed dzpub: " + err.Error())
+			t.Fail()
+		}
+		fmt.Printf("   dzpub = %s\n", hex.EncodeToString(dzpub.KeyData))
+		if !bytes.Equal(dzpub.KeyData, tc.Dzpub) {
+			t.Log("dzpub mismatch")
+			t.Fail()
+			continue
+		}
+
+		// double-check and verify derivation
+		if !dzpub.Equal(dzprv.Public()) {
+			t.Log("bad derived key")
+			t.Fail()
+			continue
+		}
+
+		// compute storage key 'q'
+		q := crypto.Hash(dzpub.KeyData).Data
 		fmt.Printf("   Q = %s\n", hex.EncodeToString(q))
 		if !bytes.Equal(q, tc.Q) {
 			fmt.Printf("    != %s\n", hex.EncodeToString(tc.Q))
-			fmt.Printf("   pd = %s\n", hex.EncodeToString(pdb))
+			fmt.Printf("   pd = %s\n", hex.EncodeToString(dzpub.KeyData))
 			t.Log("Failed: storage key mismatch")
 			t.Fail()
 		}
@@ -233,8 +261,11 @@ func TestRecordsRFC(t *testing.T) {
 		blk := blocks.NewGNSBlock().(*blocks.GNSBlock)
 		blk.Prepare(enums.BLOCK_TYPE_GNS_NAMERECORD, expires)
 		blk.SetData(bdata)
-		dsk, _, _ := zprv.Derive(tc.Label, "gns")
-		blk.Sign(dsk)
+
+		// sign the block
+		blk.Sign(dzprv)
+
+		// check resulting RRBLOCK
 		rrblock := blk.RRBLOCK()
 		if !bytes.Equal(rrblock, tc.RRblock) {
 			fmt.Printf("rrblock = %s\n", hex.EncodeToString(rrblock))
@@ -242,13 +273,76 @@ func TestRecordsRFC(t *testing.T) {
 			t.Log("RRblock mismatch")
 
 			// PKEY/ECDSA signatures are currently not identical with
-			// GNUnet produced signature, so ignore any failures.
+			// GNUnet produced signatures, so ignore any failures.
 			if ztype != enums.GNS_TYPE_PKEY {
 				t.Fail()
 			}
+
+			// check signatures
+			if ok, err := blk.Verify(); !ok || err != nil {
+				t.Fatal("FAILED: sig")
+			}
+			sd := blk.DerivedKeySig.Signature
+			r := math.NewIntFromBytes(sd[:32])
+			s := math.NewIntFromBytes(sd[32:])
+			fmt.Printf("*** r = %s\n", hex.EncodeToString(r.Bytes()))
+			fmt.Printf("*** s = %s\n", hex.EncodeToString(s.Bytes()))
+
+			BLK := blocks.NewGNSBlock().(*blocks.GNSBlock)
+			BLK.Prepare(enums.BLOCK_TYPE_GNS_NAMERECORD, expires)
+			BLK.SetData(bdata)
+			BLK.DerivedKeySig, err = crypto.NewZoneSignature(tc.RRblock[4:104])
+			SD := BLK.DerivedKeySig.Signature
+			R := math.NewIntFromBytes(SD[:32])
+			S := math.NewIntFromBytes(SD[32:])
+			fmt.Printf("*** R = %s\n", hex.EncodeToString(R.Bytes()))
+			fmt.Printf("*** S = %s\n", hex.EncodeToString(S.Bytes()))
+
+			if ok, err := BLK.Verify(); !ok || err != nil {
+				t.Fatal("FAILED: SIG")
+			}
+
 			continue
 		}
 		fmt.Println("   ----- passed -----")
+	}
+}
+
+func TestSigGcrypt(t *testing.T) {
+	tc := tests[0]
+
+	// Zonekey type
+	var ztype enums.GNSType
+	rdInt(tc.Zid, &ztype)
+	fmt.Printf("   ztype = %08x (%d)\n", uint32(ztype), ztype)
+
+	// generate private zone key
+	zprv, err := crypto.NewZonePrivate(ztype, tc.Zprv)
+	if err != nil {
+		t.Fatal("Failed: " + err.Error())
+	}
+	fmt.Printf("   zprv = %s\n", hex.EncodeToString(zprv.Bytes()))
+
+	// generate signature
+	tsig, _ := zprv.Sign([]byte("sample"))
+
+	// test result
+	R := []byte{
+		0x03, 0xfb, 0xaf, 0xa1, 0x40, 0xd0, 0x11, 0x12, 0x45, 0xa1, 0xa7, 0x38, 0x45, 0x77, 0x81, 0x66,
+		0x4c, 0x73, 0x7f, 0x97, 0x4d, 0x53, 0x6a, 0x17, 0xf7, 0xc4, 0x9a, 0x19, 0xa4, 0x01, 0xaf, 0xd7,
+	}
+	S := []byte{
+		0x0c, 0x42, 0xe7, 0xde, 0xbe, 0xa9, 0xeb, 0x5c, 0x9f, 0x4a, 0x30, 0xb8, 0x23, 0x22, 0xa9, 0xb2,
+		0xdf, 0x37, 0x0a, 0x7d, 0xe6, 0xea, 0xa7, 0x17, 0x1c, 0x90, 0xba, 0xa1, 0x0e, 0x6e, 0x15, 0x29,
+	}
+	buf := tsig.Bytes()
+	t.Log("r = " + hex.EncodeToString(buf[:32]))
+	t.Log("s = " + hex.EncodeToString(buf[32:]))
+	if !bytes.Equal(buf[:32], R) {
+		t.Fatal("Failed: R mismatch")
+	}
+	if !bytes.Equal(buf[32:], S) {
+		t.Fatal("Failed: S mismatch")
 	}
 }
 
