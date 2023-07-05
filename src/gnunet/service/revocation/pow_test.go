@@ -11,17 +11,22 @@ import (
 	"github.com/bfix/gospel/data"
 )
 
+// give more output in test run
+var verbose = false
+
 // Test revocation with test vector defined in the RFC draft.
 func TestRevocationRFC(t *testing.T) {
 	type tc struct {
 		D     string
 		Zkey  string
+		Sdata string
 		Proof string
 	}
 	var trev = []*tc{
 		{
 			"6fea32c05af58bfa979553d188605fd57d8bf9cc263b78d5f7478c07b998ed70",
 			"000100002ca223e879ecc4bbdeb5da17319281d63b2e3b6955f1c3775c804a98d5f8ddaa",
+			"00000034000000030005feb46d865c1c000100002ca223e879ecc4bbdeb5da17319281d63b2e3b6955f1c3775c804a98d5f8ddaa",
 			"0005feb46d865c1c" +
 				"0000395d1827c000" +
 				"e66a570bccd4b393" +
@@ -63,6 +68,7 @@ func TestRevocationRFC(t *testing.T) {
 		{
 			"5af7020ee19160328832352bbc6a68a8d71a7cbe1b929969a7c66d415a0d8f65",
 			"000100143cf4b924032022f0dc50581453b85d93b047b63d446c5845cb48445ddb96688f",
+			"00000034000000030005ff30b08e9e10000100143cf4b924032022f0dc50581453b85d93b047b63d446c5845cb48445ddb96688f",
 			"0005ff30b08e9e10" +
 				"0000395d1827c000" +
 				"8802bc0f10057911" +
@@ -103,7 +109,9 @@ func TestRevocationRFC(t *testing.T) {
 		},
 	}
 
-	for _, tc := range trev {
+	for i, tc := range trev {
+		t.Logf("Testcase #%d:\n", i+1)
+
 		// decode zone key
 		zkey, err := hex.DecodeString(tc.Zkey)
 		if err != nil {
@@ -127,9 +135,9 @@ func TestRevocationRFC(t *testing.T) {
 
 		// check for correct public key
 		if !bytes.Equal(zk.Bytes(), zkey) {
-			t.Logf("zkey = %s\n", hex.EncodeToString(zk.Bytes()))
-			t.Logf("ZKEY = %s\n", hex.EncodeToString(zkey))
-			t.Fatal("Private/Public key mismatch")
+			t.Logf("  zkey = %s\n", hex.EncodeToString(zk.Bytes()))
+			t.Logf("  ZKEY = %s\n", tc.Zkey)
+			t.Fatal("Failed: Private/Public key mismatch")
 		}
 
 		// assemble revocation data object
@@ -146,13 +154,13 @@ func TestRevocationRFC(t *testing.T) {
 		}
 		// check sigature
 		if !bytes.Equal(revData.ZoneKeySig.ZoneKey.Bytes(), zkey) {
-			t.Logf("zkey  = %s\n", hex.EncodeToString(revData.ZoneKeySig.Bytes()))
-			t.Logf("ZKEY  = %s\n", hex.EncodeToString(zkey))
-			t.Fatal("Wrong zone key in test revocation")
+			t.Logf("  zkey  = %s\n", hex.EncodeToString(revData.ZoneKeySig.Bytes()))
+			t.Logf("  ZKEY  = %s\n", tc.Zkey)
+			t.Fatal("Failed: Wrong zone key in test revocation")
 		}
 		// show revdata content
-		if testing.Verbose() {
-			t.Log("REVDATA:")
+		if verbose {
+			t.Log("  REVDATA:")
 			t.Logf("    Timestamp: %s\n", revData.Timestamp.String())
 			t.Logf("    TTL: %s\n", revData.TTL.String())
 
@@ -184,8 +192,16 @@ func TestRevocationRFC(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if testing.Verbose() {
-			t.Logf("SigData = %s\n", hex.EncodeToString(sigData))
+
+		// check sigdata
+		sdata, err := hex.DecodeString(tc.Sdata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(sigData, sdata) {
+			t.Logf("  SigData = %s\n", hex.EncodeToString(sigData))
+			t.Logf("         != %s\n", tc.Sdata)
+			t.Fatal("Failed: signed data mismatch")
 		}
 
 		// sign data
@@ -193,15 +209,16 @@ func TestRevocationRFC(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if testing.Verbose() {
-			t.Logf("Signature = %s\n", hex.EncodeToString(sigOut.Signature))
-			t.Logf("         ?= %s\n", hex.EncodeToString(revData.ZoneKeySig.Signature))
+		if !bytes.Equal(sigOut.Signature, revData.ZoneKeySig.Signature) {
+			t.Logf("  Signature = %s\n", hex.EncodeToString(sigOut.Signature))
+			t.Logf("           != %s\n", hex.EncodeToString(revData.ZoneKeySig.Signature))
+			t.Fatal("Failed: signature mismatch")
 		}
 
 		// verify revocation data object
 		diff, rc := revData.Verify(true)
 		if testing.Verbose() {
-			t.Logf("Average difficulty of PoWs = %f\n", diff)
+			t.Logf("  Average difficulty of PoWs = %f\n", diff)
 		}
 		if rc != 0 {
 			t.Fatalf("REV_Verify (pkey): %d\n", rc)
