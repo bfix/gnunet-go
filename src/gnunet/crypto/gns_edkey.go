@@ -80,7 +80,7 @@ func (pk *EDKEYPublicImpl) Bytes() []byte {
 // (key blinding). Returns the derived key and the blinding value.
 func (pk *EDKEYPublicImpl) Derive(h *math.Int) (dPk ZoneKeyImpl, hOut *math.Int, err error) {
 	// limit to allowed value range (see LSD0001 spec, 5.1.2.)
-	hOut = h.SetBit(255, 0)
+	hOut = h.Mod(ed25519.GetCurve().N)
 	derived := pk.pub.Mult(hOut)
 	dPk = &EDKEYPublicImpl{
 		pk.ztype,
@@ -208,7 +208,7 @@ func (pk *EDKEYPrivateImpl) Public() ZoneKeyImpl {
 // (key blinding). Returns the derived key and the blinding value.
 func (pk *EDKEYPrivateImpl) Derive(h *math.Int) (dPk ZonePrivateImpl, hOut *math.Int, err error) {
 	// limit to allowed value range (see LSD0001 spec 5.1.2)
-	hOut = h.SetBit(255, 0)
+	hOut = h.Mod(ed25519.GetCurve().N)
 	// derive private key
 	derived := pk.prv.Mult(hOut)
 	// derive nonce

@@ -22,7 +22,11 @@ import (
 	"bytes"
 	"encoding/hex"
 	"gnunet/enums"
+	"gnunet/util"
 	"testing"
+
+	"github.com/bfix/gospel/crypto/ed25519"
+	"github.com/bfix/gospel/math"
 )
 
 func TestEdKeyCreate(t *testing.T) {
@@ -57,4 +61,43 @@ func TestDeriveEDKEY(t *testing.T) {
 		t.Logf("dzk = %s", hex.EncodeToString(dzk.Bytes()))
 		t.Fatal("derive mismatch")
 	}
+}
+
+// test 'DerivedSign' from LSD0001, 5.1.2. EDKEY
+func TestDerivedSign(t *testing.T) {
+
+	good, bad := 0, 0
+	for i := 0; i < 100; i++ {
+		// generate clamped private scalar and keys (EdDSA)
+		a := util.NewRndArray(32)
+		a[31] &= 248
+		a[0] &= 127
+		a[0] |= 64
+		d := math.NewIntFromBytes(util.Reverse(a))
+		zp := ed25519.NewPrivateKeyFromD(d)
+		zk := zp.Public()
+
+		// calculate blinding factor
+		h := math.NewIntRnd(ed25519N)
+
+		// derive keys
+		dzp := zp.Mult(h)
+		dzk := zk.Mult(h)
+		if !dzk.Q.Equals(dzp.Public().Q) {
+			t.Fatal("derive")
+		}
+
+		// per draft:
+		a1 := d.Rsh(3)
+		a2 := h.Mul(a1).Mod(ed25519N)
+		dd := a2.Lsh(3)
+		dzp2 := ed25519.NewPrivateKeyFromD(dd)
+		dzk2 := dzp2.Public()
+		if dzk.Q.Equals(dzk2.Q) {
+			good++
+		} else {
+			bad++
+		}
+	}
+	t.Logf("Good=%d, Bad=%d\n", good, bad)
 }
