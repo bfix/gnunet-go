@@ -66,14 +66,13 @@ func TestDeriveEDKEY(t *testing.T) {
 // test 'DerivedSign' from LSD0001, 5.1.2. EDKEY
 func TestDerivedSign(t *testing.T) {
 
-	good, bad := 0, 0
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 20; i++ {
 		// generate clamped private scalar and keys (EdDSA)
 		a := util.NewRndArray(32)
 		a[31] &= 248
 		a[0] &= 127
 		a[0] |= 64
-		d := math.NewIntFromBytes(util.Reverse(a))
+		d := math.NewIntFromBytes(a)
 		zp := ed25519.NewPrivateKeyFromD(d)
 		zk := zp.Public()
 
@@ -93,11 +92,8 @@ func TestDerivedSign(t *testing.T) {
 		dd := a2.Lsh(3)
 		dzp2 := ed25519.NewPrivateKeyFromD(dd)
 		dzk2 := dzp2.Public()
-		if dzk.Q.Equals(dzk2.Q) {
-			good++
-		} else {
-			bad++
+		if !dzk.Q.Equals(dzk2.Q) {
+			t.Fatal("mismatch")
 		}
 	}
-	t.Logf("Good=%d, Bad=%d\n", good, bad)
 }
