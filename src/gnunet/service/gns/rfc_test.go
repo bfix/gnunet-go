@@ -225,7 +225,7 @@ func TestRecordsRFC(t *testing.T) {
 		if !bytes.Equal(skey[:32], tc.Enc.Key) {
 			fmt.Printf("key = %s\n", hex.EncodeToString(skey[:32]))
 			fmt.Printf("KEY = %s\n", hex.EncodeToString(tc.Enc.Key))
-			t.Log("NONCE mismatch")
+			t.Log("KEY mismatch")
 			t.Fail()
 			continue
 		}
