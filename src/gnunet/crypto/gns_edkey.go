@@ -1,5 +1,5 @@
 // This file is part of gnunet-go, a GNUnet-implementation in Golang.
-// Copyright (C) 2019-2022 Bernd Fix  >Y<
+// Copyright (C) 2019-2023 Bernd Fix  >Y<
 //
 // gnunet-go is free software: you can redistribute it and/or modify it
 // under the terms of the GNU Affero General Public License as published
@@ -53,17 +53,17 @@ func init() {
 }
 
 //----------------------------------------------------------------------
-// Private key
+// Public key
 //----------------------------------------------------------------------
 
-// EDKEYPublicImpl implements the public key scheme.
+// EDKEYPublicImpl implements the EDKEY public key scheme.
 type EDKEYPublicImpl struct {
 	ztype enums.GNSType
 	pub   *ed25519.PublicKey
 }
 
-// Init instance from binary data. The data represents a big integer
-// (in big-endian notation) for the private scalar d.
+// Init instance from binary data. The data represents a binary
+// representation of a curve point (as defined in RFC 8032).
 func (pk *EDKEYPublicImpl) Init(data []byte) error {
 	pk.ztype = ZONE_EDKEY
 	pk.pub = ed25519.NewPublicKeyFromBytes(data)
@@ -79,7 +79,7 @@ func (pk *EDKEYPublicImpl) Bytes() []byte {
 // Derive a public key from this key based on a big integer
 // (key blinding). Returns the derived key and the blinding value.
 func (pk *EDKEYPublicImpl) Derive(h *math.Int) (dPk ZoneKeyImpl, hOut *math.Int, err error) {
-	// limit to allowed value range (see LSD0001 spec)
+	// limit to allowed value range (see LSD0001 spec, 5.1.2.)
 	hOut = h.SetBit(255, 0)
 	derived := pk.pub.Mult(hOut)
 	dPk = &EDKEYPublicImpl{
@@ -178,8 +178,8 @@ type EDKEYPrivateImpl struct {
 	prv  *ed25519.PrivateKey // private key
 }
 
-// Init instance from binary data. The data represents a big integer
-// (in big-endian notation) for the private scalar d.
+// Init instance from binary data. The data represents the seed
+// used to generate the private scalar and nonce (see RFC 8032).
 func (pk *EDKEYPrivateImpl) Init(data []byte) error {
 	pk.seed = util.Clone(data)
 	pk.prv = ed25519.NewPrivateKeyFromSeed(data)
