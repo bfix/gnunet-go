@@ -209,8 +209,13 @@ func (pk *EDKEYPrivateImpl) Public() ZoneKeyImpl {
 func (pk *EDKEYPrivateImpl) Derive(h *math.Int) (dPk ZonePrivateImpl, hOut *math.Int, err error) {
 	// limit to allowed value range (see LSD0001 spec 5.1.2)
 	hOut = h.Mod(ed25519.GetCurve().N)
+
 	// derive private key
-	derived := pk.prv.Mult(hOut)
+	a1 := pk.prv.D.Rsh(3)
+	a2 := h.Mul(a1).Mod(ed25519.GetCurve().N)
+	dd := a2.Lsh(3)
+	derived := ed25519.NewPrivateKeyFromD(dd)
+
 	// derive nonce
 	md := sha256.Sum256(append(pk.prv.Nonce, h.Bytes()...))
 	derived.Nonce = md[:]
